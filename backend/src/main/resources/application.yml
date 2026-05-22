@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: meigei-api
+  datasource:
+    # stringtype=unspecified 让 String 参数能隐式转 jsonb / text 枚举列
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/meigei?stringtype=unspecified}
+    username: ${DB_USER:meigei}
+    password: ${DB_PASSWORD:meigei}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+mybatis-plus:
+  # 注册 UUID <-> pg uuid 列的 TypeHandler（修复 javaType=UUID 无处理器）
+  type-handlers-package: com.meigei.common.type
+  global-config:
+    db-config:
+      id-type: input
+      # 时间戳软删除：未删除 = deleted_at IS NULL；删除时写入 now()
+      logic-delete-field: deletedAt
+      logic-not-delete-value: "null"
+      logic-delete-value: "now()"
+  configuration:
+    map-underscore-to-camel-case: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENV:local}
+  traces-sample-rate: 0.1
+  send-default-pii: false
+
+app:
+  dev:
+    # 本地联调用的免 Apple 造 token 端点；默认关闭，生产勿开
+    token-enabled: ${APP_DEV_TOKEN:false}
+  apple:
+    # Sign in with Apple 的 client_id / service_id（aud 校验）
+    audiences: ${APPLE_AUDIENCES:com.meigei.app}
+    issuer: https://appleid.apple.com
+    jwks-uri: https://appleid.apple.com/auth/keys
+  jwt:
+    # 生产环境必须用 fly secrets 覆盖；HS256 要求 >= 32 字节
+    secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+    ttl-days: 90
+  apns:
+    # 留空则推送为 no-op（无凭据时安全跳过）
+    key-path: ${APNS_KEY_PATH:}
+    key-id: ${APNS_KEY_ID:}
+    team-id: ${APNS_TEAM_ID:}
+    topic: ${APNS_TOPIC:com.meigei.app}
+    production: ${APNS_PRODUCTION:false}
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true

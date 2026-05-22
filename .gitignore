@@ -1,0 +1,6 @@
+# macOS
+.DS_Store
+
+# Xcode 用户态（个人界面状态/断点，不应入库）
+**/xcuserdata/
+*.xcuserstate

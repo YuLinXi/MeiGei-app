@@ -1,0 +1,31 @@
+# Fly.io 部署配置。首次部署：fly launch --no-deploy 后 fly deploy
+# 机密（DB_*、SENTRY_DSN、Apple 私钥等）用 `fly secrets set KEY=...` 注入，勿写入本文件。
+app = "meigei-api"
+primary_region = "nrt"  # 东京，离国内近
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  SENTRY_ENV = "production"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # 不休眠：保持至少 1 台常驻，避免冷启动（Java/Spring 冷启慢）
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.checks]
+    [http_service.checks.health]
+      method = "get"
+      path = "/actuator/health"
+      interval = "15s"
+      timeout = "3s"
+      grace_period = "30s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

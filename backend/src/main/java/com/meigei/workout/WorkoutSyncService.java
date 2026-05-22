@@ -1,0 +1,122 @@
+package com.meigei.workout;
+
+import com.meigei.sync.dto.SyncConflict;
+import com.meigei.sync.dto.SyncPullResult;
+import com.meigei.sync.dto.SyncPushResult;
+import com.meigei.workout.dto.WorkoutTree;
+import com.meigei.workout.entity.Workout;
+import com.meigei.workout.entity.WorkoutExercise;
+import com.meigei.workout.entity.WorkoutSet;
+import com.meigei.workout.mapper.WorkoutExerciseMapper;
+import com.meigei.workout.mapper.WorkoutMapper;
+import com.meigei.workout.mapper.WorkoutSetMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * 训练记录聚合根同步：LWW 作用于聚合根 workout 的 updatedAt；
+ * 子树（动作/组）无独立信封，随聚合整体上传，服务端按 workoutId 全量替换。
+ * 不复用 AbstractSyncService，因同步单元是嵌套树而非单实体。
+ */
+@Service
+public class WorkoutSyncService {
+
+    private final WorkoutMapper workoutMapper;
+    private final WorkoutExerciseMapper exerciseMapper;
+    private final WorkoutSetMapper setMapper;
+
+    public WorkoutSyncService(WorkoutMapper workoutMapper,
+                              WorkoutExerciseMapper exerciseMapper,
+                              WorkoutSetMapper setMapper) {
+        this.workoutMapper = workoutMapper;
+        this.exerciseMapper = exerciseMapper;
+        this.setMapper = setMapper;
+    }
+
+    /** 增量下拉：含软删墓碑（墓碑项 exercises 为空，让其他设备删除本地）。 */
+    public SyncPullResult<WorkoutTree> pull(UUID userId, OffsetDateTime since) {
+        List<Workout> changes = workoutMapper.findChangesSince(userId, since);
+        List<WorkoutTree> trees = new ArrayList<>(changes.size());
+        for (Workout w : changes) {
+            trees.add(w.getDeletedAt() != null
+                    ? new WorkoutTree(w, List.of())
+                    : loadTree(w));
+        }
+        return new SyncPullResult<>(trees, OffsetDateTime.now());
+    }
+
+    /** 批量上传 + LWW + 子树全量替换。 */
+    @Transactional
+    public SyncPushResult<WorkoutTree> push(UUID userId, List<WorkoutTree> incoming) {
+        List<UUID> applied = new ArrayList<>();
+        List<SyncConflict<WorkoutTree>> conflicts = new ArrayList<>();
+
+        for (WorkoutTree item : incoming) {
+            Workout workout = item.workout();
+            workout.setUserId(userId); // 强制归属，忽略客户端伪造
+            Workout server = workoutMapper.findByIdIncludingDeleted(workout.getId());
+
+            if (server == null) {
+                workoutMapper.insert(workout);
+                replaceChildren(userId, workout.getId(), item.exercises());
+                applied.add(workout.getId());
+                continue;
+            }
+
+            boolean incomingWins = !server.getUpdatedAt().isAfter(workout.getUpdatedAt());
+            if (!incomingWins) {
+                conflicts.add(new SyncConflict<>(workout.getId(), loadTree(server)));
+                continue;
+            }
+
+            if (workout.getDeletedAt() != null) {
+                // 墓碑：写软删字段（updateById 写不动 @TableLogic）并清掉子树
+                workoutMapper.softDelete(workout.getId(), workout.getDeletedAt(),
+                        workout.getUpdatedAt(), server.getVersion() + 1);
+                exerciseMapper.deleteByWorkout(workout.getId());
+            } else {
+                workout.setVersion(server.getVersion()); // 通过乐观锁校验
+                workoutMapper.updateById(workout);
+                replaceChildren(userId, workout.getId(), item.exercises());
+            }
+            applied.add(workout.getId());
+        }
+
+        return new SyncPushResult<>(applied, conflicts, OffsetDateTime.now());
+    }
+
+    private WorkoutTree loadTree(Workout w) {
+        List<WorkoutExercise> exercises = exerciseMapper.findByWorkout(w.getId());
+        List<WorkoutTree.ExerciseNode> nodes = new ArrayList<>(exercises.size());
+        for (WorkoutExercise e : exercises) {
+            nodes.add(new WorkoutTree.ExerciseNode(e, setMapper.findByExercise(e.getId())));
+        }
+        return new WorkoutTree(w, nodes);
+    }
+
+    /** 删旧子树（动作删除级联删组）后按上传内容重建。 */
+    private void replaceChildren(UUID userId, UUID workoutId, List<WorkoutTree.ExerciseNode> nodes) {
+        exerciseMapper.deleteByWorkout(workoutId);
+        if (nodes == null) {
+            return;
+        }
+        for (WorkoutTree.ExerciseNode node : nodes) {
+            WorkoutExercise e = node.exercise();
+            e.setWorkoutId(workoutId);
+            e.setUserId(userId);
+            exerciseMapper.insert(e);
+            if (node.sets() == null) {
+                continue;
+            }
+            for (WorkoutSet s : node.sets()) {
+                s.setWorkoutExerciseId(e.getId());
+                setMapper.insert(s);
+            }
+        }
+    }
+}

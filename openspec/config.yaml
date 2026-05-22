@@ -1,0 +1,48 @@
+schema: spec-driven
+
+context: |
+  产品：MeiGei，一款 iOS 原生健身 App。定位「严肃健身工具」，
+  目标用户「认真训练 + 严肃饮食 + 有小圈子的健身爱好者」，不做泛大众 fitness 社交。
+  开发规模：1-2 人小团队 / 独立开发，MVP 阶段。
+
+  三大核心模块：
+  1. 训练记录（最核心）：150-200 内置动作（无动图，部位高亮图）；单次训练模板；
+     重量×次数×组数+备注+组间休息计时器；训练日历+单动作历史曲线+PR 自动识别；
+     HealthKit 写入 + Live Activity 锁屏倒计时（含配对 Watch Smart Stack 呈现 + App Intent 按钮）。
+  2. 饮食记录：内置《中国食物成分表》~1500 条权威食材（离线 sqlite）+ 用户自定义（标"个人"，云同步）；
+     7 项营养素（热量/蛋白/碳水/脂肪/纤维/糖/钠）；录入=搜索+复制昨天+自定义补充；
+     引导式每日营养目标(Mifflin-St Jeor)+手动微调。不做 LLM/拍照识别/成品菜库。
+  3. Team 共享：邀请码私密小空间（≤10人/空间，用户≤3空间）；Owner(业余教练)+Member 两角色；
+     训练计划模板可被成员 Fork（独立副本）；训练即打卡、Team 内训练数据全员可见、
+     4 个 emoji 表情回应、外部分享海报。
+
+  技术栈（终稿，经 Codex 二审）：
+  - iOS（最低 iOS 17.4+）：Swift 5.10 + SwiftUI；SwiftData（仅本地层，禁止开 CloudKit 自动同步，云同步自写）；
+    Swift Charts；ActivityKit（Live Activity，Watch 靠此呈现，不写独立 WatchKit app）；HealthKit；Apple Sign-In。
+  - 后端：Java 21 + Spring Boot 3.3（纯 Java）；Gradle (Kotlin DSL)；MyBatis-Plus 3.5 + PostgreSQL 16 + Flyway；
+    Spring Security + Apple Sign-In 服务端校验（nimbus-jose-jwt）；Pushy（APNs）；Lombok + MapStruct + SpringDoc OpenAPI。
+    不用 WebSocket，实时改 APNs 推送 + 进页面拉取（轮询/SSE）。
+  - 仅 Apple Sign-In 登录。海报前端生成（后端只给结构化数据）。
+    训练计划用 PostgreSQL jsonb 存储（动作项需稳定 itemId）、实际训练记录用规范化多表。
+  - 基础设施：Docker；部署 Fly.io/Railway/国内云；Spring Actuator + Sentry；Cloudflare。
+
+  数据模型 Day-1 铁律（所有设计必须遵守）：
+  1. 身份三层：user + identity_provider + provider_user_id，绝不拿 Apple ID 当业务主键。
+  2. 所有写接口加幂等键（idempotency key），防弱网重复提交。
+  3. 所有同步对象带 serverId / localId / updatedAt / deletedAt / version 字段。
+  4. 冲突策略：last-write-wins + 人工提示，不做复杂 merge。
+  5. 统计（PR/曲线/营养汇总）能重算就重算，少存冗余结果。
+  6. jsonb 计划里每个动作项必须有稳定 itemId。
+  7. 离线优先：本地先写 + syncStatus + 重试队列。
+
+# Per-artifact rules (optional)
+rules:
+  proposal:
+    - 必须包含 Non-goals（明确 MVP 不做什么）章节
+    - 用中文撰写
+  design:
+    - 用中文撰写
+    - 数据模型设计必须体现 Day-1 铁律（身份三层、幂等键、同步字段、软删除）
+  tasks:
+    - 用中文撰写
+    - 按模块分组，标注 iOS 端 / 后端 / 基础设施
