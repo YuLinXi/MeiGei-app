@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # MeiGei 后端本地一键启动脚本
-# 用法：./scripts/dev-start.sh
+# 用法：./scripts/dev-start.sh   （不要用 sh ./scripts/dev-start.sh）
 #   - 自动检测并启动 PostgreSQL 16（已运行则跳过）
 #   - 设置 JDK 21
 #   - 注入 APP_DEV_TOKEN=true 便于本机免 Apple 登录
 #   - 前台运行 bootRun，Ctrl+C 仅停后端，PG 保持运行（要全停用 dev-stop.sh）
+
+# 防御：若被 sh / dash 误调用（无 BASH_VERSION），自动用 bash 重启自身
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec bash "$0" "$@"
+fi
 
 set -euo pipefail
 
@@ -40,7 +45,7 @@ info "JAVA_HOME = $JAVA_HOME"
 
 # ---- 2. 校验 gradlew ----
 if [ ! -x "./gradlew" ]; then
-  error "未找到可执行的 ./gradlew（当前目录：$BACKEND_DIR）"
+  error "未找到可执行的 ./gradlew（当前目录：${BACKEND_DIR}）"
   exit 1
 fi
 
@@ -53,7 +58,7 @@ fi
 if "$PG_BIN" -D "$PG_DATA" status > /dev/null 2>&1; then
   info "PostgreSQL 16 已在运行"
 else
-  info "启动 PostgreSQL 16（日志：$PG_LOG）..."
+  info "启动 PostgreSQL 16（日志：${PG_LOG}）..."
   "$PG_BIN" -D "$PG_DATA" -l "$PG_LOG" start
 fi
 # 等待端口可连
@@ -74,7 +79,7 @@ if lsof -ti:"$APP_PORT" > /dev/null 2>&1; then
 fi
 
 # ---- 5. 启动 Spring Boot ----
-info "启动 Spring Boot（端口 $APP_PORT，APP_DEV_TOKEN=true）"
+info "启动 Spring Boot（端口 ${APP_PORT}，APP_DEV_TOKEN=true）"
 info "就绪后可访问："
 info "  - Swagger UI:  http://localhost:$APP_PORT/swagger-ui.html"
 info "  - Health:      http://localhost:$APP_PORT/actuator/health"
