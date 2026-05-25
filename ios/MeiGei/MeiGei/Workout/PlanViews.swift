@@ -16,13 +16,16 @@ struct PlanListView: View {
             ForEach(plans) { plan in
                 NavigationLink(value: plan) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(plan.name)
-                        Text("\(plan.items.count) 个动作").font(.caption).foregroundStyle(.secondary)
+                        Text(plan.name).foregroundStyle(Theme.Color.fg)
+                        Text("\(plan.items.count) 个动作").font(.caption).foregroundStyle(Theme.Color.fg2)
                     }
                 }
+                .listRowBackground(Theme.Color.surface)
             }
             .onDelete(perform: delete)
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.Color.bg)
         .navigationTitle("训练计划")
         .overlay { if plans.isEmpty { ContentUnavailableView("还没有计划", systemImage: "list.bullet.rectangle", description: Text("点右上角 + 新建一个训练计划模板")) } }
         .toolbar {

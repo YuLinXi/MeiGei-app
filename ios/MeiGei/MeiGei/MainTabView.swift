@@ -1,7 +1,28 @@
 import SwiftUI
+import UIKit
 
 /// 主界面 Tab。当前含训练三件套 + 我的；饮食/Team 在后续任务补 tab。
 struct MainTabView: View {
+    init() {
+        // 7.1 Tab bar 黑底配置：避免亮色穿透。
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(named: "bg") ?? .black
+        appearance.shadowColor = UIColor(named: "border") ?? .darkGray
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+
+        // 7.2 Navigation bar 黑底 + dark color scheme。
+        let navAppearance = UINavigationBarAppearance()
+        navAppearance.configureWithOpaqueBackground()
+        navAppearance.backgroundColor = UIColor(named: "bg") ?? .black
+        navAppearance.titleTextAttributes = [.foregroundColor: UIColor(named: "fg") ?? .white]
+        navAppearance.largeTitleTextAttributes = [.foregroundColor: UIColor(named: "fg") ?? .white]
+        UINavigationBar.appearance().standardAppearance = navAppearance
+        UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
+        UINavigationBar.appearance().compactAppearance = navAppearance
+    }
+
     var body: some View {
         TabView {
             NavigationStack { WorkoutListView() }
@@ -17,6 +38,9 @@ struct MainTabView: View {
             NavigationStack { SettingsView() }
                 .tabItem { Label("我的", systemImage: "person.circle") }
         }
+        .tint(Theme.Color.accentCyan)
+        .toolbarBackground(Theme.Color.bg, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
     }
 }
 
@@ -24,6 +48,15 @@ struct MainTabView: View {
 struct SettingsView: View {
     @Environment(SessionStore.self) private var session
     @Environment(SyncEngine.self) private var syncEngine
+
+    @State private var versionTapCount = 0
+    @State private var showDesignSystem = false
+
+    private var appVersion: String {
+        let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let b = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+        return "\(v) (\(b))"
+    }
 
     var body: some View {
         List {
@@ -35,10 +68,32 @@ struct SettingsView: View {
                 Button("立即同步") { Task { await syncEngine.syncAll() } }
                     .disabled(syncEngine.isSyncing)
             }
+            Section("关于") {
+                LabeledContent("版本", value: appVersion)
+                    .contentShape(Rectangle())
+                    .onTapGesture { handleVersionTap() }
+            }
             Section {
                 Button("退出登录", role: .destructive) { session.logout() }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.Color.bg)
         .navigationTitle("我的")
+        #if DEBUG
+        .navigationDestination(isPresented: $showDesignSystem) {
+            DesignSystemPreviewView()
+        }
+        #endif
+    }
+
+    private func handleVersionTap() {
+        #if DEBUG
+        versionTapCount += 1
+        if versionTapCount >= 5 {
+            versionTapCount = 0
+            showDesignSystem = true
+        }
+        #endif
     }
 }

@@ -14,12 +14,15 @@ struct TeamListView: View {
             ForEach(teamService.teams) { team in
                 NavigationLink(value: team) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(team.name)
-                        Text("邀请码 \(team.inviteCode)").font(.caption).foregroundStyle(.secondary)
+                        Text(team.name).foregroundStyle(Theme.Color.fg)
+                        Text("邀请码 \(team.inviteCode)").font(.caption).foregroundStyle(Theme.Color.fg2)
                     }
                 }
+                .listRowBackground(Theme.Color.surface)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.Color.bg)
         .navigationTitle("Team")
         .overlay {
             if teamService.teams.isEmpty {

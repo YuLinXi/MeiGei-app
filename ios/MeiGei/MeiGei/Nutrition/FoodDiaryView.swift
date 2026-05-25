@@ -38,6 +38,8 @@ struct FoodDiaryView: View {
                 mealSection(meal)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.Color.bg)
         .navigationTitle("饮食")
         .sheet(item: $pickerMeal) { meal in
             FoodSearchView { pick, grams in

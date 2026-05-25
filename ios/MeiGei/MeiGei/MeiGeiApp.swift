@@ -19,6 +19,7 @@ struct MeiGeiApp: App {
         _session = State(initialValue: session)
         _syncEngine = State(initialValue: SyncEngine(modelContext: container.mainContext))
         PushManager.shared.isLoggedIn = { session.isLoggedIn }
+        Theme.Font.verifyOrFallback()
     }
 
     var body: some Scene {
@@ -29,6 +30,7 @@ struct MeiGeiApp: App {
                 .environment(teamService)
                 .environment(restTimer)
                 .environment(healthKit)
+                .preferredColorScheme(.dark)
                 .task(id: session.isLoggedIn) {
                     if session.isLoggedIn { await healthKit.requestAuthorization() }
                 }

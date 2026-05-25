@@ -23,6 +23,8 @@ final class RestTimerController {
 
     /// 本次休息结束时刻；nil 表示当前无计时。
     private(set) var endDate: Date?
+    /// 本次休息原始总时长（秒），用于 RestTimerSheet 圆环进度比例。
+    private(set) var totalDuration: TimeInterval = 0
     /// 关联的下一个动作名，用于计时条与结束提醒文案（也是 3.8 Live Activity 的数据来源）。
     private(set) var contextLabel: String?
     /// 前台 ticker 写入，仅用于驱动 SwiftUI 每秒刷新。
@@ -53,6 +55,7 @@ final class RestTimerController {
         let secs = duration ?? defaultDuration
         let end = Date.now.addingTimeInterval(secs)
         endDate = end
+        totalDuration = secs
         contextLabel = label
         scheduleNotification(after: secs)
         startTicker()
@@ -79,6 +82,7 @@ final class RestTimerController {
         ticker?.invalidate()
         ticker = nil
         endDate = nil
+        totalDuration = 0
         contextLabel = nil
         endActivity()
     }

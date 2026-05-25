@@ -4,3 +4,6 @@
 # Xcode 用户态（个人界面状态/断点，不应入库）
 **/xcuserdata/
 *.xcuserstate
+
+# Node 依赖（scripts/ 下色板生成工具用，体积大且可重建）
+**/node_modules/
