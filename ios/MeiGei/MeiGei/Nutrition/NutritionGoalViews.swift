@@ -20,6 +20,7 @@ struct NutritionOnboardingView: View {
 
     var body: some View {
         NavigationStack {
+            // 必要的 Form 用法：onboarding 全屏密集字段录入，sheet 隔离视觉影响。
             Form {
                 Section("基本资料") {
                     Picker("性别", selection: $sex) {
@@ -46,10 +47,13 @@ struct NutritionOnboardingView: View {
                     LabeledContent("脂肪", value: "\(fmtNum(preview.fatG)) g")
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.Color.bg)
             .navigationTitle("设置营养目标")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") { complete() }
+                        .tint(Theme.Color.accentCyan)
                 }
             }
         }
@@ -80,6 +84,7 @@ struct NutritionGoalEditorView: View {
 
     var body: some View {
         NavigationStack {
+            // 必要的 Form 用法：目标微调密集字段，sheet 隔离视觉影响。
             Form {
                 Section("计算资料") {
                     Picker("性别", selection: $goal.sexRaw) {
@@ -107,11 +112,13 @@ struct NutritionGoalEditorView: View {
                     targetField("脂肪 (g)", $goal.targetFatG)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.Color.bg)
             .navigationTitle("调整目标")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { save() }
+                    Button("完成") { save() }.tint(Theme.Color.accentCyan)
                 }
             }
         }

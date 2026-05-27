@@ -2,38 +2,270 @@ import SwiftUI
 import SwiftData
 import Charts
 
-// MARK: - 3.9 训练历史：日历 + 单动作历史曲线
+// MARK: - 3.9 训练历史
 
 /// 按动作归并历史的稳定 key：内置 code 优先，其次自定义 id，最后回退动作名。
 extension WorkoutExercise {
     var historyKey: String { builtinExerciseCode ?? customExerciseId?.uuidString ?? exerciseName }
 }
 
-/// 历史入口：日历 / 动作趋势两段切换。统计全部由原始记录重算，不持久化派生数据（design.md Non-Goals）。
-struct TrainingHistoryView: View {
-    private enum Tab: String, CaseIterable, Identifiable { case calendar = "日历", trends = "动作趋势"; var id: String { rawValue } }
-    @State private var tab: Tab = .calendar
+// MARK: - 历史入口（Screen 10，Neon 改版）
 
-    var body: some View {
-        VStack(spacing: 0) {
-            Picker("视图", selection: $tab) {
-                ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .padding([.horizontal, .top])
-            switch tab {
-            case .calendar: WorkoutCalendarView()
-            case .trends: ExerciseTrendListView()
+struct TrainingHistoryView: View {
+    @Query(filter: #Predicate<Workout> { $0.deletedAt == nil && $0.endedAt != nil },
+           sort: \Workout.startedAt, order: .reverse)
+    private var workouts: [Workout]
+
+    @State private var windowId: String = "30"
+    @State private var showCalendar = false
+
+    private let windowChips: [HistoryChip] = [
+        HistoryChip(id: "7",   title: "7 天",   days: 7),
+        HistoryChip(id: "30",  title: "30 天",  days: 30),
+        HistoryChip(id: "90",  title: "90 天",  days: 90),
+        HistoryChip(id: "all", title: "全部",   days: nil),
+    ]
+
+    private var selectedChip: HistoryChip {
+        windowChips.first(where: { $0.id == windowId }) ?? windowChips[1]
+    }
+
+    private var windowStart: Date {
+        guard let d = selectedChip.days else { return .distantPast }
+        return Calendar.current.startOfDay(for: Date()).addingTimeInterval(-Double(d - 1) * 86_400)
+    }
+
+    private var inWindow: [Workout] {
+        workouts.filter { $0.startedAt >= windowStart }
+    }
+
+    /// 上一窗口（用于 MoM/WoW delta）。
+    private var prevInWindow: [Workout] {
+        guard let d = selectedChip.days else { return [] }
+        let prevEnd = windowStart
+        let prevStart = prevEnd.addingTimeInterval(-Double(d) * 86_400)
+        return workouts.filter { $0.startedAt >= prevStart && $0.startedAt < prevEnd }
+    }
+
+    private var totalVolumeKg: Double { Self.volume(of: inWindow) }
+    private var prevVolumeKg: Double { Self.volume(of: prevInWindow) }
+
+    private static func volume(of list: [Workout]) -> Double {
+        var sum = 0.0
+        for w in list {
+            for ex in w.exercises {
+                for s in ex.sets {
+                    sum += (s.weightKg ?? 0) * Double(s.reps ?? 0)
+                }
             }
         }
-        .navigationTitle("训练历史")
+        return sum
+    }
+
+    private var prList: [PRSummary] {
+        let until = Date()
+        return PRStats.newPRs(in: workouts, since: windowStart, until: until)
+    }
+
+    var body: some View {
+        ZStack {
+            Theme.Color.bg.ignoresSafeArea()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                    HorizontalChipPicker(items: windowChips, selection: $windowId) { $0.title }
+                        .padding(.horizontal, -Theme.Spacing.lg)
+
+                    volumeCard
+
+                    if !prList.isEmpty {
+                        Text(selectedChip.eyebrow + " PR").eyebrowStyle()
+                        VStack(spacing: Theme.Spacing.md) {
+                            ForEach(Array(prList.enumerated()), id: \.element.exerciseKey) { idx, pr in
+                                prCard(pr: pr, isFirst: idx == 0)
+                            }
+                        }
+                    }
+
+                    Color.clear.frame(height: 32)
+                }
+                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.top, Theme.Spacing.md)
+            }
+        }
+        .navigationTitle("历史")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showCalendar = true } label: {
+                    Image(systemName: "calendar").foregroundStyle(Theme.Color.fg)
+                }
+            }
+        }
+        .navigationDestination(isPresented: $showCalendar) { WorkoutCalendarView() }
+    }
+
+    private var volumeCard: some View {
+        let tons = totalVolumeKg / 1000
+        let deltaPct: Double? = prevVolumeKg > 0
+            ? (totalVolumeKg - prevVolumeKg) / prevVolumeKg * 100
+            : nil
+        return VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            HStack(alignment: .lastTextBaseline) {
+                Text("\(selectedChip.eyebrow)总训练量").eyebrowStyle()
+                Spacer()
+                if let d = deltaPct {
+                    let label = selectedChip.days == 7 ? "WoW" : "MoM"
+                    let color = d >= 0 ? Theme.Color.ok : Theme.Color.danger
+                    Text("\(label) \(d >= 0 ? "+" : "")\(String(format: "%.1f", d))%")
+                        .font(Theme.Font.mono(size: 11, weight: .semibold))
+                        .foregroundStyle(color)
+                }
+            }
+            HStack(alignment: .lastTextBaseline, spacing: 6) {
+                Text(String(format: "%.1f", tons))
+                    .numStyle(size: 36, weight: .bold)
+                    .foregroundStyle(Theme.Color.fg)
+                Text("吨")
+                    .font(Theme.Font.body(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+            }
+            chart
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+
+    private struct VolumeBar: Identifiable {
+        let id: Date
+        let day: Date
+        let volume: Double
+    }
+
+    private var volumeBars: [VolumeBar] {
+        let cal = Calendar.current
+        // 按日聚合：从 windowStart（或最早数据）到今天，每日一柱。
+        let totalDays = selectedChip.days ?? 90
+        let bars = totalDays > 60 ? 30 : (totalDays > 14 ? totalDays / 3 : totalDays)
+        let unitDays = max(1, totalDays / max(1, bars))
+        let today = cal.startOfDay(for: Date())
+        var out: [VolumeBar] = []
+        var d = today.addingTimeInterval(-Double(bars - 1) * Double(unitDays) * 86_400)
+        for _ in 0..<bars {
+            let end = d.addingTimeInterval(Double(unitDays) * 86_400)
+            let slice = inWindow.filter { $0.startedAt >= d && $0.startedAt < end }
+            let vol = Self.volume(of: slice)
+            out.append(VolumeBar(id: d, day: d, volume: vol))
+            d = end
+        }
+        return out
+    }
+
+    @ViewBuilder
+    private var chart: some View {
+        let bars = volumeBars
+        let lastDay = bars.last?.day
+        Chart(bars) { b in
+            BarMark(
+                x: .value("日期", b.day, unit: .day),
+                y: .value("容量", b.volume)
+            )
+            .foregroundStyle(
+                lastDay.map { Calendar.current.isDate(b.day, inSameDayAs: $0) } ?? false
+                    ? Theme.Color.accentMagenta
+                    : Theme.Color.accentCyan
+            )
+            .cornerRadius(2)
+        }
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .frame(height: 90)
+    }
+
+    private func prCard(pr: PRSummary, isFirst: Bool) -> some View {
+        let deltaText: String? = pr.previousBestKg.flatMap { prev in
+            let d = pr.weightKg - prev
+            return d > 0 ? "+\(formatKg(d))kg" : nil
+        }
+        return HStack(alignment: .center, spacing: Theme.Spacing.md) {
+            VStack(alignment: .leading, spacing: 4) {
+                if isFirst {
+                    Text("★ NEW PR")
+                        .font(Theme.Font.mono(size: 10, weight: .semibold))
+                        .tracking(0.08 * 10)
+                        .foregroundStyle(Theme.Color.accentMagenta)
+                }
+                Text(displayName(for: pr.exerciseKey))
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg)
+                HStack(alignment: .lastTextBaseline, spacing: 4) {
+                    Text(formatKg(pr.weightKg)).numStyle(size: 22, weight: .bold).foregroundStyle(Theme.Color.fg)
+                    Text("kg × \(pr.reps)")
+                        .font(Theme.Font.mono(size: 12))
+                        .foregroundStyle(Theme.Color.fg2)
+                }
+            }
+            Spacer()
+            if let delta = deltaText {
+                Text(delta)
+                    .font(Theme.Font.mono(size: 12, weight: .semibold))
+                    .foregroundStyle(isFirst ? Theme.Color.accentMagenta : Theme.Color.ok)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(
+                        (isFirst ? Theme.Color.accentMagenta : Theme.Color.ok).opacity(0.15),
+                        in: Capsule()
+                    )
+            }
+        }
+        .padding(Theme.Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
+                .stroke(isFirst ? Theme.Color.accentMagenta.opacity(0.55) : Theme.Color.border, lineWidth: 1)
+        )
+        .conditionalMagentaGlow(isFirst)
+    }
+
+    /// 把 historyKey 反查成可读名：内置 code → BuiltinExercise.starter；UUID → 简短回退；否则原样。
+    private func displayName(for key: String) -> String {
+        if let b = BuiltinExercise.starter.first(where: { $0.code == key }) { return b.name }
+        if let last = workouts.flatMap(\.exercises).first(where: { $0.historyKey == key }) {
+            return last.exerciseName
+        }
+        return key
     }
 }
 
-// MARK: - 训练日历
+private struct HistoryChip: Identifiable, Hashable {
+    let id: String
+    let title: String
+    /// nil = 全部
+    let days: Int?
+    var eyebrow: String {
+        switch id {
+        case "7":   return "本周"
+        case "30":  return "本月"
+        case "90":  return "本季"
+        case "all": return "全部"
+        default:    return ""
+        }
+    }
+}
 
-/// 按月日历：有已完成训练的日期标点，点选某天列出当天训练。
+private extension View {
+    @ViewBuilder
+    func conditionalMagentaGlow(_ on: Bool) -> some View {
+        if on {
+            self.neonGlow(.magenta, intensity: .medium, cornerRadius: Theme.Radius.md)
+        } else {
+            self
+        }
+    }
+}
+
+// MARK: - 训练日历（保留：从历史首页 toolbar 进入）
+
+/// 按月日历：有已完成训练的日期标点，点选某天列出当天训练。必要的 List 用法。
 struct WorkoutCalendarView: View {
     @Query(filter: #Predicate<Workout> { $0.deletedAt == nil && $0.endedAt != nil },
            sort: \Workout.startedAt, order: .reverse)
@@ -43,7 +275,6 @@ struct WorkoutCalendarView: View {
 
     private var cal: Calendar { Calendar.current }
 
-    /// 当月「日 → 训练」索引，只取已完成训练。
     private var byDay: [Date: [Workout]] {
         Dictionary(grouping: workouts) { cal.startOfDay(for: $0.startedAt) }
     }
@@ -53,6 +284,7 @@ struct WorkoutCalendarView: View {
     }
 
     var body: some View {
+        // 必要的 List 用法：日历 + 当日训练列表混排，sheet 自绘成本高，保留 List 配深色背景。
         List {
             Section {
                 CalendarGrid(month: month, selected: $selected,
@@ -63,19 +295,27 @@ struct WorkoutCalendarView: View {
             }
             Section(selected.formatted(.dateTime.year().month().day())) {
                 if selectedWorkouts.isEmpty {
-                    Text("这天没有训练").foregroundStyle(.secondary)
+                    Text("这天没有训练").foregroundStyle(Theme.Color.muted)
                 } else {
                     ForEach(selectedWorkouts) { w in
                         NavigationLink(value: w) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(w.title ?? "训练").font(.headline)
-                                Text(daySummary(w)).font(.caption).foregroundStyle(.secondary)
+                                Text(w.title ?? "训练")
+                                    .font(.headline)
+                                    .foregroundStyle(Theme.Color.fg)
+                                Text(daySummary(w))
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.Color.muted)
                             }
                         }
                     }
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.Color.bg)
+        .navigationTitle("日历")
+        .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: Workout.self) { WorkoutLoggingView(workout: $0) }
     }
 
@@ -89,7 +329,6 @@ struct WorkoutCalendarView: View {
     }
 }
 
-/// 单月网格。仅做展示与选择，不承载业务统计。
 private struct CalendarGrid: View {
     let month: Date
     @Binding var selected: Date
@@ -103,16 +342,22 @@ private struct CalendarGrid: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack {
-                Button(action: onPrev) { Image(systemName: "chevron.left") }
+                Button(action: onPrev) {
+                    Image(systemName: "chevron.left").foregroundStyle(Theme.Color.fg)
+                }
                 Spacer()
-                Text(month.formatted(.dateTime.year().month())).font(.headline)
+                Text(month.formatted(.dateTime.year().month()))
+                    .font(.headline)
+                    .foregroundStyle(Theme.Color.fg)
                 Spacer()
-                Button(action: onNext) { Image(systemName: "chevron.right") }
+                Button(action: onNext) {
+                    Image(systemName: "chevron.right").foregroundStyle(Theme.Color.fg)
+                }
             }
             .padding(.horizontal)
             HStack {
                 ForEach(weekdaySymbols, id: \.self) { s in
-                    Text(s).font(.caption2).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                    Text(s).font(.caption2).foregroundStyle(Theme.Color.muted).frame(maxWidth: .infinity)
                 }
             }
             LazyVGrid(columns: columns, spacing: 6) {
@@ -132,11 +377,12 @@ private struct CalendarGrid: View {
             VStack(spacing: 3) {
                 Text("\(cal.component(.day, from: day))")
                     .font(.callout)
-                    .foregroundStyle(isSelected ? Color.white : (isToday ? Color.accentColor : Color.primary))
-                Circle().fill(marked ? Color.accentColor : Color.clear).frame(width: 5, height: 5)
+                    .foregroundStyle(isSelected ? Theme.Color.bg : (isToday ? Theme.Color.accentCyan : Theme.Color.fg))
+                Circle().fill(marked ? Theme.Color.accentCyan : Color.clear).frame(width: 5, height: 5)
             }
             .frame(maxWidth: .infinity, minHeight: 36)
-            .background(isSelected ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+            .background(isSelected ? Theme.Color.accentCyan : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
     }
@@ -147,7 +393,6 @@ private struct CalendarGrid: View {
         return Array(s[first...] + s[..<first])
     }
 
-    /// 当月日期，前面用 nil 占位对齐周首。
     private var days: [Date?] {
         guard let interval = cal.dateInterval(of: .month, for: month) else { return [] }
         let firstDay = interval.start
@@ -161,47 +406,8 @@ private struct CalendarGrid: View {
     }
 }
 
-// MARK: - 单动作历史曲线
+// MARK: - 单动作历史曲线（保留：从训练详情进入）
 
-/// 有历史记录的动作列表 → 进入曲线。
-private struct ExerciseTrendListView: View {
-    @Query(filter: #Predicate<Workout> { $0.deletedAt == nil && $0.endedAt != nil })
-    private var workouts: [Workout]
-
-    /// 归并出有记录的动作（key → 展示名 + 出现次数），按最近训练时间排序。
-    private var exercises: [(key: String, name: String, lastDate: Date)] {
-        var latest: [String: (name: String, date: Date)] = [:]
-        for w in workouts {
-            for ex in w.exercises where ex.sets.contains(where: { $0.weightKg != nil }) {
-                let cur = latest[ex.historyKey]
-                if cur == nil || w.startedAt > cur!.date {
-                    latest[ex.historyKey] = (ex.exerciseName, w.startedAt)
-                }
-            }
-        }
-        return latest.map { (key: $0.key, name: $0.value.name, lastDate: $0.value.date) }
-            .sorted { $0.lastDate > $1.lastDate }
-    }
-
-    var body: some View {
-        List {
-            if exercises.isEmpty {
-                ContentUnavailableView("还没有可统计的记录", systemImage: "chart.xyaxis.line",
-                                       description: Text("记录带重量的训练后这里会出现趋势曲线"))
-            } else {
-                ForEach(exercises, id: \.key) { ex in
-                    NavigationLink {
-                        ExerciseHistoryChartView(exerciseKey: ex.key, exerciseName: ex.name)
-                    } label: {
-                        Text(ex.name)
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// 单动作历史曲线：默认展示每次训练的最大重量趋势（spec：默认重量趋势）。
 struct ExerciseHistoryChartView: View {
     let exerciseKey: String
     let exerciseName: String
@@ -217,7 +423,6 @@ struct ExerciseHistoryChartView: View {
         var id: Date { date }
     }
 
-    /// 每次训练取该动作的最大重量（重算，不持久化）。
     private var points: [Point] {
         workouts.compactMap { w -> Point? in
             let sets = w.exercises
@@ -231,17 +436,20 @@ struct ExerciseHistoryChartView: View {
     }
 
     var body: some View {
+        // 必要的 List 用法：曲线 + 记录条目混排。
         List {
             Section("重量趋势") {
                 if points.count < 2 {
-                    Text("至少需要两次记录才能画出趋势").foregroundStyle(.secondary)
+                    Text("至少需要两次记录才能画出趋势").foregroundStyle(Theme.Color.muted)
                 } else {
                     Chart(points) { p in
                         LineMark(x: .value("日期", p.date, unit: .day),
                                  y: .value("重量", p.maxWeight))
                             .interpolationMethod(.monotone)
+                            .foregroundStyle(Theme.Color.accentCyan)
                         PointMark(x: .value("日期", p.date, unit: .day),
                                   y: .value("重量", p.maxWeight))
+                            .foregroundStyle(Theme.Color.accentCyan)
                     }
                     .chartYAxisLabel("kg")
                     .frame(height: 220)
@@ -252,13 +460,18 @@ struct ExerciseHistoryChartView: View {
                 ForEach(points.reversed()) { p in
                     HStack {
                         Text(p.date.formatted(date: .abbreviated, time: .omitted))
+                            .foregroundStyle(Theme.Color.fg)
                         Spacer()
-                        Text("\(formatKg(p.maxWeight)) kg").bold()
+                        Text("\(formatKg(p.maxWeight)) kg")
+                            .bold()
+                            .foregroundStyle(Theme.Color.fg)
                     }
                     .font(.subheadline)
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.Color.bg)
         .navigationTitle(exerciseName)
         .navigationBarTitleDisplayMode(.inline)
     }

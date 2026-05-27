@@ -2,6 +2,17 @@ import SwiftUI
 
 /// 仅 DEBUG 构建可见。色板/字阶/间距/Modifier 的可视化回归。
 struct DesignSystemPreviewView: View {
+    @State private var chipSelection: String = "all"
+    private let chipDemos: [PreviewChip] = [
+        .init(id: "all", title: "全部"),
+        .init(id: "chest", title: "胸"),
+        .init(id: "back", title: "背"),
+        .init(id: "leg", title: "腿"),
+        .init(id: "shoulder", title: "肩"),
+        .init(id: "arm", title: "手臂"),
+        .init(id: "core", title: "核心"),
+    ]
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
@@ -9,6 +20,10 @@ struct DesignSystemPreviewView: View {
                 section("Typography") { typeStack }
                 section("Spacing") { spacingScale }
                 section("Modifiers") { modifierExamples }
+                section("Horizontal Chip Picker") {
+                    HorizontalChipPicker(items: chipDemos, selection: $chipSelection) { $0.title }
+                        .padding(.horizontal, -Theme.Spacing.lg)
+                }
             }
             .padding(Theme.Spacing.lg)
         }
@@ -40,6 +55,7 @@ struct DesignSystemPreviewView: View {
             ("accentMagenta", Theme.Color.accentMagenta),
             ("danger", Theme.Color.danger),
             ("ok", Theme.Color.ok),
+            ("macroFat", Theme.Color.macroFat),
         ]
         return LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: Theme.Spacing.sm)], spacing: Theme.Spacing.sm) {
             ForEach(items, id: \.0) { name, color in
@@ -118,6 +134,11 @@ struct DesignSystemPreviewView: View {
             }
         }
     }
+}
+
+private struct PreviewChip: Identifiable, Hashable {
+    let id: String
+    let title: String
 }
 
 #if DEBUG

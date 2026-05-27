@@ -18,6 +18,8 @@ const tokens = [
   ['accentMagenta', 0.68, 0.26,  350],
   ['danger',        0.68, 0.24,   25],
   ['ok',            0.78, 0.20,  145],
+  // 仅用于「饮食 - 脂肪进度条」语义，禁止外泄到非脂肪场景。
+  ['macroFat',      0.72, 0.18,   35],
 ];
 
 const pad = (s, n) => (s + ' '.repeat(n)).slice(0, n);

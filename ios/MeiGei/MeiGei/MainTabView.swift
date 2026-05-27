@@ -35,7 +35,7 @@ struct MainTabView: View {
                 .tabItem { Label("饮食", systemImage: "fork.knife") }
             NavigationStack { TeamListView() }
                 .tabItem { Label("Team", systemImage: "person.3") }
-            NavigationStack { SettingsView() }
+            NavigationStack { ProfileView() }
                 .tabItem { Label("我的", systemImage: "person.circle") }
         }
         .tint(Theme.Color.accentCyan)
@@ -44,56 +44,3 @@ struct MainTabView: View {
     }
 }
 
-/// 「我的」：账户信息 + 手动同步 + 退出。
-struct SettingsView: View {
-    @Environment(SessionStore.self) private var session
-    @Environment(SyncEngine.self) private var syncEngine
-
-    @State private var versionTapCount = 0
-    @State private var showDesignSystem = false
-
-    private var appVersion: String {
-        let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
-        let b = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
-        return "\(v) (\(b))"
-    }
-
-    var body: some View {
-        List {
-            Section("账户") {
-                LabeledContent("用户", value: session.currentUserId?.uuidString.prefix(8).description ?? "已登录")
-            }
-            Section("同步") {
-                LabeledContent("状态", value: syncEngine.isSyncing ? "同步中…" : "空闲")
-                Button("立即同步") { Task { await syncEngine.syncAll() } }
-                    .disabled(syncEngine.isSyncing)
-            }
-            Section("关于") {
-                LabeledContent("版本", value: appVersion)
-                    .contentShape(Rectangle())
-                    .onTapGesture { handleVersionTap() }
-            }
-            Section {
-                Button("退出登录", role: .destructive) { session.logout() }
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .background(Theme.Color.bg)
-        .navigationTitle("我的")
-        #if DEBUG
-        .navigationDestination(isPresented: $showDesignSystem) {
-            DesignSystemPreviewView()
-        }
-        #endif
-    }
-
-    private func handleVersionTap() {
-        #if DEBUG
-        versionTapCount += 1
-        if versionTapCount >= 5 {
-            versionTapCount = 0
-            showDesignSystem = true
-        }
-        #endif
-    }
-}

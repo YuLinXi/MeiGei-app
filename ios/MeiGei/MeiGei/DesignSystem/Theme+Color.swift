@@ -21,5 +21,8 @@ extension Theme {
         // 状态
         static let danger    = SwiftUI.Color("danger")
         static let ok        = SwiftUI.Color("ok")
+
+        /// 严格保留给饮食「脂肪」语义；非脂肪场景禁用。
+        static let macroFat  = SwiftUI.Color("macroFat")
     }
 }

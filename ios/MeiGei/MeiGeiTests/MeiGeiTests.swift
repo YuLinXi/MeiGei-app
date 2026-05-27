@@ -37,7 +37,8 @@ struct WorkoutWeeklyStatsTests {
         #expect(s.sessionCount == 1)
         #expect(s.setCount == 3)
         #expect(s.repCount == 18)
-        #expect(s.volumeKg == 100 * 5 + 100 * 5 + 90 * 8)
+        let expectedVolume: Double = 100 * 5 + 100 * 5 + 90 * 8
+        #expect(s.volumeKg == expectedVolume)
         #expect(s.avgDurationSec == 3600)
     }
 
