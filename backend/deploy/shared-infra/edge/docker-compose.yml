@@ -1,0 +1,26 @@
+# 共享反向代理栈（服务器级，全机唯一占用 80/443）。
+# 所有对外 HTTPS 流量都进这里，按 Caddyfile 的域名路由到各业务 app 容器。
+# 部署到服务器：放在 /opt/stacks/edge/，docker compose up -d
+services:
+  caddy:
+    image: caddy:2
+    container_name: edge-caddy
+    restart: always
+    ports:
+      - "80:80"             # Let's Encrypt HTTP-01 校验 + HTTP→HTTPS 跳转
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data    # 证书持久化，重启不重签
+      - caddy_config:/config
+    networks:
+      - web                 # 与各业务 app 互通（app 也接入此网络）
+
+# web 网络由共享基础设施预先创建：docker network create web
+networks:
+  web:
+    external: true
+
+volumes:
+  caddy_data:
+  caddy_config:

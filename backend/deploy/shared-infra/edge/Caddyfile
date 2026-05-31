@@ -1,0 +1,20 @@
+# 全服务器共享的中心路由表。每新增一个后端服务，在这里加一个域名块即可。
+# 改完执行：docker compose -f /opt/stacks/edge/docker-compose.yml exec caddy caddy reload --config /etc/caddy/Caddyfile
+#
+# 规则：域名 { reverse_proxy <容器名>:<容器内端口> }
+# Caddy 自动为每个域名申请/续期 Let's Encrypt 证书（需该域名已解析到本机且 80 可达）。
+
+# ── MeiGei 后端 ────────────────────────────────────────
+api.meigei-example.com {
+	reverse_proxy meigei-app:8080
+	encode gzip
+}
+
+# ── 新增服务示例（取消注释，改成你的域名与容器名/端口）──
+# admin.example.com {
+# 	reverse_proxy some-java-app:8090
+# }
+#
+# go.example.com {
+# 	reverse_proxy my-go-service:3000
+# }

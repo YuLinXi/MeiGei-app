@@ -1,0 +1,33 @@
+# 共享 PostgreSQL 实例（服务器级）。多套服务共用一个实例，各自独立 database + 角色（逻辑隔离）。
+# 部署到服务器：放在 /opt/stacks/shared-db/，cp .env.example .env 填密码后 docker compose up -d
+services:
+  postgres:
+    image: postgres:16
+    container_name: shared-postgres      # 各业务 app 用此名连接：jdbc:postgresql://shared-postgres:5432/<库名>
+    restart: always
+    environment:
+      # 超级用户 postgres 的密码
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERPASS:?POSTGRES_SUPERPASS 必填}
+      # 传给 init 脚本，用于创建 MeiGei 业务库的角色密码（见 init/01-create-databases.sh）
+      MEIGEI_DB_PASSWORD: ${MEIGEI_DB_PASSWORD:?MEIGEI_DB_PASSWORD 必填}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # 仅在数据卷为空的「首次初始化」时执行 init 目录下脚本
+      - ./init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5432:5432"            # 仅绑本机，供 psql 维护/备份；不暴露公网
+    networks:
+      - dbnet                            # 各业务 app 接入此网络访问数据库
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+# dbnet 网络由共享基础设施预先创建：docker network create dbnet
+networks:
+  dbnet:
+    external: true
+
+volumes:
+  pgdata:

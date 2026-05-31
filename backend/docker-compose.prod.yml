@@ -1,0 +1,34 @@
+# MeiGei 业务栈（生产）。本栈只含 app；反向代理与数据库是服务器级共享基础设施，
+# 见 deploy/shared-infra/（edge 反代占 80/443，shared-db 提供共享 Postgres）。
+#
+# 前置（仅首次，按 deploy/shared-infra/README.md）：
+#   1) 创建共享网络：docker network create web && docker network create dbnet
+#   2) 起 edge 反代栈、shared-db 栈
+# 启动本栈：docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+services:
+  app:
+    build: .
+    container_name: meigei-app          # 中心 Caddyfile 用此名反代：reverse_proxy meigei-app:8080
+    restart: always
+    env_file: .env.prod                 # JWT_SECRET / APPLE_AUDIENCES / APNS_* / DB_PASSWORD 等机密
+    environment:
+      # 连共享 PG 实例（shared-postgres）里 MeiGei 专属的 meigei 库；stringtype=unspecified 让 String 隐式转 jsonb
+      DB_URL: jdbc:postgresql://shared-postgres:5432/meigei?stringtype=unspecified
+      DB_USER: meigei
+      PORT: 8080
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
+    expose:
+      - "8080"                          # 仅 Docker 内网；由 edge-caddy 经 web 网络反代
+    networks:
+      - web                             # 与 edge 反代互通
+      - dbnet                           # 与共享 Postgres 互通
+    # APNs 推送私钥（有 .p8 后取消注释，并在 .env.prod 设 APNS_KEY_PATH=/secrets/apns.p8）
+    # volumes:
+    #   - ./secrets/apns.p8:/secrets/apns.p8:ro
+
+# 两个网络都由共享基础设施预先创建（external），本栈仅接入、不负责创建
+networks:
+  web:
+    external: true
+  dbnet:
+    external: true

@@ -5,5 +5,7 @@ build/
 *.iml
 *.log
 .env
+.env.prod
 secrets/
 *.p8
+backups/
