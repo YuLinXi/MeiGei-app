@@ -1,0 +1,26 @@
+// 国内 Docker 构建加速：把官方 Maven Central / Gradle Plugin Portal / Spring 源
+// 替换为阿里云镜像。仅在镜像构建阶段经 init.d 自动加载，不改 build.gradle.kts、不影响本地构建。
+allprojects {
+    repositories {
+        all { repo ->
+            if (repo instanceof MavenArtifactRepository) {
+                def url = repo.url.toString()
+                if (url.contains('repo.maven.apache.org') || url.contains('repo1.maven.org')
+                        || url.contains('plugins.gradle.org') || url.contains('repo.spring.io')) {
+                    repositories.remove(repo)
+                }
+            }
+        }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+    }
+}
+
+settingsEvaluated { settings ->
+    settings.pluginManagement {
+        repositories {
+            maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+            maven { url 'https://maven.aliyun.com/repository/public' }
+        }
+    }
+}
