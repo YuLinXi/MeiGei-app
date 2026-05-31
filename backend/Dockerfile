@@ -5,6 +5,8 @@ WORKDIR /app
 COPY docker/gradle-init.gradle /root/.gradle/init.d/gradle-init.gradle
 COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle ./gradle
+# 国内构建加速：Gradle 本体走腾讯云镜像（官方 services.gradle.org 国内常超时）
+RUN sed -i 's#services.gradle.org/distributions/#mirrors.cloud.tencent.com/gradle/#' gradle/wrapper/gradle-wrapper.properties
 # 预热依赖缓存
 RUN ./gradlew --no-daemon dependencies > /dev/null 2>&1 || true
 COPY src ./src
