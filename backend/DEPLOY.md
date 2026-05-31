@@ -38,7 +38,7 @@ docker compose up -d      # 首次自动建 meigei 库 + 角色
 # 共享反代
 cd /opt/stacks
 cp -r /path/to/MeiGei-app/backend/deploy/shared-infra/edge ./edge && cd edge
-cat Caddyfile             # 已预填 api.peipadada.com，确认无误即可
+cat Caddyfile             # 已预填 meigei.peipadada.com，确认无误即可
 docker compose up -d
 ```
 
