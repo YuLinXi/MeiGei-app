@@ -43,7 +43,7 @@ app:
     token-enabled: ${APP_DEV_TOKEN:false}
   apple:
     # Sign in with Apple 的 client_id / service_id（aud 校验）
-    audiences: ${APPLE_AUDIENCES:com.meigei.app}
+    audiences: ${APPLE_AUDIENCES:com.yulinxi.app.MeiGei}
     issuer: https://appleid.apple.com
     jwks-uri: https://appleid.apple.com/auth/keys
   jwt:
@@ -55,7 +55,7 @@ app:
     key-path: ${APNS_KEY_PATH:}
     key-id: ${APNS_KEY_ID:}
     team-id: ${APNS_TEAM_ID:}
-    topic: ${APNS_TOPIC:com.meigei.app}
+    topic: ${APNS_TOPIC:com.yulinxi.app.MeiGei}
     production: ${APNS_PRODUCTION:false}
 
 server:

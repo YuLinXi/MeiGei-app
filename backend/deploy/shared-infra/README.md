@@ -39,7 +39,7 @@ docker compose up -d
 # 2) 共享反代
 cd /opt/stacks
 cp -r <仓库>/backend/deploy/shared-infra/edge ./edge && cd edge
-nano Caddyfile             # 把 api.meigei-example.com 改成你的真实域名
+cat Caddyfile              # 已预填 api.peipadada.com，确认无误即可
 docker compose up -d
 ```
 
