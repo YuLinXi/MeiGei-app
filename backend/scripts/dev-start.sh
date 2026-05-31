@@ -18,7 +18,7 @@ JDK_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
 PG_BIN="/opt/homebrew/opt/postgresql@16/bin/pg_ctl"
 PG_DATA="/opt/homebrew/var/postgresql@16"
 PG_LOG="/tmp/pg_meigei.log"
-APP_PORT="${PORT:-8080}"
+APP_PORT="${PORT:-8001}"
 
 # ---- 颜色输出 ----
 GREEN='\033[0;32m'

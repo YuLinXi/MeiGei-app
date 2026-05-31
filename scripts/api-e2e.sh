@@ -8,7 +8,7 @@
 #       需要 jq、uuidgen（macOS 自带）。
 #
 # 用法（仓库根目录）：./scripts/api-e2e.sh
-# 可用环境变量：BASE（默认 http://localhost:8080）
+# 可用环境变量：BASE（默认 http://localhost:8001）
 #
 # 端点契约均按 backend 源码核验（见 controller/DTO/entity）：
 #   push 体 {"items":[...]}；pull 回 {"changes":[],"serverTime":}；
@@ -18,7 +18,7 @@
 if [ -z "${BASH_VERSION:-}" ]; then exec bash "$0" "$@"; fi
 set -uo pipefail
 
-BASE="${BASE:-http://localhost:8080}"
+BASE="${BASE:-http://localhost:8001}"
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 FAILS=0
 section() { echo -e "\n${BLUE}== $* ==${NC}"; }

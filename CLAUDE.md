@@ -31,7 +31,7 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 # 启动 PostgreSQL 16（库=meigei，角色=meigei/meigei，匹配 application.yml 默认）
 /opt/homebrew/opt/postgresql@16/bin/pg_ctl -D /opt/homebrew/var/postgresql@16 -l /tmp/pg_meigei.log start
 
-# 启动后端（Flyway 自动跑迁移，端口 8080）
+# 启动后端（Flyway 自动跑迁移，端口 8001）
 ./gradlew bootRun
 
 # 构建 / 测试
@@ -101,4 +101,4 @@ xcodebuild -project MeiGei.xcodeproj -scheme MeiGei \
 
 - **数据工程未完**：内置动作（150-200+ 部位高亮图，当前仅 ~26 占位）与标准食材库（~1500 条《中国食物成分表》，当前仅 ~40 占位）尚未采集；6.x 真机联调/验收未做。
 - **软阻塞**（需用户侧账号/密钥，不影响写码与编译）：Apple 私钥(.p8)/Service ID/APNs 凭据、Fly.io/Cloudflare 账号。无凭据时登录走 JWKS 仍可联调，APNs 自动降级 no-op。
-- 真 Apple 登录与 APNs 投递需真机 + 签名 + Apple 凭据；DEBUG 连 localhost:8080 需在 Info.plist 配 ATS `NSAllowsLocalNetworking`（当前无独立 Info.plist，留到联调时建）。
+- 真 Apple 登录与 APNs 投递需真机 + 签名 + Apple 凭据；DEBUG 连 localhost:8001 需在 Info.plist 配 ATS `NSAllowsLocalNetworking`（当前无独立 Info.plist，留到联调时建）。

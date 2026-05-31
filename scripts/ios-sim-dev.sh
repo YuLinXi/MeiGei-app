@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # MeiGei iOS 模拟器联调一键脚本
 #
-# 解决「DEBUG 连 localhost:8080 被 ATS 拦」后的模拟器侧联调闭环：
+# 解决「DEBUG 连 localhost:8001 被 ATS 拦」后的模拟器侧联调闭环：
 #   boot 模拟器 → 编译(关签名) → 安装 → 启动 App，并附 simctl push 样例与 dev token helper。
 #
 # 用法（在仓库根目录执行）：
@@ -12,7 +12,7 @@
 #   ./scripts/ios-sim-dev.sh status             # 看后端/模拟器状态
 #
 # 前置：后端需先起（另开终端跑 ./backend/scripts/dev-start.sh，它已注入 APP_DEV_TOKEN=true）。
-# 可用环境变量覆盖：SIM_DEVICE（默认 "iPhone 17 Pro"）、PORT（默认 8080）。
+# 可用环境变量覆盖：SIM_DEVICE（默认 "iPhone 17 Pro"）、PORT（默认 8001）。
 #
 # 必须真机、本脚本不覆盖的：真实 APNs 远程投递、Watch Smart Stack、TestFlight 灰度。
 # simctl push 只验证「客户端收到推送后的路由/处理」，不经过后端 Pushy→APNs 真链路。
@@ -29,7 +29,7 @@ IOS_DIR="$REPO_DIR/ios/MeiGei"
 SCHEME="MeiGei"
 BUNDLE_ID="com.yulinxi.app.MeiGei"
 SIM_DEVICE="${SIM_DEVICE:-iPhone 17 Pro}"
-APP_PORT="${PORT:-8080}"
+APP_PORT="${PORT:-8001}"
 DERIVED="$IOS_DIR/build/sim-dd"
 APP_PATH="$DERIVED/Build/Products/Debug-iphonesimulator/MeiGei.app"
 

@@ -59,7 +59,15 @@
 
 ## 6. 联调与验收
 
+> 决策（2026-05-31）：纯后端可脚本化链路由 `scripts/api-e2e.sh` 自动覆盖，验收基线见 `docs/acceptance-checklist.md`。需人盯 UI / 真机能力 / Apple 凭据的部分**不再维护人工 checklist**，留待真机/凭据到位后直接验。模拟器联调脚本 `scripts/ios-sim-dev.sh` 保留为联调辅助。
+
 - [ ] 6.1 端到端联调：登录 → 离线记录 → 同步 → Team 打卡 → 推送 → 表情回应
+  - [x] 服务端链路自动化：`scripts/api-e2e.sh` 双用户跑通 登录→同步(push/pull)→建团/加入→打卡 fan-out→表情（真库断言全过）
+  - [ ] iOS App 内真实交互 + 真实 Apple 登录 / APNs 投递：硬阻塞，需真机 + Apple 凭据
 - [ ] 6.2 弱网/离线/多设备冲突场景验证（幂等、last-write-wins、人工提示）
+  - [x] 服务端正确性自动化：`scripts/api-e2e.sh` 断言 幂等(serverTime 重放一致)/LWW 冲突回传 serverValue/较新覆盖
+  - [ ] iOS 端时序与冲突提示 UI：待真机/多设备实测
 - [ ] 6.3 HealthKit、Live Activity、Watch Smart Stack 真机验证
+  - [ ] 硬阻塞（真机 + 签名），待用户侧真机执行
 - [ ] 6.4 TestFlight 灰度发布与回归
+  - [ ] 硬阻塞（Apple Developer 账号 + 发布签名 + 生产部署），待用户侧执行

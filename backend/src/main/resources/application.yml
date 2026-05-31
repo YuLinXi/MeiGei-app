@@ -59,7 +59,7 @@ app:
     production: ${APNS_PRODUCTION:false}
 
 server:
-  port: ${PORT:8080}
+  port: ${PORT:8001}
 
 management:
   endpoints:

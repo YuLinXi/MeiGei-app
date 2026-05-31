@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # MeiGei 后端本地一键停止脚本
 # 用法：./scripts/dev-stop.sh [--keep-pg]   （不要用 sh）
-#   - 默认同时停 Spring Boot（8080）与 PostgreSQL
+#   - 默认同时停 Spring Boot（8001）与 PostgreSQL
 #   - 加 --keep-pg 只停后端，保留 PG
 
 if [ -z "${BASH_VERSION:-}" ]; then
@@ -12,7 +12,7 @@ set -euo pipefail
 
 PG_BIN="/opt/homebrew/opt/postgresql@16/bin/pg_ctl"
 PG_DATA="/opt/homebrew/var/postgresql@16"
-APP_PORT="${PORT:-8080}"
+APP_PORT="${PORT:-8001}"
 KEEP_PG=false
 [ "${1:-}" = "--keep-pg" ] && KEEP_PG=true
 

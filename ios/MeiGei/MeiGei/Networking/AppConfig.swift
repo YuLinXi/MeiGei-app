@@ -1,10 +1,10 @@
 import Foundation
 
-/// 运行期配置。本地联调指向 brew 起的后端（localhost:8080）。
+/// 运行期配置。本地联调指向 brew 起的后端（localhost:8001）。
 /// 注意：localhost http 需在 Info.plist 配 ATS `NSAllowsLocalNetworking`（联调任务 6.1 处理）。
 enum AppConfig {
     #if DEBUG
-    static let apiBaseURL = URL(string: "http://localhost:8080")!
+    static let apiBaseURL = URL(string: "http://localhost:8001")!
     /// 模拟器无法走真正的 Sign in with Apple，DEBUG 下允许用后端 dev token 造测试用户。
     static let devLoginEnabled = true
     #else
