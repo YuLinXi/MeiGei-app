@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  主 App 的 Info.plist 基底文件（仅放无法用 INFOPLIST_KEY_* 注入的嵌套字典）。
+	  GENERATE_INFOPLIST_FILE=YES 仍会把 HealthKit 用途串 / NSSupportsLiveActivities /
+	  字体 / 场景清单等 INFOPLIST_KEY_* 在构建时 merge 进来，故此处不必重复声明。
+	  NSAllowsLocalNetworking=YES 仅放行本地网络明文 HTTP（DEBUG 连 localhost:8080 后端联调用），
+	  不削弱对公网的 ATS（生产连 https 不受影响），无需 ATS 例外说明。
+	-->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

@@ -509,6 +509,7 @@
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "MeiGei-Info.plist";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "MeiGei 读取你的体重等数据以更准确地计算训练与营养目标。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "MeiGei 将完成的力量训练写入「健康」App。";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
@@ -547,6 +548,7 @@
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "MeiGei-Info.plist";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "MeiGei 读取你的体重等数据以更准确地计算训练与营养目标。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "MeiGei 将完成的力量训练写入「健康」App。";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
