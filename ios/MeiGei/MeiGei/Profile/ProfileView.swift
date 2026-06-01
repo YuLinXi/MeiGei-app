@@ -9,7 +9,6 @@ struct ProfileView: View {
     @Environment(SyncEngine.self) private var syncEngine
 
     @Query private var profiles: [UserProfile]
-    @Query private var goals: [NutritionGoal]
     @Query(filter: #Predicate<Workout> { $0.deletedAt == nil && $0.endedAt != nil })
     private var workouts: [Workout]
 
@@ -18,7 +17,6 @@ struct ProfileView: View {
     @State private var showDesignSystem = false
 
     private var profile: UserProfile? { profiles.first(where: { $0.serverUserId == session.currentUserId }) }
-    private var goal: NutritionGoal? { goals.first }
 
     private var totalWorkouts: Int { workouts.count }
 
@@ -89,8 +87,6 @@ struct ProfileView: View {
 
     private var header: some View {
         let name = profile?.displayName ?? "已登录"
-        let weight = goal?.weightKg ?? 0
-        let height = goal?.heightCm ?? 0
         let years = trainingYears()
         return HStack(spacing: Theme.Spacing.md) {
             avatarCircle(initial: String(name.prefix(1)))
@@ -98,7 +94,7 @@ struct ProfileView: View {
                 Text(name)
                     .font(Theme.Font.display(size: 22, weight: .bold))
                     .foregroundStyle(Theme.Color.fg)
-                Text(subtitleText(weight: weight, height: height, years: years))
+                Text(subtitleText(years: years))
                     .font(Theme.Font.mono(size: 12))
                     .foregroundStyle(Theme.Color.muted)
             }
@@ -120,15 +116,10 @@ struct ProfileView: View {
         Theme.Color.accentCyan,
         Theme.Color.accentMagenta,
         Theme.Color.ok,
-        Theme.Color.macroFat,
     ]
 
-    private func subtitleText(weight: Double, height: Double, years: Double) -> String {
-        var parts: [String] = []
-        if weight > 0 { parts.append("\(formatKg(weight))kg") }
-        if height > 0 { parts.append("\(Int(height))cm") }
-        parts.append("训练龄 \(String(format: "%.1f", years)) 年")
-        return parts.joined(separator: " · ")
+    private func subtitleText(years: Double) -> String {
+        "训练龄 \(String(format: "%.1f", years)) 年"
     }
 
     private func trainingYears() -> Double {
@@ -168,10 +159,6 @@ struct ProfileView: View {
     private var accountGroup: some View {
         groupCard(title: "账户") {
             SetItemRow(icon: "person", label: "个人信息", value: profile?.email, destination: AnyView(PlaceholderDetailView(title: "个人信息")))
-            rowDivider
-            SetItemRow(icon: "scalemass", label: "体重记录", value: goal.map { "\(formatKg($0.weightKg))kg" }, destination: AnyView(PlaceholderDetailView(title: "体重记录")))
-            rowDivider
-            SetItemRow(icon: "target", label: "训练目标", value: goal?.goal.rawValue, destination: AnyView(PlaceholderDetailView(title: "训练目标")))
         }
     }
 

@@ -13,7 +13,7 @@
 - [x] 2.2 [后端] 实现 Apple identityToken 校验（nimbus-jose-jwt + JWKS 缓存），首登建账户、老用户复用，签发自有 JWT
 - [x] 2.3 [后端] 实现 Apple 授权撤销回调端点（验签 + 注销会话 + 删除/匿名化数据）
 - [x] 2.4 [后端] 实现幂等键中间件（Idempotency-Key → 结果映射），覆盖所有写接口
-- [x] 2.5 [后端] 设计通用同步协议：基于 updatedAt 的增量拉取 + 批量上传 + last-write-wins 冲突标记（AbstractSyncService 骨架；具体实体子类在训练/饮食任务实现）
+- [x] 2.5 [后端] 设计通用同步协议：基于 updatedAt 的增量拉取 + 批量上传 + last-write-wins 冲突标记（AbstractSyncService 骨架；具体实体子类在训练任务实现）
 - [x] 2.6 [后端] 接入 Pushy（APNs .p8 token 认证），实现设备 token 注册与推送下发
 - [x] 2.7 [iOS] 实现 Apple 登录流程与会话管理，本地持久化用户与首登邮箱
 - [x] 2.8 [iOS] 实现离线优先同步引擎：本地先写、syncStatus 标记、后台同步、失败重试队列、冲突人工提示
@@ -35,39 +35,28 @@
 - [x] 3.10 [iOS] PR 自动识别与庆祝提示（由原始记录重算，不存冗余统计）
 - [x] 3.11 [iOS] 训练完成写入 HealthKit（力量训练 Workout，含授权流程）
 
-## 4. 饮食模块（nutrition-tracking）
+## 4. Team 模块（team-sharing）
 
-- [ ] 4.1 [数据] 自建 ~1500 条标准食材库：从公开来源逐条采集单条营养事实(7 项营养素/单位含量)并自行编排，不整表照搬成分表汇编、不用未授权转录；记录每条来源备查
-- [x] 4.2 [iOS] 内置食物库 seed 打包，实现离线搜索（标准库优先 + 「标准库/个人」来源标识）
-- [x] 4.3 [后端] 设计自定义食材表（来源 authority|personal，归属 user，参与同步），实现 CRUD + 同步接口
-- [x] 4.4 [iOS] 自定义食材创建（搜不到时补充，标「个人」、不进权威首屏）+ 跨设备同步
-- [x] 4.5 [iOS] 饮食日记记录：按餐次选食材 + 输入分量，自动换算并累计当日合计
-- [x] 4.6 [iOS] 「复制昨天」按餐次复制功能
-- [x] 4.7 [iOS] 首次引导式资料填写 + Mifflin-St Jeor 每日目标计算 + 三大宏量分配
-- [x] 4.8 [iOS] 每日目标手动微调 + 当日各营养素达成进度展示
+- [x] 4.1 [后端] 设计 Team 相关表：team / team_member(角色 Owner|Member) / 邀请码 / 打卡 / 表情回应；约束 ≤10 人、用户 ≤3 Team
+- [x] 4.2 [后端] 实现 Team 创建、邀请码加入（含上限校验）、成员管理、退出/解散
+- [x] 4.3 [后端] 实现计划模板发布到 Team（全员可见）与 Fork（复制 jsonb + forked_from 软指针，原模板增删不影响副本）
+- [x] 4.4 [后端] 实现训练即打卡（保存训练自动生成当日打卡）、Team 内训练数据可见、表情回应；事件触发 APNs 推送
+- [x] 4.5 [iOS] Team 空间界面：创建/加入、成员列表、当日打卡列表（摘要 + 点击看每组详情）
+- [x] 4.6 [iOS] Team 内浏览计划模板 + Fork 到个人
+- [x] 4.7 [iOS] 4 个 emoji 表情回应交互（发送 + 展示 + 推送提醒）
+- [x] 4.8 [iOS] 训练完成生成分享海报（客户端本地渲染，服务端只给结构化数据）
 
-## 5. Team 模块（team-sharing）
-
-- [x] 5.1 [后端] 设计 Team 相关表：team / team_member(角色 Owner|Member) / 邀请码 / 打卡 / 表情回应；约束 ≤10 人、用户 ≤3 Team
-- [x] 5.2 [后端] 实现 Team 创建、邀请码加入（含上限校验）、成员管理、退出/解散
-- [x] 5.3 [后端] 实现计划模板发布到 Team（全员可见）与 Fork（复制 jsonb + forked_from 软指针，原模板增删不影响副本）
-- [x] 5.4 [后端] 实现训练即打卡（保存训练自动生成当日打卡）、Team 内训练数据可见、表情回应；事件触发 APNs 推送
-- [x] 5.5 [iOS] Team 空间界面：创建/加入、成员列表、当日打卡列表（摘要 + 点击看每组详情）
-- [x] 5.6 [iOS] Team 内浏览计划模板 + Fork 到个人
-- [x] 5.7 [iOS] 4 个 emoji 表情回应交互（发送 + 展示 + 推送提醒）
-- [x] 5.8 [iOS] 训练完成生成分享海报（客户端本地渲染，服务端只给结构化数据）
-
-## 6. 联调与验收
+## 5. 联调与验收
 
 > 决策（2026-05-31）：纯后端可脚本化链路由 `scripts/api-e2e.sh` 自动覆盖，验收基线见 `docs/acceptance-checklist.md`。需人盯 UI / 真机能力 / Apple 凭据的部分**不再维护人工 checklist**，留待真机/凭据到位后直接验。模拟器联调脚本 `scripts/ios-sim-dev.sh` 保留为联调辅助。
 
-- [ ] 6.1 端到端联调：登录 → 离线记录 → 同步 → Team 打卡 → 推送 → 表情回应
+- [ ] 5.1 端到端联调：登录 → 离线记录 → 同步 → Team 打卡 → 推送 → 表情回应
   - [x] 服务端链路自动化：`scripts/api-e2e.sh` 双用户跑通 登录→同步(push/pull)→建团/加入→打卡 fan-out→表情（真库断言全过）
   - [ ] iOS App 内真实交互 + 真实 Apple 登录 / APNs 投递：硬阻塞，需真机 + Apple 凭据
-- [ ] 6.2 弱网/离线/多设备冲突场景验证（幂等、last-write-wins、人工提示）
+- [ ] 5.2 弱网/离线/多设备冲突场景验证（幂等、last-write-wins、人工提示）
   - [x] 服务端正确性自动化：`scripts/api-e2e.sh` 断言 幂等(serverTime 重放一致)/LWW 冲突回传 serverValue/较新覆盖
   - [ ] iOS 端时序与冲突提示 UI：待真机/多设备实测
-- [ ] 6.3 HealthKit、Live Activity、Watch Smart Stack 真机验证
+- [ ] 5.3 HealthKit、Live Activity、Watch Smart Stack 真机验证
   - [ ] 硬阻塞（真机 + 签名），待用户侧真机执行
-- [ ] 6.4 TestFlight 灰度发布与回归
+- [ ] 5.4 TestFlight 灰度发布与回归
   - [ ] 硬阻塞（Apple Developer 账号 + 发布签名 + 生产部署），待用户侧执行

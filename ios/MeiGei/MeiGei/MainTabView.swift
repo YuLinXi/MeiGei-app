@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// 主界面 Tab。当前含训练三件套 + 我的；饮食/Team 在后续任务补 tab。
+/// 主界面 Tab：训练三件套 + Team + 我的（饮食模块已移出 MVP）。
 struct MainTabView: View {
     init() {
         // 7.1 Tab bar 黑底配置：避免亮色穿透。
@@ -31,8 +31,6 @@ struct MainTabView: View {
                 .tabItem { Label("计划", systemImage: "list.bullet.rectangle") }
             NavigationStack { ExerciseLibraryView() }
                 .tabItem { Label("动作", systemImage: "dumbbell") }
-            NavigationStack { FoodDiaryView() }
-                .tabItem { Label("饮食", systemImage: "fork.knife") }
             NavigationStack { TeamListView() }
                 .tabItem { Label("Team", systemImage: "person.3") }
             NavigationStack { ProfileView() }

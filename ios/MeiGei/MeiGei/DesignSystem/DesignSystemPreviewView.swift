@@ -55,7 +55,6 @@ struct DesignSystemPreviewView: View {
             ("accentMagenta", Theme.Color.accentMagenta),
             ("danger", Theme.Color.danger),
             ("ok", Theme.Color.ok),
-            ("macroFat", Theme.Color.macroFat),
         ]
         return LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: Theme.Spacing.sm)], spacing: Theme.Spacing.sm) {
             ForEach(items, id: \.0) { name, color in

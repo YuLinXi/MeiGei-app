@@ -11,12 +11,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概览
 
-MeiGei 是一款 iOS 原生健身 App，定位「严肃健身工具」（认真训练 + 严肃饮食 + 小圈子社交）。仓库含两个工程：
+MeiGei 是一款 iOS 原生健身 App，定位「严肃健身工具」（认真训练 + 小圈子社交）。仓库含两个工程：
 
 - `backend/` — Java 21 + Spring Boot 3.3 + MyBatis-Plus + PostgreSQL 16 + Flyway 的 REST 后端。
 - `ios/MeiGei/` — SwiftUI + SwiftData 客户端（最低 iOS 17.4），含主 App、`MeiGeiWidgets` Live Activity extension、测试 target。
 
-三大模块：训练记录（最核心）、饮食记录、Team 共享。开发以 OpenSpec change `openspec/changes/meigei-mvp/` 为权威规格（proposal/design/data-model/tasks + 四份 spec），改动行为前应先读对应 spec。
+两大模块：训练记录（最核心）、Team 共享。开发以 OpenSpec change `openspec/changes/meigei-mvp/` 为权威规格（proposal/design/data-model/tasks + 三份 spec），改动行为前应先读对应 spec。
+
+> **饮食模块已移除**（2026-06-01）：原「严肃饮食」记录（内置食材库 / 自定义食材 / 饮食日记 / 每日营养目标）现阶段不做，相关代码、数据库表、OpenSpec 规格已整体清理，勿再按旧文档恢复。
 
 ## 常用命令
 
@@ -58,11 +60,11 @@ xcodebuild -project MeiGei.xcodeproj -scheme MeiGei \
 
 ## 后端架构
 
-按领域分包于 `com.meigei.*`：`auth`（Apple 登录校验 + 签发 JWT）、`account`、`workout`、`nutrition`、`team`、`sync`、`push`、`idempotency`、`security`、`config`、`common`。
+按领域分包于 `com.meigei.*`：`auth`（Apple 登录校验 + 签发 JWT）、`account`、`workout`、`team`、`sync`、`push`、`idempotency`、`security`、`config`、`common`。
 
 **两类数据流，务必区分：**
 
-1. **同步域（离线优先，客户端权威 + LWW）** —— `sync/AbstractSyncService` 是通用骨架。每个同步实体带 `serverId/localId/updatedAt/deletedAt/version`，push 先按幂等键去重、pull 按 `since` 水位增量；冲突用 last-write-wins + 回传服务端值。涉及实体：`custom_exercise` / `workout_plan`（items 存 jsonb，每项有稳定 itemId）/ `custom_food`，以及 `workout` 聚合根（子树 `workout_exercise`/`workout_set` 无独立信封，随聚合整树上传、服务端按 workoutId 全量替换，ON DELETE CASCADE）。
+1. **同步域（离线优先，客户端权威 + LWW）** —— `sync/AbstractSyncService` 是通用骨架。每个同步实体带 `serverId/localId/updatedAt/deletedAt/version`，push 先按幂等键去重、pull 按 `since` 水位增量；冲突用 last-write-wins + 回传服务端值。涉及实体：`custom_exercise` / `workout_plan`（items 存 jsonb，每项有稳定 itemId），以及 `workout` 聚合根（子树 `workout_exercise`/`workout_set` 无独立信封，随聚合整树上传、服务端按 workoutId 全量替换，ON DELETE CASCADE）。
 2. **服务端权威域（REST，非同步）** —— `team`（建团/邀请码/Fork 计划模板/训练即打卡 fan-out/emoji 表情），共享状态由服务端裁决，客户端进页面拉取，实时靠 APNs 推送（不用 WebSocket）。
 
 **跨领域约定（Day-1 铁律，新增实体必须遵守）：**
@@ -71,7 +73,7 @@ xcodebuild -project MeiGei.xcodeproj -scheme MeiGei \
 - 所有写接口带幂等键（`idempotency` 模块）。
 - UUID v7 由应用层生成（`common/id/Uuid7`，PG16 无原生 uuidv7）。
 - 错误统一经 `common/web/AppException` + `GlobalExceptionHandler` 转 ProblemDetail（404/403/409/400）。
-- 统计（PR/历史曲线/营养汇总）能重算就重算，少存冗余。
+- 统计（PR/历史曲线）能重算就重算，少存冗余。
 
 **已知坑（compact 后勿重踩）：**
 
@@ -81,11 +83,11 @@ xcodebuild -project MeiGei.xcodeproj -scheme MeiGei \
 - `@Valid` 校验失败会 forward 到 `/error`，SecurityConfig 已把 `/error` permitAll（否则 403 而非 400）。
 - **软删墓碑**：MyBatis-Plus `updateById` 不写 `@TableLogic` 字段，墓碑推不上去。新增同步实体须给 mapper 加显式 `@Update softDelete(...)`，push 时 `deletedAt != null` 走 softDelete 而非 updateById（聚合根另需连带删子树）。
 
-数据库：单一 baseline 迁移 `db/migration/V1__baseline.sql`（13 张表），新增 schema 加 `V2__*.sql` 等。
+数据库：单一 baseline 迁移 `db/migration/V1__baseline.sql`（10 张表），新增 schema 加 `V2__*.sql` 等。
 
 ## iOS 架构
 
-源码在 `ios/MeiGei/MeiGei/`，按领域分目录：`App`、`Auth`、`Networking`、`Sync`、`Push`、`Models`、`Persistence`、`Workout`、`Nutrition`、`Team`。
+源码在 `ios/MeiGei/MeiGei/`，按领域分目录：`App`、`Auth`、`Networking`、`Sync`、`Push`、`Models`、`Persistence`、`Workout`、`Team`。
 
 - **SwiftData 仅本地，显式关闭 CloudKit**（`AppModelContainer.make()` 用 `cloudKitDatabase: .none`），云同步全自写。
 - **同步信封 `Syncable` 协议**：`localId`=客户端预生成 UUID v7；`serverId` 为 nil 表示未确认；`SyncStatus`（pendingCreate/Update/Delete/synced/conflicted）+ markDirty/markDeleted。
@@ -99,6 +101,6 @@ xcodebuild -project MeiGei.xcodeproj -scheme MeiGei \
 
 ## 待办与软阻塞
 
-- **数据工程未完**：内置动作（150-200+ 部位高亮图，当前仅 ~26 占位）与标准食材库（~1500 条《中国食物成分表》，当前仅 ~40 占位）尚未采集；6.x 真机联调/验收未做。
+- **数据工程未完**：内置动作（150-200+ 部位高亮图，当前仅 ~26 占位）尚未采集；6.x 真机联调/验收未做。
 - **软阻塞**（需用户侧账号/密钥，不影响写码与编译）：Apple 私钥(.p8)/Service ID/APNs 凭据、Fly.io/Cloudflare 账号。无凭据时登录走 JWKS 仍可联调，APNs 自动降级 no-op。
 - 真 Apple 登录与 APNs 投递需真机 + 签名 + Apple 凭据；DEBUG 连 localhost:8001 需在 Info.plist 配 ATS `NSAllowsLocalNetworking`（当前无独立 Info.plist，留到联调时建）。

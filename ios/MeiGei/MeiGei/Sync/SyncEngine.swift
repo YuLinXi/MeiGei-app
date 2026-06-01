@@ -29,7 +29,6 @@ final class SyncEngine {
         defer { isSyncing = false }
         await runSafely { try await self.syncCustomExercises() }
         await runSafely { try await self.syncWorkoutPlans() }
-        await runSafely { try await self.syncCustomFoods() }
         await runSafely { try await self.syncWorkouts() }
         try? modelContext.save()
     }
@@ -153,50 +152,6 @@ final class SyncEngine {
             if dto.updatedAt > local.updatedAt { applyServer(dto, to: local) }
         } else if dto.deletedAt == nil {
             let m = WorkoutPlan(localId: dto.id, name: dto.name, now: dto.updatedAt)
-            applyServer(dto, to: m)
-            modelContext.insert(m)
-        }
-    }
-
-    // MARK: - CustomFood
-
-    private func syncCustomFoods() async throws {
-        let all = try modelContext.fetch(FetchDescriptor<CustomFood>())
-        let pending = all.filter { isPending($0.syncStatus) }
-        if !pending.isEmpty {
-            let dtos = pending.map(dto(from:))
-            let res: SyncPushResult<CustomFoodDTO> = try await push(
-                .customFoods, dtos, idParts: pending.map { "\($0.localId):\($0.updatedAt.timeIntervalSince1970)" })
-            applyPushResult(res, domain: .customFoods, lookup: { id in all.first { $0.localId == id } }, apply: applyServer(_:to:))
-        }
-        let pulled: SyncPullResult<CustomFoodDTO> = try await pull(.customFoods)
-        for dto in pulled.changes { upsert(dto) }
-        SyncDomain.customFoods.since = pulled.serverTime
-    }
-
-    private func dto(from m: CustomFood) -> CustomFoodDTO {
-        CustomFoodDTO(id: m.localId, userId: nil, name: m.name, source: m.source, unitBasis: m.unitBasis,
-                      kcal: m.kcal, proteinG: m.proteinG, carbG: m.carbG, fatG: m.fatG,
-                      fiberG: m.fiberG, sugarG: m.sugarG, sodiumMg: m.sodiumMg,
-                      createdAt: nil, updatedAt: m.updatedAt, deletedAt: m.deletedAt, version: m.version)
-    }
-
-    private func applyServer(_ dto: CustomFoodDTO, to m: CustomFood) {
-        m.name = dto.name; m.source = dto.source; m.unitBasis = dto.unitBasis
-        m.kcal = dto.kcal; m.proteinG = dto.proteinG; m.carbG = dto.carbG; m.fatG = dto.fatG
-        m.fiberG = dto.fiberG; m.sugarG = dto.sugarG; m.sodiumMg = dto.sodiumMg
-        m.updatedAt = dto.updatedAt; m.deletedAt = dto.deletedAt
-        m.version = dto.version ?? m.version
-        m.serverId = dto.id; m.syncStatus = .synced
-    }
-
-    private func upsert(_ dto: CustomFoodDTO) {
-        let all = (try? modelContext.fetch(FetchDescriptor<CustomFood>())) ?? []
-        if let local = all.first(where: { $0.localId == dto.id }) {
-            if dto.deletedAt != nil { modelContext.delete(local); return }
-            if dto.updatedAt > local.updatedAt { applyServer(dto, to: local) }
-        } else if dto.deletedAt == nil {
-            let m = CustomFood(localId: dto.id, name: dto.name, source: dto.source, unitBasis: dto.unitBasis, now: dto.updatedAt)
             applyServer(dto, to: m)
             modelContext.insert(m)
         }
@@ -330,8 +285,5 @@ extension CustomExerciseDTO: HasEnvelopeId {
     var envelopeId: UUID { id }; var envelopeName: String { name }
 }
 extension WorkoutPlanDTO: HasEnvelopeId {
-    var envelopeId: UUID { id }; var envelopeName: String { name }
-}
-extension CustomFoodDTO: HasEnvelopeId {
     var envelopeId: UUID { id }; var envelopeName: String { name }
 }

@@ -5,7 +5,6 @@ import CryptoKit
 enum SyncDomain: String, CaseIterable {
     case customExercises = "custom-exercises"
     case workoutPlans = "workout-plans"
-    case customFoods = "custom-foods"
     case workouts = "workouts"
 
     var pullPath: String { "/sync/\(rawValue)/pull" }

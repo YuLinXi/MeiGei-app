@@ -34,7 +34,7 @@
 
 ### Requirement: 离线优先的本地存储与同步
 
-系统 SHALL 以客户端本地存储为训练记录、饮食记录、自定义食材的编辑真相来源，写操作 MUST 先落本地再异步同步到服务端。所有可同步对象 MUST 携带 `serverId`、`localId`、`updatedAt`、`deletedAt`、`version` 字段，并维护 `syncStatus` 与失败重试队列。
+系统 SHALL 以客户端本地存储为训练记录、自定义动作的编辑真相来源，写操作 MUST 先落本地再异步同步到服务端。所有可同步对象 MUST 携带 `serverId`、`localId`、`updatedAt`、`deletedAt`、`version` 字段，并维护 `syncStatus` 与失败重试队列。
 
 #### Scenario: 离线记录训练
 - **WHEN** 用户在无网络环境下保存一条训练记录

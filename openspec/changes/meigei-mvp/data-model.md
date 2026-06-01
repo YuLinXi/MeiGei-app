@@ -13,7 +13,7 @@
 3. **逻辑删除**：所有查询默认 `WHERE deleted_at IS NULL`（MyBatis-Plus `@TableLogic` 映射到 `deleted_at`）。
 4. **枚举**：用 `text + CHECK` 而非原生 enum，便于演进。
 5. **Team 域为服务端权威**（D2）：`team*` 不带 `localId/syncStatus`，走 APNs + 进页面拉取；仍用 UUID v7 主键、写操作仍走幂等键（D4）。
-6. **内置目录不入库**：150-200 内置动作、~1500 标准食材随 App 包发布（只读 seed），**不建数据库表**。训练/饮食记录通过 `builtin_*_code`（稳定字符串码）引用，并**快照名称**到记录行，保证服务端与队友端无需内置目录即可展示。
+6. **内置目录不入库**：150-200 内置动作随 App 包发布（只读 seed），**不建数据库表**。训练记录通过 `builtin_exercise_code`（稳定字符串码）引用，并**快照名称**到记录行，保证服务端与队友端无需内置目录即可展示。
 
 ### 全局 ER 图
 
@@ -24,9 +24,6 @@ erDiagram
     app_user ||--o{ custom_exercise : owns
     app_user ||--o{ workout_plan : owns
     app_user ||--o{ workout : logs
-    app_user ||--o{ custom_food : owns
-    app_user ||--o{ diet_entry : logs
-    app_user ||--o| nutrition_target : "1:1 目标"
     app_user ||--o{ team_member : joins
     app_user ||--o{ checkin_reaction : gives
 
@@ -36,8 +33,6 @@ erDiagram
     workout_plan |o--o{ workout : "可发起自"
     workout_plan |o--o| workout_plan : "forked_from(软指针)"
     workout_plan |o--o| team : "可发布到"
-
-    custom_food |o--o{ diet_entry : "可被引用"
 
     team ||--o{ team_member : has
     team ||--o{ team_checkin : receives
@@ -193,82 +188,7 @@ CREATE INDEX idx_set_exercise ON workout_set(workout_exercise_id);
 
 ---
 
-## 3. 饮食域（nutrition-tracking）
-
-营养素一律「每 100 单位含量」存储，记录行按分量换算并**快照**当下营养值，使历史不受食材后续编辑影响；当日合计为重算（不持久化，Non-Goal）。
-
-```sql
--- 用户自定义食材（标准库为 App 内置 seed，不入库）
-CREATE TABLE custom_food (
-    id          uuid PRIMARY KEY,
-    user_id     uuid NOT NULL REFERENCES app_user(id),
-    name        text NOT NULL,
-    source      text NOT NULL DEFAULT 'personal' CHECK (source IN ('personal')),
-    unit_basis  text NOT NULL DEFAULT '100g',   -- 营养值基准
-    kcal        numeric(8,2) NOT NULL,
-    protein_g   numeric(8,2) NOT NULL,
-    carb_g      numeric(8,2) NOT NULL,
-    fat_g       numeric(8,2) NOT NULL,
-    fiber_g     numeric(8,2) NOT NULL,
-    sugar_g     numeric(8,2) NOT NULL,
-    sodium_mg   numeric(8,2) NOT NULL,
-    created_at  timestamptz NOT NULL,
-    updated_at  timestamptz NOT NULL,
-    deleted_at  timestamptz,
-    version     int NOT NULL DEFAULT 0
-);
-CREATE INDEX idx_food_user ON custom_food(user_id) WHERE deleted_at IS NULL;
-
--- 饮食日记条目（聚合根带同步信封）；按餐次记录，营养值快照
-CREATE TABLE diet_entry (
-    id                uuid PRIMARY KEY,
-    user_id           uuid NOT NULL REFERENCES app_user(id),
-    log_date          date NOT NULL,
-    meal_type         text NOT NULL CHECK (meal_type IN ('breakfast','lunch','dinner','snack')),
-    builtin_food_code text,                    -- 三选一来源
-    custom_food_id    uuid,                     -- 三选一（软指针无 FK）
-    food_name         text NOT NULL,            -- 快照
-    amount_g          numeric(8,2) NOT NULL,
-    -- 以下为「每 100 单位」营养快照，乘 amount_g/100 得本条贡献；当日合计 = 重算 SUM
-    kcal_per100       numeric(8,2) NOT NULL,
-    protein_per100    numeric(8,2) NOT NULL,
-    carb_per100       numeric(8,2) NOT NULL,
-    fat_per100        numeric(8,2) NOT NULL,
-    fiber_per100      numeric(8,2) NOT NULL,
-    sugar_per100      numeric(8,2) NOT NULL,
-    sodium_per100     numeric(8,2) NOT NULL,
-    created_at        timestamptz NOT NULL,
-    updated_at        timestamptz NOT NULL,
-    deleted_at        timestamptz,
-    version           int NOT NULL DEFAULT 0
-);
-CREATE INDEX idx_diet_user_date ON diet_entry(user_id, log_date) WHERE deleted_at IS NULL;
-
--- 每日营养目标（每用户一行）；存输入资料 + 最终目标值（手动微调后覆盖推荐）
-CREATE TABLE nutrition_target (
-    id              uuid PRIMARY KEY,
-    user_id         uuid NOT NULL REFERENCES app_user(id),
-    height_cm       numeric(5,1),
-    weight_kg       numeric(5,1),
-    age             int,
-    sex             text CHECK (sex IN ('male','female')),
-    activity_level  text CHECK (activity_level IN ('sedentary','light','moderate','active','very_active')),
-    goal            text CHECK (goal IN ('cut','bulk','maintain')),
-    target_kcal     numeric(8,2),
-    target_protein_g numeric(8,2),
-    target_carb_g    numeric(8,2),
-    target_fat_g     numeric(8,2),
-    created_at      timestamptz NOT NULL,
-    updated_at      timestamptz NOT NULL,
-    deleted_at      timestamptz,
-    version         int NOT NULL DEFAULT 0,
-    CONSTRAINT uq_target_user UNIQUE (user_id)
-);
-```
-
----
-
-## 4. Team 域（team-sharing，服务端权威）
+## 3. Team 域（team-sharing，服务端权威）
 
 成员上限（≤10/Team、用户 ≤3 Team）在应用层校验（MVP 不用 DB 触发器）。
 
@@ -326,8 +246,8 @@ CREATE INDEX idx_reaction_checkin ON checkin_reaction(checkin_id);
 
 ## 设计要点与权衡小结
 
-- **软指针 vs 外键**：`forked_from / plan_id / workout_id / custom_*_id`（被记录引用的那一侧）一律不设 FK，确保「原对象删除不破坏副本/历史」；强归属关系（子表→聚合根、identity→user）才用 FK。
-- **快照字段**：`exercise_name/primary_muscle`、`food_name + *_per100`、`team_checkin.summary` 为有意冗余——它们是「成交时的事实」，不是派生统计，故与「不持久化派生统计」不冲突。派生量（PR、容量、当日营养合计、曲线）一律重算。
-- **同步信封 vs 服务端权威**：训练/饮食/自定义动作食材/目标带完整信封参与离线同步；Team 域只用 UUID + 幂等，不带本地同步状态。
+- **软指针 vs 外键**：`forked_from / plan_id / workout_id / custom_exercise_id`（被记录引用的那一侧）一律不设 FK，确保「原对象删除不破坏副本/历史」；强归属关系（子表→聚合根、identity→user）才用 FK。
+- **快照字段**：`exercise_name/primary_muscle`、`team_checkin.summary` 为有意冗余——它们是「成交时的事实」，不是派生统计，故与「不持久化派生统计」不冲突。派生量（PR、容量、曲线）一律重算。
+- **同步信封 vs 服务端权威**：训练/自定义动作带完整信封参与离线同步；Team 域只用 UUID + 幂等，不带本地同步状态。
 - **UUID v7 的现实**：PG 16 无原生函数，统一由应用层生成；待迁移到 PG 18 可改用 `uuidv7()` 默认值。
-- **待后续细化**：jsonb（`workout_plan.items`、`team_checkin.summary`）的 JSON Schema 校验；标准库 seed 的本地存储形态（SQLite 只读 vs SwiftData 预置）。
+- **待后续细化**：jsonb（`workout_plan.items`、`team_checkin.summary`）的 JSON Schema 校验。

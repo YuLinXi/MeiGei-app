@@ -213,12 +213,11 @@ struct TeamDetailView: View {
 
     private var isOwner: Bool { team.ownerUserId == session.currentUserId }
 
-    /// 4 档颜色 hash 头像配色。
+    /// 3 档颜色 hash 头像配色。
     private static let avatarPalette: [Color] = [
         Theme.Color.accentCyan,
         Theme.Color.accentMagenta,
         Theme.Color.ok,
-        Theme.Color.macroFat,
     ]
 
     var body: some View {

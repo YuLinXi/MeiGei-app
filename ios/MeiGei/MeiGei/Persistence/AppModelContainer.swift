@@ -15,9 +15,6 @@ enum AppModelContainer {
         Workout.self,
         WorkoutExercise.self,
         WorkoutSet.self,
-        CustomFood.self,
-        FoodEntry.self,
-        NutritionGoal.self,
     ])
 
     static func make(inMemory: Bool = false) -> ModelContainer {

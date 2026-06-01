@@ -62,19 +62,3 @@ App SHALL 加载 JetBrains Mono 字体用于所有等宽数字展示（训练量
 - **WHEN** ExerciseLibraryView 渲染部位筛选 chips
 - **THEN** 使用 `HorizontalChipPicker`，传入 `[全部, 胸, 背, 腿, 肩, 手臂, 核心]`，默认选中第 0 个。
 
-#### Scenario: 食材选择器分类
-- **WHEN** FoodPickerView 渲染分类 chips
-- **THEN** 使用同一个 `HorizontalChipPicker`，复用相同样式 token。
-
-### Requirement: 宏量色补充语义 `macroFat`
-
-设计系统 SHALL 在 Assets 新增一个 colorset `macroFat`（暖橙，目标 `oklch(72% 0.18 35)`，对应 sRGB 由 `scripts/oklch_to_srgb.*` 离线生成）。该颜色 MUST 仅用于「饮食 - 脂肪进度条」语义；视图代码 MUST NOT 在非饮食模块或非脂肪语义下引用该颜色。
-
-#### Scenario: 饮食日记脂肪进度条
-- **WHEN** 渲染脂肪宏量进度条
-- **THEN** 进度填充使用 `Theme.Color.macroFat`，其余进度条使用 cyan / blue。
-
-#### Scenario: 非脂肪语义引用
-- **WHEN** 视图试图把 `macroFat` 用于非脂肪 UI（如 PR 卡 / 错误提示）
-- **THEN** Code review MUST 拒绝该提交，迁移到 `accentMagenta` / `danger` / `accentCyan` 等正确语义色。
-

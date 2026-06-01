@@ -71,25 +71,6 @@ struct WorkoutPlanDTO: Codable {
     var version: Int?
 }
 
-struct CustomFoodDTO: Codable {
-    var id: UUID
-    var userId: UUID?
-    var name: String
-    var source: String
-    var unitBasis: String
-    var kcal: Double?
-    var proteinG: Double?
-    var carbG: Double?
-    var fatG: Double?
-    var fiberG: Double?
-    var sugarG: Double?
-    var sodiumMg: Double?
-    var createdAt: Date?
-    var updatedAt: Date
-    var deletedAt: Date?
-    var version: Int?
-}
-
 // MARK: - 训练聚合树（workout + 动作/组子树）
 
 struct WorkoutDTO: Codable {
