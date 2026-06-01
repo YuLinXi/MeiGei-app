@@ -6,12 +6,17 @@
 	  主 App 的 Info.plist 基底文件（仅放无法用 INFOPLIST_KEY_* 注入的嵌套字典）。
 	  GENERATE_INFOPLIST_FILE=YES 仍会把 HealthKit 用途串 / NSSupportsLiveActivities /
 	  字体 / 场景清单等 INFOPLIST_KEY_* 在构建时 merge 进来，故此处不必重复声明。
-	  NSAllowsLocalNetworking=YES 仅放行本地网络明文 HTTP（DEBUG 连 localhost:8001 后端联调用），
-	  不削弱对公网的 ATS（生产连 https 不受影响），无需 ATS 例外说明。
+
+	  临时：真机联调连服务器公网 IP 明文 HTTP（http://124.222.79.121:8080）。
+	  公网 IP 无法签 HTTPS 证书，故全局放行明文。
+	  注意：NSAllowsArbitraryLoads 与 NSAllowsLocalNetworking 不能并存——iOS 10+ 一旦出现
+	  NSAllowsLocalNetworking，NSAllowsArbitraryLoads 会被忽略、回退默认 ATS，导致公网明文仍被拦。
+	  故这里只留 NSAllowsArbitraryLoads（它本身已放行一切，含 localhost）。
+	  备案后 App 切到 https://meigei.peipadada.com 时，务必删除整个 NSAppTransportSecurity 字典。
 	-->
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsLocalNetworking</key>
+		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
 </dict>
