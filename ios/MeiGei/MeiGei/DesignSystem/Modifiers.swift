@@ -86,6 +86,19 @@ extension View {
     }
 }
 
+/// 按压微反馈样式：按下时轻微缩小（0.97，不引发布局位移）+ 降不透明度，`.easeOut(0.12)`。
+/// 尊重「减弱动态效果」：开启 `accessibilityReduceMotion` 时退化为仅不透明度变化、不缩放。
+struct PressableButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(reduceMotion ? 1.0 : (configuration.isPressed ? 0.97 : 1.0))
+            .opacity(configuration.isPressed ? 0.92 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
 private struct NeonGlowModifier: ViewModifier {
     let color: SwiftUI.Color
     let intensity: Theme.GlowIntensity

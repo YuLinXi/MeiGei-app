@@ -16,13 +16,9 @@ struct PlanListView: View {
     @State private var creatingNew = false
 
     /// 「进行中」= 最近 14 天内有 workout 关联 planId 的计划；
-    /// 否则取最近更新的一个；若无任何计划则为 nil。
+    /// 否则取最近更新的一个；若无任何计划则为 nil。判定逻辑复用 `WorkoutPlan.active`，与首页一致。
     private var activePlan: WorkoutPlan? {
-        let cutoff = Date().addingTimeInterval(-14 * 86_400)
-        let recentPlanIds = Set(workouts
-            .filter { $0.endedAt != nil && $0.startedAt > cutoff && $0.planId != nil }
-            .compactMap { $0.planId })
-        return plans.first(where: { recentPlanIds.contains($0.localId) }) ?? plans.first
+        WorkoutPlan.active(in: plans, workouts: workouts)
     }
 
     private var otherPlans: [WorkoutPlan] {

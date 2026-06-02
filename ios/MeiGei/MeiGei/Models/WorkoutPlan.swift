@@ -74,3 +74,18 @@ final class WorkoutPlan: Syncable {
         self.sharedToTeamId = sharedToTeamId
     }
 }
+
+extension WorkoutPlan {
+    /// 「进行中」计划判定——首页开始 CTA 与「计划」页共用同一份逻辑，避免两处漂移。
+    /// 优先取近 14 天内有关联已完成训练的计划；否则退回最近更新的一个；无计划为 nil。
+    /// - Parameters:
+    ///   - plans: 有效计划集（调用方按 `updatedAt` 倒序传入）。
+    ///   - workouts: 训练集，用于判定近 14 天关联。
+    static func active(in plans: [WorkoutPlan], workouts: [Workout], now: Date = .now) -> WorkoutPlan? {
+        let cutoff = now.addingTimeInterval(-14 * 86_400)
+        let recentPlanIds = Set(workouts
+            .filter { $0.endedAt != nil && $0.startedAt > cutoff && $0.planId != nil }
+            .compactMap { $0.planId })
+        return plans.first(where: { recentPlanIds.contains($0.localId) }) ?? plans.first
+    }
+}
