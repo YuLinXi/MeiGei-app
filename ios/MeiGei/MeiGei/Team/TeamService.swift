@@ -85,8 +85,10 @@ final class TeamService {
         let body = CheckInRequest(workoutId: workout.localId,
                                   checkinDate: Self.dateOnly(workout.startedAt),
                                   summary: CheckinSummary(workout: workout))
+        // 幂等键含 updatedAt：首次打卡去重；编辑训练后 updatedAt 变化 → 新键穿透幂等过滤，
+        // 后端按 (team,user,workout) 更新摘要快照。
         return try await api.send("POST", "/checkins", body: body,
-                                  idempotencyKey: "checkin-\(workout.localId.uuidString)")
+                                  idempotencyKey: "checkin-\(workout.localId.uuidString):\(workout.updatedAt.timeIntervalSince1970)")
     }
 
     // MARK: - 工具

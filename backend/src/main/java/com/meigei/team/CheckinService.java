@@ -55,8 +55,13 @@ public class CheckinService {
         List<Team> teams = teamMapper.findByMember(userId);
         List<TeamCheckin> created = new ArrayList<>();
         for (Team team : teams) {
-            if (checkinMapper.findByTeamUserWorkout(team.getId(), userId, workoutId) != null) {
-                continue; // 已打卡，幂等跳过
+            TeamCheckin existing = checkinMapper.findByTeamUserWorkout(team.getId(), userId, workoutId);
+            if (existing != null) {
+                // 已打卡：编辑训练后更新摘要快照（不重复推送），保持本地与 Team 一致。
+                existing.setSummary(summary);
+                existing.setCheckinDate(date);
+                checkinMapper.updateById(existing);
+                continue;
             }
             TeamCheckin c = new TeamCheckin();
             c.setId(Uuid7.generate());
@@ -76,6 +81,15 @@ public class CheckinService {
     public List<TeamCheckin> listCheckins(UUID userId, UUID teamId, LocalDate date) {
         teamService.requireMember(teamId, userId);
         return checkinMapper.findByTeamAndDate(teamId, date);
+    }
+
+    /**
+     * 训练被删除时连带移除其在所有 Team 的打卡，保持「删除后不再计入」与 Team 视图一致。
+     * 表情回应由 checkin_reaction 的 ON DELETE CASCADE 自动清理。
+     */
+    @Transactional
+    public void removeForWorkout(UUID userId, UUID workoutId) {
+        checkinMapper.deleteByUserWorkout(userId, workoutId);
     }
 
     /** 表情回应：一人一打卡仅一条，重复回应更新表情。推送给打卡主人。 */

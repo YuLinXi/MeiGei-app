@@ -270,8 +270,10 @@ struct WorkoutCalendarView: View {
     @Query(filter: #Predicate<Workout> { $0.deletedAt == nil && $0.endedAt != nil },
            sort: \Workout.startedAt, order: .reverse)
     private var workouts: [Workout]
+    @Environment(\.modelContext) private var modelContext
     @State private var month: Date = .now
     @State private var selected: Date = .now
+    @State private var pendingDelete: Workout?
 
     private var cal: Calendar { Calendar.current }
 
@@ -308,6 +310,11 @@ struct WorkoutCalendarView: View {
                                     .foregroundStyle(Theme.Color.muted)
                             }
                         }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) { pendingDelete = w } label: {
+                                Label("删除", systemImage: "trash")
+                            }
+                        }
                     }
                 }
             }
@@ -317,6 +324,15 @@ struct WorkoutCalendarView: View {
         .navigationTitle("日历")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: Workout.self) { WorkoutLoggingView(workout: $0) }
+        .confirmationDialog("删除这次训练？", isPresented: Binding(
+            get: { pendingDelete != nil },
+            set: { if !$0 { pendingDelete = nil } }), presenting: pendingDelete) { w in
+            Button("删除", role: .destructive) {
+                w.markDeleted()
+                try? modelContext.save()
+            }
+            Button("取消", role: .cancel) {}
+        } message: { _ in Text("删除后将从列表移除、不再计入统计，且同步到云端。") }
     }
 
     private func shift(_ months: Int) {

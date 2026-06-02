@@ -47,6 +47,15 @@ final class Workout: Syncable {
     }
 }
 
+// MARK: - 会话生命周期派生状态（不新增持久化字段，见 workout-session-lifecycle）
+
+extension Workout {
+    /// 进行中会话：未删除且未结束。全局至多一个（由 `WorkoutSession.beginSession` 守卫保证）。
+    var isActive: Bool { deletedAt == nil && endedAt == nil }
+    /// 已完成会话：未删除且已结束。
+    var isFinished: Bool { deletedAt == nil && endedAt != nil }
+}
+
 /// 训练中的一个动作条目（聚合子节点，不单独同步）。
 @Model
 final class WorkoutExercise {

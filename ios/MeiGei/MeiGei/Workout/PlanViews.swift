@@ -180,6 +180,10 @@ struct PlanDetailView: View {
     @State private var editingItem: PlanItem?
     @State private var editing = false
     @State private var decodeError: String?
+    /// 单一活跃会话守卫：冲突态 + 待新建闭包 + 导航打开的会话。
+    @State private var conflict: Workout?
+    @State private var pendingBuild: (() -> Workout)?
+    @State private var startedSession: Workout?
 
     private static let log = Logger(subsystem: "com.yulinxi.app.MeiGei", category: "PlanDetail")
 
@@ -263,6 +267,18 @@ struct PlanDetailView: View {
         .sheet(isPresented: $editing) {
             PlanRenameSheet(plan: plan)
         }
+        .navigationDestination(item: $startedSession) { WorkoutLoggingView(workout: $0) }
+        .confirmationDialog("已有进行中的训练", isPresented: Binding(
+            get: { conflict != nil },
+            set: { if !$0 { conflict = nil; pendingBuild = nil } }), presenting: conflict) { existing in
+            Button("继续训练") { startedSession = existing; pendingBuild = nil }
+            Button("丢弃并开始新训练", role: .destructive) {
+                WorkoutSession.discard(existing, in: modelContext)
+                if let build = pendingBuild { commit(build) }
+                pendingBuild = nil
+            }
+            Button("取消", role: .cancel) { pendingBuild = nil }
+        } message: { _ in Text("同一时间只能有一个进行中的训练。继续既有训练，或丢弃后开始新的。") }
     }
 
     private var header: some View {
@@ -432,7 +448,17 @@ struct PlanDetailView: View {
         try? modelContext.save()
     }
 
+    /// 单一活跃会话守卫：存在进行中会话时弹「继续 / 丢弃」，否则新建并进入。
     private func startWorkout() {
+        if let existing = WorkoutSession.activeSession(in: modelContext) {
+            pendingBuild = buildFromPlan
+            conflict = existing
+        } else {
+            commit(buildFromPlan)
+        }
+    }
+
+    private func buildFromPlan() -> Workout {
         let w = Workout(planId: plan.localId, title: plan.name)
         for (i, item) in orderedItems.enumerated() {
             let ex = WorkoutExercise(
@@ -445,9 +471,14 @@ struct PlanDetailView: View {
             ex.sets = (0..<count).map { idx in WorkoutSet(setIndex: idx) }
             w.exercises.append(ex)
         }
+        return w
+    }
+
+    private func commit(_ build: () -> Workout) {
+        let w = build()
         modelContext.insert(w)
         try? modelContext.save()
-        dismiss()
+        startedSession = w
     }
 
     private func delete() {

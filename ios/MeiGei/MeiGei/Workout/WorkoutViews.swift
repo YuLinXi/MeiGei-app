@@ -12,11 +12,21 @@ struct WorkoutListView: View {
     @Query(filter: #Predicate<WorkoutPlan> { $0.deletedAt == nil },
            sort: \WorkoutPlan.updatedAt, order: .reverse)
     private var plans: [WorkoutPlan]
-    @State private var active: Workout?
-    @State private var choosingPlan = false
+    /// 导航打开的会话（点横幅继续 / 新建后进入 Live 记录界面）。
+    @State private var openedSession: Workout?
+    /// 单一活跃会话守卫：存在进行中会话时暂存「继续 / 丢弃」冲突态与待新建闭包。
+    @State private var conflict: Workout?
+    @State private var pendingBuild: (() -> Workout)?
+    /// 待删除的已完成训练（左滑删除二次确认）。
+    @State private var pendingDelete: Workout?
+
+    /// 当前唯一进行中会话（首页横幅来源）。
+    private var activeSession: Workout? { workouts.first(where: { $0.isActive }) }
+    /// 已完成训练（最近列表 / 统计仅看这些，进行中会话不混入）。
+    private var finishedWorkouts: [Workout] { workouts.filter { $0.isFinished } }
 
     private var stats: WeeklyStats {
-        WorkoutWeeklyStats.compute(workouts: workouts)
+        WorkoutWeeklyStats.compute(workouts: finishedWorkouts)
     }
     /// 本周已完成训练（按 startedAt 落入本周）的次数。
     private var weeklyDoneCount: Int { stats.sessionCount }
@@ -47,6 +57,7 @@ struct WorkoutListView: View {
             Theme.Color.bg.ignoresSafeArea()
             ScrollView {
                 VStack(spacing: Theme.Spacing.lg) {
+                    if let active = activeSession { continueBanner(active) }
                     heroSection
                     statsGrid
                     recentSection
@@ -80,7 +91,65 @@ struct WorkoutListView: View {
             }
         }
         .navigationDestination(for: Workout.self) { WorkoutLoggingView(workout: $0) }
-        .navigationDestination(item: $active) { WorkoutLoggingView(workout: $0) }
+        .navigationDestination(item: $openedSession) { WorkoutLoggingView(workout: $0) }
+        .confirmationDialog("已有进行中的训练", isPresented: Binding(
+            get: { conflict != nil },
+            set: { if !$0 { conflict = nil; pendingBuild = nil } }), presenting: conflict) { existing in
+            Button("继续训练") { openedSession = existing; pendingBuild = nil }
+            Button("丢弃并开始新训练", role: .destructive) {
+                WorkoutSession.discard(existing, in: modelContext)
+                if let build = pendingBuild { commit(build) }
+                pendingBuild = nil
+            }
+            Button("取消", role: .cancel) { pendingBuild = nil }
+        } message: { _ in Text("同一时间只能有一个进行中的训练。继续既有训练，或丢弃后开始新的。") }
+        .confirmationDialog("删除这次训练？", isPresented: Binding(
+            get: { pendingDelete != nil },
+            set: { if !$0 { pendingDelete = nil } }), presenting: pendingDelete) { w in
+            Button("删除", role: .destructive) {
+                w.markDeleted()
+                try? modelContext.save()
+            }
+            Button("取消", role: .cancel) {}
+        } message: { _ in Text("删除后将从列表移除、不再计入统计，且同步到云端。") }
+    }
+
+    // MARK: 继续训练横幅（仅在存在进行中会话时显示）
+
+    private func continueBanner(_ w: Workout) -> some View {
+        let totalSets = w.exercises.reduce(0) { $0 + $1.sets.count }
+        let doneSets = w.exercises.flatMap(\.sets).filter(\.completed).count
+        return Button { openedSession = w } label: {
+            HStack(spacing: Theme.Spacing.md) {
+                ZStack {
+                    Circle().fill(Theme.Color.danger.opacity(0.15)).frame(width: 44, height: 44)
+                    Image(systemName: "figure.run")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Theme.Color.danger)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("LIVE · 进行中").eyebrowStyle().foregroundStyle(Theme.Color.danger)
+                    Text(w.title ?? "训练")
+                        .font(Theme.Font.body(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.Color.fg)
+                    Text("\(w.exercises.count) 动作 · \(doneSets)/\(totalSets) 组完成")
+                        .font(Theme.Font.body(size: 12))
+                        .foregroundStyle(Theme.Color.fg2)
+                }
+                Spacer()
+                HStack(spacing: 4) {
+                    Text("继续").font(Theme.Font.body(size: 14, weight: .semibold))
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(Theme.Color.danger)
+            }
+            .cardStyle()
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.md)
+                    .stroke(Theme.Color.danger.opacity(0.55), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Hero
@@ -146,7 +215,8 @@ struct WorkoutListView: View {
     // MARK: 最近训练
 
     private var recentSection: some View {
-        let recent = Array(workouts.prefix(8))
+        // 仅展示已完成训练，进行中会话由顶部横幅承载，不混入常规行。
+        let recent = Array(finishedWorkouts.prefix(8))
         return VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             HStack {
                 Text("RECENT · 最近训练").eyebrowStyle()
@@ -161,10 +231,10 @@ struct WorkoutListView: View {
             } else {
                 VStack(spacing: Theme.Spacing.sm) {
                     ForEach(recent) { w in
-                        NavigationLink(value: w) {
-                            recentRow(w)
-                        }
-                        .buttonStyle(.plain)
+                        SwipeToDeleteCard(
+                            onTap: { openedSession = w },
+                            onDelete: { pendingDelete = w }
+                        ) { recentRow(w) }
                     }
                 }
             }
@@ -239,27 +309,90 @@ struct WorkoutListView: View {
 
     // MARK: actions
 
-    private func startBlank() {
-        let w = Workout(title: "训练")
+    /// 单一活跃会话守卫：存在进行中会话时弹「继续 / 丢弃」，否则直接新建并进入。
+    private func beginSession(_ build: @escaping () -> Workout) {
+        if let existing = WorkoutSession.activeSession(in: modelContext) {
+            pendingBuild = build
+            conflict = existing
+        } else {
+            commit(build)
+        }
+    }
+
+    private func commit(_ build: () -> Workout) {
+        let w = build()
         modelContext.insert(w)
         try? modelContext.save()
-        active = w
+        openedSession = w
+    }
+
+    private func startBlank() {
+        beginSession { Workout(title: "训练") }
     }
 
     private func start(from plan: WorkoutPlan) {
-        let w = Workout(planId: plan.localId, title: plan.name)
-        for item in plan.items.sorted(by: { $0.orderIndex < $1.orderIndex }) {
-            let ex = WorkoutExercise(builtinExerciseCode: item.builtinExerciseCode,
-                                     customExerciseId: item.customExerciseId,
-                                     exerciseName: item.exerciseName,
-                                     primaryMuscle: nil, orderIndex: item.orderIndex)
-            let count = max(item.suggestedSets ?? 1, 1)
-            ex.sets = (0..<count).map { WorkoutSet(setIndex: $0, weightKg: nil, reps: item.suggestedReps) }
-            w.exercises.append(ex)
+        beginSession {
+            let w = Workout(planId: plan.localId, title: plan.name)
+            for item in plan.items.sorted(by: { $0.orderIndex < $1.orderIndex }) {
+                let ex = WorkoutExercise(builtinExerciseCode: item.builtinExerciseCode,
+                                         customExerciseId: item.customExerciseId,
+                                         exerciseName: item.exerciseName,
+                                         primaryMuscle: nil, orderIndex: item.orderIndex)
+                let count = max(item.suggestedSets ?? 1, 1)
+                ex.sets = (0..<count).map { WorkoutSet(setIndex: $0, weightKg: nil, reps: item.suggestedReps) }
+                w.exercises.append(ex)
+            }
+            return w
         }
-        modelContext.insert(w)
-        try? modelContext.save()
-        active = w
+    }
+}
+
+// MARK: - 左滑删除容器（非 List 卡片列表用，首页「最近训练」）
+
+/// 训练首页「最近训练」是 ScrollView 内的卡片栈而非 List，无法用 `.swipeActions`，
+/// 故以轻量水平拖动手势实现左滑显露删除按钮；点击空白处收回，点击卡片走 onTap。
+private struct SwipeToDeleteCard<Content: View>: View {
+    var onTap: () -> Void
+    var onDelete: () -> Void
+    @ViewBuilder var content: Content
+    @State private var offset: CGFloat = 0
+    private let revealed: CGFloat = -76
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            Button(role: .destructive) {
+                withAnimation(.spring(response: 0.3)) { offset = 0 }
+                onDelete()
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 64, height: 64)
+                    .background(Theme.Color.danger, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+            }
+            .buttonStyle(.plain)
+            .opacity(offset < -8 ? 1 : 0)
+
+            content
+                .offset(x: offset)
+                .highPriorityGesture(
+                    DragGesture(minimumDistance: 16)
+                        .onChanged { v in
+                            guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                            if v.translation.width < 0 { offset = max(v.translation.width, revealed) }
+                            else if offset < 0 { offset = min(0, revealed + v.translation.width) }
+                        }
+                        .onEnded { v in
+                            withAnimation(.spring(response: 0.3)) {
+                                offset = v.translation.width < -40 ? revealed : 0
+                            }
+                        }
+                )
+                .onTapGesture {
+                    if offset < 0 { withAnimation(.spring(response: 0.3)) { offset = 0 } }
+                    else { onTap() }
+                }
+        }
     }
 }
 
@@ -291,6 +424,13 @@ struct WorkoutLoggingView: View {
     @State private var sharingSummary: CheckinSummary?
     @State private var celebration: [PersonalRecord]?
     @State private var isRestExpanded = false
+    /// 已完成会话显式编辑态；进行中会话恒为可编辑。
+    @State private var isEditing = false
+    /// 结束二次确认弹窗。
+    @State private var confirmingFinish = false
+
+    /// 是否允许编辑内容（勾选完成 / 改重量次数 / 加删动作）：进行中或已完成且进入编辑态。
+    private var canEdit: Bool { workout.isActive || isEditing }
 
     private var completedSetCount: Int {
         workout.exercises.flatMap(\.sets).filter(\.completed).count
@@ -325,9 +465,10 @@ struct WorkoutLoggingView: View {
             ScrollView {
                 VStack(spacing: Theme.Spacing.md) {
                     LiveHeaderView(startedAt: workout.startedAt,
-                                   isEnded: workout.endedAt != nil,
-                                   onFinish: finish)
+                                   endedAt: workout.endedAt,
+                                   onFinish: { confirmingFinish = true })
                     triadStats
+                    if isEditing { editTimeCard }
                     exerciseList
                     if workout.endedAt != nil {
                         Button { sharingSummary = CheckinSummary(workout: workout) } label: {
@@ -361,6 +502,15 @@ struct WorkoutLoggingView: View {
         .navigationTitle(workout.title ?? "训练")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // 已完成会话：显式「编辑 / 完成」切换（进行中会话恒可编辑，不显示此入口）。
+            if workout.isFinished {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(isEditing ? "完成" : "编辑") {
+                        if isEditing { exitEditing() } else { isEditing = true }
+                    }
+                    .foregroundStyle(Theme.Color.accentCyan)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Picker("休息时长", selection: Binding(
@@ -370,9 +520,17 @@ struct WorkoutLoggingView: View {
                             Text("\(Int(secs)) 秒").tag(secs)
                         }
                     }
-                    Button { pickingExercise = true } label: { Label("添加动作", systemImage: "plus") }
+                    if canEdit {
+                        Button { pickingExercise = true } label: { Label("添加动作", systemImage: "plus") }
+                    }
                 } label: { Image(systemName: "ellipsis").foregroundStyle(Theme.Color.fg) }
             }
+        }
+        .confirmationDialog("结束这次训练？", isPresented: $confirmingFinish, titleVisibility: .visible) {
+            Button("结束训练") { finish() }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("\(workout.exercises.count) 动作 · \(completedSetCount) 组完成。结束后将归档，可在「编辑」中继续修改。")
         }
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in addExercise(pick) }
@@ -424,22 +582,44 @@ struct WorkoutLoggingView: View {
         return VStack(spacing: Theme.Spacing.md) {
             ForEach(sorted) { ex in
                 ExerciseBlock(exercise: ex,
+                              readOnly: !canEdit,
                               onChange: touch,
                               onCompleteSet: { restTimer.start(label: ex.exerciseName) },
                               onDeleteExercise: { delete(ex) })
             }
-            Button { pickingExercise = true } label: {
-                Label("添加动作", systemImage: "plus")
-                    .font(Theme.Font.body(size: 14, weight: .medium))
-                    .foregroundStyle(Theme.Color.fg2)
-                    .frame(maxWidth: .infinity).frame(height: 44)
-                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Theme.Radius.md)
-                            .stroke(Theme.Color.border, style: StrokeStyle(lineWidth: 1, dash: [4]))
-                    )
-            }.buttonStyle(.plain)
+            // 只读（已完成且未进入编辑态）时隐藏「添加动作」入口。
+            if canEdit {
+                Button { pickingExercise = true } label: {
+                    Label("添加动作", systemImage: "plus")
+                        .font(Theme.Font.body(size: 14, weight: .medium))
+                        .foregroundStyle(Theme.Color.fg2)
+                        .frame(maxWidth: .infinity).frame(height: 44)
+                        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.md)
+                                .stroke(Theme.Color.border, style: StrokeStyle(lineWidth: 1, dash: [4]))
+                        )
+                }.buttonStyle(.plain)
+            }
         }
+    }
+
+    // MARK: 编辑态时长修正（修正墙钟被遗弃拉长的脏数据）
+
+    @ViewBuilder private var editTimeCard: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text("EDIT · 时长修正").eyebrowStyle()
+            DatePicker("开始", selection: Binding(
+                get: { workout.startedAt },
+                set: { workout.startedAt = $0; touch() }))
+                .foregroundStyle(Theme.Color.fg)
+            DatePicker("结束", selection: Binding(
+                get: { workout.endedAt ?? workout.startedAt },
+                set: { workout.endedAt = max($0, workout.startedAt); touch() }))
+                .foregroundStyle(Theme.Color.fg)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
     }
 
     // MARK: FAB
@@ -487,12 +667,25 @@ struct WorkoutLoggingView: View {
         touch()
     }
 
+    /// 结束训练（二次确认后调用）：置 endedAt + HealthKit 写入，再统一重算派生数据。
     private func finish() {
         let endedAt = Date.now
         workout.endedAt = endedAt
         touch()
         let startedAt = workout.startedAt
         Task { await healthKit.saveStrengthWorkout(start: startedAt, end: endedAt) }
+        recomputeDerived()
+    }
+
+    /// 退出已完成会话的编辑态：保存后重算 PR 并更新 Team 打卡摘要。
+    private func exitEditing() {
+        isEditing = false
+        touch()
+        recomputeDerived()
+    }
+
+    /// 重算派生数据：PR 检测（命中弹庆祝）+ Team 打卡（按 localId 幂等：首次创建、编辑后更新摘要）。
+    private func recomputeDerived() {
         let descriptor = FetchDescriptor<Workout>(
             predicate: #Predicate { $0.deletedAt == nil && $0.endedAt != nil })
         if let all = try? modelContext.fetch(descriptor) {
@@ -514,39 +707,44 @@ struct WorkoutLoggingView: View {
 
 private struct LiveHeaderView: View {
     let startedAt: Date
-    let isEnded: Bool
+    /// nil = 进行中（墙钟实时计时）；非 nil = 已完成（计时冻结为 endedAt − startedAt）。
+    let endedAt: Date?
     let onFinish: () -> Void
-    @State private var paused = false
     @State private var pulse = false
+
+    private var isEnded: Bool { endedAt != nil }
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
             HStack(spacing: 8) {
-                Circle().fill(Theme.Color.danger)
-                    .frame(width: 10, height: 10)
-                    .scaleEffect(pulse ? 1.0 : 0.7)
-                    .opacity(pulse ? 1.0 : 0.6)
-                    .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
-                    .onAppear { pulse = true }
-                TimelineView(.periodic(from: .now, by: 1.0)) { ctx in
-                    Text("REC · \(formatHMS(ctx.date.timeIntervalSince(startedAt)))")
+                if isEnded {
+                    // 已完成：静态时长，无录制点、不再增长。
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.Color.accentCyan)
+                    Text("时长 · \(formatHMS(endedAt!.timeIntervalSince(startedAt)))")
                         .font(Theme.Font.number(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.Color.fg)
+                } else {
+                    // 进行中：墙钟实时计时（含组间休息，无暂停）。
+                    Circle().fill(Theme.Color.danger)
+                        .frame(width: 10, height: 10)
+                        .scaleEffect(pulse ? 1.0 : 0.7)
+                        .opacity(pulse ? 1.0 : 0.6)
+                        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
+                        .onAppear { pulse = true }
+                    TimelineView(.periodic(from: .now, by: 1.0)) { ctx in
+                        Text("REC · \(formatHMS(ctx.date.timeIntervalSince(startedAt)))")
+                            .font(Theme.Font.number(size: 14, weight: .semibold))
+                            .foregroundStyle(Theme.Color.fg)
+                    }
                 }
             }
             Spacer()
-            if !isEnded {
-                Button {
-                    paused.toggle()
-                } label: {
-                    Image(systemName: paused ? "play.fill" : "pause.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.fg)
-                        .frame(width: 36, height: 36)
-                        .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm).stroke(Theme.Color.border, lineWidth: 1))
-                }
-                .buttonStyle(.plain)
+            if isEnded {
+                Text("已完成").font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.muted)
+            } else {
+                // 进行中仅有「结束」（已移除会话级暂停）。
                 Button(action: onFinish) {
                     Image(systemName: "stop.fill")
                         .font(.system(size: 13, weight: .semibold))
@@ -555,8 +753,6 @@ private struct LiveHeaderView: View {
                         .background(Theme.Color.danger, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
                 }
                 .buttonStyle(.plain)
-            } else {
-                Text("已完成").font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.muted)
             }
         }
         .padding(.horizontal, Theme.Spacing.md)
@@ -576,6 +772,8 @@ private func formatHMS(_ seconds: TimeInterval) -> String {
 private struct ExerciseBlock: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var exercise: WorkoutExercise
+    /// 只读态（已完成且未进入编辑）：隐藏菜单、禁用组内操作。
+    var readOnly: Bool = false
     let onChange: () -> Void
     let onCompleteSet: () -> Void
     let onDeleteExercise: () -> Void
@@ -604,19 +802,22 @@ private struct ExerciseBlock: View {
                         .foregroundStyle(Theme.Color.accentCyan)
                 }
                 Spacer()
-                Menu {
-                    Button { addSet() } label: { Label("加一组", systemImage: "plus") }
-                    Button(role: .destructive) { onDeleteExercise() } label: { Label("删除", systemImage: "trash") }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .foregroundStyle(Theme.Color.muted)
-                        .frame(width: 28, height: 28)
+                if !readOnly {
+                    Menu {
+                        Button { addSet() } label: { Label("加一组", systemImage: "plus") }
+                        Button(role: .destructive) { onDeleteExercise() } label: { Label("删除", systemImage: "trash") }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .foregroundStyle(Theme.Color.muted)
+                            .frame(width: 28, height: 28)
+                    }
                 }
             }
             VStack(spacing: 6) {
                 ForEach(sortedSets) { set in
                     SetRow(set: set,
                            isActive: activeSetIndex == set.setIndex,
+                           readOnly: readOnly,
                            onChange: onChange,
                            onComplete: onCompleteSet)
                 }
@@ -636,6 +837,8 @@ private struct ExerciseBlock: View {
 private struct SetRow: View {
     @Bindable var set: WorkoutSet
     let isActive: Bool
+    /// 只读态：禁用输入框与完成勾选。
+    var readOnly: Bool = false
     let onChange: () -> Void
     let onComplete: () -> Void
 
@@ -645,9 +848,9 @@ private struct SetRow: View {
                 .font(Theme.Font.number(size: 13, weight: .semibold))
                 .frame(width: 22)
                 .foregroundStyle(textColor)
-            numberField("kg", value: $set.weightKg).foregroundStyle(textColor)
+            numberField("kg", value: $set.weightKg).foregroundStyle(textColor).disabled(readOnly)
             Text("×").foregroundStyle(Theme.Color.muted)
-            intField("次", value: $set.reps).foregroundStyle(textColor)
+            intField("次", value: $set.reps).foregroundStyle(textColor).disabled(readOnly)
             Spacer()
             Button {
                 set.completed.toggle()
@@ -657,7 +860,7 @@ private struct SetRow: View {
                 Image(systemName: set.completed ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 20))
                     .foregroundStyle(set.completed ? Theme.Color.accentCyan : Theme.Color.muted)
-            }.buttonStyle(.plain)
+            }.buttonStyle(.plain).disabled(readOnly)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)

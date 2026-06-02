@@ -3,6 +3,7 @@ package com.meigei.workout;
 import com.meigei.sync.dto.SyncConflict;
 import com.meigei.sync.dto.SyncPullResult;
 import com.meigei.sync.dto.SyncPushResult;
+import com.meigei.team.CheckinService;
 import com.meigei.workout.dto.WorkoutTree;
 import com.meigei.workout.entity.Workout;
 import com.meigei.workout.entity.WorkoutExercise;
@@ -29,13 +30,16 @@ public class WorkoutSyncService {
     private final WorkoutMapper workoutMapper;
     private final WorkoutExerciseMapper exerciseMapper;
     private final WorkoutSetMapper setMapper;
+    private final CheckinService checkinService;
 
     public WorkoutSyncService(WorkoutMapper workoutMapper,
                               WorkoutExerciseMapper exerciseMapper,
-                              WorkoutSetMapper setMapper) {
+                              WorkoutSetMapper setMapper,
+                              CheckinService checkinService) {
         this.workoutMapper = workoutMapper;
         this.exerciseMapper = exerciseMapper;
         this.setMapper = setMapper;
+        this.checkinService = checkinService;
     }
 
     /** 增量下拉：含软删墓碑（墓碑项 exercises 为空，让其他设备删除本地）。 */
@@ -79,6 +83,8 @@ public class WorkoutSyncService {
                 workoutMapper.softDelete(workout.getId(), workout.getDeletedAt(),
                         workout.getUpdatedAt(), server.getVersion() + 1);
                 exerciseMapper.deleteByWorkout(workout.getId());
+                // 连带移除该训练在所有 Team 的打卡（保持「删除后不再计入」与 Team 视图一致）
+                checkinService.removeForWorkout(userId, workout.getId());
             } else {
                 workout.setVersion(server.getVersion()); // 通过乐观锁校验
                 workoutMapper.updateById(workout);

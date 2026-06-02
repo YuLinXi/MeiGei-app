@@ -426,6 +426,8 @@ struct ExerciseDetailView: View {
     @Query(filter: #Predicate<Workout> { $0.deletedAt == nil },
            sort: \Workout.startedAt, order: .reverse)
     private var workouts: [Workout]
+    /// 加入今日训练后导航进入的会话。
+    @State private var startedSession: Workout?
 
     /// 本动作历史所有 (重量, 次数, 日期)。
     private struct Entry { let weight: Double; let reps: Int; let date: Date }
@@ -472,6 +474,7 @@ struct ExerciseDetailView: View {
             joinCTA
         }
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(item: $startedSession) { WorkoutLoggingView(workout: $0) }
     }
 
     // 顶部 cover：渐变 + 部位文字
@@ -586,10 +589,10 @@ struct ExerciseDetailView: View {
         .padding(.bottom, 16)
     }
 
-    /// 找当前进行中的训练（endedAt == nil）：有则 append 动作，无则新建。
+    /// 加入今日训练：经单一活跃会话守卫——存在进行中会话则追加动作（即「继续」），
+    /// 否则新建唯一会话。随后导航进入 Live 记录界面。
     private func addToTodayWorkout() {
-        let active = workouts.first(where: { $0.endedAt == nil && $0.deletedAt == nil })
-        let target = active ?? {
+        let target = WorkoutSession.activeSession(in: modelContext) ?? {
             let w = Workout(title: "训练")
             modelContext.insert(w)
             return w
@@ -603,6 +606,6 @@ struct ExerciseDetailView: View {
         target.exercises.append(ex)
         target.markDirty()
         try? modelContext.save()
-        dismiss()
+        startedSession = target
     }
 }
