@@ -42,46 +42,4 @@ enum PRStats {
             .max()
         return PRSummary(exerciseKey: exerciseKey, weightKg: b.w, reps: b.r, date: b.d, previousBestKg: prevBest)
     }
-
-    /// 在给定时间窗内新出现的 PR：按 `historyKey` 分组，找窗口内最大重量，
-    /// 且严格大于「窗口外历史最大」。窗口由 `[since, until)` 描述（含 since，不含 until）。
-    /// 返回按重量降序排列；首项可作为「★ NEW PR」高亮卡。
-    static func newPRs(in workouts: [Workout], since: Date, until: Date) -> [PRSummary] {
-        // 先把所有训练拆解到 (key, weight, reps, day)
-        struct Row { let key: String; let name: String; let weight: Double; let reps: Int; let day: Date }
-        var rows: [Row] = []
-        for w in workouts where w.deletedAt == nil && w.endedAt != nil {
-            for ex in w.exercises {
-                let key = ex.historyKey
-                for s in ex.sets {
-                    if let wt = s.weightKg, let r = s.reps, r > 0 {
-                        rows.append(Row(key: key, name: ex.exerciseName, weight: wt, reps: r, day: w.startedAt))
-                    }
-                }
-            }
-        }
-
-        // 按 key 分组
-        var byKey: [String: [Row]] = [:]
-        for r in rows { byKey[r.key, default: []].append(r) }
-
-        var out: [PRSummary] = []
-        for (key, items) in byKey {
-            let inWindow = items.filter { $0.day >= since && $0.day < until }
-            guard let winMax = inWindow.max(by: { $0.weight < $1.weight }) else { continue }
-            let outWindow = items.filter { $0.day < since || $0.day >= until }
-            let priorMax = outWindow.map(\.weight).max()
-            // 必须严格大于窗口外的历史最大，才算窗口内新 PR
-            if (priorMax ?? -.infinity) < winMax.weight {
-                out.append(PRSummary(
-                    exerciseKey: key,
-                    weightKg: winMax.weight,
-                    reps: winMax.reps,
-                    date: winMax.day,
-                    previousBestKg: priorMax
-                ))
-            }
-        }
-        return out.sorted { $0.weightKg > $1.weightKg }
-    }
 }

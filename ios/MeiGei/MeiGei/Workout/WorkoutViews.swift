@@ -70,16 +70,8 @@ struct WorkoutListView: View {
         }
         .navigationTitle("训练")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            // 右上角原「搜索占位 + 加号菜单」整组移除：开始训练唯一收敛到底部悬浮 CTA。
-            // 左上角「日历 / 训练历史」入口保留。
-            ToolbarItem(placement: .topBarLeading) {
-                NavigationLink { TrainingHistoryView() } label: {
-                    Image(systemName: "calendar").foregroundStyle(Theme.Color.fg)
-                }
-                .accessibilityLabel("训练历史")
-            }
-        }
+        // 工具栏左右上角入口均已移除：右上角原「搜索占位 + 加号菜单」、左上角「日历 / 训练历史」
+        // （历史模块已删，留待后续单独立项）。开始训练唯一收敛到底部悬浮 CTA。
         .navigationDestination(for: Workout.self) { WorkoutLoggingView(workout: $0) }
         .navigationDestination(item: $openedSession) { WorkoutLoggingView(workout: $0) }
         .confirmationDialog("已有进行中的训练", isPresented: Binding(
@@ -474,7 +466,6 @@ struct WorkoutLoggingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var workout: Workout
     @State private var pickingExercise = false
-    @State private var sharingSummary: CheckinSummary?
     @State private var celebration: [PersonalRecord]?
     @State private var isRestExpanded = false
     /// 已完成会话显式编辑态；进行中会话恒为可编辑。
@@ -526,16 +517,6 @@ struct WorkoutLoggingView: View {
                     triadStats
                     if isEditing { editTimeCard }
                     exerciseList
-                    if workout.endedAt != nil {
-                        Button { sharingSummary = CheckinSummary(workout: workout) } label: {
-                            Label("生成分享海报", systemImage: "square.and.arrow.up")
-                                .frame(maxWidth: .infinity).frame(height: 44)
-                                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
-                                .foregroundStyle(Theme.Color.fg)
-                        }
-                        .buttonStyle(.plain)
-                    }
                     Color.clear.frame(height: 80)
                 }
                 .padding(.horizontal, Theme.Spacing.lg)
@@ -592,7 +573,6 @@ struct WorkoutLoggingView: View {
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in addExercise(pick) }
         }
-        .sheet(item: $sharingSummary) { SharePosterSheet(summary: $0) }
         .sheet(isPresented: Binding(get: { celebration != nil }, set: { if !$0 { celebration = nil } })) {
             if let celebration { PRCelebrationSheet(records: celebration) }
         }
