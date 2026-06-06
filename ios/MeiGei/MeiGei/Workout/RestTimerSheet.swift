@@ -26,7 +26,7 @@ struct RestTimerSheet: View {
         VStack(spacing: Theme.Spacing.lg) {
             HStack {
                 pillButton(icon: "iphone.radiowaves.left.and.right", label: "手机震动") {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    Theme.Haptics.impact(.medium)
                 }
                 Spacer()
                 pillButton(icon: "arrow.down.right.and.arrow.up.left", label: "最小化", action: onDismiss)
@@ -50,7 +50,7 @@ struct RestTimerSheet: View {
             HStack(spacing: Theme.Spacing.md) {
                 actionButton("−10s") { controller.adjust(by: -10) }
                 actionButton("完成", emphasized: true) {
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    Theme.Haptics.notification(.success)
                     controller.stop()
                     onDismiss()
                 }

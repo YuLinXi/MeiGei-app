@@ -70,26 +70,8 @@ struct WorkoutListView: View {
         }
         .navigationTitle("训练")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                NavigationLink { TrainingHistoryView() } label: {
-                    Image(systemName: "calendar").foregroundStyle(Theme.Color.fg)
-                }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 14) {
-                    // 搜索 sheet 留到后续 change，先占位。
-                    Image(systemName: "magnifyingglass").foregroundStyle(Theme.Color.fg2)
-                    Menu {
-                        Button("空白训练") { startBlank() }
-                        if !plans.isEmpty {
-                            Divider()
-                            ForEach(plans) { p in Button("从「\(p.name)」开始") { start(from: p) } }
-                        }
-                    } label: { Image(systemName: "plus").foregroundStyle(Theme.Color.fg) }
-                }
-            }
-        }
+        // 工具栏左右上角入口均已移除：右上角原「搜索占位 + 加号菜单」、左上角「日历 / 训练历史」
+        // （历史模块已删，留待后续单独立项）。开始训练唯一收敛到底部悬浮 CTA。
         .navigationDestination(for: Workout.self) { WorkoutLoggingView(workout: $0) }
         .navigationDestination(item: $openedSession) { WorkoutLoggingView(workout: $0) }
         .confirmationDialog("已有进行中的训练", isPresented: Binding(
@@ -107,6 +89,7 @@ struct WorkoutListView: View {
             get: { pendingDelete != nil },
             set: { if !$0 { pendingDelete = nil } }), presenting: pendingDelete) { w in
             Button("删除", role: .destructive) {
+                Theme.Haptics.notification(.warning)
                 w.markDeleted()
                 try? modelContext.save()
             }
@@ -119,7 +102,10 @@ struct WorkoutListView: View {
     private func continueBanner(_ w: Workout) -> some View {
         let totalSets = w.exercises.reduce(0) { $0 + $1.sets.count }
         let doneSets = w.exercises.flatMap(\.sets).filter(\.completed).count
-        return Button { openedSession = w } label: {
+        return Button {
+            Theme.Haptics.impact(.light)
+            openedSession = w
+        } label: {
             HStack(spacing: Theme.Spacing.md) {
                 ZStack {
                     Circle().fill(Theme.Color.danger.opacity(0.15)).frame(width: 44, height: 44)
@@ -149,7 +135,9 @@ struct WorkoutListView: View {
                     .stroke(Theme.Color.danger.opacity(0.55), lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("继续训练 \(w.title ?? "训练")，\(w.exercises.count) 个动作，\(doneSets)/\(totalSets) 组完成")
     }
 
     // MARK: Hero
@@ -161,9 +149,13 @@ struct WorkoutListView: View {
                 Text("准备好了吗？")
                     .font(Theme.Font.display(size: 32, weight: .bold))
                     .foregroundStyle(Theme.Color.fg)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Text("本周还没开始 · 现在开始第 1 次训练")
                     .font(Theme.Font.body(size: 13))
                     .foregroundStyle(Theme.Color.fg2)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .cardStyle()
@@ -174,11 +166,15 @@ struct WorkoutListView: View {
                     Text(formatTons(stats.volumeKg)).numStyle(size: 56)
                         .foregroundStyle(Theme.Color.accentCyan)
                         .shadow(color: Theme.Color.accentCyan.opacity(0.55), radius: 14)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                     Text("t").numStyle(size: 22).foregroundStyle(Theme.Color.fg2)
                 }
                 Text("本周第 \(weeklyDoneCount) 次训练")
                     .font(Theme.Font.body(size: 13))
                     .foregroundStyle(Theme.Color.fg2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .cardStyle()
@@ -203,9 +199,14 @@ struct WorkoutListView: View {
     private func statCell(label: String, value: String) -> some View {
         VStack(spacing: 4) {
             Text(value).numStyle(size: 22).foregroundStyle(Theme.Color.fg)
+                .lineLimit(1).minimumScaleFactor(0.7)
             Text(label).eyebrowStyle()
+                .lineLimit(1).minimumScaleFactor(0.85)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
     }
 
     private var divider: some View {
@@ -245,19 +246,28 @@ struct WorkoutListView: View {
         let totalSets = w.exercises.reduce(0) { $0 + $1.sets.count }
         let durationMin: Int? = w.endedAt.map { Int($0.timeIntervalSince(w.startedAt) / 60) }
         let pr = prByWorkout[w.localId]
+        let durText = durationMin.map { "，\($0) 分钟" } ?? ""
+        let prText = pr.map { "，\($0.name) PR \(formatKg($0.weight)) 公斤" } ?? ""
+        let a11yLabel = "\(w.title ?? "训练")，\(w.exercises.count) 个动作，\(totalSets) 组\(durText)\(prText)"
         return HStack(spacing: Theme.Spacing.md) {
             dateBlock(w.startedAt)
             VStack(alignment: .leading, spacing: 4) {
                 Text(w.title ?? "训练")
                     .font(Theme.Font.body(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 Text("\(w.exercises.count) 动作 · \(totalSets) 组" + (durationMin.map { " · \($0)′" } ?? ""))
                     .font(Theme.Font.body(size: 12))
                     .foregroundStyle(Theme.Color.fg2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 if let pr {
                     Text("▲ \(pr.name) PR \(formatKg(pr.weight))kg")
                         .font(Theme.Font.body(size: 11, weight: .medium))
                         .foregroundStyle(Theme.Color.accentMagenta)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
             }
             Spacer()
@@ -266,6 +276,8 @@ struct WorkoutListView: View {
                 .foregroundStyle(Theme.Color.muted)
         }
         .cardStyle()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(a11yLabel)
     }
 
     private func dateBlock(_ date: Date) -> some View {
@@ -289,11 +301,28 @@ struct WorkoutListView: View {
 
     // MARK: 悬浮 CTA
 
+    /// 首页「进行中」计划：与「计划」页共用 `WorkoutPlan.active` 判定，供 CTA 智能单键上浮。
+    private var activePlan: WorkoutPlan? {
+        WorkoutPlan.active(in: plans, workouts: workouts)
+    }
+
+    /// CTA 文案：存在进行中计划 → 「从「X」开始」；否则按本周是否已训练给空白训练文案。
+    private func ctaTitle(_ plan: WorkoutPlan?) -> String {
+        if let plan { return "从「\(plan.name)」开始" }
+        return weeklyDoneCount == 0 ? "开始第 1 次训练" : "开始今日训练"
+    }
+
     private var startCTA: some View {
-        Button { startBlank() } label: {
+        // 智能单键：有进行中计划从该计划预填，否则空白训练；无长按、无备选菜单。
+        let plan = activePlan
+        return Button {
+            if let plan { start(from: plan) } else { startBlank() }
+        } label: {
             HStack(spacing: 8) {
                 Image(systemName: "play.fill")
-                Text(weeklyDoneCount == 0 ? "开始第 1 次训练" : "开始今日训练")
+                Text(ctaTitle(plan))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .font(Theme.Font.body(size: 16, weight: .semibold))
             .foregroundStyle(Theme.Color.bg)
@@ -302,7 +331,7 @@ struct WorkoutListView: View {
             .background(Theme.Color.accentCyan, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
             .neonGlow(.cyan, intensity: .medium, cornerRadius: Theme.Radius.md)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.bottom, 16) // tab bar 之上留 16pt
     }
@@ -327,10 +356,12 @@ struct WorkoutListView: View {
     }
 
     private func startBlank() {
+        Theme.Haptics.impact(.medium)
         beginSession { Workout(title: "训练") }
     }
 
     private func start(from plan: WorkoutPlan) {
+        Theme.Haptics.impact(.medium)
         beginSession {
             let w = Workout(planId: plan.localId, title: plan.name)
             for item in plan.items.sorted(by: { $0.orderIndex < $1.orderIndex }) {
@@ -356,12 +387,16 @@ private struct SwipeToDeleteCard<Content: View>: View {
     var onDelete: () -> Void
     @ViewBuilder var content: Content
     @State private var offset: CGFloat = 0
+    /// 越阈触感去抖：仅在首次越过删除显露阈值时触发一次 selection。
+    @State private var didReveal = false
     private let revealed: CGFloat = -76
+    /// 显露 / 收回统一回弹，保证手感对称。
+    private let snap: Animation = .spring(response: 0.3, dampingFraction: 0.8)
 
     var body: some View {
         ZStack(alignment: .trailing) {
             Button(role: .destructive) {
-                withAnimation(.spring(response: 0.3)) { offset = 0 }
+                withAnimation(snap) { offset = 0 }
                 onDelete()
             } label: {
                 Image(systemName: "trash")
@@ -372,26 +407,35 @@ private struct SwipeToDeleteCard<Content: View>: View {
             }
             .buttonStyle(.plain)
             .opacity(offset < -8 ? 1 : 0)
+            .accessibilityHidden(offset > -8)
 
-            content
-                .offset(x: offset)
-                .highPriorityGesture(
-                    DragGesture(minimumDistance: 16)
-                        .onChanged { v in
-                            guard abs(v.translation.width) > abs(v.translation.height) else { return }
-                            if v.translation.width < 0 { offset = max(v.translation.width, revealed) }
-                            else if offset < 0 { offset = min(0, revealed + v.translation.width) }
+            // 点击走 Button 以获得按压微反馈；横向拖动经 highPriorityGesture 接管，互不冲突。
+            Button {
+                if offset < 0 { withAnimation(snap) { offset = 0 } }
+                else { onTap() }
+            } label: {
+                content
+            }
+            .buttonStyle(PressableButtonStyle())
+            .offset(x: offset)
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 16)
+                    .onChanged { v in
+                        guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                        if v.translation.width < 0 { offset = max(v.translation.width, revealed) }
+                        else if offset < 0 { offset = min(0, revealed + v.translation.width) }
+                        // 越过显露阈值首次触发选择触感，回到阈值内复位去抖标记。
+                        if offset <= -40, !didReveal { Theme.Haptics.selection(); didReveal = true }
+                        if offset > -40 { didReveal = false }
+                    }
+                    .onEnded { v in
+                        withAnimation(snap) {
+                            offset = v.translation.width < -40 ? revealed : 0
                         }
-                        .onEnded { v in
-                            withAnimation(.spring(response: 0.3)) {
-                                offset = v.translation.width < -40 ? revealed : 0
-                            }
-                        }
-                )
-                .onTapGesture {
-                    if offset < 0 { withAnimation(.spring(response: 0.3)) { offset = 0 } }
-                    else { onTap() }
-                }
+                    }
+            )
+            // 左滑手势对 VoiceOver 不可达，提供等价删除自定义动作（走同一二次确认）。
+            .accessibilityAction(named: "删除") { onDelete() }
         }
     }
 }
@@ -419,9 +463,9 @@ struct WorkoutLoggingView: View {
     @Environment(RestTimerController.self) private var restTimer
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var workout: Workout
     @State private var pickingExercise = false
-    @State private var sharingSummary: CheckinSummary?
     @State private var celebration: [PersonalRecord]?
     @State private var isRestExpanded = false
     /// 已完成会话显式编辑态；进行中会话恒为可编辑。
@@ -448,6 +492,9 @@ struct WorkoutLoggingView: View {
         }
     }
 
+    /// 休息弹窗开合动画：尊重「减弱动态效果」，开启时退化为短淡变而非弹簧。
+    private var sheetAnim: Animation { reduceMotion ? .easeInOut(duration: 0.2) : .spring() }
+
     /// 下一组提示：找第一个未完成 set 所属动作 + setIndex。
     private var nextHint: String? {
         for ex in workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }) {
@@ -470,16 +517,6 @@ struct WorkoutLoggingView: View {
                     triadStats
                     if isEditing { editTimeCard }
                     exerciseList
-                    if workout.endedAt != nil {
-                        Button { sharingSummary = CheckinSummary(workout: workout) } label: {
-                            Label("生成分享海报", systemImage: "square.and.arrow.up")
-                                .frame(maxWidth: .infinity).frame(height: 44)
-                                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
-                                .foregroundStyle(Theme.Color.fg)
-                        }
-                        .buttonStyle(.plain)
-                    }
                     Color.clear.frame(height: 80)
                 }
                 .padding(.horizontal, Theme.Spacing.lg)
@@ -490,12 +527,13 @@ struct WorkoutLoggingView: View {
                 restFAB
                     .padding(.trailing, Theme.Spacing.lg)
                     .padding(.bottom, 90)
-                    .transition(.scale.combined(with: .opacity))
+                    // 「减弱动态效果」开启时只淡入淡出，不做缩放入场。
+                    .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
             }
             if isRestExpanded {
                 RestTimerSheet(controller: restTimer,
                                nextHint: nextHint) {
-                    withAnimation(.spring()) { isRestExpanded = false }
+                    withAnimation(sheetAnim) { isRestExpanded = false }
                 }
             }
         }
@@ -535,13 +573,12 @@ struct WorkoutLoggingView: View {
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in addExercise(pick) }
         }
-        .sheet(item: $sharingSummary) { SharePosterSheet(summary: $0) }
         .sheet(isPresented: Binding(get: { celebration != nil }, set: { if !$0 { celebration = nil } })) {
             if let celebration { PRCelebrationSheet(records: celebration) }
         }
         .onChange(of: restTimer.isRunning) { _, running in
             // 倒计时归零时自动收回弹窗。
-            if !running { withAnimation(.spring()) { isRestExpanded = false } }
+            if !running { withAnimation(sheetAnim) { isRestExpanded = false } }
         }
     }
 
@@ -626,7 +663,7 @@ struct WorkoutLoggingView: View {
 
     private var restFAB: some View {
         Button {
-            withAnimation(.spring()) { isRestExpanded = true }
+            withAnimation(sheetAnim) { isRestExpanded = true }
         } label: {
             TimelineView(.periodic(from: .now, by: 1.0)) { _ in
                 let total = restTimer.totalDuration
@@ -648,6 +685,7 @@ struct WorkoutLoggingView: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("休息计时，点按展开")
     }
 
     // MARK: actions
@@ -669,6 +707,7 @@ struct WorkoutLoggingView: View {
 
     /// 结束训练（二次确认后调用）：置 endedAt + HealthKit 写入，再统一重算派生数据。
     private func finish() {
+        Theme.Haptics.notification(.success)
         let endedAt = Date.now
         workout.endedAt = endedAt
         touch()
@@ -711,6 +750,7 @@ private struct LiveHeaderView: View {
     let endedAt: Date?
     let onFinish: () -> Void
     @State private var pulse = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isEnded: Bool { endedAt != nil }
 
@@ -727,12 +767,13 @@ private struct LiveHeaderView: View {
                         .foregroundStyle(Theme.Color.fg)
                 } else {
                     // 进行中：墙钟实时计时（含组间休息，无暂停）。
+                    // 「减弱动态效果」开启时不做 repeatForever 脉冲，呈静态红点。
                     Circle().fill(Theme.Color.danger)
                         .frame(width: 10, height: 10)
-                        .scaleEffect(pulse ? 1.0 : 0.7)
-                        .opacity(pulse ? 1.0 : 0.6)
-                        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
-                        .onAppear { pulse = true }
+                        .scaleEffect(reduceMotion ? 1.0 : (pulse ? 1.0 : 0.7))
+                        .opacity(reduceMotion ? 1.0 : (pulse ? 1.0 : 0.6))
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
+                        .onAppear { if !reduceMotion { pulse = true } }
                     TimelineView(.periodic(from: .now, by: 1.0)) { ctx in
                         Text("REC · \(formatHMS(ctx.date.timeIntervalSince(startedAt)))")
                             .font(Theme.Font.number(size: 14, weight: .semibold))
@@ -753,6 +794,7 @@ private struct LiveHeaderView: View {
                         .background(Theme.Color.danger, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("结束训练")
             }
         }
         .padding(.horizontal, Theme.Spacing.md)
@@ -861,6 +903,7 @@ private struct SetRow: View {
                     .font(.system(size: 20))
                     .foregroundStyle(set.completed ? Theme.Color.accentCyan : Theme.Color.muted)
             }.buttonStyle(.plain).disabled(readOnly)
+            .accessibilityLabel(set.completed ? "第 \(set.setIndex + 1) 组已完成" : "标记第 \(set.setIndex + 1) 组完成")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)

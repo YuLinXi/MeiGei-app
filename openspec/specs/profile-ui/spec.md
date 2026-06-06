@@ -13,27 +13,31 @@ TBD - created by archiving change redesign-remaining-neon-screens. Update Purpos
 
 ### Requirement: 三宫格统计
 
-ProfileHeader 下方 SHALL 渲染 1×3 网格：「总训练 / 本月 PR / 最长连续」，每格背景 `Theme.Color.surface`，外层 1px `Theme.Color.border` 网格内 1px 分隔。本月 PR 数字 MUST 使用 `Theme.Color.accentCyan`，其余两格数字使用 `Theme.Color.fg`。
+ProfileHeader 下方 SHALL 渲染 1×2 网格：「总训练 / 最长连续」，每格背景 `Theme.Color.surface`，外层 1px `Theme.Color.border` 网格内 1px 分隔，两格数字均使用 `Theme.Color.fg`。原「本月 PR」格 MUST 移除（其依赖的 `PRStats.newPRs()` 随历史模块一并删除）。
 
 #### Scenario: 用户从未训练
 - **WHEN** `Workout` 表 0 行
-- **THEN** 三格分别显示 `0` / `0` / `0d`，不报错不空白。
+- **THEN** 两格分别显示 `0` / `0d`，不报错不空白。
 
-#### Scenario: 用户本月命中 PR
-- **WHEN** 本月内 PR 计数 = 12
-- **THEN** 中间格大字 `12` 以 `Theme.Color.accentCyan` 渲染。
+#### Scenario: 不再展示本月 PR
+- **WHEN** 用户进入「我的」页
+- **THEN** 顶部统计仅含「总训练」与「最长连续」两格，不渲染「本月 PR」格，布局不留空位。
 
 ### Requirement: 设置分组列表
 
-ProfileView SHALL 渲染至少 3 组设置项：**账户**（个人信息）、**数据 · 同步**（立即同步 / HealthKit / 导出数据）、**偏好**（外观 / 通知 / 单位）。每组顶部为 `sec-h`（uppercase `eyebrow` 样式），每项为 `SetItemRow`：左 24×24pt outlined icon + label + 可选 right value（muted）+ 右 chevron。
+ProfileView SHALL 渲染设置项分组：**数据 · 同步**（含 HealthKit、立即同步两行）。每组顶部为 `sec-h`（uppercase `eyebrow` 样式）。每行左侧为 24×24pt outlined icon + label，右侧为状态 value（`mono` 样式）。HealthKit 为纯展示行（无导航、无 chevron），立即同步为 `SyncRow`（点击触发 `SyncEngine.syncAll`）。「个人信息」「单位」「通知」三项及其二级页 MUST 移除（三者各自留待后续单独立项），其占位目标页 `PlaceholderDetailView` 一并删除；通用导航行组件 `SetItemRow` 因再无调用方 MUST 一并删除。
+
+#### Scenario: 不再展示三个二级入口
+- **WHEN** 用户进入「我的」页查看设置分组
+- **THEN** 列表不出现「个人信息」「单位」「通知」任一行，亦无指向 `PlaceholderDetailView` 的入口。
 
 #### Scenario: HealthKit 已授权
 - **WHEN** HealthKit 已授权
-- **THEN** HealthKit 行右侧 value 显示「已连接」并用 `Theme.Color.ok` 文字。
+- **THEN** HealthKit 行右侧 value 显示「已连接」并用 `Theme.Color.ok` 文字；未授权时显示「未授权」并用 `Theme.Color.danger` 文字。
 
 #### Scenario: 立即同步进行中
 - **WHEN** 用户点击「立即同步」且 `SyncEngine.syncAll` 正在运行
-- **THEN** value 切换为「同步中…」灰色文字，完成后切到「已同步 {N} 分钟前」绿色文字。
+- **THEN** 右侧呈现 `ProgressView` + 「同步中…」文字；空闲时显示「空闲」灰色文字。
 
 ### Requirement: 退出登录入口
 

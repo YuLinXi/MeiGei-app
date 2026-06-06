@@ -639,7 +639,6 @@ struct CheckinDetailView: View {
     let isMine: Bool
     @State private var reactions: [CheckinReactionDTO] = []
     @State private var error: String?
-    @State private var sharingSummary: CheckinSummary?
 
     private var summary: CheckinSummary { checkin.parsedSummary }
 
@@ -671,12 +670,6 @@ struct CheckinDetailView: View {
         .background(Theme.Color.bg)
         .navigationTitle(isMine ? "我的训练" : "队友训练")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { sharingSummary = summary } label: { Image(systemName: "square.and.arrow.up") }
-            }
-        }
-        .sheet(item: $sharingSummary) { SharePosterSheet(summary: $0) }
         .task { reactions = (try? await teamService.reactions(checkinId: checkin.id)) ?? [] }
         .alert("出错了", isPresented: .constant(error != nil)) {
             Button("好") { error = nil }

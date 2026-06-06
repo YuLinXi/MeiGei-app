@@ -429,32 +429,6 @@ struct ExerciseDetailView: View {
     /// 加入今日训练后导航进入的会话。
     @State private var startedSession: Workout?
 
-    /// 本动作历史所有 (重量, 次数, 日期)。
-    private struct Entry { let weight: Double; let reps: Int; let date: Date }
-    private var entries: [Entry] {
-        var out: [Entry] = []
-        for w in workouts where w.deletedAt == nil && w.endedAt != nil {
-            for ex in w.exercises where ex.builtinExerciseCode == exercise.code {
-                for s in ex.sets {
-                    if let wt = s.weightKg, let r = s.reps, r > 0 {
-                        out.append(Entry(weight: wt, reps: r, date: w.startedAt))
-                    }
-                }
-            }
-        }
-        return out
-    }
-    /// 当前 PR：本动作历史最大重量；返回 (重量, 次数, 日期)。
-    private var currentPR: Entry? {
-        entries.max(by: { $0.weight < $1.weight })
-    }
-    /// 历史第二高 PR 的重量（不同日期的次高，用来算「较上次 PR +X」差值）。
-    private var secondBestKg: Double? {
-        guard let pr = currentPR else { return nil }
-        let others = entries.filter { !Calendar.current.isDate($0.date, inSameDayAs: pr.date) }
-        return others.map(\.weight).max()
-    }
-
     var body: some View {
         ZStack(alignment: .bottom) {
             Theme.Color.bg.ignoresSafeArea()
@@ -462,8 +436,6 @@ struct ExerciseDetailView: View {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     cover
                     title
-                    if currentPR != nil { prCard }
-                    OneRepMaxChart(workouts: workouts, exerciseKey: exercise.code)
                     tipsCard
                     musclesCard
                     Color.clear.frame(height: 80)
@@ -506,40 +478,6 @@ struct ExerciseDetailView: View {
             Text("\(exercise.primaryMuscle) · \(exercise.equipmentType)")
                 .eyebrowStyle()
         }
-    }
-
-    private var prCard: some View {
-        let pr = currentPR!
-        let dateStr = pr.date.formatted(.iso8601.year().month().day().dateSeparator(.dash))
-        let diffStr: String? = {
-            guard let sec = secondBestKg, sec < pr.weight else { return nil }
-            return "较上次 PR +\(formatKg(pr.weight - sec))kg"
-        }()
-        return HStack(spacing: 0) {
-            Rectangle().fill(Theme.Color.accentMagenta).frame(width: 3)
-            VStack(alignment: .leading, spacing: 8) {
-                Text("★ PERSONAL RECORD")
-                    .font(Theme.Font.mono(size: 10, weight: .semibold))
-                    .tracking(0.08 * 10).textCase(.uppercase)
-                    .foregroundStyle(Theme.Color.accentMagenta)
-                HStack(alignment: .lastTextBaseline, spacing: 4) {
-                    Text(formatKg(pr.weight)).numStyle(size: 32).foregroundStyle(Theme.Color.fg)
-                    Text("kg").numStyle(size: 14).foregroundStyle(Theme.Color.fg2)
-                    Text("× \(pr.reps)").numStyle(size: 18).foregroundStyle(Theme.Color.fg2)
-                }
-                Text("\(dateStr)" + (diffStr.map { " · \($0)" } ?? ""))
-                    .font(Theme.Font.body(size: 12))
-                    .foregroundStyle(Theme.Color.fg2)
-            }
-            .padding(Theme.Spacing.md)
-            Spacer()
-        }
-        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.md)
-                .stroke(Theme.Color.accentMagenta.opacity(0.45), lineWidth: 1)
-        )
-        .neonGlow(.magenta, intensity: .sm, cornerRadius: Theme.Radius.md)
     }
 
     private var tipsCard: some View {

@@ -20,15 +20,6 @@ struct ProfileView: View {
 
     private var totalWorkouts: Int { workouts.count }
 
-    /// 本月 PR：以本月窗口算 newPRs 数量。
-    private var monthlyPRCount: Int {
-        let cal = Calendar.current
-        let now = Date()
-        let comps = cal.dateComponents([.year, .month], from: now)
-        let monthStart = cal.date(from: comps) ?? now
-        return PRStats.newPRs(in: workouts, since: monthStart, until: now).count
-    }
-
     /// 最长连续训练天数（不要求每日，按日去重连贯计）。
     private var longestStreak: Int {
         let cal = Calendar.current
@@ -62,9 +53,7 @@ struct ProfileView: View {
                 LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     header
                     statsGrid
-                    accountGroup
                     syncGroup
-                    preferenceGroup
                     aboutGroup
                     logoutButton
                     Color.clear.frame(height: 32)
@@ -134,8 +123,6 @@ struct ProfileView: View {
         HStack(spacing: 0) {
             statCell(title: "总训练", value: "\(totalWorkouts)", tint: Theme.Color.fg)
             statDivider
-            statCell(title: "本月 PR", value: "\(monthlyPRCount)", tint: Theme.Color.accentCyan)
-            statDivider
             statCell(title: "最长连续", value: "\(longestStreak)", tint: Theme.Color.fg)
         }
         .cardStyle(padding: 0)
@@ -156,32 +143,31 @@ struct ProfileView: View {
 
     // MARK: - 设置分组
 
-    private var accountGroup: some View {
-        groupCard(title: "账户") {
-            SetItemRow(icon: "person", label: "个人信息", value: profile?.email, destination: AnyView(PlaceholderDetailView(title: "个人信息")))
-        }
-    }
-
     private var syncGroup: some View {
         groupCard(title: "数据 · 同步") {
-            SetItemRow(
-                icon: "heart.text.square",
-                label: "HealthKit",
-                value: HKHealthStore.isHealthDataAvailable() ? "已连接" : "未授权",
-                valueColor: HKHealthStore.isHealthDataAvailable() ? Theme.Color.ok : Theme.Color.danger,
-                destination: AnyView(PlaceholderDetailView(title: "HealthKit"))
-            )
+            healthKitRow
             rowDivider
             SyncRow(syncEngine: syncEngine)
         }
     }
 
-    private var preferenceGroup: some View {
-        groupCard(title: "偏好") {
-            SetItemRow(icon: "ruler", label: "单位", value: "kg / cm", destination: AnyView(PlaceholderDetailView(title: "单位")))
-            rowDivider
-            SetItemRow(icon: "bell", label: "通知", value: "默认", destination: AnyView(PlaceholderDetailView(title: "通知")))
+    /// HealthKit 连接态：纯展示行（详细授权流程留待后续单独立项，无二级页）。
+    private var healthKitRow: some View {
+        let available = HKHealthStore.isHealthDataAvailable()
+        return HStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "heart.text.square")
+                .foregroundStyle(Theme.Color.fg2)
+                .frame(width: 24)
+            Text("HealthKit")
+                .font(Theme.Font.body(size: 14))
+                .foregroundStyle(Theme.Color.fg)
+            Spacer()
+            Text(available ? "已连接" : "未授权")
+                .font(Theme.Font.mono(size: 12))
+                .foregroundStyle(available ? Theme.Color.ok : Theme.Color.danger)
         }
+        .padding(.horizontal, Theme.Spacing.md)
+        .frame(height: 48)
     }
 
     private var aboutGroup: some View {
@@ -238,41 +224,6 @@ struct ProfileView: View {
     }
 }
 
-// MARK: - SetItemRow
-
-struct SetItemRow: View {
-    let icon: String
-    let label: String
-    var value: String? = nil
-    var valueColor: Color = Theme.Color.muted
-    let destination: AnyView
-
-    var body: some View {
-        NavigationLink(destination: destination) {
-            HStack(spacing: Theme.Spacing.md) {
-                Image(systemName: icon)
-                    .foregroundStyle(Theme.Color.fg2)
-                    .frame(width: 24)
-                Text(label)
-                    .font(Theme.Font.body(size: 14))
-                    .foregroundStyle(Theme.Color.fg)
-                Spacer()
-                if let v = value {
-                    Text(v)
-                        .font(Theme.Font.mono(size: 12))
-                        .foregroundStyle(valueColor)
-                }
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.Color.muted)
-            }
-            .padding(.horizontal, Theme.Spacing.md)
-            .frame(height: 48)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 // MARK: - 同步行（带 SyncEngine 状态）
 
 struct SyncRow: View {
@@ -308,28 +259,4 @@ struct SyncRow: View {
     }
 }
 
-// MARK: - 二级占位页
-
-struct PlaceholderDetailView: View {
-    let title: String
-
-    var body: some View {
-        ZStack {
-            Theme.Color.bg.ignoresSafeArea()
-            VStack(spacing: Theme.Spacing.md) {
-                Text("COMING SOON").eyebrowStyle()
-                Text("即将上线")
-                    .font(Theme.Font.display(size: 22, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg)
-                Text("\(title) 详细编辑在后续版本中补齐。")
-                    .font(Theme.Font.body(size: 13))
-                    .foregroundStyle(Theme.Color.fg2)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(Theme.Spacing.lg)
-        }
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
 
