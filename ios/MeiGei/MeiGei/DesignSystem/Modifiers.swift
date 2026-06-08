@@ -1,64 +1,49 @@
 import SwiftUI
 
 extension Theme {
-    enum GlowColor {
-        case cyan
-        case magenta
+    /// 纸感阴影三级，数值对齐 C 设计稿 sh-sm / sh-md / sh-lg（阴影底色 = fg #1c1a17）。
+    enum ShadowLevel {
+        case sm   // 卡片、按钮
+        case md   // 中等高度（徽章、浮层）
+        case lg   // Sheet、Dialog
 
-        var color: SwiftUI.Color {
+        var opacity: Double {
             switch self {
-            case .cyan:    return Theme.Color.accentCyan
-            case .magenta: return Theme.Color.accentMagenta
+            case .sm: return 0.07
+            case .md: return 0.09
+            case .lg: return 0.12
+            }
+        }
+        var radius: CGFloat {
+            switch self {
+            case .sm: return 4
+            case .md: return 8
+            case .lg: return 16
+            }
+        }
+        var y: CGFloat {
+            switch self {
+            case .sm: return 1
+            case .md: return 4
+            case .lg: return 8
             }
         }
     }
 
-    enum GlowIntensity {
-        case sm       // 按钮
-        case medium   // 卡片
-        case lg       // PR 庆祝爆光
-
-        var outerRadius: CGFloat {
-            switch self {
-            case .sm:     return 8
-            case .medium: return 14
-            case .lg:     return 28
-            }
-        }
-
-        var spreadRadius: CGFloat {
-            switch self {
-            case .sm:     return 18
-            case .medium: return 32
-            case .lg:     return 64
-            }
-        }
-
-        var spreadOpacity: Double {
-            switch self {
-            case .sm:     return 0.20
-            case .medium: return 0.25
-            case .lg:     return 0.45
-            }
-        }
-
-        var strokeOpacity: Double {
-            switch self {
-            case .sm:     return 0.45
-            case .medium: return 0.55
-            case .lg:     return 0.75
-            }
-        }
-    }
 }
 
 extension View {
-    /// 设计稿三层阴影的 SwiftUI 近似：1px stroke overlay + 两层 shadow。
-    func neonGlow(_ color: Theme.GlowColor, intensity: Theme.GlowIntensity = .medium, cornerRadius: CGFloat = Theme.Radius.md) -> some View {
-        modifier(NeonGlowModifier(color: color.color, intensity: intensity, cornerRadius: cornerRadius))
+    /// 纸感投影：柔和 drop shadow + ~0.5px 描边近似（无彩色辉光）。
+    func paperShadow(_ level: Theme.ShadowLevel = .sm, cornerRadius: CGFloat = Theme.Radius.md) -> some View {
+        self
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Theme.Color.fg.opacity(0.04), lineWidth: 0.5)
+            )
+            .shadow(color: Theme.Color.fg.opacity(level.opacity), radius: level.radius, x: 0, y: level.y)
     }
 
-    /// Surface 卡片：Surface 背景 + Border 描边 + Radius.md + padding 14。
+    /// Surface 卡片：白底 + Border 描边 + 圆角 + padding + 纸感阴影。
     func cardStyle(padding: CGFloat = Theme.Spacing.md, cornerRadius: CGFloat = Theme.Radius.md) -> some View {
         self
             .padding(padding)
@@ -67,6 +52,7 @@ extension View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(Theme.Color.border, lineWidth: 1)
             )
+            .shadow(color: Theme.Color.fg.opacity(Theme.ShadowLevel.sm.opacity), radius: Theme.ShadowLevel.sm.radius, x: 0, y: Theme.ShadowLevel.sm.y)
     }
 
     /// 等宽小字 ALL CAPS + tracking + muted。常用于栏目标签。
@@ -96,21 +82,5 @@ struct PressableButtonStyle: ButtonStyle {
             .scaleEffect(reduceMotion ? 1.0 : (configuration.isPressed ? 0.97 : 1.0))
             .opacity(configuration.isPressed ? 0.92 : 1.0)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
-
-private struct NeonGlowModifier: ViewModifier {
-    let color: SwiftUI.Color
-    let intensity: Theme.GlowIntensity
-    let cornerRadius: CGFloat
-
-    func body(content: Content) -> some View {
-        content
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(color.opacity(intensity.strokeOpacity), lineWidth: 1)
-            )
-            .shadow(color: color.opacity(0.55), radius: intensity.outerRadius)
-            .shadow(color: color.opacity(intensity.spreadOpacity), radius: intensity.spreadRadius)
     }
 }

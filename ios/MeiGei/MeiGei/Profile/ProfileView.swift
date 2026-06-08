@@ -102,8 +102,8 @@ struct ProfileView: View {
     }
 
     private static let avatarPalette: [Color] = [
-        Theme.Color.accentCyan,
-        Theme.Color.accentMagenta,
+        Theme.Color.accent,
+        Theme.Color.accent,
         Theme.Color.ok,
     ]
 
@@ -239,7 +239,7 @@ struct SyncRow: View {
                 .foregroundStyle(Theme.Color.fg)
             Spacer()
             if syncEngine.isSyncing {
-                ProgressView().tint(Theme.Color.accentCyan)
+                ProgressView().tint(Theme.Color.accent)
                 Text("同步中…")
                     .font(Theme.Font.mono(size: 11))
                     .foregroundStyle(Theme.Color.fg2)

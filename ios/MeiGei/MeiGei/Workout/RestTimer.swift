@@ -21,6 +21,12 @@ final class RestTimerController {
         didSet { UserDefaults.standard.set(defaultDuration, forKey: Self.durationKey) }
     }
 
+    /// 休息结束/完成时是否在前台震动（由全屏弹窗底部「震动」开关控制），持久化到 UserDefaults，默认开。
+    /// 仅作用于前台 `Theme.Haptics`；后台本地通知的震动由系统设置裁决，不在此范围。
+    var hapticsEnabled: Bool {
+        didSet { UserDefaults.standard.set(hapticsEnabled, forKey: Self.hapticsKey) }
+    }
+
     /// 本次休息结束时刻；nil 表示当前无计时。
     private(set) var endDate: Date?
     /// 本次休息原始总时长（秒），用于 RestTimerSheet 圆环进度比例。
@@ -30,14 +36,22 @@ final class RestTimerController {
     /// 前台 ticker 写入，仅用于驱动 SwiftUI 每秒刷新。
     private(set) var tick: Date = .now
 
+    /// 全屏休息弹窗是否展开（共享态：训练页 FAB 触发置真，根层 overlay 渲染，层级天然高于 Tab/Nav）。
+    var isExpanded = false
+    /// 下一组提示（markdown「下一组 · **动作名** 第 N 组」），由训练会话页在启动休息时写入，供全屏弹窗显示。
+    var nextHint: String?
+
     private var ticker: Timer?
     private var activity: Activity<RestActivityAttributes>?
     private static let durationKey = "meigei.rest.defaultDuration"
+    private static let hapticsKey = "meigei.rest.hapticsEnabled"
     private static let notificationId = "meigei.rest.timer"
 
     init() {
         let saved = UserDefaults.standard.double(forKey: Self.durationKey)
         defaultDuration = saved > 0 ? saved : 90
+        // 未设置过时默认开（object 取不到 → nil → true）。
+        hapticsEnabled = (UserDefaults.standard.object(forKey: Self.hapticsKey) as? Bool) ?? true
         observeExternalEnd()
     }
 
@@ -84,6 +98,8 @@ final class RestTimerController {
         endDate = nil
         totalDuration = 0
         contextLabel = nil
+        nextHint = nil
+        // isExpanded 不在此清，交给根层 onChange(isRunning) 动画收起，保证渐隐。
         endActivity()
     }
 
@@ -96,8 +112,11 @@ final class RestTimerController {
 
     private func onTick() {
         tick = .now
-        // 前台到点：本地通知同刻触发即为前台提醒，这里只负责收起计时条。
-        if let endDate, endDate.timeIntervalSinceNow <= 0 { clear() }
+        // 前台到点：本地通知同刻触发即为前台提醒，这里负责收起计时条并（按开关）震动。
+        if let endDate, endDate.timeIntervalSinceNow <= 0 {
+            clear()
+            if hapticsEnabled { Theme.Haptics.notification(.success) }
+        }
     }
 
     private func scheduleNotification(after seconds: TimeInterval) {

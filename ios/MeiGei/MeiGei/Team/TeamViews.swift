@@ -12,37 +12,30 @@ struct TeamListView: View {
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                    if teamService.teams.isEmpty {
-                        emptyCard
-                    } else {
-                        Text("我的 Team").eyebrowStyle()
-                        ForEach(teamService.teams) { team in
-                            NavigationLink(value: team) {
-                                teamCard(team)
+            VStack(spacing: 0) {
+                header
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                        if teamService.teams.isEmpty {
+                            emptyCard
+                        } else {
+                            Text("我的 Team").eyebrowStyle()
+                            ForEach(teamService.teams) { team in
+                                NavigationLink(value: team) {
+                                    teamCard(team)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
+                        Color.clear.frame(height: 32)
                     }
-                    Color.clear.frame(height: 32)
-                }
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.top, Theme.Spacing.md)
-            }
-        }
-        .navigationTitle("Team")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("创建 Team") { creating = true }
-                    Button("用邀请码加入") { joining = true }
-                } label: {
-                    Image(systemName: "plus").foregroundStyle(Theme.Color.fg)
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.top, Theme.Spacing.md)
                 }
             }
         }
+        // 自绘大标题头（与训练/动作 Tab 一致），隐藏系统导航栏。
+        .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(for: TeamDTO.self) { TeamDetailView(team: $0) }
         .sheet(isPresented: $creating) { CreateTeamSheet() }
         .sheet(isPresented: $joining) { JoinTeamSheet() }
@@ -51,6 +44,29 @@ struct TeamListView: View {
         .alert("出错了", isPresented: .constant(error != nil)) {
             Button("好") { error = nil }
         } message: { Text(error ?? "") }
+    }
+
+    // MARK: Header（大标题「Team」+ 右侧圆形朱砂红加号菜单，与动作 Tab 一致）
+
+    private var header: some View {
+        HStack {
+            Text("Team")
+                .font(Theme.Font.display(size: 36, weight: .heavy))
+                .tracking(-1.08)
+                .foregroundStyle(Theme.Color.fg)
+            Spacer(minLength: 0)
+            Menu {
+                Button("创建 Team") { creating = true }
+                Button("用邀请码加入") { joining = true }
+            } label: {
+                CircleAddLabel()
+            }
+            .buttonStyle(PressableButtonStyle())
+            .accessibilityLabel("创建或加入 Team")
+        }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
     }
 
     private func teamCard(_ team: TeamDTO) -> some View {
@@ -94,10 +110,10 @@ struct TeamListView: View {
                         .foregroundStyle(Theme.Color.bg)
                         .padding(.horizontal, Theme.Spacing.lg)
                         .frame(height: 40)
-                        .background(Theme.Color.accentCyan, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                        .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
                 }
                 .buttonStyle(.plain)
-                .neonGlow(.cyan, intensity: .sm, cornerRadius: Theme.Radius.md)
+                .paperShadow(.sm, cornerRadius: Theme.Radius.md)
                 Button { joining = true } label: {
                     Text("加入")
                         .font(Theme.Font.body(size: 14, weight: .semibold))
@@ -131,13 +147,18 @@ struct CreateTeamSheet: View {
 
     var body: some View {
         NavigationStack {
-            // 必要的 Form 用法：单字段录入 sheet，原生体验最稳。
-            Form {
-                Section("名称") { TextField("如：周三力量小队", text: $name) }
-                if let error { Text(error).foregroundStyle(Theme.Color.danger).font(.caption) }
+            ZStack {
+                Theme.Color.bg.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                    Text("队名").eyebrowStyle()
+                    TextField("如：周三力量小队", text: $name).paperField()
+                    if let error {
+                        Text(error).foregroundStyle(Theme.Color.danger).font(Theme.Font.l5)
+                    }
+                    Spacer()
+                }
+                .padding(Theme.Spacing.lg)
             }
-            .scrollContentBackground(.hidden)
-            .background(Theme.Color.bg)
             .navigationTitle("创建 Team")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -145,7 +166,7 @@ struct CreateTeamSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("创建") { Task { await submit() } }
                         .disabled(busy || name.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .tint(Theme.Color.accentCyan)
+                        .tint(Theme.Color.accent)
                 }
             }
         }
@@ -167,16 +188,21 @@ struct JoinTeamSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("邀请码") {
+            ZStack {
+                Theme.Color.bg.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                    Text("邀请码").eyebrowStyle()
                     TextField("输入队友给你的邀请码", text: $code)
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
+                        .paperField()
+                    if let error {
+                        Text(error).foregroundStyle(Theme.Color.danger).font(Theme.Font.l5)
+                    }
+                    Spacer()
                 }
-                if let error { Text(error).foregroundStyle(Theme.Color.danger).font(.caption) }
+                .padding(Theme.Spacing.lg)
             }
-            .scrollContentBackground(.hidden)
-            .background(Theme.Color.bg)
             .navigationTitle("加入 Team")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -184,7 +210,7 @@ struct JoinTeamSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("加入") { Task { await submit() } }
                         .disabled(busy || code.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .tint(Theme.Color.accentCyan)
+                        .tint(Theme.Color.accent)
                 }
             }
         }
@@ -215,8 +241,8 @@ struct TeamDetailView: View {
 
     /// 3 档颜色 hash 头像配色。
     private static let avatarPalette: [Color] = [
-        Theme.Color.accentCyan,
-        Theme.Color.accentMagenta,
+        Theme.Color.accent,
+        Theme.Color.accent,
         Theme.Color.ok,
     ]
 
@@ -251,7 +277,7 @@ struct TeamDetailView: View {
                         TeamPlansView(team: team)
                     } label: {
                         HStack {
-                            Image(systemName: "list.bullet.rectangle").foregroundStyle(Theme.Color.accentCyan)
+                            Image(systemName: "list.bullet.rectangle").foregroundStyle(Theme.Color.accent)
                             Text("Team 计划模板")
                                 .font(Theme.Font.body(size: 15, weight: .semibold))
                                 .foregroundStyle(Theme.Color.fg)
@@ -300,13 +326,12 @@ struct TeamDetailView: View {
                 Spacer()
                 Text("\(trainedToday) / \(totalMembers) 今日已练")
                     .font(Theme.Font.mono(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg)
+                    .foregroundStyle(.white)
                     .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(Theme.Color.bg.opacity(0.55), in: Capsule())
-                    .overlay(Capsule().stroke(Theme.Color.border, lineWidth: 1))
+                    .background(Theme.Color.accent, in: Capsule())
             }
             Text(team.name)
-                .font(Theme.Font.display(size: 24, weight: .bold))
+                .font(Theme.Font.l1)
                 .foregroundStyle(Theme.Color.fg)
             HStack(spacing: 6) {
                 Text("邀请码")
@@ -327,12 +352,9 @@ struct TeamDetailView: View {
         }
         .padding(Theme.Spacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(colors: [Theme.Color.surface2, Theme.Color.bg],
-                           startPoint: .topLeading, endPoint: .bottomTrailing),
-            in: RoundedRectangle(cornerRadius: Theme.Radius.lg)
-        )
+        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg).stroke(Theme.Color.border, lineWidth: 1))
+        .paperShadow(.sm, cornerRadius: Theme.Radius.lg)
     }
 
     // 成员头像横向条：4 档配色 hash，超 4 折叠 +N，尾部 mono「N 成员」。
@@ -387,10 +409,10 @@ struct TeamDetailView: View {
                     .foregroundStyle(Theme.Color.bg)
                     .padding(.horizontal, Theme.Spacing.lg)
                     .frame(height: 38)
-                    .background(Theme.Color.accentCyan, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                    .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
             }
             .buttonStyle(.plain)
-            .neonGlow(.cyan, intensity: .sm, cornerRadius: Theme.Radius.md)
+            .paperShadow(.sm, cornerRadius: Theme.Radius.md)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
@@ -545,22 +567,16 @@ struct FeedItemCard: View {
             sep.foregroundColor = Theme.Color.fg2
             s.append(sep)
             var prAttr = AttributedString("★ \(pr)")
-            prAttr.foregroundColor = Theme.Color.accentMagenta
+            prAttr.foregroundColor = Theme.Color.accent
             s.append(prAttr)
         }
         return s
     }
 
-    @ViewBuilder
     private func body(text: AttributedString) -> some View {
-        if summary.headlinePR != nil {
-            Text(text)
-                .font(Theme.Font.body(size: 14, weight: .semibold))
-                .neonGlow(.magenta, intensity: .sm, cornerRadius: Theme.Radius.sm)
-        } else {
-            Text(text)
-                .font(Theme.Font.body(size: 14, weight: .semibold))
-        }
+        Text(text)
+            .font(Theme.Font.body(size: 14, weight: .semibold))
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func relativeTime(_ d: Date) -> String {
@@ -607,10 +623,10 @@ struct ReactionRow: View {
                     .padding(.horizontal, 10)
                     .frame(height: 28)
                     .background(
-                        mine ? Theme.Color.surface2 : Theme.Color.surface,
+                        mine ? Theme.Color.accentSoft : Theme.Color.surface,
                         in: Capsule()
                     )
-                    .overlay(Capsule().stroke(mine ? Theme.Color.accentCyan.opacity(0.4) : Theme.Color.border, lineWidth: 1))
+                    .overlay(Capsule().stroke(mine ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
@@ -725,7 +741,7 @@ struct TeamPlansView: View {
                     .font(Theme.Font.body(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.Color.bg)
                     .padding(.horizontal, 16).padding(.vertical, 10)
-                    .background(Theme.Color.accentCyan, in: Capsule())
+                    .background(Theme.Color.accent, in: Capsule())
                     .padding(.bottom, 24)
                     .transition(.opacity)
             }
@@ -748,14 +764,17 @@ struct TeamPlansView: View {
             Spacer()
             Button { Task { await fork(p) } } label: {
                 if forking == p.id {
-                    ProgressView().tint(Theme.Color.accentCyan)
+                    ProgressView().tint(Theme.Color.accent)
                 } else {
-                    Text("Fork")
-                        .font(Theme.Font.body(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.bg)
-                        .padding(.horizontal, 14)
-                        .frame(height: 32)
-                        .background(Theme.Color.accentCyan, in: Capsule())
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.branch").font(.system(size: 11, weight: .bold))
+                        Text("Fork")
+                    }
+                    .font(Theme.Font.body(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Color.accent)
+                    .padding(.horizontal, 14)
+                    .frame(height: 32)
+                    .overlay(Capsule().stroke(Theme.Color.accent, lineWidth: 1.5))
                 }
             }
             .buttonStyle(.plain)

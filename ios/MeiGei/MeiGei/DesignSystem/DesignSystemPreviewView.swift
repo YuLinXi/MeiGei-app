@@ -51,8 +51,10 @@ struct DesignSystemPreviewView: View {
             ("fg", Theme.Color.fg),
             ("fg2", Theme.Color.fg2),
             ("muted", Theme.Color.muted),
-            ("accentCyan", Theme.Color.accentCyan),
-            ("accentMagenta", Theme.Color.accentMagenta),
+            ("border2", Theme.Color.border2),
+            ("accent", Theme.Color.accent),
+            ("accentSoft", Theme.Color.accentSoft),
+            ("accentSofter", Theme.Color.accentSofter),
             ("danger", Theme.Color.danger),
             ("ok", Theme.Color.ok),
         ]
@@ -81,7 +83,7 @@ struct DesignSystemPreviewView: View {
             HStack(spacing: Theme.Spacing.lg) {
                 Text("00:36").numStyle(size: 28)
                 Text("102.5kg").numStyle(size: 28)
-                Text("28.4t").numStyle(size: 28).foregroundStyle(Theme.Color.accentCyan)
+                Text("28.4t").numStyle(size: 28).foregroundStyle(Theme.Color.accent)
             }
             Text("EYEBROW · TINY MONO").eyebrowStyle()
         }
@@ -99,7 +101,7 @@ struct DesignSystemPreviewView: View {
             ], id: \.0) { name, v in
                 HStack {
                     Text(name).font(Theme.Font.mono(size: 11)).frame(width: 36, alignment: .leading)
-                    Rectangle().fill(Theme.Color.accentCyan).frame(width: v, height: 14)
+                    Rectangle().fill(Theme.Color.accent).frame(width: v, height: 14)
                     Text("\(Int(v))").font(Theme.Font.mono(size: 11)).foregroundStyle(Theme.Color.muted)
                 }
             }
@@ -122,14 +124,14 @@ struct DesignSystemPreviewView: View {
                     .padding(.horizontal, Theme.Spacing.lg)
                     .padding(.vertical, Theme.Spacing.md)
                     .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                    .neonGlow(.cyan, intensity: .sm)
+                    .paperShadow(.sm)
 
                 Text("PR + 5kg")
                     .font(Theme.Font.body(size: 15, weight: .semibold))
                     .padding(.horizontal, Theme.Spacing.lg)
                     .padding(.vertical, Theme.Spacing.md)
                     .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                    .neonGlow(.magenta, intensity: .lg)
+                    .paperShadow(.lg)
             }
         }
     }

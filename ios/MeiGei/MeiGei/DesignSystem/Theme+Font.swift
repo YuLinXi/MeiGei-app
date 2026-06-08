@@ -9,6 +9,23 @@ extension Theme {
         static let monoRegularPS = "JetBrainsMono-Regular"
         static let monoBoldPS    = "JetBrainsMono-Bold"
 
+        // MARK: - C 设计稿字号语义层（数值对齐「纸感极简」设计稿）
+
+        /// 品牌/特大标题 32pt。
+        static var hero: SwiftUI.Font { display(size: 32, weight: .bold) }
+        /// 屏幕级大标题 23pt。
+        static var l1:   SwiftUI.Font { display(size: 23, weight: .bold) }
+        /// 卡片标题/按钮文字 16pt（semibold）。
+        static var l2:   SwiftUI.Font { display(size: 16, weight: .semibold) }
+        /// 小标题/分类 15pt。
+        static var l3:   SwiftUI.Font { display(size: 15, weight: .medium) }
+        /// 正文/次级信息 13pt。
+        static var l4:   SwiftUI.Font { body(size: 13) }
+        /// 标签/说明 11pt。
+        static var l5:   SwiftUI.Font { body(size: 11) }
+        /// 计时器大数字 58pt（等宽 tabular）。
+        static var timer: SwiftUI.Font { number(size: 58, weight: .bold) }
+
         /// 标题/数字大字：用 PingFang SC，按系统字体渲染（中文友好）。
         static func display(size: CGFloat, weight: SwiftUI.Font.Weight = .bold) -> SwiftUI.Font {
             .system(size: size, weight: weight, design: .default)

@@ -2,8 +2,8 @@ import SwiftUI
 
 /// 横向滑动 chip 选择器。规范见 `design-system` spec 「横向 Chip 选择器组件」：
 /// 单选；chip 高 32、横 padding 14、`Theme.Radius.pill` 圆角；
-/// 选中 = accentCyan 填充 + bg 文字 + cyan glow sm；
-/// 未选 = surface + 1pt border + fg2 文字。
+/// 选中 = accent 朱砂红实底 + 白字（无辉光）；
+/// 未选 = surface 白底 + 1pt border + fg2 文字。
 struct HorizontalChipPicker<Item: Identifiable & Hashable>: View {
     let items: [Item]
     @Binding var selection: Item.ID
@@ -33,29 +33,17 @@ struct HorizontalChipPicker<Item: Identifiable & Hashable>: View {
                 .font(Theme.Font.body(size: 13, weight: .semibold))
                 .padding(.horizontal, 14)
                 .frame(height: 32)
-                .foregroundStyle(isSelected ? Theme.Color.bg : Theme.Color.fg2)
+                .foregroundStyle(isSelected ? Color.white : Theme.Color.fg2)
                 .background(
-                    isSelected ? Theme.Color.accentCyan : Theme.Color.surface,
+                    isSelected ? Theme.Color.accent : Theme.Color.surface,
                     in: RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
                         .stroke(isSelected ? Color.clear : Theme.Color.border, lineWidth: 1)
                 )
-                .conditionalGlow(isSelected)
         }
         .buttonStyle(.plain)
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func conditionalGlow(_ on: Bool) -> some View {
-        if on {
-            self.neonGlow(.cyan, intensity: .sm, cornerRadius: Theme.Radius.pill)
-        } else {
-            self
-        }
     }
 }
 
@@ -85,7 +73,7 @@ private struct _PreviewChip: Identifiable, Hashable {
             .padding(.top, 40)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.Color.bg)
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(.light)
         }
     }
     return Demo()

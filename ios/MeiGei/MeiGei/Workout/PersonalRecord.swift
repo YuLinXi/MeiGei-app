@@ -39,42 +39,167 @@ func detectPersonalRecords(in workout: Workout, history: [Workout]) -> [Personal
     return prs
 }
 
-/// 庆祝弹窗：训练完成识别到新 PR 时展示。
+/// 庆祝弹窗（设计稿 04 · C 纸感，严格对齐 `meigei-c-pr-celebrate.md`）。
+///
+/// 结束/编辑训练检测到新 PR 时，从底部升起半屏白 sheet（墨色 scrim 由系统 sheet 提供）：
+/// grabber → 64px 朱砂红奖杯徽记（白色线性图标 + 三点微光）→「PERSONAL RECORD」eyebrow
+/// →「N 项新纪录！」标题 → 训练摘要副行 → 单容器 PR 列表（旧/首次 + 30px 红重量大数）→「太棒了」CTA。
+/// 高度按内容自适应（半屏内），可点 CTA 关闭或下滑关闭。
 struct PRCelebrationSheet: View {
     let records: [PersonalRecord]
+    /// 训练摘要副行：`title · N 动作 · N 组 · N 分钟`（title 为空则省略首段）。
+    let summary: String
     @Environment(\.dismiss) private var dismiss
 
+    /// 内容自然高度（用于 presentationDetents 自适应），默认给一个略大初值待测量收敛。
+    @State private var contentHeight: CGFloat = 460
+
     var body: some View {
-        VStack(spacing: 20) {
-            Text("🎉").font(.system(size: 64))
-            Text(records.count == 1 ? "新纪录！" : "\(records.count) 项新纪录！")
-                .font(.title.bold())
-            VStack(spacing: 12) {
-                ForEach(records) { pr in
-                    HStack {
-                        Text(pr.exerciseName).font(.headline)
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("\(formatKg(pr.weightKg)) kg").font(.headline).foregroundStyle(.tint)
-                            if let prev = pr.previousBestKg {
-                                Text("旧 \(formatKg(prev)) kg").font(.caption).foregroundStyle(.secondary)
-                            } else {
-                                Text("首次记录").font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(.tint.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+        content
+            .background(
+                GeometryReader { proxy in
+                    Color.clear.preference(key: SheetHeightKey.self, value: proxy.size.height)
+                }
+            )
+            .onPreferenceChange(SheetHeightKey.self) { contentHeight = $0 }
+            .frame(maxWidth: .infinity)
+            .presentationBackground(Theme.Color.surface)
+            .presentationCornerRadius(26)
+            .presentationDragIndicator(.hidden)
+            .presentationDetents([.height(contentHeight)])
+    }
+
+    private var content: some View {
+        VStack(spacing: 0) {
+            // grabber：38×5，border2，顶 10 / 底 16。
+            Capsule().fill(Theme.Color.border2)
+                .frame(width: 38, height: 5)
+                .padding(.top, 10)
+                .padding(.bottom, 16)
+
+            badge
+            Text("PERSONAL RECORD")
+                .font(Theme.Font.mono(size: 10, weight: .bold))
+                .tracking(0.2 * 10)
+                .textCase(.uppercase)
+                .foregroundStyle(Theme.Color.accent)
+                .padding(.top, 16)
+            Text(records.count == 1 ? "1 项新纪录！" : "\(records.count) 项新纪录！")
+                .font(Theme.Font.display(size: 23, weight: .heavy))
+                .tracking(-0.02 * 23)
+                .foregroundStyle(Theme.Color.fg)
+                .padding(.top, 6)
+            Text(summary)
+                .font(Theme.Font.body(size: 12))
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.top, 5)
+
+            prList.padding(.top, 22)
+
+            cta.padding(.top, 20)
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 26)
+    }
+
+    // MARK: 徽记（64px 实心红圆 + 白色奖杯线性图标 + 三点微光）
+
+    private var badge: some View {
+        ZStack {
+            Circle().fill(Theme.Color.accent)
+                .frame(width: 64, height: 64)
+                .shadow(color: Theme.Color.accent.opacity(0.32), radius: 9, x: 0, y: 6)
+            Image(systemName: "trophy")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(.white)
+            // 三颗 spark 点缀（相对 64 徽章中心的近似坐标，对齐原型 s1/s2/s3）。
+            spark(size: 5, opacity: 0.7).offset(x: -21.5, y: -32.5)
+            spark(size: 4, opacity: 1.0).offset(x: 35, y: -24)
+            spark(size: 4, opacity: 0.8).offset(x: -34, y: 32)
+        }
+        .frame(width: 64, height: 64)
+    }
+
+    private func spark(size: CGFloat, opacity: Double) -> some View {
+        Circle().fill(Theme.Color.accent).frame(width: size, height: size).opacity(opacity)
+    }
+
+    // MARK: PR 列表（单容器 + 行间分隔线）
+
+    private var prList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(records.enumerated()), id: \.element.id) { index, pr in
+                if index > 0 {
+                    Rectangle().fill(Theme.Color.border).frame(height: 1)
+                }
+                prRow(pr)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .stroke(Theme.Color.border, lineWidth: 1)
+        )
+    }
+
+    private func prRow(_ pr: PersonalRecord) -> some View {
+        HStack(spacing: Theme.Spacing.md) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(pr.exerciseName)
+                    .font(Theme.Font.display(size: 15, weight: .bold))
+                    .tracking(-0.01 * 15)
+                    .foregroundStyle(Theme.Color.fg)
+                if let prev = pr.previousBestKg {
+                    // 刷新型：灰字「旧纪录 N kg」。
+                    Text("旧纪录 \(formatKg(prev)) kg")
+                        .font(Theme.Font.body(size: 12))
+                        .foregroundStyle(Theme.Color.muted)
+                } else {
+                    // 首次型：朱砂红 mono「首次记录」标签。
+                    Text("首次记录")
+                        .font(Theme.Font.mono(size: 10, weight: .regular))
+                        .tracking(0.06 * 10)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Theme.Color.accent)
                 }
             }
-            Spacer()
-            Button { dismiss() } label: {
-                Text("太棒了").frame(maxWidth: .infinity)
+            Spacer(minLength: 0)
+            HStack(alignment: .center, spacing: 3) {
+                Image(systemName: "arrowtriangle.up.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Theme.Color.accent)
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text(formatKg(pr.weightKg))
+                        .numStyle(size: 30, weight: .bold)
+                        .foregroundStyle(Theme.Color.accent)
+                    Text("kg")
+                        .font(Theme.Font.mono(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.Color.accent.opacity(0.7))
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
         }
-        .padding()
-        .presentationDetents([.medium])
+        .padding(.horizontal, 15)
+        .padding(.vertical, 14)
     }
+
+    // MARK: CTA
+
+    private var cta: some View {
+        Button { dismiss() } label: {
+            Text("太棒了")
+                .font(Theme.Font.display(size: 15, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .shadow(color: Theme.Color.accent.opacity(0.26), radius: 7, x: 0, y: 4)
+        }
+        .buttonStyle(PressableButtonStyle())
+    }
+}
+
+/// 测量 sheet 内容自然高度，喂给 presentationDetents 实现内容自适应。
+private struct SheetHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }

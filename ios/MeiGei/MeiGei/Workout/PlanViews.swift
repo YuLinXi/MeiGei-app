@@ -29,47 +29,59 @@ struct PlanListView: View {
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    if let active = activePlan {
-                        Text("进行中").eyebrowStyle()
-                        featuredCard(active)
-                    }
+            VStack(spacing: 0) {
+                header
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                        if let active = activePlan {
+                            Text("进行中").eyebrowStyle()
+                            featuredCard(active)
+                        }
 
-                    Text("我的计划").eyebrowStyle()
-                    if otherPlans.isEmpty {
-                        emptyMineCard
-                    } else {
-                        VStack(spacing: Theme.Spacing.md) {
-                            ForEach(otherPlans) { plan in
-                                NavigationLink(value: plan) { planCard(plan) }
-                                    .buttonStyle(.plain)
+                        Text("我的计划").eyebrowStyle()
+                        if otherPlans.isEmpty {
+                            emptyMineCard
+                        } else {
+                            VStack(spacing: Theme.Spacing.md) {
+                                ForEach(otherPlans) { plan in
+                                    NavigationLink(value: plan) { planCard(plan) }
+                                        .buttonStyle(.plain)
+                                }
                             }
                         }
+
+                        Text("推荐模板").eyebrowStyle()
+                        recommendedCard
+
+                        Color.clear.frame(height: 32)
                     }
-
-                    Text("推荐模板").eyebrowStyle()
-                    recommendedCard
-
-                    Color.clear.frame(height: 32)
-                }
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.top, Theme.Spacing.md)
-            }
-        }
-        .navigationTitle("计划")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { creatingNew = true } label: {
-                    Image(systemName: "plus").foregroundStyle(Theme.Color.fg)
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.top, Theme.Spacing.md)
                 }
             }
         }
+        // 自绘大标题头（与训练/动作 Tab 一致），隐藏系统导航栏。
+        .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(for: WorkoutPlan.self) { PlanDetailView(plan: $0) }
         .navigationDestination(isPresented: $creatingNew) {
             PlanEditorView(plan: nil)
         }
+    }
+
+    // MARK: Header（大标题「计划」+ 右侧圆形朱砂红加号，与动作 Tab 一致）
+
+    private var header: some View {
+        HStack {
+            Text("计划")
+                .font(Theme.Font.display(size: 36, weight: .heavy))
+                .tracking(-1.08)
+                .foregroundStyle(Theme.Color.fg)
+            Spacer(minLength: 0)
+            CircleAddButton(action: { creatingNew = true }, accessibilityLabel: "新建计划")
+        }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
     }
 
     @ViewBuilder
@@ -77,49 +89,61 @@ struct PlanListView: View {
         let n = workouts.filter { $0.planId == plan.localId && $0.endedAt != nil }.count
         let total = max(8, n + 4)
         NavigationLink(value: plan) {
-            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                HStack {
-                    Text("WEEK \(min(n, total)) / \(total)")
-                        .font(Theme.Font.mono(size: 11, weight: .semibold))
-                        .padding(.horizontal, 10).padding(.vertical, 4)
-                        .background(Theme.Color.bg.opacity(0.35), in: Capsule())
+            HStack(spacing: 0) {
+                // 左侧朱砂红竖条
+                Rectangle().fill(Theme.Color.accent).frame(width: 4)
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    HStack {
+                        Text("WEEK \(min(n, total)) / \(total)")
+                            .font(Theme.Font.mono(size: 11, weight: .semibold))
+                            .padding(.horizontal, 10).padding(.vertical, 4)
+                            .background(Theme.Color.accentSoft, in: Capsule())
+                            .foregroundStyle(Theme.Color.accent)
+                        Spacer()
+                        Image(systemName: "chevron.right").foregroundStyle(Theme.Color.muted)
+                    }
+                    Text(plan.name)
+                        .font(Theme.Font.l1)
                         .foregroundStyle(Theme.Color.fg)
-                    Spacer()
-                    Image(systemName: "chevron.right").foregroundStyle(Theme.Color.fg)
+                    Text("\(plan.items.count) 个动作 · 严肃推/拉/腿循环")
+                        .font(Theme.Font.l4)
+                        .foregroundStyle(Theme.Color.fg2)
+                    weekProgress(done: n, total: total)
+                    HStack(spacing: Theme.Spacing.xl) {
+                        metaCol(title: "已完成", value: "\(n)")
+                        metaCol(title: "剩余",   value: "\(max(0, total - n))")
+                        metaCol(title: "次/周", value: "3")
+                    }
                 }
-                Text(plan.name)
-                    .font(Theme.Font.display(size: 26, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg)
-                Text("\(plan.items.count) 个动作 · 严肃推/拉/腿循环")
-                    .font(Theme.Font.body(size: 13))
-                    .foregroundStyle(Theme.Color.fg.opacity(0.85))
-                HStack(spacing: Theme.Spacing.xl) {
-                    metaCol(title: "已完成", value: "\(n)")
-                    metaCol(title: "剩余",   value: "\(max(0, total - n))")
-                    metaCol(title: "次/周", value: "3")
-                }
+                .padding(Theme.Spacing.lg)
             }
-            .padding(Theme.Spacing.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                LinearGradient(
-                    colors: [Theme.Color.accentCyan, Theme.Color.surface],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ),
-                in: RoundedRectangle(cornerRadius: Theme.Radius.lg)
-            )
+            .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                    .stroke(Theme.Color.accentCyan.opacity(0.5), lineWidth: 1)
+                    .stroke(Theme.Color.border, lineWidth: 1)
             )
-            .neonGlow(.cyan, intensity: .medium, cornerRadius: Theme.Radius.lg)
+            .paperShadow(.sm, cornerRadius: Theme.Radius.lg)
         }
         .buttonStyle(.plain)
     }
 
+    /// 周进度小条：total 段，前 done 段填 accent，其余 border2。
+    private func weekProgress(done: Int, total: Int) -> some View {
+        let n = min(max(total, 1), 8)
+        return HStack(spacing: 4) {
+            ForEach(0..<n, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(i < done ? Theme.Color.accent : Theme.Color.border2)
+                    .frame(height: 5)
+            }
+        }
+    }
+
     private func metaCol(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(title).eyebrowStyle().foregroundStyle(Theme.Color.fg.opacity(0.7))
+            Text(title).eyebrowStyle()
             Text(value).numStyle(size: 18).foregroundStyle(Theme.Color.fg)
         }
     }
@@ -175,7 +199,11 @@ struct PlanDetailView: View {
     @State private var pickingExercise = false
     @State private var editingItem: PlanItem?
     @State private var editing = false
+    @State private var confirmingDelete = false
     @State private var decodeError: String?
+    /// 待删除动作行（左滑删除二次确认）+ 该行全局坐标，供确认卡定位于其正下方。
+    @State private var pendingDeleteItem: PlanItem?
+    @State private var deleteRect: CGRect = .zero
     /// 单一活跃会话守卫：冲突态 + 待新建闭包 + 导航打开的会话。
     @State private var conflict: Workout?
     @State private var pendingBuild: (() -> Workout)?
@@ -197,12 +225,14 @@ struct PlanDetailView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             Theme.Color.bg.ignoresSafeArea()
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                // 对齐原型 .scroll：children gap 11、横向 17、顶部 4。
+                VStack(alignment: .leading, spacing: 11) {
                     header
-                    metaRow
+                    statRow
+                    sectionLabel
 
                     if let err = decodeError {
                         decodeErrorCard(err)
@@ -213,7 +243,8 @@ struct PlanDetailView: View {
                             ForEach(Array(orderedItems.enumerated()), id: \.element.itemId) { idx, item in
                                 row(index: idx + 1, item: item)
                                 if idx < orderedItems.count - 1 {
-                                    Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.leading, 56)
+                                    // 对齐原型 .item border-top：满宽 1px，无缩进。
+                                    Rectangle().fill(Theme.Color.border).frame(height: 1)
                                 }
                             }
                         }
@@ -221,24 +252,59 @@ struct PlanDetailView: View {
                     }
 
                     addExerciseCTA
-                    Color.clear.frame(height: 120)
                 }
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.top, Theme.Spacing.md)
+                .padding(.horizontal, 17)
+                .padding(.top, 4)
+                .padding(.bottom, 12)
             }
-            bottomBar
         }
+        // 对齐原型 .footer：scroll 与 footer 为兄弟（内容不穿底栏），底栏实底 + 顶部分隔线。
+        .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        // 二级详情页：隐藏底部 Tab 栏，全屏展示（底栏贴屏幕最底）。
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("编辑名称…") { editing = true }
-                    Button("删除计划", role: .destructive) { delete() }
-                } label: {
-                    Image(systemName: "ellipsis").foregroundStyle(Theme.Color.fg)
+            // 圆形返回 / ⋯ 菜单（沿用 WorkoutViews 既定约定；iOS 26 关掉系统 Liquid Glass 圆背景避免双环）。
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarLeading) {
+                    CircleIconButton(systemName: "chevron.left", action: { dismiss() }, size: 32)
                 }
+                .sharedBackgroundVisibility(.hidden)
+                ToolbarItem(placement: .topBarTrailing) { menuButton }
+                    .sharedBackgroundVisibility(.hidden)
+            } else {
+                ToolbarItem(placement: .topBarLeading) {
+                    CircleIconButton(systemName: "chevron.left", action: { dismiss() }, size: 32)
+                }
+                ToolbarItem(placement: .topBarTrailing) { menuButton }
             }
         }
+        .paperConfirmDialog(
+            isPresented: $confirmingDelete,
+            title: "删除计划?",
+            message: "将删除「\(plan.name)」,此操作不可撤销。",
+            confirmTitle: "删除计划",
+            onConfirm: { delete() }
+        )
+        // 删除动作二次确认：复用首页「最近训练」的透明浮层 + 锚定卡片，文案改「删除动作」。
+        .fullScreenCover(isPresented: Binding(
+            get: { pendingDeleteItem != nil },
+            set: { if !$0 { pendingDeleteItem = nil } })) {
+            if let item = pendingDeleteItem {
+                DeleteConfirmCover(
+                    anchorRect: deleteRect,
+                    confirmTitle: "删除动作",
+                    onConfirm: {
+                        Theme.Haptics.notification(.warning)
+                        deleteItem(item)
+                    },
+                    onClose: { pendingDeleteItem = nil }
+                )
+                .presentationBackground(.clear)
+            }
+        }
+        .transaction(value: pendingDeleteItem != nil) { $0.disablesAnimations = true }
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in
                 var items = plan.items
@@ -277,56 +343,115 @@ struct PlanDetailView: View {
         } message: { _ in Text("同一时间只能有一个进行中的训练。继续既有训练，或丢弃后开始新的。") }
     }
 
+    // 对齐原型 .navbar ⋯：圆形钮 + Menu（重命名 / 删除走二次确认）。点 dots 用 fg2。
+    private var menuButton: some View {
+        Menu {
+            Button { editing = true } label: { Label("重命名计划", systemImage: "pencil") }
+            Button(role: .destructive) { confirmingDelete = true } label: { Label("删除计划", systemImage: "trash") }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg2)
+                .frame(width: 32, height: 32)
+                .background(Theme.Color.surface, in: Circle())
+                .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
+        }
+    }
+
     private var header: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            Text("PLAN · 训练模板").eyebrowStyle()
+        // 对齐原型：eyebrow mono 10/.16em/muted；ptitle 30 weight 800/-.03em；间距 3。
+        VStack(alignment: .leading, spacing: 3) {
+            Text("PLAN · 训练模板")
+                .font(Theme.Font.mono(size: 10))
+                .tracking(1.6)
+                .textCase(.uppercase)
+                .foregroundStyle(Theme.Color.muted)
             Text(plan.name)
-                .font(Theme.Font.display(size: 30, weight: .bold))
+                .font(Theme.Font.display(size: 30, weight: .heavy))
+                .tracking(-0.9)
                 .foregroundStyle(Theme.Color.fg)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private var metaRow: some View {
-        HStack(spacing: Theme.Spacing.xl) {
-            metaCol("动作", "\(plan.items.count)")
-            metaCol("组数", "\(totalSets)")
-            metaCol("时长", "≈\(estimatedMinutes) 分")
+    // 对齐原型 .stat3：3 列居中 + 中缝 1px 分隔线；n=sans 22/800/-.025em，k=mono 9/.06em/muted。
+    private var statRow: some View {
+        HStack(spacing: 0) {
+            statCell(n: "\(plan.items.count)", k: "动作")
+            statDivider
+            statCell(n: "\(totalSets)", k: "总组数")
+            statDivider
+            statCell(n: "≈\(estimatedMinutes)", k: "分钟")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardStyle()
+        .cardStyle(padding: 0)
     }
 
-    private func metaCol(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).eyebrowStyle()
-            Text(value).numStyle(size: 20).foregroundStyle(Theme.Color.fg)
-        }
+    private var statDivider: some View {
+        Rectangle().fill(Theme.Color.border).frame(width: 1, height: 40)
     }
 
+    private func statCell(n: String, k: String) -> some View {
+        VStack(spacing: 7) {
+            Text(n)
+                .font(Theme.Font.display(size: 22, weight: .heavy))
+                .tracking(-0.55)
+                .foregroundStyle(Theme.Color.fg)
+            Text(k)
+                .font(Theme.Font.mono(size: 9))
+                .tracking(0.54)
+                .textCase(.uppercase)
+                .foregroundStyle(Theme.Color.muted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 13)
+        .padding(.horizontal, 4)
+    }
+
+    // 对齐原型 .seclbl：mono 10/.1em/uppercase/muted。
+    private var sectionLabel: some View {
+        Text("动作")
+            .font(Theme.Font.mono(size: 10))
+            .tracking(1.0)
+            .textCase(.uppercase)
+            .foregroundStyle(Theme.Color.muted)
+            .padding(.horizontal, 2)
+    }
+
+    // 对齐原型 .item：序号 mono 12/700/muted/宽 18 居中；名称 sans 15/600；参数 mono 12/muted；⋯ muted 17。
+    // 左滑显露删除（与训练首页「最近训练」统一交互），点击行进建议参数编辑。
     private func row(index: Int, item: PlanItem) -> some View {
-        Button { editingItem = item } label: {
-            HStack(spacing: Theme.Spacing.md) {
+        SwipeToDeleteCard(
+            onTap: { editingItem = item },
+            onDelete: { rect in
+                deleteRect = rect
+                pendingDeleteItem = item
+            }
+        ) {
+            HStack(spacing: 11) {
                 Text(String(format: "%02d", index))
-                    .numStyle(size: 18)
-                    .foregroundStyle(Theme.Color.accentCyan)
-                    .frame(width: 28, alignment: .leading)
-                VStack(alignment: .leading, spacing: 2) {
+                    .font(Theme.Font.mono(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 3) {
                     Text(item.exerciseName)
                         .font(Theme.Font.body(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.Color.fg)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                     Text(subtitle(item))
-                        .font(Theme.Font.mono(size: 11))
+                        .font(Theme.Font.mono(size: 12))
                         .foregroundStyle(Theme.Color.muted)
                 }
-                Spacer()
-                Image(systemName: "line.3.horizontal")
+                Spacer(minLength: 0)
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 17))
                     .foregroundStyle(Theme.Color.muted)
             }
-            .padding(.horizontal, Theme.Spacing.md)
-            .frame(minHeight: 60)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 12)
+            .background(Theme.Color.surface)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
     }
 
     private var emptyExercisesCard: some View {
@@ -342,20 +467,21 @@ struct PlanDetailView: View {
         .cardStyle()
     }
 
+    // 对齐原型 .add-row：虚线 border2 1.5px、muted、12/600、padding 12、加号 15。
     private var addExerciseCTA: some View {
         Button { pickingExercise = true } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 7) {
                 Image(systemName: "plus")
+                    .font(.system(size: 15, weight: .bold))
                 Text("添加动作")
+                    .font(Theme.Font.body(size: 12, weight: .semibold))
             }
-            .font(Theme.Font.body(size: 14, weight: .semibold))
-            .foregroundStyle(Theme.Color.accentCyan)
+            .foregroundStyle(Theme.Color.muted)
             .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.md)
-                    .strokeBorder(Theme.Color.border, style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .strokeBorder(Theme.Color.border2, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
             )
         }
         .buttonStyle(.plain)
@@ -382,47 +508,59 @@ struct PlanDetailView: View {
         )
     }
 
+    // 对齐原型 .footer：复制=ghost 次级键(自适应宽 + border2 + sh-sm)，开始=主键(flex1 + accent)；
+    // 容器实底 bg + 顶部 1px 分隔线。主次对比靠填充 vs 描边，不靠尺寸。
     private var bottomBar: some View {
-        HStack(spacing: Theme.Spacing.md) {
+        HStack(spacing: 10) {
             Button { duplicate() } label: {
-                Image(systemName: "doc.on.doc")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg2)
-                    .frame(width: 50, height: 50)
-                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text("复制")
+                        .font(Theme.Font.body(size: 12, weight: .bold))
+                }
+                .foregroundStyle(Theme.Color.fg)
+                .padding(.horizontal, 16)
+                .frame(height: 50)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                        .stroke(Theme.Color.border2, lineWidth: 1)
+                )
+                .shadow(color: Theme.Color.fg.opacity(Theme.ShadowLevel.sm.opacity),
+                        radius: Theme.ShadowLevel.sm.radius, x: 0, y: Theme.ShadowLevel.sm.y)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
 
             Button { startWorkout() } label: {
                 HStack(spacing: 6) {
                     Text("开始这次训练")
-                    Image(systemName: "arrow.right")
+                        .font(Theme.Font.body(size: 15, weight: .bold))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .bold))
                 }
-                .font(Theme.Font.body(size: 16, weight: .semibold))
-                .foregroundStyle(Theme.Color.bg)
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                .background(Theme.Color.accentCyan, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .shadow(color: Theme.Color.accent.opacity(0.24), radius: 7, x: 0, y: 4)
             }
-            .buttonStyle(.plain)
-            .neonGlow(.cyan, intensity: .medium, cornerRadius: Theme.Radius.md)
+            .buttonStyle(PressableButtonStyle())
         }
-        .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.bottom, Theme.Spacing.md)
-        .padding(.top, Theme.Spacing.sm)
-        .background(
-            LinearGradient(
-                colors: [Theme.Color.bg.opacity(0), Theme.Color.bg, Theme.Color.bg],
-                startPoint: .top, endPoint: .bottom
-            )
-        )
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Theme.Color.bg)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.Color.border).frame(height: 1)
+        }
     }
 
     private func subtitle(_ item: PlanItem) -> String {
+        // 对齐原型 .pm：「3 组 × 10 · 60 kg」/「3 组 × 12」；重量可空时仅显示组×次。
         var parts: [String] = []
-        if let s = item.suggestedSets, let r = item.suggestedReps { parts.append("\(s)组 × \(r)次") }
-        else if let s = item.suggestedSets { parts.append("\(s)组") }
+        if let s = item.suggestedSets, let r = item.suggestedReps { parts.append("\(s) 组 × \(r)") }
+        else if let s = item.suggestedSets { parts.append("\(s) 组") }
         if let w = item.suggestedWeightKg { parts.append("\(formatKg(w)) kg") }
         return parts.isEmpty ? "未设建议" : parts.joined(separator: " · ")
     }
@@ -482,6 +620,16 @@ struct PlanDetailView: View {
         try? modelContext.save()
         dismiss()
     }
+
+    /// 删除单个动作项：从 items 移除后按顺序重排 orderIndex，markDirty 并落盘。
+    private func deleteItem(_ item: PlanItem) {
+        var items = plan.items.sorted { $0.orderIndex < $1.orderIndex }
+        items.removeAll { $0.itemId == item.itemId }
+        for i in items.indices { items[i].orderIndex = i }
+        plan.items = items
+        plan.markDirty()
+        try? modelContext.save()
+    }
 }
 
 // MARK: - 计划编辑器（仅用于新建空模板入口；详情页内联编辑动作项）
@@ -520,7 +668,7 @@ struct PlanEditorView: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("保存") { save() }
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                    .tint(Theme.Color.accentCyan)
+                    .tint(Theme.Color.accent)
             }
         }
     }
@@ -576,7 +724,8 @@ struct PlanRenameSheet: View {
                         plan.markDirty()
                         dismiss()
                     }
-                    .tint(Theme.Color.accentCyan)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .tint(Theme.Color.accent)
                 }
             }
         }
@@ -603,21 +752,31 @@ struct PlanItemEditorView: View {
 
     var body: some View {
         NavigationStack {
-            // 必要的 Form 用法：动作建议是 sheet 内编辑表单，原生 Stepper/decimalPad
-            // 在自绘容器内体验差，sheet 隔离视觉范围有限，保留 Form 并把背景压成 bg。
-            Form {
-                Section(original.exerciseName) {
-                    Stepper("建议组数：\(sets)", value: $sets, in: 1...20)
-                    Stepper("建议次数：\(reps)", value: $reps, in: 1...100)
-                    HStack {
-                        Text("建议重量(kg)")
-                        TextField("可空", text: $weight).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+            ZStack {
+                Theme.Color.bg.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                    Text(original.exerciseName)
+                        .font(Theme.Font.l1)
+                        .foregroundStyle(Theme.Color.fg)
+                    // 建议组数
+                    stepperRow(title: "建议组数") {
+                        PaperStepper(value: sets, range: 1...20) { sets = $0 }
                     }
+                    // 建议次数
+                    stepperRow(title: "建议次数") {
+                        PaperStepper(value: reps, range: 1...100) { reps = $0 }
+                    }
+                    // 建议重量（可空）
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        Text("建议重量 (kg)").eyebrowStyle()
+                        TextField("可空", text: $weight)
+                            .keyboardType(.decimalPad)
+                            .paperField()
+                    }
+                    Spacer()
                 }
+                .padding(Theme.Spacing.lg)
             }
-            .scrollContentBackground(.hidden)
-            .background(Theme.Color.bg)
-            .navigationTitle("动作建议")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -629,10 +788,22 @@ struct PlanItemEditorView: View {
                         onSave(updated)
                         dismiss()
                     }
-                    .tint(Theme.Color.accentCyan)
+                    .tint(Theme.Color.accent)
                 }
             }
         }
+        .presentationDetents([.medium])
+    }
+
+    /// 标签 + 右侧控件一行（卡片容器）。
+    private func stepperRow<Control: View>(title: String, @ViewBuilder control: () -> Control) -> some View {
+        HStack {
+            Text(title).font(Theme.Font.l2).foregroundStyle(Theme.Color.fg)
+            Spacer()
+            control()
+        }
+        .frame(maxWidth: .infinity)
+        .cardStyle()
     }
 }
 

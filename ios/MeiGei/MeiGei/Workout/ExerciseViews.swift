@@ -10,21 +10,6 @@ struct ExercisePick: Identifiable, Hashable {
     var id: String { builtinCode ?? customId?.uuidString ?? name }
 }
 
-/// 动作列表的筛选/搜索。返回内置 + 自定义两段结果（保留来源以打标）。
-func filterExercises(
-    builtin: [BuiltinExercise],
-    custom: [CustomExercise],
-    query: String,
-    muscle: MuscleGroup?
-) -> (builtin: [BuiltinExercise], custom: [CustomExercise]) {
-    let q = query.trimmingCharacters(in: .whitespaces)
-    func matchMuscle(_ m: String?) -> Bool { muscle == nil || m == muscle?.rawValue }
-    func matchQuery(_ name: String) -> Bool { q.isEmpty || name.localizedCaseInsensitiveContains(q) }
-    let b = builtin.filter { matchMuscle($0.primaryMuscle) && matchQuery($0.name) }
-    let c = custom.filter { $0.deletedAt == nil && matchMuscle($0.primaryMuscle) && matchQuery($0.name) }
-    return (b, c)
-}
-
 // MARK: - 3.4 动作库（Screen 04，Neon 改版）
 
 /// 动作库筛选 chip 项。
@@ -56,7 +41,8 @@ private enum LibraryGroup: String, CaseIterable {
     }
 }
 
-/// 动作库：搜索 noop + 部位 chip + 分组列表 + PR 副标。
+/// 动作库 · Tab 根页（设计稿 Screen 10）：
+/// 自绘大标题头 + 真实搜索 + 部位 chip 筛选 + 分组列表（自定义→复合推/拉/腿→单关节），行右显示 PR。
 struct ExerciseLibraryView: View {
     @Query(sort: \CustomExercise.updatedAt, order: .reverse) private var custom: [CustomExercise]
     @Query(filter: #Predicate<Workout> { $0.deletedAt == nil },
@@ -81,9 +67,19 @@ struct ExerciseLibraryView: View {
         chips.first(where: { $0.id == muscle })?.muscle
     }
 
+    /// 去空白后的搜索词；空则不参与名称过滤。
+    private var trimmedQuery: String { query.trimmingCharacters(in: .whitespaces) }
+
+    /// 库内动作总量（内置 + 自定义），用于搜索框占位。
+    private var totalCount: Int {
+        BuiltinExercise.starter.count + custom.filter { $0.deletedAt == nil }.count
+    }
+
+    /// 同时按部位 chip 与搜索词（名称子串，忽略大小写）过滤内置动作。
     private var builtinFiltered: [BuiltinExercise] {
         BuiltinExercise.starter.filter { ex in
             (selectedMuscle == nil || ex.primaryMuscle == selectedMuscle?.rawValue)
+                && (trimmedQuery.isEmpty || ex.name.localizedCaseInsensitiveContains(trimmedQuery))
         }
     }
 
@@ -91,81 +87,98 @@ struct ExerciseLibraryView: View {
         custom.filter { ex in
             ex.deletedAt == nil
                 && (selectedMuscle == nil || ex.primaryMuscle == selectedMuscle?.rawValue)
+                && (trimmedQuery.isEmpty || ex.name.localizedCaseInsensitiveContains(trimmedQuery))
         }
     }
 
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg, pinnedViews: []) {
-                    searchBar
-                    HorizontalChipPicker(items: chips, selection: $muscle) { $0.title }
-                        .padding(.horizontal, -Theme.Spacing.lg)
+            VStack(spacing: 0) {
+                header
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10, pinnedViews: []) {
+                        searchBar
+                        HorizontalChipPicker(items: chips, selection: $muscle) { $0.title }
+                            .padding(.horizontal, -Theme.Spacing.lg)
 
-                    if builtinFiltered.isEmpty && customFiltered.isEmpty {
-                        emptyState
-                    } else {
-                        groupedList
+                        if builtinFiltered.isEmpty && customFiltered.isEmpty {
+                            emptyState
+                        } else {
+                            groupedList
+                        }
+                        Color.clear.frame(height: 32)
                     }
-                    Color.clear.frame(height: 32)
-                }
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.top, Theme.Spacing.md)
-            }
-        }
-        .navigationTitle("动作")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showingCreate = true } label: {
-                    Image(systemName: "plus").foregroundStyle(Theme.Color.fg)
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.top, 6)
                 }
             }
         }
+        // 自绘大标题头（对齐设计稿 .nav，与首页一致），隐藏系统导航栏。
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingCreate) { CustomExerciseEditorView() }
         .navigationDestination(for: BuiltinExercise.self) { ExerciseDetailView(exercise: $0) }
     }
 
-    // 搜索框（noop，仅占位）
+    // MARK: Header（设计稿 .nav：大标题「动作」+ 右侧圆形朱砂红 +）
+
+    private var header: some View {
+        HStack {
+            Text("动作")
+                .font(Theme.Font.display(size: 36, weight: .heavy))
+                .tracking(-1.08)
+                .foregroundStyle(Theme.Color.fg)
+            Spacer(minLength: 0)
+            CircleAddButton(action: { showingCreate = true }, accessibilityLabel: "添加自定义动作")
+        }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
+    }
+
+    // 搜索框（真实可用）：暖底 + 实线次边框 + 放大镜 + 清除按钮。
     private var searchBar: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: "magnifyingglass").foregroundStyle(Theme.Color.muted)
-            TextField("", text: $query, prompt: Text("搜索 \(BuiltinExercise.starter.count + custom.count) 个动作").foregroundColor(Theme.Color.muted))
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(Theme.Color.muted)
+            TextField("", text: $query,
+                      prompt: Text("搜索 \(totalCount) 个动作").foregroundColor(Theme.Color.muted))
                 .font(Theme.Font.body(size: 14))
                 .foregroundStyle(Theme.Color.fg)
                 .submitLabel(.search)
-                .disabled(true) // 真实搜索留到后续 change
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.Color.muted)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("清除搜索")
+            }
         }
-        .padding(.horizontal, Theme.Spacing.md)
-        .frame(height: 40)
-        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .strokeBorder(Theme.Color.border2, lineWidth: 1)
+        )
     }
 
     @ViewBuilder
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            Text("EMPTY · 动作库").eyebrowStyle()
-            Text("动作库尚未采集")
-                .font(Theme.Font.display(size: 20, weight: .semibold))
+        let searching = !trimmedQuery.isEmpty
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text(searching ? "NO MATCH · 无匹配" : "EMPTY · 动作库").eyebrowStyle()
+            Text(searching ? "没有匹配「\(trimmedQuery)」的动作" : "该部位暂无动作")
+                .font(Theme.Font.display(size: 17, weight: .semibold))
                 .foregroundStyle(Theme.Color.fg)
-            Text("内置 150+ 动作正在补齐中。\n点击右上 + 添加自定义动作。")
+            Text(searching ? "试试其他关键词，或点右上 + 添加自定义动作。" : "切换部位，或点右上 + 添加自定义动作。")
                 .font(Theme.Font.body(size: 13))
                 .foregroundStyle(Theme.Color.fg2)
-            Button { showingCreate = true } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                    Text("添加自定义动作")
-                }
-                .font(Theme.Font.body(size: 14, weight: .semibold))
-                .foregroundStyle(Theme.Color.bg)
-                .padding(.horizontal, Theme.Spacing.lg)
-                .frame(height: 40)
-                .background(Theme.Color.accentCyan, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-            }
-            .buttonStyle(.plain)
-            .neonGlow(.cyan, intensity: .sm, cornerRadius: Theme.Radius.md)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
@@ -179,108 +192,139 @@ struct ExerciseLibraryView: View {
 
         if !customFiltered.isEmpty {
             sectionHeader("我的 · 自定义")
-            VStack(spacing: 0) {
+            exList {
                 ForEach(Array(customFiltered.enumerated()), id: \.element.localId) { idx, ex in
+                    if idx > 0 { rowDivider }
                     customRow(ex)
-                    if idx < customFiltered.count - 1 { rowDivider }
                 }
             }
-            .cardStyle(padding: 0)
         }
 
         ForEach(orderedGroups, id: \.self) { g in
             sectionHeader(g.rawValue)
             let items = grouped[g] ?? []
-            VStack(spacing: 0) {
+            exList {
                 ForEach(Array(items.enumerated()), id: \.element.code) { idx, ex in
+                    if idx > 0 { rowDivider }
                     NavigationLink(value: ex) {
                         builtinRow(ex)
                     }
                     .buttonStyle(.plain)
-                    if idx < items.count - 1 { rowDivider }
                 }
             }
-            .cardStyle(padding: 0)
         }
     }
 
+    /// 分组标题（.grp）：等宽小字、宽字距、muted。
     private func sectionHeader(_ title: String) -> some View {
-        Text(title).eyebrowStyle().padding(.top, 4)
+        Text(title)
+            .font(Theme.Font.mono(size: 10, weight: .regular))
+            .tracking(0.1 * 10)
+            .textCase(.uppercase)
+            .foregroundStyle(Theme.Color.muted)
+            .padding(.top, 4)
+            .padding(.leading, 2)
     }
 
+    /// 列表容器（.ex-list）：白底卡片 + 圆角裁切 + border + 纸感阴影。
+    /// 阴影作用在底层「不透明圆角矩形」上（有明确路径，GPU 走 shadowPath），
+    /// 避免把 `.shadow` 加在 `.clipShape` 后的复合视图上而触发离屏渲染——
+    /// 后者在 LazyVStack 滚动时会产生矩形色块/黑块残影。
+    private func exList<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+        VStack(spacing: 0) { content() }
+            .background(Theme.Color.surface)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .stroke(Theme.Color.border, lineWidth: 1)
+            )
+            .background(
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .fill(Theme.Color.surface)
+                    .shadow(color: Theme.Color.fg.opacity(Theme.ShadowLevel.sm.opacity),
+                            radius: Theme.ShadowLevel.sm.radius, x: 0, y: Theme.ShadowLevel.sm.y)
+            )
+    }
+
+    /// 行分隔线（.ex + .ex border-top）：整行通栏，无左缩进。
     private var rowDivider: some View {
         Rectangle().fill(Theme.Color.border).frame(height: 1)
-            .padding(.leading, 56)
     }
 
     private func builtinRow(_ ex: BuiltinExercise) -> some View {
         let pr = PRStats.latestPR(for: ex.code, in: workouts)
-        return HStack(spacing: Theme.Spacing.md) {
-            thumb(initial: String(ex.name.prefix(1)))
+        return HStack(spacing: 12) {
+            avatar(String(ex.name.prefix(1)))
             VStack(alignment: .leading, spacing: 2) {
                 Text(ex.name)
                     .font(Theme.Font.body(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
-                Text(humanize(code: ex.code))
-                    .font(Theme.Font.mono(size: 11))
+                    .lineLimit(1)
+                Text("\(ex.primaryMuscle) · \(ex.equipmentType)")
+                    .font(Theme.Font.body(size: 12))
                     .foregroundStyle(Theme.Color.muted)
             }
-            Spacer()
+            Spacer(minLength: 8)
             if let pr {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("PR").eyebrowStyle()
-                    Text("\(formatKg(pr.weightKg))kg")
-                        .numStyle(size: 13)
-                        .foregroundStyle(Theme.Color.fg)
-                }
+                prPill("PR \(formatKg(pr.weightKg))")
             }
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Theme.Color.muted)
         }
-        .padding(.horizontal, Theme.Spacing.md)
-        .frame(minHeight: 60)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 11)
+        .contentShape(Rectangle())
     }
 
     private func customRow(_ ex: CustomExercise) -> some View {
-        let key = ex.localId.uuidString
-        let pr = PRStats.latestPR(for: key, in: workouts)
-        return HStack(spacing: Theme.Spacing.md) {
-            thumb(initial: String(ex.name.prefix(1)), tint: Theme.Color.accentMagenta.opacity(0.25))
+        let pr = PRStats.latestPR(for: ex.localId.uuidString, in: workouts)
+        return HStack(spacing: 12) {
+            avatar(String(ex.name.prefix(1)))
             VStack(alignment: .leading, spacing: 2) {
                 Text(ex.name)
                     .font(Theme.Font.body(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
+                    .lineLimit(1)
                 Text("自定义 · \(ex.primaryMuscle ?? "—")")
-                    .font(Theme.Font.mono(size: 11))
+                    .font(Theme.Font.body(size: 12))
                     .foregroundStyle(Theme.Color.muted)
             }
-            Spacer()
+            Spacer(minLength: 8)
             if let pr {
-                Text("\(formatKg(pr.weightKg))kg")
-                    .numStyle(size: 13)
-                    .foregroundStyle(Theme.Color.fg2)
+                selfTag("\(formatKg(pr.weightKg)) kg")
             }
         }
-        .padding(.horizontal, Theme.Spacing.md)
-        .frame(minHeight: 60)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 11)
     }
 
-    private func thumb(initial: String, tint: Color = Theme.Color.surface2) -> some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(tint)
-                .frame(width: 42, height: 42)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.Color.border, lineWidth: 1))
-            Text(initial)
-                .font(Theme.Font.body(size: 16, weight: .semibold))
-                .foregroundStyle(Theme.Color.fg)
-        }
+    /// 行首方形首字头像（.av）：暖底 + border。
+    private func avatar(_ ch: String) -> some View {
+        Text(ch)
+            .font(Theme.Font.body(size: 14, weight: .bold))
+            .foregroundStyle(Theme.Color.fg2)
+            .frame(width: 40, height: 40)
+            .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
     }
 
-    /// "BB_BENCH_PRESS" -> "Bb Bench Press"
-    private func humanize(code: String) -> String {
-        code.split(separator: "_").map { $0.lowercased().capitalized }.joined(separator: " ")
+    /// 内置动作 PR 药丸（.pr）：朱砂红实心 + 白字。
+    private func prPill(_ text: String) -> some View {
+        Text(text)
+            .font(Theme.Font.mono(size: 9, weight: .bold))
+            .tracking(0.04 * 9)
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Theme.Color.accent, in: Capsule())
+    }
+
+    /// 自定义动作重量药丸（.selftag）：朱砂红描边 + 红字、无填充。
+    private func selfTag(_ text: String) -> some View {
+        Text(text)
+            .font(Theme.Font.mono(size: 9, weight: .bold))
+            .foregroundStyle(Theme.Color.accent)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1))
     }
 }
 
@@ -295,28 +339,55 @@ struct CustomExerciseEditorView: View {
 
     var body: some View {
         NavigationStack {
-            // 必要的 Form 用法：自定义动作创建 sheet，原生 Picker/TextField 体验最稳。
-            Form {
-                TextField("动作名称", text: $name)
-                Picker("主要肌群", selection: $muscle) {
-                    ForEach(MuscleGroup.allCases) { Text($0.rawValue).tag($0) }
+            ZStack {
+                Theme.Color.bg.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                    // 动作名称（必填 *）
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        HStack(spacing: 2) {
+                            Text("动作名称").eyebrowStyle()
+                            Text("*").font(Theme.Font.l5).foregroundStyle(Theme.Color.accent)
+                        }
+                        TextField("如：哑铃飞鸟", text: $name).paperField()
+                    }
+                    // 主要肌群
+                    pickerRow(title: "主要肌群") {
+                        Picker("", selection: $muscle) {
+                            ForEach(MuscleGroup.allCases) { Text($0.rawValue).tag($0) }
+                        }.tint(Theme.Color.accent)
+                    }
+                    // 器械
+                    pickerRow(title: "器械") {
+                        Picker("", selection: $equipment) {
+                            ForEach(EquipmentType.allCases) { Text($0.rawValue).tag($0) }
+                        }.tint(Theme.Color.accent)
+                    }
+                    Spacer()
                 }
-                Picker("器械", selection: $equipment) {
-                    ForEach(EquipmentType.allCases) { Text($0.rawValue).tag($0) }
-                }
+                .padding(Theme.Spacing.lg)
             }
-            .scrollContentBackground(.hidden)
-            .background(Theme.Color.bg)
             .navigationTitle("新建动作")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") { save() }
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .tint(Theme.Color.accentCyan)
+                        .tint(Theme.Color.accent)
                 }
             }
         }
+    }
+
+    /// 标签 + 右侧原生 Picker（menu 风格）一行卡片。
+    private func pickerRow<Control: View>(title: String, @ViewBuilder control: () -> Control) -> some View {
+        HStack {
+            Text(title).font(Theme.Font.l2).foregroundStyle(Theme.Color.fg)
+            Spacer()
+            control()
+        }
+        .frame(maxWidth: .infinity)
+        .cardStyle()
     }
 
     private func save() {
@@ -328,88 +399,358 @@ struct CustomExerciseEditorView: View {
     }
 }
 
-// MARK: - 动作选择器（供计划/训练添加动作复用）
+// MARK: - 动作选择器 Sheet（C 设计稿 Screen 9 · 计划/训练复用）
 
-/// 必要的 List 用法：`.searchable` 与 `List` 搭配是 SwiftUI 原生路径，
-/// 自绘 ScrollView 仍需手写 query 绑定与键盘联动，picker 是 sheet 模态，故保留 List。
-struct ExercisePickerView: View {
-    @Query(sort: \CustomExercise.updatedAt, order: .reverse) private var custom: [CustomExercise]
-    @Environment(\.dismiss) private var dismiss
-    @State private var query = ""
-    @State private var muscle: MuscleGroup?
-    let onPick: (ExercisePick) -> Void
+/// 选择器分组：个人置顶，其后按大肌群（顺序对齐设计稿）。
+/// 既作分组键、ScrollView 定位锚点，也作右侧快捷索引项。
+private enum PickerGroup: Hashable {
+    case personal
+    case muscle(MuscleGroup)
 
-    var body: some View {
-        NavigationStack {
-            let result = filterExercises(builtin: BuiltinExercise.starter, custom: custom, query: query, muscle: muscle)
-            List {
-                if !result.custom.isEmpty {
-                    Section("个人") {
-                        ForEach(result.custom) { ex in
-                            Button { pick(custom: ex) } label: {
-                                PickerExerciseRow(name: ex.name, muscle: ex.primaryMuscle, equipment: ex.equipmentType, isCustom: true)
-                            }.buttonStyle(.plain)
-                        }
-                    }
-                }
-                Section("标准库") {
-                    ForEach(result.builtin) { ex in
-                        Button { pick(builtin: ex) } label: {
-                            PickerExerciseRow(name: ex.name, muscle: ex.primaryMuscle, equipment: ex.equipmentType, isCustom: false)
-                        }.buttonStyle(.plain)
-                    }
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(Theme.Color.bg)
-            .searchable(text: $query, prompt: "搜索动作")
-            .navigationTitle("选择动作")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        Button("全部部位") { muscle = nil }
-                        ForEach(MuscleGroup.allCases) { m in Button(m.rawValue) { muscle = m } }
-                    } label: { Label(muscle?.rawValue ?? "部位", systemImage: "line.3.horizontal.decrease.circle") }
-                }
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-            }
+    /// 分组与右侧索引的固定顺序：个人 / 胸 / 背 / 腿 / 臀 / 肩 / 手臂 / 核心 / 全身。
+    static let order: [PickerGroup] = [
+        .personal,
+        .muscle(.chest), .muscle(.back), .muscle(.legs), .muscle(.glutes),
+        .muscle(.shoulders), .muscle(.arms), .muscle(.core), .muscle(.fullBody),
+    ]
+
+    /// 组头标题（朱砂红 mono）。
+    var title: String {
+        switch self {
+        case .personal: return "个人"
+        case .muscle(let m): return m.rawValue
         }
     }
 
-    private func pick(builtin ex: BuiltinExercise) {
-        onPick(ExercisePick(builtinCode: ex.code, customId: nil, name: ex.name, primaryMuscle: ex.primaryMuscle))
-        dismiss()
-    }
-    private func pick(custom ex: CustomExercise) {
-        onPick(ExercisePick(builtinCode: nil, customId: ex.localId, name: ex.name, primaryMuscle: ex.primaryMuscle))
-        dismiss()
+    /// 右侧快捷索引单字（个人 = ★，多字肌群取代表字）。
+    var indexLabel: String {
+        switch self {
+        case .personal: return "★"
+        case .muscle(let m):
+            switch m {
+            case .arms:     return "臂"
+            case .core:     return "核"
+            case .fullBody: return "全"
+            default:        return m.rawValue   // 胸/背/肩/腿/臀 本就单字
+            }
+        }
     }
 }
 
-private struct PickerExerciseRow: View {
+/// 选择器内部行数据（携带回传 payload）。
+private struct PickerRow: Identifiable {
+    let id: String
     let name: String
     let muscle: String?
     let equipment: String?
     let isCustom: Bool
+    let pick: ExercisePick
+}
+
+/// 组头在滚动坐标系中的 minY，用于推断「当前所在组」高亮右侧索引。
+private struct GroupOffsetKey: PreferenceKey {
+    static let defaultValue: [PickerGroup: CGFloat] = [:]
+    static func reduce(value: inout [PickerGroup: CGFloat], nextValue: () -> [PickerGroup: CGFloat]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+
+/// 右侧索引条总高度，用于把拖动 y 坐标映射到索引项。
+private struct IndexBarHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+/// 动作选择器 Sheet：去掉下拉筛选，列表直接按大肌群分组；右侧 iOS 风格快捷索引一触定位；
+/// 实时搜索跨组过滤，空结果转「创建自定义」引导；点击行回传选中动作。
+struct ExercisePickerView: View {
+    @Query(sort: \CustomExercise.updatedAt, order: .reverse) private var custom: [CustomExercise]
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+    @State private var showingCreate = false
+    @State private var currentGroup: PickerGroup = .personal
+    @State private var barHeight: CGFloat = 0
+    let onPick: (ExercisePick) -> Void
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name).foregroundStyle(Theme.Color.fg)
-                if let detail = [muscle, equipment].compactMap({ $0 }).joined(separator: " · ").nilIfEmpty {
-                    Text(detail).font(.caption).foregroundStyle(Theme.Color.muted)
-                }
-            }
-            Spacer()
-            if isCustom {
-                Text("个人")
-                    .font(Theme.Font.mono(size: 10, weight: .semibold))
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Theme.Color.accentCyan.opacity(0.18), in: Capsule())
-                    .foregroundStyle(Theme.Color.accentCyan)
+        let groups = buildGroups()
+        let ordered = PickerGroup.order.filter { groups[$0]?.isEmpty == false }
+        VStack(spacing: 0) {
+            header
+            searchBar
+            if ordered.isEmpty {
+                emptyState
+            } else {
+                listWithIndex(groups: groups, ordered: ordered)
             }
         }
-        .listRowBackground(Theme.Color.bg)
+        .background(Theme.Color.surface.ignoresSafeArea())
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .sheet(isPresented: $showingCreate) { CustomExerciseEditorView() }
+    }
+
+    // MARK: 顶栏（取消 / 标题 / 占位对称）
+
+    private var header: some View {
+        ZStack {
+            Text("选择动作")
+                .font(Theme.Font.display(size: 15, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+            HStack {
+                Button("取消") { dismiss() }
+                    .font(Theme.Font.body(size: 14))
+                    .foregroundStyle(Theme.Color.muted)
+                Spacer()
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 24)   // 让出系统 grabber，避免标题被挤压
+        .padding(.bottom, 12)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.border).frame(height: 1)
+        }
+    }
+
+    // MARK: 搜索框（实时跨组过滤）
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(Theme.Color.muted)
+            TextField("", text: $query, prompt: Text("搜索动作…").foregroundColor(Theme.Color.muted))
+                .font(Theme.Font.body(size: 14))
+                .foregroundStyle(Theme.Color.fg)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    // MARK: 分组列表 + 右侧快捷索引
+
+    private func listWithIndex(groups: [PickerGroup: [PickerRow]], ordered: [PickerGroup]) -> some View {
+        ScrollViewReader { proxy in
+            ZStack(alignment: .trailing) {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(ordered, id: \.self) { g in
+                            groupHeader(g)
+                            let rows = groups[g] ?? []
+                            ForEach(rows) { r in
+                                Button { onPick(r.pick); dismiss() } label: { row(r) }
+                                    .buttonStyle(PressableButtonStyle())
+                                if r.id != rows.last?.id { rowDivider }
+                            }
+                        }
+                        Color.clear.frame(height: 20)
+                    }
+                    .padding(.leading, 16)
+                    .padding(.trailing, 28)   // 让出右侧索引条
+                }
+                .coordinateSpace(name: "pickerList")
+                .onPreferenceChange(GroupOffsetKey.self) { updateCurrentGroup($0) }
+
+                indexBar(groups: groups, proxy: proxy)
+                    .padding(.trailing, 5)
+            }
+        }
+    }
+
+    private func groupHeader(_ g: PickerGroup) -> some View {
+        Text(g.title)
+            .font(Theme.Font.mono(size: 10, weight: .semibold))
+            .tracking(0.1 * 10)
+            .foregroundStyle(Theme.Color.accent)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 2)
+            .padding(.top, 9)
+            .padding(.bottom, 6)
+            .id(g)
+            .background(
+                GeometryReader { geo in
+                    Color.clear.preference(
+                        key: GroupOffsetKey.self,
+                        value: [g: geo.frame(in: .named("pickerList")).minY]
+                    )
+                }
+            )
+    }
+
+    private func row(_ r: PickerRow) -> some View {
+        HStack(spacing: 12) {
+            avatar(String(r.name.prefix(1)))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(r.name)
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg)
+                if let meta = [r.muscle, r.equipment].compactMap({ $0 }).joined(separator: " · ").nilIfEmpty {
+                    Text(meta)
+                        .font(Theme.Font.body(size: 12))
+                        .foregroundStyle(Theme.Color.muted)
+                }
+            }
+            Spacer(minLength: 8)
+            if r.isCustom { personalTag }
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 4)
+        .contentShape(Rectangle())
+    }
+
+    private func avatar(_ ch: String) -> some View {
+        Text(ch)
+            .font(Theme.Font.body(size: 12, weight: .bold))
+            .foregroundStyle(Theme.Color.fg2)
+            .frame(width: 38, height: 38)
+            .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
+    }
+
+    private var personalTag: some View {
+        Text("个人")
+            .font(Theme.Font.mono(size: 9, weight: .semibold))
+            .tracking(0.04 * 9)
+            .foregroundStyle(Theme.Color.accent)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1))
+    }
+
+    private var rowDivider: some View {
+        Rectangle()
+            .fill(Theme.Color.border.opacity(0.55))
+            .frame(height: 1)
+    }
+
+    /// 右侧 iOS 通讯录式索引条：点或上下拖动一触定位到对应肌群组头。
+    private func indexBar(groups: [PickerGroup: [PickerRow]], proxy: ScrollViewProxy) -> some View {
+        VStack(spacing: 4) {
+            ForEach(PickerGroup.order, id: \.self) { g in
+                let hasItems = (groups[g]?.isEmpty == false)
+                let isCurrent = (currentGroup == g)
+                Text(g.indexLabel)
+                    .font(.system(size: 10, weight: .heavy))
+                    .frame(width: 20, height: 20)
+                    .foregroundStyle(isCurrent ? Theme.Color.surface
+                                     : (hasItems ? Theme.Color.accent : Theme.Color.border2))
+                    .background(
+                        Circle().fill(isCurrent ? Theme.Color.accent : .clear)
+                    )
+            }
+        }
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(key: IndexBarHeightKey.self, value: geo.size.height)
+            }
+        )
+        .onPreferenceChange(IndexBarHeightKey.self) { barHeight = $0 }
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                .onChanged { value in jumpToIndex(at: value.location.y, groups: groups, proxy: proxy) }
+        )
+    }
+
+    // MARK: 空态（无匹配 → 创建自定义引导）
+
+    private var emptyState: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            Spacer()
+            Text(query.isEmpty ? "暂无动作" : "无匹配动作")
+                .font(Theme.Font.display(size: 17, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg)
+            Text(query.isEmpty ? "点击下方创建自定义动作"
+                 : "「\(query.trimmingCharacters(in: .whitespaces))」没有匹配，可创建为自定义动作")
+                .font(Theme.Font.body(size: 13))
+                .foregroundStyle(Theme.Color.muted)
+                .multilineTextAlignment(.center)
+            Button { showingCreate = true } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                    Text("创建自定义动作")
+                }
+                .font(Theme.Font.body(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.Color.bg)
+                .padding(.horizontal, Theme.Spacing.lg)
+                .frame(height: 44)
+                .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                .paperShadow(.sm, cornerRadius: Theme.Radius.md)
+            }
+            .buttonStyle(PressableButtonStyle())
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(Theme.Spacing.lg)
+    }
+
+    // MARK: 数据与交互
+
+    /// 个人组（自定义动作恒置顶）+ 各大肌群（内置库）；query 非空时跨组过滤。
+    private func buildGroups() -> [PickerGroup: [PickerRow]] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        func match(_ name: String) -> Bool { q.isEmpty || name.localizedCaseInsensitiveContains(q) }
+
+        var dict: [PickerGroup: [PickerRow]] = [:]
+
+        let personal = custom
+            .filter { $0.deletedAt == nil && match($0.name) }
+            .map { ex in
+                PickerRow(id: "c-\(ex.localId.uuidString)", name: ex.name,
+                          muscle: ex.primaryMuscle, equipment: ex.equipmentType, isCustom: true,
+                          pick: ExercisePick(builtinCode: nil, customId: ex.localId,
+                                             name: ex.name, primaryMuscle: ex.primaryMuscle))
+            }
+        if !personal.isEmpty { dict[.personal] = personal }
+
+        for case let .muscle(m) in PickerGroup.order {
+            let rows = BuiltinExercise.starter
+                .filter { $0.primaryMuscle == m.rawValue && match($0.name) }
+                .map { ex in
+                    PickerRow(id: "b-\(ex.code)", name: ex.name,
+                              muscle: ex.primaryMuscle, equipment: ex.equipmentType, isCustom: false,
+                              pick: ExercisePick(builtinCode: ex.code, customId: nil,
+                                                 name: ex.name, primaryMuscle: ex.primaryMuscle))
+                }
+            if !rows.isEmpty { dict[.muscle(m)] = rows }
+        }
+        return dict
+    }
+
+    /// 组头中最靠近顶部（已滚过顶）的组即「当前组」；都未滚过则取首个可见组。
+    private func updateCurrentGroup(_ offsets: [PickerGroup: CGFloat]) {
+        let threshold: CGFloat = 8
+        let passed = offsets.filter { $0.value <= threshold }
+        let target: PickerGroup?
+        if let top = passed.max(by: { $0.value < $1.value }) {
+            target = top.key
+        } else {
+            target = PickerGroup.order.first { offsets[$0] != nil }
+        }
+        if let target, target != currentGroup { currentGroup = target }
+    }
+
+    /// 把索引条上的触点 y 映射到对应肌群组头并滚动定位（点击与拖动共用）。
+    private func jumpToIndex(at y: CGFloat, groups: [PickerGroup: [PickerRow]], proxy: ScrollViewProxy) {
+        let items = PickerGroup.order
+        guard barHeight > 0 else { return }
+        let slice = barHeight / CGFloat(items.count)
+        let idx = min(items.count - 1, max(0, Int(y / slice)))
+        let g = items[idx]
+        // 置灰（无该肌群动作）的索引项不可定位。
+        guard groups[g]?.isEmpty == false else { return }
+        if g != currentGroup {
+            currentGroup = g
+            UISelectionFeedbackGenerator().selectionChanged()
+        }
+        // 拖动时即时跳转（不包动画），跟手手感对齐 iOS 通讯录 A–Z 索引。
+        proxy.scrollTo(g, anchor: .top)
     }
 }
 
@@ -449,22 +790,33 @@ struct ExerciseDetailView: View {
         .navigationDestination(item: $startedSession) { WorkoutLoggingView(workout: $0) }
     }
 
-    // 顶部 cover：渐变 + 部位文字
+    // 顶部 cover：斜条纹「采集中」占位图（部位高亮图素材尚未采集，design.md Non-Goals）。
     private var cover: some View {
-        ZStack(alignment: .bottomLeading) {
-            LinearGradient(colors: [Theme.Color.surface, Theme.Color.bg],
-                           startPoint: .top, endPoint: .bottom)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("MUSCLE · 部位").eyebrowStyle()
-                Text(exercise.primaryMuscle)
-                    .font(Theme.Font.display(size: 18, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg2)
+        ZStack {
+            Theme.Color.surface2
+            // 斜条纹纹理
+            Canvas { ctx, size in
+                let spacing: CGFloat = 14
+                let lineColor = Theme.Color.border2
+                var x: CGFloat = -size.height
+                while x <= size.width {
+                    var p = Path()
+                    p.move(to: CGPoint(x: x, y: size.height))
+                    p.addLine(to: CGPoint(x: x + size.height, y: 0))
+                    ctx.stroke(p, with: .color(lineColor), lineWidth: 1.5)
+                    x += spacing
+                }
             }
-            .padding(Theme.Spacing.md)
+            VStack(spacing: 6) {
+                Image(systemName: "photo.badge.plus")
+                    .font(.system(size: 24, weight: .regular))
+                    .foregroundStyle(Theme.Color.muted)
+                Text("部位高亮图 · 采集中").eyebrowStyle()
+            }
         }
-        .frame(height: 140)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
+        .frame(height: 160)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg).stroke(Theme.Color.border, lineWidth: 1))
     }
 
     private var title: some View {
@@ -519,8 +871,8 @@ struct ExerciseDetailView: View {
             .font(Theme.Font.body(size: 16, weight: .semibold))
             .foregroundStyle(Theme.Color.bg)
             .frame(maxWidth: .infinity).frame(height: 52)
-            .background(Theme.Color.accentCyan, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-            .neonGlow(.cyan, intensity: .medium, cornerRadius: Theme.Radius.md)
+            .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+            .paperShadow(.md, cornerRadius: Theme.Radius.md)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, Theme.Spacing.lg)

@@ -30,7 +30,7 @@ struct MeiGeiApp: App {
                 .environment(teamService)
                 .environment(restTimer)
                 .environment(healthKit)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
                 .task(id: session.isLoggedIn) {
                     if session.isLoggedIn { await healthKit.requestAuthorization() }
                 }
