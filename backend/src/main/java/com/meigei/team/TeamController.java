@@ -1,10 +1,10 @@
 package com.meigei.team;
 
 import com.meigei.security.SecurityUtils;
+import com.meigei.team.dto.TeamMemberView;
 import com.meigei.team.dto.TeamRequests.CreateTeam;
 import com.meigei.team.dto.TeamRequests.JoinTeam;
 import com.meigei.team.entity.Team;
-import com.meigei.team.entity.TeamMember;
 import com.meigei.workout.entity.WorkoutPlan;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +44,7 @@ public class TeamController {
     }
 
     @GetMapping("/{teamId}/members")
-    public List<TeamMember> members(@PathVariable UUID teamId) {
+    public List<TeamMemberView> members(@PathVariable UUID teamId) {
         return teamService.getMembers(teamId, SecurityUtils.currentUserId());
     }
 

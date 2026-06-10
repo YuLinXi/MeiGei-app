@@ -4,6 +4,7 @@ import UIKit
 /// 主界面 Tab：训练三件套 + Team + 我的（饮食模块已移出 MVP）。
 struct MainTabView: View {
     @Environment(RestTimerController.self) private var restTimer
+    @Environment(PRCelebrationCenter.self) private var prCelebration
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// 休息全屏弹窗开/关动画：纯渐隐（无位移）。
@@ -61,23 +62,27 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        TabView {
-            NavigationStack { WorkoutListView() }
-                .tabItem { Label("训练", image: "tabTrain") }
-            NavigationStack { PlanListView() }
-                .tabItem { Label("计划", image: "tabPlan") }
-            NavigationStack { ExerciseLibraryView() }
-                .tabItem { Label("动作", image: "tabExercise") }
-            NavigationStack { TeamListView() }
-                .tabItem { Label("Team", image: "tabTeam") }
-            NavigationStack { ProfileView() }
-                .tabItem { Label("我的", image: "tabProfile") }
+        // 全局唯一 NavigationStack 包 TabView：push 页渲染在 TabView（含 Tab Bar）之上，
+        // 所有二级/三级页天然全屏、标准右滑入转场，Tab Bar 被盖住而非做消失动画。
+        NavigationStack {
+            TabView {
+                WorkoutListView()
+                    .tabItem { Label("训练", image: "tabTrain") }
+                PlanListView()
+                    .tabItem { Label("计划", image: "tabPlan") }
+                ExerciseLibraryView()
+                    .tabItem { Label("动作", image: "tabExercise") }
+                TeamListView()
+                    .tabItem { Label("Team", image: "tabTeam") }
+                ProfileView()
+                    .tabItem { Label("我的", image: "tabProfile") }
+            }
+            .toolbarBackground(Theme.Color.bg, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
         }
         .tint(Theme.Color.accent)
-        .toolbarBackground(Theme.Color.bg, for: .navigationBar)
-        .toolbarColorScheme(.light, for: .navigationBar)
-        // 休息全屏弹窗：挂在 TabView 之上的根层 overlay，层级天然高于 Tab Bar 与各页 Header，
-        // 无需隐藏两栏；纯 .opacity 渐隐、无位移。
+        // 休息全屏弹窗：挂在全局 NavigationStack 之上的 overlay，层级高于 push 页与 Tab Bar；
+        // 纯 .opacity 渐隐、无位移。
         .overlay {
             if restTimer.isExpanded {
                 RestTimerSheet(controller: restTimer) {
@@ -89,6 +94,16 @@ struct MainTabView: View {
         .onChange(of: restTimer.isRunning) { _, running in
             // 倒计时归零（或外部结束）时自动渐隐收回弹窗。
             if !running { withAnimation(restAnim) { restTimer.isExpanded = false } }
+        }
+        // PR 庆祝弹窗：挂在稳定不被销毁的全局 NavigationStack 根层（详见 PRCelebrationCenter 说明），
+        // 避免结束训练导航切换时承载页被替换导致弹窗一闪即逝。
+        .sheet(isPresented: Binding(
+            get: { prCelebration.records != nil },
+            set: { if !$0 { prCelebration.records = nil } }
+        )) {
+            if let records = prCelebration.records {
+                PRCelebrationSheet(records: records, summary: prCelebration.summary)
+            }
         }
     }
 }

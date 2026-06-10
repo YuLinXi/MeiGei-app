@@ -8,6 +8,9 @@ final class TeamService {
     private let api: APIClient
     private(set) var teams: [TeamDTO] = []
 
+    /// 退出/解散成功后由详情页写入，返回 Team 列表时顶部 toast 读取并清空（跨页结果反馈）。
+    var pendingActionToast: String?
+
     init(api: APIClient = .shared) {
         self.api = api
     }
@@ -73,9 +76,10 @@ final class TeamService {
         try await api.send("GET", "/checkins/\(checkinId)/reactions")
     }
 
-    @discardableResult
-    func react(checkinId: UUID, emoji: String) async throws -> CheckinReactionDTO {
-        try await api.send("POST", "/checkins/\(checkinId)/reactions", body: ReactRequest(emoji: emoji))
+    /// 单选·可取消：服务端按 (checkin,user) 唯一切换；再点同一个表情时服务端删除并返回空 body，故用 sendVoid。
+    /// 调用方点击后会回拉 reactions(checkinId:) 拿真实状态，无需解析返回。
+    func react(checkinId: UUID, emoji: String) async throws {
+        try await api.sendVoid("POST", "/checkins/\(checkinId)/reactions", body: ReactRequest(emoji: emoji))
     }
 
     /// 训练完成即打卡：fan-out 到本人所有 Team（无 Team 时服务端返回空，无副作用）。

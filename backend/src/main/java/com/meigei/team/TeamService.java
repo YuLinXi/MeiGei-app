@@ -2,6 +2,7 @@ package com.meigei.team;
 
 import com.meigei.common.id.Uuid7;
 import com.meigei.common.web.AppException;
+import com.meigei.team.dto.TeamMemberView;
 import com.meigei.team.entity.Team;
 import com.meigei.team.entity.TeamMember;
 import com.meigei.team.mapper.TeamMapper;
@@ -70,9 +71,9 @@ public class TeamService {
         return teamMapper.findByMember(userId);
     }
 
-    public List<TeamMember> getMembers(UUID teamId, UUID userId) {
+    public List<TeamMemberView> getMembers(UUID teamId, UUID userId) {
         requireMember(teamId, userId);
-        return memberMapper.findByTeam(teamId);
+        return memberMapper.findViewByTeam(teamId);
     }
 
     /** 成员退出；群主不可退出（需解散或后续支持转让）。 */

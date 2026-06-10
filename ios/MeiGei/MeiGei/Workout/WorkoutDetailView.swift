@@ -207,7 +207,7 @@ struct WorkoutDetailView: View {
     /// 时长：≥1 小时显示 `H:MM`，否则 `M′`。
     private var durationText: String {
         guard let end = workout.endedAt else { return "—" }
-        let mins = max(0, Int(end.timeIntervalSince(workout.startedAt) / 60))
+        let mins = max(0, Int(end.timeIntervalSince(workout.timerStartedAt ?? workout.startedAt) / 60))
         if mins >= 60 { return "\(mins / 60):" + String(format: "%02d", mins % 60) }
         return "\(mins)′"
     }

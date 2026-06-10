@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  统一日志格式（appender / pattern 唯一来源）。
+  日志级别不在此写死，统一交给 application.yml 的 logging.level.*（Spring Boot 会回填到 logback）。
+  全部输出到 stdout，由容器平台（docker logs / 腾讯云）采集，不自管文件滚动（遵循 12-factor）。
+  traceId / userId 来自 MDC：RequestLoggingFilter 注入 traceId，JwtAuthFilter 认证后注入 userId。
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- 本地联调：彩色精简，便于肉眼扫读（需 spring.profiles.active=local 激活） -->
+    <springProfile name="local">
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%clr(%d{HH:mm:ss.SSS}){faint} %clr(%-5level) %clr([%X{traceId:-}]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %msg%n%wEx</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <!-- 非本地（默认 / 生产 / 测试）：完整结构化，带日期 / 线程 / traceId / userId，便于按请求串联 -->
+    <springProfile name="!local">
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [traceId=%X{traceId:-} userId=%X{userId:-}] [%thread] %logger{40} - %msg%n%wEx</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

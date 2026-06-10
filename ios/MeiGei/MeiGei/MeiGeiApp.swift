@@ -11,6 +11,7 @@ struct MeiGeiApp: App {
     @State private var teamService = TeamService()
     @State private var restTimer = RestTimerController()
     @State private var healthKit = HealthKitManager()
+    @State private var prCelebration = PRCelebrationCenter()
 
     init() {
         let container = AppModelContainer.make()
@@ -30,6 +31,7 @@ struct MeiGeiApp: App {
                 .environment(teamService)
                 .environment(restTimer)
                 .environment(healthKit)
+                .environment(prCelebration)
                 .preferredColorScheme(.light)
                 .task(id: session.isLoggedIn) {
                     if session.isLoggedIn { await healthKit.requestAuthorization() }

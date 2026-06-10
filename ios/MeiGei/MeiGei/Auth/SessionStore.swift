@@ -16,10 +16,11 @@ final class SessionStore {
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
         self.token = Keychain.get(Self.tokenKey)
-        // 重启后 handleLogin 不会再走一遍，从持久化档案恢复当前用户 id（区分「我」用）。
-        if token != nil {
-            let profiles = (try? modelContext.fetch(FetchDescriptor<UserProfile>())) ?? []
-            self.currentUserId = profiles.first?.serverUserId
+        // 重启后 handleLogin 不会再走一遍。currentUserId 直接从 JWT 的 sub 解出（与 token 同生命周期），
+        // 避免 SwiftData 档案被清空（如开发期重装 App）导致 token 在、currentUserId 却为 nil 的 desync。
+        if let token {
+            self.currentUserId = Self.userId(fromJWT: token)
+                ?? ((try? modelContext.fetch(FetchDescriptor<UserProfile>()))?.first?.serverUserId)
         }
         // provider 直接读 Keychain：线程安全且非 actor 隔离，避免捕获 MainActor 状态。
         let key = Self.tokenKey
@@ -40,6 +41,20 @@ final class SessionStore {
         Keychain.delete(Self.tokenKey)
         token = nil
         currentUserId = nil
+    }
+
+    /// 从自有 JWT 的 payload.sub 解出 userId（后端 JwtService 以 sub = userId 签发）。base64url 需补位。
+    static func userId(fromJWT token: String) -> UUID? {
+        let parts = token.split(separator: ".")
+        guard parts.count == 3 else { return nil }
+        var b64 = String(parts[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        while b64.count % 4 != 0 { b64 += "=" }
+        guard let data = Data(base64Encoded: b64),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let sub = json["sub"] as? String else { return nil }
+        return UUID(uuidString: sub)
     }
 
     private func upsertProfile(userId: UUID, appleSub: String?, email: String?, displayName: String?) {

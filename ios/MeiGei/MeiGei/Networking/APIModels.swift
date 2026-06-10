@@ -134,6 +134,8 @@ struct TeamMemberDTO: Decodable, Identifiable, Hashable {
     var userId: UUID
     var role: String        // owner | member
     var joinedAt: Date?
+    /// 后端 join app_user.display_name 得到；用户未设名时为 nil，前端兜底。
+    var displayName: String?
 }
 
 /// 队友打卡。`summary` 为后端 jsonb，序列化为 JSON **字符串**（同 WorkoutPlanDTO.items），需二次解析。

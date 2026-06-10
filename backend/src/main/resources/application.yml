@@ -1,3 +1,13 @@
+# 日志级别（格式 / appender 见 logback-spring.xml）。可用环境变量覆盖，便于线上临时调高排障。
+logging:
+  level:
+    root: INFO
+    com.meigei: ${LOG_LEVEL_APP:INFO}
+    # 需要时打开 SQL：把下行设为 DEBUG（或经环境变量覆盖）
+    com.meigei.workout.mapper: ${LOG_LEVEL_SQL:INFO}
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+
 spring:
   application:
     name: meigei-api

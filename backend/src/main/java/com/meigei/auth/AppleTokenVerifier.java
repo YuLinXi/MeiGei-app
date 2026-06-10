@@ -11,7 +11,7 @@ import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import org.springframework.stereotype.Component;
 
-import java.net.URL;
+import java.net.URI;
 import java.util.Date;
 
 /**
@@ -27,7 +27,7 @@ public class AppleTokenVerifier {
     public AppleTokenVerifier(AppleProperties props) throws Exception {
         this.props = props;
         JWKSource<SecurityContext> keySource =
-                JWKSourceBuilder.create(new URL(props.jwksUri())).build();
+                JWKSourceBuilder.create(URI.create(props.jwksUri()).toURL()).build();
         DefaultJWTProcessor<SecurityContext> p = new DefaultJWTProcessor<>();
         JWSKeySelector<SecurityContext> keySelector =
                 new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, keySource);

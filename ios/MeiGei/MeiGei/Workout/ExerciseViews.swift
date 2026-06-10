@@ -283,7 +283,7 @@ struct ExerciseLibraryView: View {
                     .font(Theme.Font.body(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
                     .lineLimit(1)
-                Text("自定义 · \(ex.primaryMuscle ?? "—")")
+                Text("\(ex.primaryMuscle ?? "—") · \(ex.equipmentType ?? "—")")
                     .font(Theme.Font.body(size: 12))
                     .foregroundStyle(Theme.Color.muted)
             }
@@ -330,72 +330,285 @@ struct ExerciseLibraryView: View {
 
 // MARK: - 自定义动作创建
 
+/// C 设计稿 Screen 12 · 方案 C「底部滚轮 Picker」。
+/// 表单极简两字段（主要肌群 + 器械），选择交由从底部升起的自绘滚轮承载：
+/// 点字段 → 滚轮升起 + scrim 压暗表单 → 滚动居中高亮（朱砂红选中带）→「完成」回填。
 struct CustomExerciseEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+
     @State private var name = ""
-    @State private var muscle: MuscleGroup = .chest
-    @State private var equipment: EquipmentType = .barbell
+    @State private var selectedMuscle: String? = nil
+    @State private var selectedEquip: String? = nil
+
+    /// 当前升起的滚轮（nil = 收起，仅表单态）。
+    @State private var activeWheel: WheelKind? = nil
+    /// 滚轮当前居中项（滚动停止后回填的候选值）。
+    @State private var centeredValue: String? = nil
+
+    private var nameTrimmed: String { name.trimmingCharacters(in: .whitespaces) }
+    private var canSave: Bool { !nameTrimmed.isEmpty }
+
+    /// 滚轮升起/收起的统一动效曲线（设计稿规格）。
+    private var wheelAnimation: Animation { .timingCurve(0.32, 1, 0.36, 1, duration: 0.32) }
 
     var body: some View {
-        NavigationStack {
+        // scrim 与滚轮用 overlay 承载（不参与表单 sheet 的基础布局，避免底对齐基准变化导致抖动）。
+        formSheet
+            .overlay {
+                if activeWheel != nil {
+                    Theme.Color.fg.opacity(0.28)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                        .onTapGesture { closeWheel(commit: false) }
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if let kind = activeWheel {
+                    wheelSheet(kind)
+                        .transition(.move(edge: .bottom))
+                }
+            }
+            .background(Theme.Color.surface)
+            .presentationDetents([.height(460)])
+            .presentationDragIndicator(.hidden)
+            // 二级滚轮打开时禁止下拉关闭表单 sheet。
+            .interactiveDismissDisabled(activeWheel != nil)
+    }
+
+    // MARK: - 表单 sheet（grab + 头部 + 三字段 + 底部保存）
+
+    private var formSheet: some View {
+        VStack(spacing: 0) {
+            // grab handle
+            Capsule()
+                .fill(Theme.Color.border2)
+                .frame(width: 34, height: 4)
+                .padding(.top, Theme.Spacing.sm)
+                .padding(.bottom, Theme.Spacing.xs)
+
+            // 头部：左「取消」+ 居中标题
             ZStack {
-                Theme.Color.bg.ignoresSafeArea()
-                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    // 动作名称（必填 *）
-                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                        HStack(spacing: 2) {
-                            Text("动作名称").eyebrowStyle()
-                            Text("*").font(Theme.Font.l5).foregroundStyle(Theme.Color.accent)
-                        }
-                        TextField("如：哑铃飞鸟", text: $name).paperField()
-                    }
-                    // 主要肌群
-                    pickerRow(title: "主要肌群") {
-                        Picker("", selection: $muscle) {
-                            ForEach(MuscleGroup.allCases) { Text($0.rawValue).tag($0) }
-                        }.tint(Theme.Color.accent)
-                    }
-                    // 器械
-                    pickerRow(title: "器械") {
-                        Picker("", selection: $equipment) {
-                            ForEach(EquipmentType.allCases) { Text($0.rawValue).tag($0) }
-                        }.tint(Theme.Color.accent)
-                    }
+                Text("新建动作")
+                    .font(Theme.Font.l1)
+                    .foregroundStyle(Theme.Color.fg)
+                HStack {
+                    Button("取消") { dismiss() }
+                        .font(Theme.Font.l3)
+                        .foregroundStyle(Theme.Color.muted)
                     Spacer()
                 }
-                .padding(Theme.Spacing.lg)
             }
-            .navigationTitle("新建动作")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }
-                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .tint(Theme.Color.accent)
+            .padding(.top, Theme.Spacing.lg)
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.bottom, Theme.Spacing.md)
+            .overlay(alignment: .bottom) {
+                Theme.Color.border.frame(height: 1)
+            }
+
+            // 字段区
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                field("动作名称", required: true) {
+                    TextField("输入名称（必填）", text: $name).paperField()
                 }
+                field("主要肌群") { pickerField(.muscle) }
+                field("器械") { pickerField(.equipment) }
             }
+            .padding(Theme.Spacing.md)
+
+            Spacer(minLength: 0)
+
+            // 底部保存
+            Button { save() } label: {
+                Text("保存")
+                    .font(Theme.Font.l1)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Theme.Color.accent,
+                                in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            }
+            .buttonStyle(PressableButtonStyle())
+            .disabled(!canSave)
+            .opacity(canSave ? 1 : 0.38)
+            .shadow(color: Theme.Color.accent.opacity(canSave ? 0.22 : 0), radius: 14, x: 0, y: 4)
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.top, Theme.Spacing.sm)
+            .padding(.bottom, Theme.Spacing.lg)
         }
     }
 
-    /// 标签 + 右侧原生 Picker（menu 风格）一行卡片。
-    private func pickerRow<Control: View>(title: String, @ViewBuilder control: () -> Control) -> some View {
-        HStack {
-            Text(title).font(Theme.Font.l2).foregroundStyle(Theme.Color.fg)
-            Spacer()
-            control()
+    /// 字段：label（必填红 *）+ 内容。
+    private func field<C: View>(_ label: String, required: Bool = false,
+                                @ViewBuilder content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            HStack(spacing: 2) {
+                Text(label)
+                    .font(Theme.Font.l4)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.fg2)
+                if required {
+                    Text("*").font(Theme.Font.l4).foregroundStyle(Theme.Color.accent)
+                }
+            }
+            content()
         }
-        .frame(maxWidth: .infinity)
-        .cardStyle()
+    }
+
+    /// 收起态 Picker 行：空=placeholder 灰；编辑中=朱砂红边+浅红底；已选=墨黑值。
+    private func pickerField(_ kind: WheelKind) -> some View {
+        let value = kind == .muscle ? selectedMuscle : selectedEquip
+        let active = activeWheel == kind
+        return HStack {
+            Text(value ?? kind.placeholder)
+                .font(Theme.Font.l2)
+                .fontWeight(value == nil ? .regular : .semibold)
+                .foregroundStyle(value == nil ? Theme.Color.muted : Theme.Color.fg)
+            Spacer()
+            Image(systemName: "chevron.down")
+                .font(Theme.Font.l4)
+                .foregroundStyle(active ? Theme.Color.accent : Theme.Color.muted)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .background(active ? Theme.Color.accentSoft : Theme.Color.surface,
+                    in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .stroke(active ? Theme.Color.accent : Theme.Color.border, lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { openWheel(kind) }
+    }
+
+    // MARK: - 滚轮弹层
+
+    private func wheelSheet(_ kind: WheelKind) -> some View {
+        VStack(spacing: 0) {
+            // 顶栏：标题 | 完成（取消路径 = 点 scrim）
+            ZStack {
+                Text(kind.title)
+                    .font(Theme.Font.l1)
+                    .foregroundStyle(Theme.Color.fg)
+                HStack {
+                    Spacer()
+                    Button("完成") { closeWheel(commit: true) }
+                        .font(Theme.Font.l2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(Theme.Color.accent)
+                }
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.vertical, 14)
+            .overlay(alignment: .bottom) { Theme.Color.border.frame(height: 1) }
+
+            // 滚轮：选中带 + 自绘滚动列表
+            ZStack {
+                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                    .fill(Theme.Color.accentSoft)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                            .stroke(Theme.Color.accentSofter, lineWidth: 1)
+                    )
+                    .frame(height: 44)
+                    .padding(.horizontal, 14)
+                    .allowsHitTesting(false)
+                WheelPicker(options: kind.options, centered: $centeredValue)
+            }
+            .frame(height: 220)
+            .padding(.bottom, Theme.Spacing.sm)
+        }
+        .background(Theme.Color.surface)
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: Theme.Radius.lg,
+                                          topTrailingRadius: Theme.Radius.lg, style: .continuous))
+        .shadow(color: Theme.Color.fg.opacity(0.18), radius: 20, x: 0, y: -10)
+    }
+
+    // MARK: - 滚轮开关
+
+    private func openWheel(_ kind: WheelKind) {
+        let current = kind == .muscle ? selectedMuscle : selectedEquip
+        centeredValue = current ?? kind.options.first   // 非动画：避免初始定位被动画化
+        Theme.Haptics.impact(.light)
+        withAnimation(wheelAnimation) { activeWheel = kind }
+    }
+
+    /// 关闭滚轮。commit=true 时把居中项回填到对应字段。
+    private func closeWheel(commit: Bool) {
+        if commit, let kind = activeWheel {
+            switch kind {
+            case .muscle:    selectedMuscle = centeredValue
+            case .equipment: selectedEquip = centeredValue
+            }
+            Theme.Haptics.selection()
+        }
+        withAnimation(wheelAnimation) { activeWheel = nil }
     }
 
     private func save() {
-        let ex = CustomExercise(name: name.trimmingCharacters(in: .whitespaces),
-                                primaryMuscle: muscle.rawValue, equipmentType: equipment.rawValue)
+        // 设计稿：肌群/器械可空 → 落库补「未分类」。
+        let ex = CustomExercise(name: nameTrimmed,
+                                primaryMuscle: selectedMuscle ?? "未分类",
+                                equipmentType: selectedEquip ?? "未分类")
         modelContext.insert(ex)
         try? modelContext.save()
+        Theme.Haptics.notification(.success)
         dismiss()
+    }
+}
+
+/// 滚轮字段种类（肌群 / 器械），与动作库筛选同一套枚举。
+private enum WheelKind: Equatable {
+    case muscle, equipment
+
+    var title: String { self == .muscle ? "主要肌群" : "器械" }
+    var placeholder: String { self == .muscle ? "选择肌群" : "选择器械" }
+    var options: [String] {
+        switch self {
+        case .muscle:    return MuscleGroup.allCases.map(\.rawValue)
+        case .equipment: return EquipmentType.allCases.map(\.rawValue)
+        }
+    }
+}
+
+/// 自绘 iOS 风格滚轮（对齐 C 设计稿动效规格）：
+/// 行高 38 / 可视 5 行 / scroll-snap 吸附 / 居中行朱砂红加粗放大 1.06、相邻行渐隐。
+private struct WheelPicker: View {
+    let options: [String]
+    @Binding var centered: String?
+
+    private let itemH: CGFloat = 44
+    private let visibleH: CGFloat = 220   // 5 行
+
+    var body: some View {
+        let centerIdx = centered.flatMap { options.firstIndex(of: $0) }
+        ScrollViewReader { proxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 0) {
+                    ForEach(Array(options.enumerated()), id: \.element) { idx, opt in
+                        let dist = centerIdx.map { abs($0 - idx) }
+                        Text(opt)
+                            .font(Theme.Font.l2)
+                            .fontWeight(dist == 0 ? .bold : .medium)
+                            .foregroundStyle(dist == 0 ? Theme.Color.accent : Theme.Color.muted)
+                            .opacity(dist == 1 ? 0.7 : 1)
+                            .scaleEffect(dist == 0 ? 1.06 : 1)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: itemH)
+                            .id(opt)
+                            .animation(.easeOut(duration: 0.12), value: centerIdx)
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .frame(height: visibleH)
+            .contentMargins(.vertical, (visibleH - itemH) / 2, for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $centered, anchor: .center)
+            .onAppear {
+                if let c = centered { proxy.scrollTo(c, anchor: .center) }
+            }
+        }
     }
 }
 

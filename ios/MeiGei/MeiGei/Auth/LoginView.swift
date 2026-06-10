@@ -1,9 +1,10 @@
 import SwiftUI
 import AuthenticationServices
 
-// MARK: - 登录（Screen 0，C 纸感极简）
+// MARK: - 登录（Screen 0，C 纸感极简，对齐 meigei-c-login.html）
 
-/// 全屏纸白底 + 品牌标识 + 大标题 + Sign in with Apple（黑色）。
+/// 全屏纸白底：顶部品牌（App Icon + 品牌名）→ 底部编号 + 反转主张大字 + tagline
+/// + 黑底 Sign in with Apple + 合规链接 + 模拟器开发者入口。
 struct LoginView: View {
     @Environment(SessionStore.self) private var session
     @State private var authService: AuthService?
@@ -16,12 +17,13 @@ struct LoginView: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 brandMark
-                    .padding(.top, Theme.Spacing.lg)
-                Spacer()
+                    .padding(.top, Theme.Spacing.md)
+                Spacer(minLength: Theme.Spacing.lg)
                 copyBlock
-                Spacer().frame(height: 40)
+                Spacer(minLength: 26)
                 appleButton
                 legalSmallPrint
+                    .padding(.top, Theme.Spacing.md)
                 if let errorMessage {
                     Text(errorMessage)
                         .font(Theme.Font.l5)
@@ -42,42 +44,45 @@ struct LoginView: View {
         .onAppear { if authService == nil { authService = AuthService(session: session) } }
     }
 
-    /// 品牌：朱砂红 M 方块 + 大写字距「MEIGEI」。
+    /// 品牌：App Icon 方块 + mono 小字距品牌名。
+    /// 图标底色与纸白页面几乎同色，加 hairline 边框保证方块轮廓可读。
     private var brandMark: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Text("M")
-                .font(Theme.Font.display(size: 24, weight: .heavy))
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-            Text("MEIGEI")
-                .font(Theme.Font.body(size: 15, weight: .semibold))
-                .tracking(3)
-                .foregroundStyle(Theme.Color.fg2)
+        HStack(spacing: 10) {
+            Image("brandIcon")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Theme.Color.border, lineWidth: 1)
+                )
+            Text("别练了 · BIELIANLE")
+                .font(Theme.Font.mono(size: 12))
+                .tracking(1.8)
+                .foregroundStyle(Theme.Color.muted)
         }
     }
 
+    /// 编号 + 三行反转主张（「彦祖」朱砂红单点）+ tagline。
     private var copyBlock: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+        VStack(alignment: .leading, spacing: 0) {
             Text("NO. 0001")
-                .font(Theme.Font.mono(size: 12, weight: .semibold))
+                .font(Theme.Font.mono(size: 12))
                 .tracking(2)
                 .foregroundStyle(Theme.Color.accent)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("认真训练。")
-                    .font(Theme.Font.hero)
-                    .foregroundStyle(Theme.Color.fg)
-                Text("严肃记录。")
-                    .font(Theme.Font.hero)
-                    .foregroundStyle(Theme.Color.fg)
-                Text("仅此而已。")
-                    .font(Theme.Font.hero)
-                    .foregroundStyle(Theme.Color.fg)
-            }
-            Text("为认真练的人做的训练记录工具，\n和一个能互相看见的小圈子。")
-                .font(Theme.Font.l3)
+            (Text("别练了。\n再练就成\n")
+                + Text("彦祖").foregroundStyle(Theme.Color.accent)
+                + Text("了。"))
+                .font(Theme.Font.display(size: 40, weight: .heavy))
+                .tracking(-1)
+                .foregroundStyle(Theme.Color.fg)
+                .padding(.top, Theme.Spacing.md)
+            Text("我们只负责记录\n变帅变美这事儿\n全是你自己练的\n可不关我们事儿")
+                .font(Theme.Font.body(size: 16))
                 .foregroundStyle(Theme.Color.fg2)
-                .lineSpacing(3)
+                .lineSpacing(7)
+                .padding(.top, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -87,7 +92,7 @@ struct LoginView: View {
             if loading {
                 ProgressView()
                     .tint(.white)
-                    .frame(height: 50)
+                    .frame(height: 52)
                     .frame(maxWidth: .infinity)
                     .background(Color.black, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
             } else {
@@ -97,7 +102,7 @@ struct LoginView: View {
                     Task { await handleApple(result) }
                 }
                 .signInWithAppleButtonStyle(.black)
-                .frame(height: 50)
+                .frame(height: 52)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
             }
         }
@@ -111,27 +116,23 @@ struct LoginView: View {
             Button("隐私政策") { /* 文档链接占位 */ }
                 .foregroundStyle(Theme.Color.fg2)
         }
-        .font(Theme.Font.l5)
+        .font(Theme.Font.body(size: 12))
         .foregroundStyle(Theme.Color.muted)
         .frame(maxWidth: .infinity)
-        .padding(.top, Theme.Spacing.md)
     }
 
-    /// 开发者登录：整行虚线胶囊（仅 DEBUG/模拟器）。
+    /// 开发者登录：整行虚线框（仅 DEBUG/模拟器），mono 小字。
     private var devLoginButton: some View {
         Button { Task { await handleDev() } } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.up.left").font(.system(size: 11, weight: .semibold))
-                Text("开发者登录（仅模拟器）")
-            }
-            .font(Theme.Font.l4)
-            .foregroundStyle(Theme.Color.muted)
-            .frame(maxWidth: .infinity)
-            .frame(height: 44)
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                    .strokeBorder(Theme.Color.border2, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-            )
+            Text("⌥ 开发者登录（仅模拟器）")
+                .font(Theme.Font.mono(size: 11))
+                .foregroundStyle(Theme.Color.muted)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .strokeBorder(Theme.Color.border2, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                )
         }
         .buttonStyle(.plain)
     }

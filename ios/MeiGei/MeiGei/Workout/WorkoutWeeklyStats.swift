@@ -38,7 +38,7 @@ enum WorkoutWeeklyStats {
                 }
             }
             if let ended = w.endedAt {
-                totalSec += ended.timeIntervalSince(w.startedAt)
+                totalSec += ended.timeIntervalSince(w.timerStartedAt ?? w.startedAt)
             }
         }
         // 平均时长按「有结束时间的 session」加权平均。

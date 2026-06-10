@@ -2,6 +2,24 @@ import SwiftUI
 
 // MARK: - 3.10 PR 自动识别与庆祝
 
+/// PR 庆祝弹窗的 App 级承载器（注入根环境）。
+///
+/// 结束训练会让 `workout.isFinished` 翻转，首页导航随即把进行中页换成只读详情页，
+/// 若庆祝 sheet 挂在被替换的页内会一闪即逝。故把待展示的庆祝数据提到此处，
+/// 由稳定不被销毁的 `MainTabView` 统一呈现，避免随导航切换被销毁。
+@Observable
+final class PRCelebrationCenter {
+    /// 待展示的新纪录；非 nil 即触发庆祝弹窗。展示后置 nil 收起。
+    var records: [PersonalRecord]?
+    /// 弹窗副标题摘要（`title · N 动作 · N 组 · N 分钟`）。
+    var summary: String = ""
+
+    func present(_ records: [PersonalRecord], summary: String) {
+        self.summary = summary
+        self.records = records
+    }
+}
+
 /// 一条个人记录：由原始训练记录重算得出，不持久化（design.md Non-Goals）。
 struct PersonalRecord: Identifiable {
     let exerciseName: String

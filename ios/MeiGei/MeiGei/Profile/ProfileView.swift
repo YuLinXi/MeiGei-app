@@ -64,9 +64,13 @@ struct ProfileView: View {
         }
         .navigationTitle("我的")
         .navigationBarTitleDisplayMode(.inline)
-        .confirmationDialog("确定退出登录？", isPresented: $confirmLogout, titleVisibility: .visible) {
-            Button("退出登录", role: .destructive) { session.logout() }
-        }
+        .paperConfirmDialog(
+            isPresented: $confirmLogout,
+            title: "退出登录?",
+            message: "本地数据保留,下次登录后继续同步。",
+            confirmTitle: "退出登录",
+            onConfirm: { session.logout() }
+        )
         #if DEBUG
         .navigationDestination(isPresented: $showDesignSystem) { DesignSystemPreviewView() }
         #endif

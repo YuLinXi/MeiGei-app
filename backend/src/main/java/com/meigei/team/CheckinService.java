@@ -92,7 +92,10 @@ public class CheckinService {
         checkinMapper.deleteByUserWorkout(userId, workoutId);
     }
 
-    /** 表情回应：一人一打卡仅一条，重复回应更新表情。推送给打卡主人。 */
+    /**
+     * 表情回应（单选·可取消）：一人一打卡仅一条。
+     * 再点同一个表情 = 取消（删除，返回 null，不推送）；点另一个 = 切换；未点过 = 新增。仅新增/切换时推送给打卡主人。
+     */
     @Transactional
     public CheckinReaction react(UUID userId, UUID checkinId, String emoji) {
         if (!EMOJIS.contains(emoji)) {
@@ -116,6 +119,10 @@ public class CheckinService {
             reaction.setCreatedAt(now);
             reaction.setUpdatedAt(now);
             reactionMapper.insert(reaction);
+        } else if (existing.getEmoji().equals(emoji)) {
+            // 再点同一个 → 取消：物理删除该条（uq_reaction 唯一约束允许重新点亮）
+            reactionMapper.deleteById(existing.getId());
+            return null;
         } else {
             existing.setEmoji(emoji);
             existing.setUpdatedAt(now);

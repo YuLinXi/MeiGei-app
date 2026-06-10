@@ -1,5 +1,9 @@
 import SwiftUI
 import SwiftData
+import os.log
+
+/// Team 交互日志：可在 Xcode 控制台 / Console.app 按 category=TeamUI 过滤。
+private let uiLog = Logger(subsystem: "com.yulinxi.app.MeiGei", category: "TeamUI")
 
 // MARK: - Team 列表（tab 根）
 
@@ -8,6 +12,7 @@ struct TeamListView: View {
     @State private var creating = false
     @State private var joining = false
     @State private var error: String?
+    @State private var actionToast: String?   // 退出/解散返回后的黑底结果 toast
 
     var body: some View {
         ZStack {
@@ -15,11 +20,11 @@ struct TeamListView: View {
             VStack(spacing: 0) {
                 header
                 ScrollView {
+                    // 原型 scroll 直接铺团队卡（无「我的 Team」分组标签），下拉刷新走系统 refreshable。
                     LazyVStack(alignment: .leading, spacing: Theme.Spacing.md) {
                         if teamService.teams.isEmpty {
-                            emptyCard
+                            emptyState
                         } else {
-                            Text("我的 Team").eyebrowStyle()
                             ForEach(teamService.teams) { team in
                                 NavigationLink(value: team) {
                                     teamCard(team)
@@ -39,11 +44,49 @@ struct TeamListView: View {
         .navigationDestination(for: TeamDTO.self) { TeamDetailView(team: $0) }
         .sheet(isPresented: $creating) { CreateTeamSheet() }
         .sheet(isPresented: $joining) { JoinTeamSheet() }
+        .overlay(alignment: .top) { resultToast }
         .task { await reload() }
         .refreshable { await reload() }
+        .onAppear { consumePendingToast() }
         .alert("出错了", isPresented: .constant(error != nil)) {
             Button("好") { error = nil }
         } message: { Text(error ?? "") }
+    }
+
+    // 退出/解散成功后返回列表顶部的黑底 toast（朱砂红勾选圆点 + 队名文案）。
+    @ViewBuilder
+    private var resultToast: some View {
+        if let actionToast {
+            HStack(spacing: 9) {
+                ZStack {
+                    Circle().fill(Theme.Color.accent).frame(width: 18, height: 18)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundStyle(.white)
+                }
+                Text(actionToast)
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+                    .foregroundStyle(Color(white: 0.98))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .background(Theme.Color.fg, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .paperShadow(.lg, cornerRadius: Theme.Radius.md)
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+
+    /// 从 TeamService 取走详情页写入的结果文案，显示 2.5s 后清空。
+    private func consumePendingToast() {
+        guard let msg = teamService.pendingActionToast else { return }
+        teamService.pendingActionToast = nil
+        withAnimation(.easeOut(duration: 0.2)) { actionToast = msg }
+        Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            withAnimation(.easeOut(duration: 0.2)) { actionToast = nil }
+        }
     }
 
     // MARK: Header（大标题「Team」+ 右侧圆形朱砂红加号菜单，与动作 Tab 一致）
@@ -69,41 +112,44 @@ struct TeamListView: View {
         .padding(.bottom, 4)
     }
 
+    // 原型团队卡：首字方块（朱砂红 8% 底 + 18% 描边 + accent 首字，社交温度）+ 名称 + 邀请码 mono。
     private func teamCard(_ team: TeamDTO) -> some View {
-        HStack(spacing: Theme.Spacing.md) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Theme.Color.surface2)
-                    .frame(width: 56, height: 56)
-                Text(String(team.name.prefix(1)))
-                    .font(Theme.Font.display(size: 22, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg)
-            }
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 12) {
+            Text(String(team.name.prefix(1)))
+                .font(Theme.Font.display(size: 15, weight: .heavy))
+                .foregroundStyle(Theme.Color.accent)
+                .frame(width: 44, height: 44)
+                .background(Theme.Color.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.Color.accentSofter, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 3) {
                 Text(team.name)
-                    .font(Theme.Font.body(size: 16, weight: .semibold))
+                    .font(Theme.Font.body(size: 15, weight: .bold))
                     .foregroundStyle(Theme.Color.fg)
                 Text("邀请码 \(team.inviteCode)")
-                    .font(Theme.Font.mono(size: 11))
+                    .font(Theme.Font.mono(size: 12))
+                    .tracking(0.48)            // 原型 letter-spacing .04em ≈ 0.48pt @12
                     .foregroundStyle(Theme.Color.muted)
             }
-            Spacer()
-            Image(systemName: "chevron.right").foregroundStyle(Theme.Color.muted)
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 16))
+                .foregroundStyle(Theme.Color.muted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
     }
 
-    private var emptyCard: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("EMPTY · Team").eyebrowStyle()
+    // 原型空态：居中标题「还没有 Team」+ 朱砂红「创建」主键 + 「用邀请码加入」次键。
+    private var emptyState: some View {
+        VStack(spacing: Theme.Spacing.md) {
             Text("还没有 Team")
-                .font(Theme.Font.display(size: 20, weight: .semibold))
+                .font(Theme.Font.display(size: 22, weight: .bold))
                 .foregroundStyle(Theme.Color.fg)
             Text("创建一个小队，或用邀请码加入训练搭子的圈子。")
                 .font(Theme.Font.body(size: 13))
                 .foregroundStyle(Theme.Color.fg2)
-            HStack(spacing: Theme.Spacing.md) {
+                .multilineTextAlignment(.center)
+            VStack(spacing: Theme.Spacing.sm) {
                 Button { creating = true } label: {
                     Text("创建 Team")
                         .font(Theme.Font.body(size: 14, weight: .semibold))
@@ -115,7 +161,7 @@ struct TeamListView: View {
                 .buttonStyle(.plain)
                 .paperShadow(.sm, cornerRadius: Theme.Radius.md)
                 Button { joining = true } label: {
-                    Text("加入")
+                    Text("用邀请码加入")
                         .font(Theme.Font.body(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.Color.fg)
                         .padding(.horizontal, Theme.Spacing.lg)
@@ -125,9 +171,10 @@ struct TeamListView: View {
                 }
                 .buttonStyle(.plain)
             }
+            .padding(.top, Theme.Spacing.sm)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardStyle()
+        .frame(maxWidth: .infinity)
+        .padding(.top, 96)
     }
 
     private func reload() async {
@@ -136,7 +183,7 @@ struct TeamListView: View {
     }
 }
 
-// MARK: - 创建 / 加入 sheet
+// MARK: - 创建 / 加入 sheet（纸感底部 sheet：自绘 取消/标题/确认 栏 + 朱砂红 CTA）
 
 struct CreateTeamSheet: View {
     @Environment(TeamService.self) private var teamService
@@ -144,37 +191,45 @@ struct CreateTeamSheet: View {
     @State private var name = ""
     @State private var busy = false
     @State private var error: String?
+    @FocusState private var focused: Bool
+
+    private var trimmed: String { name.trimmingCharacters(in: .whitespaces) }
+    private var canSubmit: Bool { !busy && !trimmed.isEmpty }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Theme.Color.bg.ignoresSafeArea()
-                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    Text("队名").eyebrowStyle()
-                    TextField("如：周三力量小队", text: $name).paperField()
-                    if let error {
-                        Text(error).foregroundStyle(Theme.Color.danger).font(Theme.Font.l5)
-                    }
-                    Spacer()
-                }
-                .padding(Theme.Spacing.lg)
+        VStack(spacing: 0) {
+            // 顶部栏：取消(muted) · 标题(700) · 确认(accent)。与底部 CTA 同动作（双确认，按设计稿保留）。
+            TeamSheetBar(title: "创建 Team", confirmText: "创建",
+                         confirmEnabled: canSubmit,
+                         onCancel: { dismiss() },
+                         onConfirm: { Task { await submit() } })
+            VStack(alignment: .leading, spacing: 0) {
+                TeamSheetLabel("队名").padding(.bottom, 8)
+                // 纸感输入框（内联以放大字号；paperField 固定 l2 无法覆盖）
+                TextField("周三力量小队", text: $name)
+                    .focused($focused)
+                    .font(Theme.Font.body(size: 17))
+                    .foregroundStyle(Theme.Color.fg)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 13)
+                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
+                TeamSheetHint(error ?? "3 人小圈子，建后自动生成邀请码", isError: error != nil)
+                    .padding(.top, 7)
+                TeamSheetCTA(title: "创建 Team", enabled: canSubmit) { Task { await submit() } }
             }
-            .navigationTitle("创建 Team")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("创建") { Task { await submit() } }
-                        .disabled(busy || name.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .tint(Theme.Color.accent)
-                }
-            }
+            .padding(.horizontal, 18)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
         }
+        .fittedTeamSheet()
+        .onAppear { focused = true }
     }
 
     private func submit() async {
+        guard canSubmit else { return }
         busy = true; defer { busy = false }
-        do { _ = try await teamService.create(name: name.trimmingCharacters(in: .whitespaces)); dismiss() }
+        do { _ = try await teamService.create(name: trimmed); dismiss() }
         catch { self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
     }
 }
@@ -186,44 +241,227 @@ struct JoinTeamSheet: View {
     @State private var busy = false
     @State private var error: String?
 
+    /// 后端邀请码定长 6 位（`CODE_LEN = 6`）。
+    private static let codeLength = 6
+    private var canSubmit: Bool { !busy && code.count == Self.codeLength }
+
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Theme.Color.bg.ignoresSafeArea()
-                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    Text("邀请码").eyebrowStyle()
-                    TextField("输入队友给你的邀请码", text: $code)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .paperField()
-                    if let error {
-                        Text(error).foregroundStyle(Theme.Color.danger).font(Theme.Font.l5)
-                    }
-                    Spacer()
-                }
-                .padding(Theme.Spacing.lg)
+        VStack(spacing: 0) {
+            TeamSheetBar(title: "加入 Team", confirmText: "加入",
+                         confirmEnabled: canSubmit,
+                         onCancel: { dismiss() },
+                         onConfirm: { Task { await submit() } })
+            VStack(alignment: .leading, spacing: 0) {
+                TeamSheetLabel("邀请码").padding(.bottom, 8)
+                SegmentedCodeField(code: $code, length: Self.codeLength)
+                TeamSheetHint(error ?? "向队友要 6 位邀请码，输入自动转大写", isError: error != nil)
+                    .padding(.top, 7)
+                TeamSheetCTA(title: "加入 Team", enabled: canSubmit) { Task { await submit() } }
             }
-            .navigationTitle("加入 Team")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("加入") { Task { await submit() } }
-                        .disabled(busy || code.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .tint(Theme.Color.accent)
-                }
-            }
+            .padding(.horizontal, 18)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
         }
+        .fittedTeamSheet()
     }
 
     private func submit() async {
+        guard canSubmit else { return }
         busy = true; defer { busy = false }
-        do { _ = try await teamService.join(inviteCode: code.trimmingCharacters(in: .whitespaces)); dismiss() }
+        do { _ = try await teamService.join(inviteCode: code); dismiss() }
         catch { self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
     }
 }
 
-// MARK: - Team 详情（Screen 09，Neon 改版）
+// MARK: - Team sheet 复用组件（栏 / 标签 / hint / CTA / 分段邀请码）
+
+/// 内容自适应底部 sheet：按内容实际高度设 detent（贴合内容、CTA 紧贴 sheet 底），顶部圆角 26、白底。
+private struct FittedTeamSheet: ViewModifier {
+    @State private var height: CGFloat = 360
+    func body(content: Content) -> some View {
+        content
+            .background {
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear { height = proxy.size.height }
+                        .onChange(of: proxy.size.height) { _, h in height = h }
+                }
+            }
+            .presentationDetents([.height(height)])
+            .presentationCornerRadius(26)
+            .presentationBackground(Theme.Color.surface)
+    }
+}
+
+private extension View {
+    func fittedTeamSheet() -> some View { modifier(FittedTeamSheet()) }
+}
+
+/// 顶部栏：取消(muted l3) · 标题(700 l2) · 确认(accent l3，禁用转 muted) + 底边 1px border。
+private struct TeamSheetBar: View {
+    let title: String
+    let confirmText: String
+    let confirmEnabled: Bool
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        HStack {
+            Button("取消", action: onCancel)
+                .font(Theme.Font.body(size: 15))
+                .foregroundStyle(Theme.Color.muted)
+            Spacer()
+            Text(title)
+                .font(Theme.Font.body(size: 17, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+            Spacer()
+            Button(confirmText, action: onConfirm)
+                .font(Theme.Font.body(size: 15, weight: .bold))
+                .foregroundStyle(confirmEnabled ? Theme.Color.accent : Theme.Color.muted)
+                .disabled(!confirmEnabled)
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 15)
+        .padding(.bottom, 13)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.border).frame(height: 1)
+        }
+    }
+}
+
+/// 字段标签：l4 12px / fg2 / 600。
+private struct TeamSheetLabel: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text)
+            .font(Theme.Font.body(size: 14, weight: .semibold))
+            .foregroundStyle(Theme.Color.fg2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// 提示/错误：l5 10px，正常 muted、错误 danger。
+private struct TeamSheetHint: View {
+    let text: String
+    let isError: Bool
+    init(_ text: String, isError: Bool) { self.text = text; self.isError = isError }
+    var body: some View {
+        Text(text)
+            .font(Theme.Font.body(size: 12))
+            .foregroundStyle(isError ? Theme.Color.danger : Theme.Color.muted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// 底部全宽 CTA：on=accent 白字 + 朱砂红投影；off=暖底 muted + border。l2 15px / 700。
+private struct TeamSheetCTA: View {
+    let title: String
+    let enabled: Bool
+    let action: () -> Void
+    var body: some View {
+        Button(action: { if enabled { action() } }) {
+            Text(title)
+                .font(Theme.Font.body(size: 17, weight: .bold))
+                .foregroundStyle(enabled ? .white : Theme.Color.muted)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(enabled ? Theme.Color.accent : Theme.Color.surface2,
+                            in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .overlay {
+                    if !enabled {
+                        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                            .stroke(Theme.Color.border, lineWidth: 1)
+                    }
+                }
+                .shadow(color: enabled ? Theme.Color.accent.opacity(0.28) : .clear,
+                        radius: 8, x: 0, y: 4)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .padding(.top, 18)
+        .padding(.bottom, 4)
+    }
+}
+
+/// 分段邀请码输入：N 个方格（mono 24 / r-sm / border2），当前格朱砂红环 + 闪光游标；隐藏 TextField 承接键盘、输入自动转大写。
+private struct SegmentedCodeField: View {
+    @Binding var code: String
+    let length: Int
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        ZStack {
+            TextField("", text: Binding(get: { code }, set: { code = normalize($0) }))
+                .focused($focused)
+                .keyboardType(.asciiCapable)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .foregroundStyle(.clear)
+                .tint(.clear)
+                .frame(height: 1)
+                .opacity(0.01)
+
+            HStack(spacing: 8) {
+                ForEach(0..<length, id: \.self) { cell(index: $0) }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { focused = true }
+        }
+        .onAppear { focused = true }
+    }
+
+    private func cell(index i: Int) -> some View {
+        let chars = Array(code)
+        let isActive = focused && i == chars.count && i < length
+        let ch = i < chars.count ? String(chars[i]) : ""
+        return ZStack {
+            RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                .fill(Theme.Color.surface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .stroke(isActive ? Theme.Color.accent : Theme.Color.border2, lineWidth: 1)
+                )
+                // active 朱砂红 18% 外环（近似设计稿 box-shadow 0 0 0 2px accent-3）
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm + 2, style: .continuous)
+                        .stroke(Theme.Color.accentSofter, lineWidth: 2)
+                        .padding(-2)
+                        .opacity(isActive ? 1 : 0)
+                )
+            if ch.isEmpty {
+                if isActive { CodeCaret() }
+            } else {
+                Text(ch)
+                    .font(Theme.Font.mono(size: 27, weight: .bold))
+                    .foregroundStyle(Theme.Color.fg)
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+    }
+
+    private func normalize(_ s: String) -> String {
+        String(s.uppercased().filter { $0.isLetter || $0.isNumber }.prefix(length))
+    }
+}
+
+/// 朱砂红闪光游标（2×24）。
+private struct CodeCaret: View {
+    @State private var on = true
+    var body: some View {
+        RoundedRectangle(cornerRadius: 1)
+            .fill(Theme.Color.accent)
+            .frame(width: 2, height: 24)
+            .opacity(on ? 1 : 0)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
+                    on = false
+                }
+            }
+    }
+}
+
+// MARK: - Team 详情（Screen 16 · C 纸感极简）
 
 struct TeamDetailView: View {
     @Environment(TeamService.self) private var teamService
@@ -235,162 +473,214 @@ struct TeamDetailView: View {
     @State private var checkins: [TeamCheckinDTO] = []
     @State private var reactions: [UUID: [CheckinReactionDTO]] = [:]
     @State private var error: String?
-    @State private var confirmLeave = false
+
+    // ⋯ 操作菜单 → 二次确认 → 结果反馈 状态机
+    @State private var showActionSheet = false
+    @State private var confirmKind: ConfirmKind?
+    @State private var dissolveInput = ""
+    @State private var actionBusy = false
+    @State private var actionFailed = false   // 详情页顶部红 toast（操作失败）
+
+    private enum ConfirmKind: Identifiable { case leave, dissolve; var id: Int { hashValue } }
 
     private var isOwner: Bool { team.ownerUserId == session.currentUserId }
-
-    /// 3 档颜色 hash 头像配色。
-    private static let avatarPalette: [Color] = [
-        Theme.Color.accent,
-        Theme.Color.accent,
-        Theme.Color.ok,
-    ]
 
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    coverCard
-                    membersStrip
+            VStack(spacing: 0) {
+                navBar
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                        headerCard
 
-                    Text("今日动态").eyebrowStyle()
-                    if checkins.isEmpty {
-                        emptyFeedCard
-                    } else {
-                        VStack(spacing: Theme.Spacing.md) {
-                            ForEach(checkins) { c in
-                                FeedItemCard(
-                                    checkin: c,
-                                    mine: c.userId == session.currentUserId,
-                                    memberName: memberName(userId: c.userId),
-                                    avatarColor: avatarColor(for: c.userId),
-                                    reactions: reactions[c.id] ?? [],
-                                    myUserId: session.currentUserId,
-                                    onReact: { emoji in await react(checkinId: c.id, emoji: emoji) }
-                                )
+                        Text("今日动态").eyebrowStyle()
+                        if checkins.isEmpty {
+                            emptyFeedCard
+                        } else {
+                            VStack(spacing: Theme.Spacing.md) {
+                                ForEach(checkins) { c in
+                                    FeedItemCard(
+                                        checkin: c,
+                                        memberName: displayName(for: c.userId),
+                                        reactions: reactions[c.id] ?? [],
+                                        myUserId: session.currentUserId,
+                                        onReact: { emoji in await react(checkinId: c.id, emoji: emoji) }
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    NavigationLink {
-                        TeamPlansView(team: team)
-                    } label: {
-                        HStack {
-                            Image(systemName: "list.bullet.rectangle").foregroundStyle(Theme.Color.accent)
-                            Text("Team 计划模板")
-                                .font(Theme.Font.body(size: 15, weight: .semibold))
-                                .foregroundStyle(Theme.Color.fg)
-                            Spacer()
-                            Image(systemName: "chevron.right").foregroundStyle(Theme.Color.muted)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .cardStyle()
-                    }
-                    .buttonStyle(.plain)
+                        planEntry
 
-                    Button(isOwner ? "解散 Team" : "退出 Team") {
-                        confirmLeave = true
+                        Color.clear.frame(height: 24)
                     }
-                    .font(Theme.Font.body(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.Color.danger)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Theme.Spacing.md)
-
-                    Color.clear.frame(height: 32)
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.top, Theme.Spacing.md)
                 }
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.top, Theme.Spacing.md)
+                .refreshable { await reload() }
+            }
+
+            // ⋯ action sheet
+            if showActionSheet {
+                actionSheetOverlay
+                    .transition(.opacity)
+                    .zIndex(2)
+            }
+            // 二次确认弹窗
+            if let kind = confirmKind {
+                confirmDialogOverlay(kind)
+                    .transition(.opacity)
+                    .zIndex(3)
             }
         }
-        .navigationTitle(team.name)
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        .overlay(alignment: .top) { failureToast }
         .task { await reload() }
-        .refreshable { await reload() }
-        .confirmationDialog(isOwner ? "解散后该 Team 不可恢复" : "确定退出该 Team？",
-                            isPresented: $confirmLeave, titleVisibility: .visible) {
-            Button(isOwner ? "解散" : "退出", role: .destructive) { Task { await leaveOrDissolve() } }
-        }
         .alert("出错了", isPresented: .constant(error != nil)) {
             Button("好") { error = nil }
         } message: { Text(error ?? "") }
     }
 
-    // 顶部 cover 卡：gradient surface2→bg + 圆角 lg + 右上「N/M 今日已练」pill。
-    private var coverCard: some View {
+    // MARK: 自绘导航栏（返回 / 队名 / ⋯）
+
+    private var navBar: some View {
+        HStack {
+            Button { dismiss() } label: { navCircle("chevron.left") }
+                .buttonStyle(PressableButtonStyle())
+                .accessibilityLabel("返回")
+            Spacer(minLength: 8)
+            Text(team.name)
+                .font(Theme.Font.body(size: 15, weight: .heavy))
+                .tracking(-0.15)
+                .foregroundStyle(Theme.Color.fg)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Button { withAnimation(.easeOut(duration: 0.18)) { showActionSheet = true } } label: {
+                navCircle("ellipsis", active: showActionSheet, rotated: true)
+            }
+            .buttonStyle(PressableButtonStyle())
+            .accessibilityLabel("更多操作")
+        }
+        .padding(.horizontal, Theme.Spacing.md)
+        .frame(height: 46)
+    }
+
+    private func navCircle(_ system: String, active: Bool = false, rotated: Bool = false) -> some View {
+        Image(systemName: system)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(active ? Theme.Color.accent : Theme.Color.fg)
+            .rotationEffect(.degrees(rotated ? 90 : 0))
+            .frame(width: 32, height: 32)
+            .background(active ? Theme.Color.accentSoft : Theme.Color.surface, in: Circle())
+            .overlay(Circle().stroke(active ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
+            .paperShadow(.sm, cornerRadius: 16)
+    }
+
+    // MARK: 队头卡（左竖条 + 进度 pill + 邀请码 + monogram 头像栈）
+
+    private var headerCard: some View {
         let totalMembers = members.count
         let trainedToday = Set(checkins.map(\.userId)).count
         return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            HStack {
-                Text("TEAM").eyebrowStyle()
-                Spacer()
+            HStack(alignment: .top) {
+                Text(isOwner ? "TEAM · 你是队长" : "TEAM").eyebrowStyle()
+                Spacer(minLength: 8)
                 Text("\(trainedToday) / \(totalMembers) 今日已练")
                     .font(Theme.Font.mono(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(Theme.Color.accent, in: Capsule())
+                    .foregroundStyle(Theme.Color.accent)
+                    .padding(.horizontal, 9).padding(.vertical, 4)
+                    .background(Theme.Color.accentSoft, in: Capsule())
+                    .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1))
+                    .fixedSize()
             }
             Text(team.name)
-                .font(Theme.Font.l1)
+                .font(Theme.Font.l2)
                 .foregroundStyle(Theme.Color.fg)
-            HStack(spacing: 6) {
-                Text("邀请码")
-                    .font(Theme.Font.mono(size: 11))
-                    .foregroundStyle(Theme.Color.muted)
-                Text(team.inviteCode)
-                    .font(Theme.Font.mono(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg)
+            HStack {
                 Button {
                     UIPasteboard.general.string = team.inviteCode
                 } label: {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.Color.fg2)
+                    HStack(spacing: 5) {
+                        Text("邀请码 \(team.inviteCode)")
+                            .font(Theme.Font.mono(size: 12))
+                            .tracking(0.48)
+                            .foregroundStyle(Theme.Color.fg2)
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.Color.muted)
+                    }
                 }
                 .buttonStyle(.plain)
+                Spacer(minLength: 8)
+                avatarStack
             }
         }
-        .padding(Theme.Spacing.lg)
+        .padding(15)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg).stroke(Theme.Color.border, lineWidth: 1))
+        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
+        // 左侧 4px 朱砂红竖条
+        .overlay(alignment: .leading) {
+            Rectangle().fill(Theme.Color.accent).frame(width: 4)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .paperShadow(.sm, cornerRadius: Theme.Radius.lg)
     }
 
-    // 成员头像横向条：4 档配色 hash，超 4 折叠 +N，尾部 mono「N 成员」。
-    private var membersStrip: some View {
-        let shown = Array(members.prefix(4))
+    // monogram 头像栈：me 在前高亮，−7px 重叠，超 5 折叠 +N。
+    private var avatarStack: some View {
+        let sorted = members.sorted { a, _ in a.userId == session.currentUserId }
+        let shown = Array(sorted.prefix(5))
         let overflow = max(0, members.count - shown.count)
-        return HStack(spacing: -8) {
+        return HStack(spacing: -7) {
             ForEach(Array(shown.enumerated()), id: \.element.id) { _, m in
-                avatarCircle(name: memberName(m), color: avatarColor(for: m.userId))
+                headerMonogram(name: displayName(for: m.userId), isMe: m.userId == session.currentUserId)
             }
             if overflow > 0 {
-                ZStack {
-                    Circle()
-                        .fill(Theme.Color.surface)
-                        .frame(width: 36, height: 36)
-                        .overlay(Circle().stroke(Theme.Color.bg, lineWidth: 2))
-                    Text("+\(overflow)")
-                        .font(Theme.Font.mono(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.Color.fg2)
-                }
+                Text("+\(overflow)")
+                    .font(Theme.Font.mono(size: 9, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .frame(width: 26, height: 26)
+                    .background(Theme.Color.surface2, in: Circle())
+                    .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
+                    .overlay(Circle().stroke(Theme.Color.surface, lineWidth: 1.5).padding(-0.75))
             }
-            Spacer()
-            Text("\(members.count) 成员")
-                .font(Theme.Font.mono(size: 11))
-                .foregroundStyle(Theme.Color.muted)
         }
     }
 
-    private func avatarCircle(name: String, color: Color) -> some View {
-        ZStack {
-            Circle().fill(color).frame(width: 36, height: 36)
-            Circle().stroke(Theme.Color.bg, lineWidth: 2).frame(width: 36, height: 36)
-            Text(String(name.prefix(1)))
-                .font(Theme.Font.body(size: 13, weight: .bold))
-                .foregroundStyle(Theme.Color.bg)
+    private func headerMonogram(name: String, isMe: Bool) -> some View {
+        Text(String(name.prefix(1)))
+            .font(Theme.Font.body(size: 9, weight: .bold))
+            .foregroundStyle(isMe ? Theme.Color.accent : Theme.Color.fg2)
+            .frame(width: 26, height: 26)
+            .background(isMe ? Theme.Color.accentSoft : Theme.Color.surface2, in: Circle())
+            .overlay(Circle().stroke(isMe ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
+            .overlay(Circle().stroke(Theme.Color.surface, lineWidth: 1.5).padding(-0.75))
+    }
+
+    // MARK: Team 计划入口
+
+    private var planEntry: some View {
+        NavigationLink {
+            TeamPlansView(team: team)
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.Color.fg2)
+                Text("Team 计划")
+                    .font(Theme.Font.l2)
+                    .foregroundStyle(Theme.Color.fg)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.Color.muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
         }
+        .buttonStyle(.plain)
     }
 
     private var emptyFeedCard: some View {
@@ -401,34 +691,252 @@ struct TeamDetailView: View {
             Text("第一个完成训练的人，自动出现在这里。")
                 .font(Theme.Font.body(size: 13))
                 .foregroundStyle(Theme.Color.fg2)
-            NavigationLink {
-                WorkoutListView()
-            } label: {
-                Text("开始训练")
-                    .font(Theme.Font.body(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.Color.bg)
-                    .padding(.horizontal, Theme.Spacing.lg)
-                    .frame(height: 38)
-                    .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-            }
-            .buttonStyle(.plain)
-            .paperShadow(.sm, cornerRadius: Theme.Radius.md)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
     }
 
-    private func avatarColor(for userId: UUID) -> Color {
-        let h = abs(userId.hashValue)
-        return Self.avatarPalette[h % Self.avatarPalette.count]
+    // MARK: ⋯ Action Sheet（自绘毛玻璃底部 sheet）
+
+    private var actionSheetOverlay: some View {
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(0.34).ignoresSafeArea()
+                .onTapGesture { withAnimation(.easeOut(duration: 0.18)) { showActionSheet = false } }
+            VStack(spacing: 8) {
+                VStack(spacing: 0) {
+                    VStack(spacing: 2) {
+                        Text(sheetHeaderTitle)
+                            .font(Theme.Font.body(size: 13, weight: .bold))
+                            .foregroundStyle(Theme.Color.fg2)
+                        Text(sheetHeaderSub)
+                            .font(Theme.Font.body(size: 11))
+                            .foregroundStyle(Theme.Color.muted)
+                    }
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11).padding(.horizontal, 16)
+                    .overlay(alignment: .bottom) { Rectangle().fill(Theme.Color.border).frame(height: 1) }
+
+                    Button {
+                        withAnimation(.easeOut(duration: 0.18)) {
+                            showActionSheet = false
+                            confirmKind = isOwner ? .dissolve : .leave
+                        }
+                    } label: {
+                        Text(isOwner ? "解散 Team" : "退出 Team")
+                            .font(Theme.Font.body(size: 16, weight: .bold))
+                            .foregroundStyle(Theme.Color.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
+
+                Button { withAnimation(.easeOut(duration: 0.18)) { showActionSheet = false } } label: {
+                    Text("取消")
+                        .font(Theme.Font.body(size: 16, weight: .heavy))
+                        .foregroundStyle(Theme.Color.fg)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
+            }
+            .padding(.horizontal, 9)
+            .padding(.bottom, 12)
+            .paperShadow(.lg, cornerRadius: Theme.Radius.lg)
+            .transition(.move(edge: .bottom))
+        }
     }
 
-    private func memberName(_ m: TeamMemberDTO) -> String { memberName(userId: m.userId) }
-
-    private func memberName(userId: UUID) -> String {
-        if userId == session.currentUserId { return "我" }
-        return "队友 " + userId.uuidString.prefix(4)
+    private var sheetHeaderTitle: String {
+        isOwner ? "\(team.name) · 队长" : team.name
     }
+
+    private var sheetHeaderSub: String {
+        let count = members.count
+        if isOwner {
+            if let days = ownerCreatedDaysAgo {
+                return "你创建于 \(days) 天前 · \(count) 名成员"
+            }
+            return "\(count) 名成员"
+        } else {
+            if let days = myJoinedDaysAgo {
+                return "\(count) 名成员 · 你已加入 \(days) 天"
+            }
+            return "\(count) 名成员"
+        }
+    }
+
+    /// 当前用户加入天数（成员视角）。
+    private var myJoinedDaysAgo: Int? {
+        guard let me = members.first(where: { $0.userId == session.currentUserId }),
+              let joined = me.joinedAt else { return nil }
+        return max(0, Calendar.current.dateComponents([.day], from: joined, to: .now).day ?? 0)
+    }
+
+    /// 队长创建天数：用 owner 成员 joinedAt 近似（≈ 建队时间）。
+    private var ownerCreatedDaysAgo: Int? {
+        guard let owner = members.first(where: { $0.userId == team.ownerUserId }),
+              let joined = owner.joinedAt else { return nil }
+        return max(0, Calendar.current.dateComponents([.day], from: joined, to: .now).day ?? 0)
+    }
+
+    // MARK: 二次确认弹窗
+
+    @ViewBuilder
+    private func confirmDialogOverlay(_ kind: ConfirmKind) -> some View {
+        ZStack {
+            Color.black.opacity(0.34).ignoresSafeArea()
+                .onTapGesture { if !actionBusy { closeConfirm() } }
+            VStack(spacing: 0) {
+                // 图标
+                ZStack {
+                    Circle().fill(Theme.Color.accentSoft).frame(width: 46, height: 46)
+                    Circle().stroke(Theme.Color.accentSofter, lineWidth: 1).frame(width: 46, height: 46)
+                    Image(systemName: kind == .leave ? "rectangle.portrait.and.arrow.right" : "exclamationmark.triangle")
+                        .font(.system(size: 21, weight: .semibold))
+                        .foregroundStyle(Theme.Color.accent)
+                }
+                .padding(.bottom, 13)
+
+                Text(kind == .leave ? "退出「\(team.name)」?" : "解散「\(team.name)」?")
+                    .font(Theme.Font.body(size: 16, weight: .heavy))
+                    .foregroundStyle(Theme.Color.fg)
+                    .multilineTextAlignment(.center)
+
+                dialogMessage(kind)
+                    .font(Theme.Font.body(size: 12))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(2)
+                    .padding(.top, 9)
+
+                if kind == .dissolve {
+                    dissolveConfirmField.padding(.top, 15)
+                }
+
+                HStack(spacing: 9) {
+                    Button { closeConfirm() } label: {
+                        Text("取消")
+                            .font(Theme.Font.body(size: 15, weight: .bold))
+                            .foregroundStyle(Theme.Color.fg2)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 11)
+                            .background(Theme.Color.surface, in: Capsule())
+                            .overlay(Capsule().stroke(Theme.Color.border2, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(actionBusy)
+
+                    Button { Task { await performConfirmedAction(kind) } } label: {
+                        ZStack {
+                            Text(kind == .leave ? "退出" : "解散")
+                                .opacity(actionBusy ? 0 : 1)
+                            if actionBusy { ProgressView().tint(.white) }
+                        }
+                        .font(Theme.Font.body(size: 15, weight: .bold))
+                        .foregroundStyle(dangerEnabled(kind) ? .white : Theme.Color.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background(dangerEnabled(kind) ? Theme.Color.accent : Theme.Color.surface2, in: Capsule())
+                        .shadow(color: dangerEnabled(kind) ? Theme.Color.accent.opacity(0.4) : .clear, radius: 8, x: 0, y: 4)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!dangerEnabled(kind) || actionBusy)
+                }
+                .padding(.top, 17)
+            }
+            .padding(.horizontal, 18).padding(.top, 20).padding(.bottom, 16)
+            .frame(maxWidth: .infinity)
+            .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
+            .paperShadow(.lg, cornerRadius: Theme.Radius.lg)
+            .padding(.horizontal, 22)
+        }
+    }
+
+    private func dialogMessage(_ kind: ConfirmKind) -> Text {
+        switch kind {
+        case .leave:
+            return Text("退出后将不再接收队内动态与计划更新。你可以凭邀请码 ")
+                + Text(team.inviteCode).foregroundColor(Theme.Color.fg).fontWeight(.bold)
+                + Text(" 随时重新加入。")
+        case .dissolve:
+            return Text("此操作")
+                + Text("不可恢复").foregroundColor(Theme.Color.accent).fontWeight(.bold)
+                + Text("。\(members.count) 名成员将被移除，队内全部打卡动态与共享计划将被永久删除。")
+        }
+    }
+
+    // 队长输入队名强校验字段
+    private var dissolveConfirmField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("输入队名以确认").eyebrowStyle()
+            TextField(team.name, text: $dissolveInput)
+                .font(Theme.Font.body(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg)
+                .autocorrectionDisabled()
+                .padding(.horizontal, 12).padding(.vertical, 11)
+                .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                    .stroke(dissolveMatches ? Theme.Color.accentSofter : Theme.Color.border2, lineWidth: 1.5))
+        }
+    }
+
+    private var dissolveMatches: Bool {
+        dissolveInput.trimmingCharacters(in: .whitespaces) == team.name
+    }
+
+    private func dangerEnabled(_ kind: ConfirmKind) -> Bool {
+        kind == .leave ? true : dissolveMatches
+    }
+
+    private func closeConfirm() {
+        withAnimation(.easeOut(duration: 0.18)) { confirmKind = nil }
+        dissolveInput = ""
+    }
+
+    // MARK: 失败 toast（顶部红条，弹窗保留）
+
+    @ViewBuilder
+    private var failureToast: some View {
+        if actionFailed {
+            HStack(spacing: 9) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                Text("操作失败，请重试")
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .paperShadow(.lg, cornerRadius: Theme.Radius.md)
+            .padding(.horizontal, 14)
+            .padding(.top, 6)
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .zIndex(5)
+        }
+    }
+
+    // MARK: 名称解析（displayName 兜底）
+
+    private func displayName(for userId: UUID) -> String {
+        if let m = members.first(where: { $0.userId == userId }),
+           let n = m.displayName, !n.isEmpty {
+            return n
+        }
+        return userId == session.currentUserId ? "我" : "队友"
+    }
+
+    // MARK: 数据加载与动作
 
     private func reload() async {
         do {
@@ -450,15 +958,17 @@ struct TeamDetailView: View {
         reactions = map
     }
 
-    /// 6.5 乐观更新：先本地追加/移除，再请求；失败则回滚 + 弹错。
+    /// 6.5 乐观更新（单选·可取消）：一人一打卡只点一个表情。
+    /// 再点同一个 = 取消，点另一个 = 切换；先本地预测，再请求，失败回滚。
     private func react(checkinId: UUID, emoji: String) async {
-        guard let myId = session.currentUserId else { return }
+        guard let myId = session.currentUserId else {
+            uiLog.error("react 跳过：currentUserId 为空（token 可能与本地档案 desync）")
+            return
+        }
         let prior = reactions[checkinId] ?? []
-        var next = prior
-        if let i = next.firstIndex(where: { $0.userId == myId && $0.emoji == emoji }) {
-            // 已点亮 → 取消（本地预测；服务端 toggle 由 react() 处理）
-            next.remove(at: i)
-        } else {
+        let hadSame = prior.contains { $0.userId == myId && $0.emoji == emoji }
+        var next = prior.filter { $0.userId != myId }   // 先清掉我在这条打卡的所有表情
+        if !hadSame {                                    // 原本不是这个 → 切换/新增；原本就是这个 → 取消，不再追加
             next.append(CheckinReactionDTO(id: UUID(), checkinId: checkinId, userId: myId, emoji: emoji))
         }
         reactions[checkinId] = next
@@ -472,14 +982,27 @@ struct TeamDetailView: View {
         }
     }
 
-    private func leaveOrDissolve() async {
+    /// 退出/解散：成功写跨页 toast 并返回列表；失败保留弹窗 + 顶部红 toast。
+    private func performConfirmedAction(_ kind: ConfirmKind) async {
+        guard dangerEnabled(kind), !actionBusy else { return }
+        actionBusy = true
+        defer { actionBusy = false }
         do {
-            if isOwner { try await teamService.dissolve(team.id) }
+            if kind == .dissolve { try await teamService.dissolve(team.id) }
             else { try await teamService.leave(team.id) }
+            teamService.pendingActionToast = kind == .dissolve
+                ? "已解散「\(team.name)」"
+                : "已退出「\(team.name)」"
             dismiss()
         } catch {
-            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            await flashFailureToast()
         }
+    }
+
+    private func flashFailureToast() async {
+        withAnimation(.easeOut(duration: 0.2)) { actionFailed = true }
+        try? await Task.sleep(for: .seconds(2.5))
+        withAnimation(.easeOut(duration: 0.2)) { actionFailed = false }
     }
 }
 
@@ -487,9 +1010,7 @@ struct TeamDetailView: View {
 
 struct FeedItemCard: View {
     let checkin: TeamCheckinDTO
-    let mine: Bool
     let memberName: String
-    let avatarColor: Color
     let reactions: [CheckinReactionDTO]
     let myUserId: UUID?
     let onReact: (String) async -> Void
@@ -528,14 +1049,14 @@ struct FeedItemCard: View {
 
     private var head: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            ZStack {
-                Circle().fill(avatarColor).frame(width: 32, height: 32)
-                Text(String(memberName.prefix(1)))
-                    .font(Theme.Font.body(size: 12, weight: .bold))
-                    .foregroundStyle(Theme.Color.bg)
-            }
+            Text(String(memberName.prefix(1)))
+                .font(Theme.Font.body(size: 13, weight: .bold))
+                .foregroundStyle(Theme.Color.accent)
+                .frame(width: 32, height: 32)
+                .background(Theme.Color.accentSoft, in: Circle())
+                .overlay(Circle().stroke(Theme.Color.accentSofter, lineWidth: 1))
             VStack(alignment: .leading, spacing: 1) {
-                Text(memberName + (mine ? " · 你" : ""))
+                Text(memberName)
                     .font(Theme.Font.body(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
                 Text(relativeTime(checkin.createdAt ?? Date()))
@@ -611,35 +1132,25 @@ struct ReactionRow: View {
                     reactions.contains(where: { $0.userId == my && $0.emoji == item.code })
                 } ?? false
                 Button { onTap(item.code) } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Text(item.glyph)
                             .font(.system(size: 14))
                         if count > 0 {
                             Text("\(count)")
-                                .font(Theme.Font.mono(size: 11, weight: .semibold))
-                                .foregroundStyle(mine ? Theme.Color.fg : Theme.Color.fg2)
+                                .font(Theme.Font.mono(size: 10, weight: .semibold))
+                                .foregroundStyle(mine ? Theme.Color.accent : Theme.Color.fg2)
                         }
                     }
                     .padding(.horizontal, 10)
                     .frame(height: 28)
                     .background(
-                        mine ? Theme.Color.accentSoft : Theme.Color.surface,
+                        mine ? Theme.Color.accentSoft : Theme.Color.bg,
                         in: Capsule()
                     )
                     .overlay(Capsule().stroke(mine ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
-            Button { /* + 自定义反应：本 change 不实现 */ } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
-                    .frame(width: 28, height: 28)
-                    .background(Theme.Color.surface, in: Circle())
-                    .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-            .disabled(true)
             Spacer()
         }
     }

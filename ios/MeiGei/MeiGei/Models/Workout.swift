@@ -16,6 +16,9 @@ final class Workout: Syncable {
     var planId: UUID?
     var title: String?
     var startedAt: Date
+    /// 计时起点（仅本地，不入同步信封）：nil = 计时未启动（会话已创建、浏览中）；
+    /// 非 nil = 计时已启动（完成第一组或手动「开始训练」），REC 与训练时长均以此为基准。
+    var timerStartedAt: Date?
     var endedAt: Date?
     var note: String?
 
@@ -27,6 +30,7 @@ final class Workout: Syncable {
         planId: UUID? = nil,
         title: String? = nil,
         startedAt: Date = .now,
+        timerStartedAt: Date? = nil,
         endedAt: Date? = nil,
         note: String? = nil,
         exercises: [WorkoutExercise] = [],
@@ -41,6 +45,7 @@ final class Workout: Syncable {
         self.planId = planId
         self.title = title
         self.startedAt = startedAt
+        self.timerStartedAt = timerStartedAt
         self.endedAt = endedAt
         self.note = note
         self.exercises = exercises

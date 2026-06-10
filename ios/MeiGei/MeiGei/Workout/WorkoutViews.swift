@@ -22,6 +22,8 @@ struct WorkoutListView: View {
     @State private var pendingDelete: Workout?
     /// 待删训练行的全局坐标，供删除确认卡片定位于其正下方。
     @State private var deleteRect: CGRect = .zero
+    /// 左滑删除协调器：同一时刻仅一张展开，点击别处自动收回（详见 SwipeDeleteList）。
+    @State private var swipe = SwipeRowCoordinator()
 
     /// 当前唯一进行中会话（首页横幅来源）。
     private var activeSession: Workout? { workouts.first(where: { $0.isActive }) }
@@ -69,6 +71,8 @@ struct WorkoutListView: View {
                     }
                     .padding(.horizontal, Theme.Spacing.lg)
                     .padding(.top, Theme.Spacing.md)
+                    // 点击列表任意其它区域（含列表下方空白）：收回当前展开的左滑卡片。
+                    .collapseSwipeOnTap(swipe)
                 }
             }
             startCTA
@@ -265,24 +269,23 @@ struct WorkoutListView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, Theme.Spacing.md)
             } else {
-                VStack(spacing: Theme.Spacing.sm) {
-                    ForEach(recent) { w in
-                        SwipeToDeleteCard(
-                            onTap: { openedSession = w },
-                            onDelete: { rect in
-                                deleteRect = rect
-                                pendingDelete = w
-                            }
-                        ) { recentRow(w) }
+                SwipeDeleteList(
+                    data: recent,
+                    id: \.localId,
+                    coordinator: swipe,
+                    onTap: { openedSession = $0 },
+                    onDelete: { w, rect in
+                        deleteRect = rect
+                        pendingDelete = w
                     }
-                }
+                ) { recentRow($0) }
             }
         }
     }
 
     private func recentRow(_ w: Workout) -> some View {
         let totalSets = w.exercises.reduce(0) { $0 + $1.sets.count }
-        let durationMin: Int? = w.endedAt.map { Int($0.timeIntervalSince(w.startedAt) / 60) }
+        let durationMin: Int? = w.endedAt.map { Int($0.timeIntervalSince(w.timerStartedAt ?? w.startedAt) / 60) }
         let pr = prByWorkout[w.localId]
         let durText = durationMin.map { "，\($0) 分钟" } ?? ""
         let prText = pr.map { "，\($0.name) PR \(formatKg($0.weight)) 公斤" } ?? ""
@@ -418,76 +421,6 @@ struct WorkoutListView: View {
 
 // MARK: - 左滑删除容器（非 List 卡片列表用，首页「最近训练」）
 
-/// 训练首页「最近训练」是 ScrollView 内的卡片栈而非 List，无法用 `.swipeActions`，
-/// 故以轻量水平拖动手势实现左滑显露删除按钮；点击空白处收回，点击卡片走 onTap。
-/// 计划详情页的动作行复用同一交互（见 PlanViews）。
-struct SwipeToDeleteCard<Content: View>: View {
-    var onTap: () -> Void
-    /// 回传该行的全局坐标，供父视图把删除确认卡片定位于其正下方。
-    var onDelete: (CGRect) -> Void
-    @ViewBuilder var content: Content
-    @State private var offset: CGFloat = 0
-    /// 越阈触感去抖：仅在首次越过删除显露阈值时触发一次 selection。
-    @State private var didReveal = false
-    /// 本行在屏幕中的全局 frame（随布局更新），删除时随回调一并回传。
-    @State private var globalFrame: CGRect = .zero
-    private let revealed: CGFloat = -76
-    /// 显露 / 收回统一回弹，保证手感对称。
-    private let snap: Animation = .spring(response: 0.3, dampingFraction: 0.8)
-
-    var body: some View {
-        ZStack(alignment: .trailing) {
-            Button(role: .destructive) {
-                withAnimation(snap) { offset = 0 }
-                onDelete(globalFrame)
-            } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 64, height: 64)
-                    .background(Theme.Color.danger, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-            }
-            .buttonStyle(.plain)
-            .opacity(offset < -8 ? 1 : 0)
-            .accessibilityHidden(offset > -8)
-
-            // 点击走 Button 以获得按压微反馈；横向拖动经 highPriorityGesture 接管，互不冲突。
-            Button {
-                if offset < 0 { withAnimation(snap) { offset = 0 } }
-                else { onTap() }
-            } label: {
-                content
-            }
-            .buttonStyle(PressableButtonStyle())
-            .offset(x: offset)
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 16)
-                    .onChanged { v in
-                        guard abs(v.translation.width) > abs(v.translation.height) else { return }
-                        if v.translation.width < 0 { offset = max(v.translation.width, revealed) }
-                        else if offset < 0 { offset = min(0, revealed + v.translation.width) }
-                        // 越过显露阈值首次触发选择触感，回到阈值内复位去抖标记。
-                        if offset <= -40, !didReveal { Theme.Haptics.selection(); didReveal = true }
-                        if offset > -40 { didReveal = false }
-                    }
-                    .onEnded { v in
-                        withAnimation(snap) {
-                            offset = v.translation.width < -40 ? revealed : 0
-                        }
-                    }
-            )
-            // 左滑手势对 VoiceOver 不可达，提供等价删除自定义动作（走同一二次确认）。
-            .accessibilityAction(named: "删除") { onDelete(globalFrame) }
-        }
-        // 持续记录本行的全局 frame（屏幕坐标系），供删除确认卡片定位于其正下方。
-        .background(GeometryReader { g in
-            Color.clear
-                .onAppear { globalFrame = g.frame(in: .global) }
-                .onChange(of: g.frame(in: .global)) { _, new in globalFrame = new }
-        })
-    }
-}
-
 /// 删除二次确认浮层：透明 fullScreenCover 内的暗 scrim（盖住 Tab Bar）+ 锚定在被删 Item
 /// 正下方的纸感卡片（单行删除文案，对齐计划页 ⋯ 菜单样式）。点击 scrim 即取消，不另设取消按钮。
 struct DeleteConfirmCover: View {
@@ -573,11 +506,11 @@ struct WorkoutLoggingView: View {
     @Environment(TeamService.self) private var teamService
     @Environment(RestTimerController.self) private var restTimer
     @Environment(HealthKitManager.self) private var healthKit
+    @Environment(PRCelebrationCenter.self) private var prCelebration
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var workout: Workout
     @State private var pickingExercise = false
-    @State private var celebration: [PersonalRecord]?
     /// 结束二次确认弹窗。
     @State private var confirmingFinish = false
     /// 手风琴互斥展开的三态：
@@ -628,7 +561,8 @@ struct WorkoutLoggingView: View {
         parts.append("\(workout.exercises.count) 动作")
         parts.append("\(workout.exercises.reduce(0) { $0 + $1.sets.count }) 组")
         if let end = workout.endedAt {
-            parts.append("\(Int(end.timeIntervalSince(workout.startedAt) / 60)) 分钟")
+            let from = workout.timerStartedAt ?? workout.startedAt
+            parts.append("\(Int(end.timeIntervalSince(from) / 60)) 分钟")
         }
         return parts.joined(separator: " · ")
     }
@@ -650,7 +584,9 @@ struct WorkoutLoggingView: View {
             ScrollView {
                 VStack(spacing: Theme.Spacing.md) {
                     LiveHeaderView(startedAt: workout.startedAt,
+                                   timerStartedAt: workout.timerStartedAt,
                                    endedAt: workout.endedAt,
+                                   onStart: { startTimerIfNeeded() },
                                    onFinish: { confirmingFinish = true })
                     triadStats
                     exerciseList
@@ -660,7 +596,7 @@ struct WorkoutLoggingView: View {
                 .padding(.top, Theme.Spacing.sm)
             }
             // 浮动 FAB（仅在 rest 进行中显示且未展开）。本屏无 Tab Bar，贴右下角常驻。
-            // 全屏休息弹窗已上提到 MainTabView 的根层 overlay（层级高于 Tab/Nav，无需隐藏两栏）。
+            // 全屏休息弹窗已上提到全局 NavigationStack 的 overlay（层级高于 push 页与 Tab Bar）。
             if restTimer.isRunning && !restTimer.isExpanded {
                 restFAB
                     .padding(.trailing, Theme.Spacing.lg)
@@ -718,9 +654,6 @@ struct WorkoutLoggingView: View {
         )
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in addExercise(pick) }
-        }
-        .sheet(isPresented: Binding(get: { celebration != nil }, set: { if !$0 { celebration = nil } })) {
-            if let celebration { PRCelebrationSheet(records: celebration, summary: prSummary) }
         }
     }
 
@@ -792,6 +725,8 @@ struct WorkoutLoggingView: View {
                               },
                               onChange: touch,
                               onCompleteSet: {
+                                  // 完成第一组即自动启动训练计时（幂等：已启动则不动）。
+                                  startTimerIfNeeded()
                                   let secs = restByExercise[ex.localId] ?? Int(restTimer.defaultDuration)
                                   if secs > 0 {
                                       restTimer.start(duration: TimeInterval(secs), label: ex.exerciseName)
@@ -929,13 +864,22 @@ struct WorkoutLoggingView: View {
         touch()
     }
 
+    /// 启动训练计时（幂等）：仅在尚未启动时落定 timerStartedAt。
+    /// 触发来源：完成第一组（自动）或顶部「开始训练」按钮（手动）。
+    private func startTimerIfNeeded() {
+        guard workout.timerStartedAt == nil else { return }
+        workout.timerStartedAt = .now
+        touch()
+    }
+
     /// 结束训练（二次确认后调用）：置 endedAt + HealthKit 写入，再统一重算派生数据。
     private func finish() {
         Theme.Haptics.notification(.success)
         let endedAt = Date.now
         workout.endedAt = endedAt
         touch()
-        let startedAt = workout.startedAt
+        // 时长以计时起点为基准（排除开始前空闲）；旧数据无 timerStartedAt 时回退 startedAt。
+        let startedAt = workout.timerStartedAt ?? workout.startedAt
         Task { await healthKit.saveStrengthWorkout(start: startedAt, end: endedAt) }
         recomputeDerived()
     }
@@ -947,7 +891,9 @@ struct WorkoutLoggingView: View {
         if let all = try? modelContext.fetch(descriptor) {
             let history = all.filter { $0.localId != workout.localId }
             let prs = detectPersonalRecords(in: workout, history: history)
-            if !prs.isEmpty { celebration = prs }
+            // 庆祝弹窗经 App 级 center 由 MainTabView 呈现：结束训练会触发导航把本页换成
+            // 只读详情页，若挂本页 sheet 会随本页销毁而一闪即逝（详见 PRCelebrationCenter）。
+            if !prs.isEmpty { prCelebration.present(prs, summary: prSummary) }
         }
         let snapshot = workout
         Task { try? await teamService.checkIn(workout: snapshot) }
@@ -962,14 +908,23 @@ struct WorkoutLoggingView: View {
 // MARK: - LiveHeader: REC · MM:SS + 暂停/结束
 
 private struct LiveHeaderView: View {
+    /// 会话创建时刻，仅作旧数据/已结束时长的回退基准。
     let startedAt: Date
-    /// nil = 进行中（墙钟实时计时）；非 nil = 已完成（计时冻结为 endedAt − startedAt）。
+    /// nil = 计时未启动（显示「开始训练」）；非 nil = 计时已启动（REC 从此刻走表）。
+    let timerStartedAt: Date?
+    /// nil = 进行中；非 nil = 已完成（计时冻结为 endedAt − 计时起点）。
     let endedAt: Date?
+    /// 手动启动计时（「开始训练」按钮）。
+    let onStart: () -> Void
     let onFinish: () -> Void
     @State private var pulse = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isEnded: Bool { endedAt != nil }
+    /// 计时未启动且未结束：会话已创建、尚未开始计时。
+    private var notStarted: Bool { timerStartedAt == nil && endedAt == nil }
+    /// 已完成时长基准：优先计时起点，回退创建时刻（兼容旧数据）。
+    private var endedBase: Date { timerStartedAt ?? startedAt }
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
@@ -979,9 +934,20 @@ private struct LiveHeaderView: View {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Theme.Color.accent)
-                    Text("时长 · \(formatHMS(endedAt!.timeIntervalSince(startedAt)))")
+                    Text("时长 · \(formatHMS(endedAt!.timeIntervalSince(endedBase)))")
                         .font(Theme.Font.number(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.Color.fg)
+                } else if notStarted {
+                    // 未启动：灰点 + 静态 00:00，提示计时尚未开始。
+                    Circle().fill(Theme.Color.muted)
+                        .frame(width: 9, height: 9)
+                    Text("未开始")
+                        .font(Theme.Font.mono(size: 11, weight: .bold))
+                        .tracking(1.1)
+                        .foregroundStyle(Theme.Color.muted)
+                    Text(formatHMS(0))
+                        .font(Theme.Font.number(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg2)
                 } else {
                     // 进行中：墙钟实时计时（含组间休息，无暂停）。朱砂红脉冲点 + REC + 等宽计时。
                     // 「减弱动态效果」开启时不做 repeatForever 脉冲，呈静态红点。
@@ -996,7 +962,7 @@ private struct LiveHeaderView: View {
                         .tracking(1.1)
                         .foregroundStyle(Theme.Color.accent)
                     TimelineView(.periodic(from: .now, by: 1.0)) { ctx in
-                        Text(formatHMS(ctx.date.timeIntervalSince(startedAt)))
+                        Text(formatHMS(ctx.date.timeIntervalSince(timerStartedAt ?? startedAt)))
                             .font(Theme.Font.number(size: 15, weight: .bold))
                             .foregroundStyle(Theme.Color.fg)
                     }
@@ -1005,6 +971,18 @@ private struct LiveHeaderView: View {
             Spacer()
             if isEnded {
                 Text("已完成").font(Theme.Font.l4).foregroundStyle(Theme.Color.muted)
+            } else if notStarted {
+                // 未启动：朱砂红实心胶囊「开始训练」，点击手动启动计时（无二次确认）。
+                Button(action: onStart) {
+                    Text("开始训练")
+                        .font(Theme.Font.body(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .frame(height: 32)
+                        .background(Theme.Color.accent, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("开始训练")
             } else {
                 // 进行中仅有「停止训练」（朱砂红实心胶囊，全屏唯一此形态）。
                 Button(action: onFinish) {

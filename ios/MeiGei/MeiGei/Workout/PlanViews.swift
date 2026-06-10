@@ -204,6 +204,8 @@ struct PlanDetailView: View {
     /// 待删除动作行（左滑删除二次确认）+ 该行全局坐标，供确认卡定位于其正下方。
     @State private var pendingDeleteItem: PlanItem?
     @State private var deleteRect: CGRect = .zero
+    /// 左滑删除协调器：同一时刻仅一张展开，点击别处自动收回（详见 SwipeDeleteList）。
+    @State private var swipe = SwipeRowCoordinator()
     /// 单一活跃会话守卫：冲突态 + 待新建闭包 + 导航打开的会话。
     @State private var conflict: Workout?
     @State private var pendingBuild: (() -> Workout)?
@@ -239,16 +241,17 @@ struct PlanDetailView: View {
                     } else if orderedItems.isEmpty {
                         emptyExercisesCard
                     } else {
-                        VStack(spacing: 0) {
-                            ForEach(Array(orderedItems.enumerated()), id: \.element.itemId) { idx, item in
-                                row(index: idx + 1, item: item)
-                                if idx < orderedItems.count - 1 {
-                                    // 对齐原型 .item border-top：满宽 1px，无缩进。
-                                    Rectangle().fill(Theme.Color.border).frame(height: 1)
-                                }
+                        // 与首页「最近训练」一致：每行独立卡片（带间距/描边/阴影）+ 统一左滑交互。
+                        SwipeDeleteList(
+                            data: orderedItems,
+                            id: \.itemId,
+                            coordinator: swipe,
+                            onTap: { editingItem = $0 },
+                            onDelete: { item, rect in
+                                deleteRect = rect
+                                pendingDeleteItem = item
                             }
-                        }
-                        .cardStyle(padding: 0)
+                        ) { item in planItemRow(item) }
                     }
 
                     addExerciseCTA
@@ -256,14 +259,14 @@ struct PlanDetailView: View {
                 .padding(.horizontal, 17)
                 .padding(.top, 4)
                 .padding(.bottom, 12)
+                // 点击列表任意其它区域（含列表下方空白）：收回当前展开的左滑动作行。
+                .collapseSwipeOnTap(swipe)
             }
         }
         // 对齐原型 .footer：scroll 与 footer 为兄弟（内容不穿底栏），底栏实底 + 顶部分隔线。
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
-        // 二级详情页：隐藏底部 Tab 栏，全屏展示（底栏贴屏幕最底）。
-        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             // 圆形返回 / ⋯ 菜单（沿用 WorkoutViews 既定约定；iOS 26 关掉系统 Liquid Glass 圆背景避免双环）。
             if #available(iOS 26.0, *) {
@@ -417,41 +420,33 @@ struct PlanDetailView: View {
             .padding(.horizontal, 2)
     }
 
-    // 对齐原型 .item：序号 mono 12/700/muted/宽 18 居中；名称 sans 15/600；参数 mono 12/muted；⋯ muted 17。
-    // 左滑显露删除（与训练首页「最近训练」统一交互），点击行进建议参数编辑。
-    private func row(index: Int, item: PlanItem) -> some View {
-        SwipeToDeleteCard(
-            onTap: { editingItem = item },
-            onDelete: { rect in
-                deleteRect = rect
-                pendingDeleteItem = item
-            }
-        ) {
-            HStack(spacing: 11) {
-                Text(String(format: "%02d", index))
-                    .font(Theme.Font.mono(size: 12, weight: .bold))
-                    .foregroundStyle(Theme.Color.muted)
-                    .frame(width: 18)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.exerciseName)
-                        .font(Theme.Font.body(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.Color.fg)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    Text(subtitle(item))
-                        .font(Theme.Font.mono(size: 12))
-                        .foregroundStyle(Theme.Color.muted)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 17))
+    // 动作行（独立卡片，与训练首页「最近训练」统一观感与左滑交互）：
+    // 序号 mono 12/700/muted/宽 18 居中；名称 sans 15/600；参数 mono 12/muted；⋯ muted 17。
+    // 行外层卡片与左滑交互由 `SwipeDeleteList` 统一装配，此处只产出卡片内容。点击行进建议参数编辑。
+    private func planItemRow(_ item: PlanItem) -> some View {
+        // 序号按当前顺序推出（动作数极少，firstIndex 开销可忽略）。
+        let index = (orderedItems.firstIndex { $0.itemId == item.itemId } ?? 0) + 1
+        return HStack(spacing: 11) {
+            Text(String(format: "%02d", index))
+                .font(Theme.Font.mono(size: 12, weight: .bold))
+                .foregroundStyle(Theme.Color.muted)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.exerciseName)
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(subtitle(item))
+                    .font(Theme.Font.mono(size: 12))
                     .foregroundStyle(Theme.Color.muted)
             }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 12)
-            .background(Theme.Color.surface)
-            .contentShape(Rectangle())
+            Spacer(minLength: 0)
+            Image(systemName: "ellipsis")
+                .font(.system(size: 17))
+                .foregroundStyle(Theme.Color.muted)
         }
+        .cardStyle()
     }
 
     private var emptyExercisesCard: some View {
@@ -664,11 +659,31 @@ struct PlanEditorView: View {
         }
         .navigationTitle(existing == nil ? "新建计划" : "编辑计划")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        // 圆形返回按钮（沿用 WorkoutDetailView/PlanDetailView 既定约定；
+        // iOS 26 关掉系统 Liquid Glass 圆背景避免与自绘圆叠成双环）。
         .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("保存") { save() }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                    .tint(Theme.Color.accent)
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarLeading) {
+                    CircleIconButton(systemName: "chevron.left", action: { dismiss() }, size: 32)
+                }
+                .sharedBackgroundVisibility(.hidden)
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") { save() }
+                        .font(Theme.Font.body(size: 15, weight: .semibold))
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .tint(Theme.Color.accent)
+                }
+            } else {
+                ToolbarItem(placement: .topBarLeading) {
+                    CircleIconButton(systemName: "chevron.left", action: { dismiss() }, size: 32)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") { save() }
+                        .font(Theme.Font.body(size: 15, weight: .semibold))
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .tint(Theme.Color.accent)
+                }
             }
         }
     }
