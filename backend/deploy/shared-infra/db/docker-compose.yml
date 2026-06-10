@@ -8,8 +8,8 @@ services:
     environment:
       # 超级用户 postgres 的密码
       POSTGRES_PASSWORD: ${POSTGRES_SUPERPASS:?POSTGRES_SUPERPASS 必填}
-      # 传给 init 脚本，用于创建 MeiGei 业务库的角色密码（见 init/01-create-databases.sh）
-      MEIGEI_DB_PASSWORD: ${MEIGEI_DB_PASSWORD:?MEIGEI_DB_PASSWORD 必填}
+      # 传给 init 脚本，用于创建 DontLift 业务库的角色密码（见 init/01-create-databases.sh）
+      DONTLIFT_DB_PASSWORD: ${DONTLIFT_DB_PASSWORD:?DONTLIFT_DB_PASSWORD 必填}
     volumes:
       - pgdata:/var/lib/postgresql/data
       # 仅在数据卷为空的「首次初始化」时执行 init 目录下脚本

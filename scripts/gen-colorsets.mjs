@@ -21,7 +21,7 @@ const tokens = [
   ['ok',            0.78, 0.20,  145],
 ];
 
-const root = 'ios/MeiGei/MeiGei/Assets.xcassets';
+const root = 'ios/DontLift/DontLift/Assets.xcassets';
 const fmt = (v) => Math.max(0, Math.min(1, v)).toFixed(3);
 
 for (const [name, L, C, H] of tokens) {

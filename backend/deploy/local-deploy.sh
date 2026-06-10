@@ -5,11 +5,11 @@
 set -euo pipefail
 
 TARGET="${1:?用法: $0 <ssh_user>@<server_ip>}"
-REMOTE_DIR="/opt/MeiGei-app/backend"
+REMOTE_DIR="/opt/DontLift-app/backend"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"   # 指向 backend/
 
 echo "==> 确保远程目录存在并可写"
-ssh "$TARGET" 'sudo mkdir -p /opt/MeiGei-app && sudo chown -R $(id -un):$(id -gn) /opt/MeiGei-app'
+ssh "$TARGET" 'sudo mkdir -p /opt/DontLift-app && sudo chown -R $(id -un):$(id -gn) /opt/DontLift-app'
 
 echo "==> rsync 推送 backend/（排除构建产物与机密）"
 rsync -avz --delete \

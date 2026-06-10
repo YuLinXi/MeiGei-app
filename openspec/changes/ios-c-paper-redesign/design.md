@@ -1,6 +1,6 @@
 ## Context
 
-当前 iOS 实装是「Neon Design System」——`bg` 近黑 `srgb(0.010,0.018,0.030)`、`accentCyan` 青色 `srgb(0,0.844,0.850)`、`accentMagenta` 品红（PR 专用）、`neonGlow` 三层辉光、登录页赛博网格 + 双 radial。Open Design `MeiGeiApp2` 的 C「纸感极简」设计稿则是纸白底 `#f4f2ec` + 朱砂红 `#d9482b` 单点强调 + 柔和纸感阴影。两者方向完全相反。
+当前 iOS 实装是「Neon Design System」——`bg` 近黑 `srgb(0.010,0.018,0.030)`、`accentCyan` 青色 `srgb(0,0.844,0.850)`、`accentMagenta` 品红（PR 专用）、`neonGlow` 三层辉光、登录页赛博网格 + 双 radial。Open Design `DontLiftApp2` 的 C「纸感极简」设计稿则是纸白底 `#f4f2ec` + 朱砂红 `#d9482b` 单点强调 + 柔和纸感阴影。两者方向完全相反。
 
 幸运的是现有代码已高度集中化：颜色经 `Theme.Color.*`（指向 Asset Catalog colorset）、字体经 `Theme.Font.*`、间距/圆角经 `Theme.Spacing/Radius.*`、视觉质感经 `Modifiers`（`neonGlow`/`cardStyle`）、组件经 `HorizontalChipPicker`。视图层几乎不含颜色字面量（design-system spec「Theme Token 命名空间」要求强制）。因此**主题翻转可在 token 与修饰符层集中完成，视图引用基本不动**，再逐屏校准版式差异。
 

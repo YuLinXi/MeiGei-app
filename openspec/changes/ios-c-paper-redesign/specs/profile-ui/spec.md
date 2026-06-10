@@ -2,7 +2,7 @@
 
 ### Requirement: 登录页视觉规范
 
-`LoginView` SHALL 全屏纸白底（`Theme.Color.bg`），以大面积留白 + 极简排版呈现，MUST NOT 使用赛博网格、radial gradient 或 scanline 背景。顶部区域 SHALL 渲染品牌标识：方形「M」标记 + `Theme.Font.mono` 小字「MEIGEI · NO.0001」。中部/下部 SHALL 渲染大标题「认真训练。/ 严肃记录。/ 仅此而已。」（`Theme.Color.fg`，可单行用 `accent` 点缀）+ 一行说明副标（`fg2`）。底部 SHALL 渲染原生 `SignInWithAppleButton`（黑底白字 `.black` 风格，高 50pt，圆角 `Theme.Radius.md`=13pt），下方 `Theme.Font.mono` 小字法律提示「继续即表示同意 服务条款 与 隐私政策」，并在 DevConfig 启用时渲染开发者快捷登录入口。
+`LoginView` SHALL 全屏纸白底（`Theme.Color.bg`），以大面积留白 + 极简排版呈现，MUST NOT 使用赛博网格、radial gradient 或 scanline 背景。顶部区域 SHALL 渲染品牌标识：方形「M」标记 + `Theme.Font.mono` 小字「DONTLIFT · NO.0001」。中部/下部 SHALL 渲染大标题「认真训练。/ 严肃记录。/ 仅此而已。」（`Theme.Color.fg`，可单行用 `accent` 点缀）+ 一行说明副标（`fg2`）。底部 SHALL 渲染原生 `SignInWithAppleButton`（黑底白字 `.black` 风格，高 50pt，圆角 `Theme.Radius.md`=13pt），下方 `Theme.Font.mono` 小字法律提示「继续即表示同意 服务条款 与 隐私政策」，并在 DevConfig 启用时渲染开发者快捷登录入口。
 
 #### Scenario: 用户首次启动
 - **WHEN** App 启动且 `SessionStore.isSignedIn == false`

@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: meigei
-      POSTGRES_USER: meigei
-      POSTGRES_PASSWORD: meigei
+      POSTGRES_DB: dontlift
+      POSTGRES_USER: dontlift
+      POSTGRES_PASSWORD: dontlift
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U meigei -d meigei"]
+      test: ["CMD-SHELL", "pg_isready -U dontlift -d dontlift"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -21,9 +21,9 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/meigei
-      DB_USER: meigei
-      DB_PASSWORD: meigei
+      DB_URL: jdbc:postgresql://postgres:5432/dontlift
+      DB_USER: dontlift
+      DB_PASSWORD: dontlift
       PORT: 8080
     ports:
       - "8080:8080"

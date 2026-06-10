@@ -4,9 +4,9 @@
 # 规则：域名 { reverse_proxy <容器名>:<容器内端口> }
 # Caddy 自动为每个域名申请/续期 Let's Encrypt 证书（需该域名已解析到本机且 80 可达）。
 
-# ── MeiGei 后端 ────────────────────────────────────────
-meigei.peipadada.com {
-	reverse_proxy meigei-app:8080
+# ── DontLift 后端 ────────────────────────────────────────
+dontlift.peipadada.com {
+	reverse_proxy dontlift-app:8080
 	encode gzip
 }
 

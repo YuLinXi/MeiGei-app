@@ -1,6 +1,6 @@
 # Fly.io 部署配置。首次部署：fly launch --no-deploy 后 fly deploy
 # 机密（DB_*、SENTRY_DSN、Apple 私钥等）用 `fly secrets set KEY=...` 注入，勿写入本文件。
-app = "meigei-api"
+app = "dontlift-api"
 primary_region = "nrt"  # 东京，离国内近
 
 [build]

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# MeiGei iOS 模拟器联调一键脚本
+# DontLift iOS 模拟器联调一键脚本
 #
 # 解决「DEBUG 连 localhost:8001 被 ATS 拦」后的模拟器侧联调闭环：
 #   boot 模拟器 → 编译(关签名) → 安装 → 启动 App，并附 simctl push 样例与 dev token helper。
@@ -25,13 +25,13 @@ set -euo pipefail
 # ---- 配置 ----
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-IOS_DIR="$REPO_DIR/ios/MeiGei"
-SCHEME="MeiGei"
-BUNDLE_ID="com.yulinxi.app.MeiGei"
+IOS_DIR="$REPO_DIR/ios/DontLift"
+SCHEME="DontLift"
+BUNDLE_ID="com.yulinxi.app.DontLift"
 SIM_DEVICE="${SIM_DEVICE:-iPhone 17 Pro}"
 APP_PORT="${PORT:-8001}"
 DERIVED="$IOS_DIR/build/sim-dd"
-APP_PATH="$DERIVED/Build/Products/Debug-iphonesimulator/MeiGei.app"
+APP_PATH="$DERIVED/Build/Products/Debug-iphonesimulator/DontLift.app"
 
 # ---- 颜色 ----
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
@@ -62,7 +62,7 @@ backend_up() { curl -sf "http://localhost:$APP_PORT/actuator/health" >/dev/null 
 cmd_up() {
   ensure_sim
   info "编译（Debug / iphonesimulator / 关签名）..."
-  xcodebuild -project "$IOS_DIR/MeiGei.xcodeproj" -scheme "$SCHEME" \
+  xcodebuild -project "$IOS_DIR/DontLift.xcodeproj" -scheme "$SCHEME" \
     -sdk iphonesimulator -destination "platform=iOS Simulator,name=$SIM_DEVICE" \
     -configuration Debug -derivedDataPath "$DERIVED" \
     CODE_SIGNING_ALLOWED=NO build | tail -3
@@ -81,7 +81,7 @@ cmd_up() {
 cmd_push() {
   local kind="${1:-}"
   local payload
-  payload="$(mktemp -t meigei-push).apns"
+  payload="$(mktemp -t dontlift-push).apns"
   case "$kind" in
     reaction)
       cat > "$payload" <<'JSON'
@@ -107,7 +107,7 @@ JSON
   info "向 ${BUNDLE_ID} 注入「${kind}」样例推送（仅验客户端路由，不经真实 APNs）..."
   xcrun simctl push "$SIM_DEVICE" "$BUNDLE_ID" "$payload"
   rm -f "$payload"
-  info "已发送。App 应据 userInfo 路由：reaction→.meigeiReactionReceived / checkin→.meigeiCheckinReceived"
+  info "已发送。App 应据 userInfo 路由：reaction→.dontliftReactionReceived / checkin→.dontliftCheckinReceived"
 }
 
 cmd_token() {

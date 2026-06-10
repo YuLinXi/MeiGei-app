@@ -1,4 +1,4 @@
--- MeiGei 基线 schema（详见 openspec/changes/meigei-mvp/data-model.md）
+-- DontLift 基线 schema（详见 openspec/changes/meigei-mvp/data-model.md）
 -- 约定：主键 UUID v7 由应用层生成（PG16 无原生 uuidv7()）；同步信封 created_at/updated_at/deleted_at/version；
 -- 软删除走 deleted_at IS NULL；枚举用 text + CHECK；被引用侧用软指针不设 FK。
 

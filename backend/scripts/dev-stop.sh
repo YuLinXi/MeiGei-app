@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# MeiGei 后端本地一键停止脚本
+# DontLift 后端本地一键停止脚本
 # 用法：./scripts/dev-stop.sh [--keep-pg]   （不要用 sh）
 #   - 默认同时停 Spring Boot（8001）与 PostgreSQL
 #   - 加 --keep-pg 只停后端，保留 PG

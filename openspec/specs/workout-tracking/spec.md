@@ -1,6 +1,6 @@
 ## Purpose
 
-定义 MeiGei 训练核心三屏（训练首页 / 训练进行中 / 动作详情）与 Live Activity 的行为规约。训练记录、休息计时、动作库的基础行为以现有实现为准；本 spec 聚焦视觉强度升级后的可观察行为与边界条件（empty state、placeholder、PR 元素配色独占）。
+定义 DontLift 训练核心三屏（训练首页 / 训练进行中 / 动作详情）与 Live Activity 的行为规约。训练记录、休息计时、动作库的基础行为以现有实现为准；本 spec 聚焦视觉强度升级后的可观察行为与边界条件（empty state、placeholder、PR 元素配色独占）。
 ## Requirements
 ### Requirement: 训练首页周聚合视图
 

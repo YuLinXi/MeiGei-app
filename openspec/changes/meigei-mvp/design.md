@@ -1,6 +1,6 @@
 ## Context
 
-MeiGei 是全新的 iOS 原生健身 App + Java 后端，无既有代码。MVP 由 1-2 人开发，需在有限工期内交付训练记录、Team 共享两大模块（饮食记录现阶段不做，已移出本 change）。本设计经过一次外部第二意见（Codex）评审，核心结论是「收窄技术面、明确数据真相来源、离线优先」。技术栈已锁定（见 `openspec/config.yaml`），本文档聚焦数据模型、同步、关键架构决策的取舍。字段级 ER 图与 DDL 草案见同目录 `data-model.md`（Flyway 基线迁移设计稿）。
+DontLift 是全新的 iOS 原生健身 App + Java 后端，无既有代码。MVP 由 1-2 人开发，需在有限工期内交付训练记录、Team 共享两大模块（饮食记录现阶段不做，已移出本 change）。本设计经过一次外部第二意见（Codex）评审，核心结论是「收窄技术面、明确数据真相来源、离线优先」。技术栈已锁定（见 `openspec/config.yaml`），本文档聚焦数据模型、同步、关键架构决策的取舍。字段级 ER 图与 DDL 草案见同目录 `data-model.md`（Flyway 基线迁移设计稿）。
 
 ## Goals / Non-Goals
 

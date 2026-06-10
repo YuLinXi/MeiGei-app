@@ -2,20 +2,20 @@
 logging:
   level:
     root: INFO
-    com.meigei: ${LOG_LEVEL_APP:INFO}
+    com.dontlift: ${LOG_LEVEL_APP:INFO}
     # 需要时打开 SQL：把下行设为 DEBUG（或经环境变量覆盖）
-    com.meigei.workout.mapper: ${LOG_LEVEL_SQL:INFO}
+    com.dontlift.workout.mapper: ${LOG_LEVEL_SQL:INFO}
     org.springframework.web: INFO
     org.springframework.security: INFO
 
 spring:
   application:
-    name: meigei-api
+    name: dontlift-api
   datasource:
     # stringtype=unspecified 让 String 参数能隐式转 jsonb / text 枚举列
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/meigei?stringtype=unspecified}
-    username: ${DB_USER:meigei}
-    password: ${DB_PASSWORD:meigei}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/dontlift?stringtype=unspecified}
+    username: ${DB_USER:dontlift}
+    password: ${DB_PASSWORD:dontlift}
     driver-class-name: org.postgresql.Driver
   flyway:
     enabled: true
@@ -24,7 +24,7 @@ spring:
 
 mybatis-plus:
   # 注册 UUID <-> pg uuid 列的 TypeHandler（修复 javaType=UUID 无处理器）
-  type-handlers-package: com.meigei.common.type
+  type-handlers-package: com.dontlift.common.type
   global-config:
     db-config:
       id-type: input
@@ -53,7 +53,7 @@ app:
     token-enabled: ${APP_DEV_TOKEN:false}
   apple:
     # Sign in with Apple 的 client_id / service_id（aud 校验）
-    audiences: ${APPLE_AUDIENCES:com.yulinxi.app.MeiGei}
+    audiences: ${APPLE_AUDIENCES:com.yulinxi.app.DontLift}
     issuer: https://appleid.apple.com
     jwks-uri: https://appleid.apple.com/auth/keys
   jwt:
@@ -65,7 +65,7 @@ app:
     key-path: ${APNS_KEY_PATH:}
     key-id: ${APNS_KEY_ID:}
     team-id: ${APNS_TEAM_ID:}
-    topic: ${APNS_TOPIC:com.yulinxi.app.MeiGei}
+    topic: ${APNS_TOPIC:com.yulinxi.app.DontLift}
     production: ${APNS_PRODUCTION:false}
 
 server:

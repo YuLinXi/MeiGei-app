@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# MeiGei 后端本地一键启动脚本
+# DontLift 后端本地一键启动脚本
 # 用法：./scripts/dev-start.sh   （不要用 sh ./scripts/dev-start.sh）
 #   - 自动检测并启动 PostgreSQL 16（已运行则跳过）
 #   - 设置 JDK 21
@@ -17,7 +17,7 @@ set -euo pipefail
 JDK_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
 PG_BIN="/opt/homebrew/opt/postgresql@16/bin/pg_ctl"
 PG_DATA="/opt/homebrew/var/postgresql@16"
-PG_LOG="/tmp/pg_meigei.log"
+PG_LOG="/tmp/pg_dontlift.log"
 APP_PORT="${PORT:-8001}"
 
 # ---- 颜色输出 ----

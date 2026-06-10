@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# MeiGei 后端 API 端到端联调脚本（纯服务端 curl，不含 iOS UI）
+# DontLift 后端 API 端到端联调脚本（纯服务端 curl，不含 iOS UI）
 #
 # 覆盖链路：登录 → 离线同步(push/pull/幂等/LWW 冲突) → Team 建团/加入/成员
 #           → 训练即打卡(fan-out) → 表情回应。双用户(A=owner / B=member)。

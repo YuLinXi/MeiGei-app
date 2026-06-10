@@ -1,4 +1,4 @@
-# MeiGei 业务栈（生产）。本栈只含 app；反向代理与数据库是服务器级共享基础设施，
+# DontLift 业务栈（生产）。本栈只含 app；反向代理与数据库是服务器级共享基础设施，
 # 见 deploy/shared-infra/（edge 反代占 80/443，shared-db 提供共享 Postgres）。
 #
 # 前置（仅首次，按 deploy/shared-infra/README.md）：
@@ -8,13 +8,13 @@
 services:
   app:
     build: .
-    container_name: meigei-app          # 中心 Caddyfile 用此名反代：reverse_proxy meigei-app:8080
+    container_name: dontlift-app          # 中心 Caddyfile 用此名反代：reverse_proxy dontlift-app:8080
     restart: always
     env_file: .env.prod                 # JWT_SECRET / APPLE_AUDIENCES / APNS_* / DB_PASSWORD 等机密
     environment:
-      # 连共享 PG 实例（shared-postgres）里 MeiGei 专属的 meigei 库；stringtype=unspecified 让 String 隐式转 jsonb
-      DB_URL: jdbc:postgresql://shared-postgres:5432/meigei?stringtype=unspecified
-      DB_USER: meigei
+      # 连共享 PG 实例（shared-postgres）里 DontLift 专属的 dontlift 库；stringtype=unspecified 让 String 隐式转 jsonb
+      DB_URL: jdbc:postgresql://shared-postgres:5432/dontlift?stringtype=unspecified
+      DB_USER: dontlift
       PORT: 8080
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
     expose:

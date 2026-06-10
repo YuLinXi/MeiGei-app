@@ -1,7 +1,7 @@
 schema: spec-driven
 
 context: |
-  产品：MeiGei，一款 iOS 原生健身 App。定位「严肃健身工具」，
+  产品：别练了（Don't Lift，代号 DontLift），一款 iOS 原生健身 App。定位「严肃健身工具」，
   目标用户「认真训练 + 严肃饮食 + 有小圈子的健身爱好者」，不做泛大众 fitness 社交。
   开发规模：1-2 人小团队 / 独立开发，MVP 阶段。
 

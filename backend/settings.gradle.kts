@@ -1,1 +1,1 @@
-rootProject.name = "meigei-api"
+rootProject.name = "dontlift-api"

@@ -53,7 +53,7 @@ ProfileView SHALL 在列表底部居中渲染「退出登录」红色文字（`T
 
 ### Requirement: 登录页视觉规范
 
-`LoginView` SHALL 全屏黑底，以 cyber 网格 + 双 radial gradient（cyan 右上 / magenta 左下）+ 横向 scanline 作为背景。左下区域 SHALL 渲染：3 段彩色色条装饰、`Theme.Font.mono` 小字「MEIGEI · NO.0001」、大标题「认真训练。/ 严肃记录。/ 仅此而已。」最后一行用 `Theme.Color.accentCyan`。底部 SHALL 渲染原生 `SignInWithAppleButton`（黑底白字风格 = `.whiteOutline` 或 `.white`，高 50pt，圆角 13pt），下方 `Theme.Font.mono` 小字法律提示「继续即表示同意 服务条款 与 隐私政策」。
+`LoginView` SHALL 全屏黑底，以 cyber 网格 + 双 radial gradient（cyan 右上 / magenta 左下）+ 横向 scanline 作为背景。左下区域 SHALL 渲染：3 段彩色色条装饰、`Theme.Font.mono` 小字「DONTLIFT · NO.0001」、大标题「认真训练。/ 严肃记录。/ 仅此而已。」最后一行用 `Theme.Color.accentCyan`。底部 SHALL 渲染原生 `SignInWithAppleButton`（黑底白字风格 = `.whiteOutline` 或 `.white`，高 50pt，圆角 13pt），下方 `Theme.Font.mono` 小字法律提示「继续即表示同意 服务条款 与 隐私政策」。
 
 #### Scenario: 用户首次启动
 - **WHEN** App 启动且 `SessionStore.isSignedIn == false`
