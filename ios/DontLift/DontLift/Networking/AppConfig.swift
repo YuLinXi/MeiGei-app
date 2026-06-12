@@ -8,7 +8,8 @@ enum AppConfig {
         /// 本机 Mac 后端（`./gradlew bootRun`，端口 8001）。模拟器联调用，需后端以 `APP_DEV_TOKEN=true` 启动。
         case localhost
         /// 腾讯云公网 IP 明文 HTTP（真机临时联调）。服务器 `APP_DEV_TOKEN=false`，须走真 Apple 登录。
-        /// 依赖 DontLift-Info.plist 的 `NSAllowsArbitraryLoads`（上线后须删）。
+        /// ⚠️ 已不可用：HTTPS 上线后 Info.plist 的 `NSAllowsArbitraryLoads` 已删（2026-06-11），
+        /// 公网明文会被 ATS 拦截。真机联调直接用 `.production`。
         case serverIP
         /// 线上正式域名（HTTPS）。
         case production

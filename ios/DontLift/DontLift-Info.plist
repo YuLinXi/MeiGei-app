@@ -7,17 +7,17 @@
 	  GENERATE_INFOPLIST_FILE=YES 仍会把 HealthKit 用途串 / NSSupportsLiveActivities /
 	  字体 / 场景清单等 INFOPLIST_KEY_* 在构建时 merge 进来，故此处不必重复声明。
 
-	  临时：真机联调连服务器公网 IP 明文 HTTP（http://124.222.79.121:8080）。
-	  公网 IP 无法签 HTTPS 证书，故全局放行明文。
-	  注意：NSAllowsArbitraryLoads 与 NSAllowsLocalNetworking 不能并存——iOS 10+ 一旦出现
-	  NSAllowsLocalNetworking，NSAllowsArbitraryLoads 会被忽略、回退默认 ATS，导致公网明文仍被拦。
-	  故这里只留 NSAllowsArbitraryLoads（它本身已放行一切，含 localhost）。
-	  备案后 App 切到 https://dontlift.peipadada.com 时，务必删除整个 NSAppTransportSecurity 字典。
+	  ATS：公网一律强制 HTTPS；仅留 NSAllowsLocalNetworking 放行本地明文
+	  （模拟器 Debug 联调 localhost:8001 用，随包发布无害、不影响过审）。
+	  勿再加回 NSAllowsArbitraryLoads——公网明文口子已随 HTTPS 上线删除（2026-06-11）。
 	-->
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsArbitraryLoads</key>
+		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<!-- 仅用系统标准加密（HTTPS/Keychain），属豁免范围；声明后每次上传 TestFlight 免答出口合规问卷。 -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
