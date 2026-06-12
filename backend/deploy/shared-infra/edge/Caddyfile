@@ -6,8 +6,17 @@
 
 # ── DontLift 后端 ────────────────────────────────────────
 dontlift.peipadada.com {
-	reverse_proxy dontlift-app:8080
 	encode gzip
+
+	# 隐私政策静态页（App Store 上架硬要求），源文件在 ./site/dontlift/privacy/
+	handle_path /privacy* {
+		root * /srv/site/dontlift/privacy
+		file_server
+	}
+
+	handle {
+		reverse_proxy dontlift-app:8080
+	}
 }
 
 # ── 新增服务示例（取消注释，改成你的域名与容器名/端口）──

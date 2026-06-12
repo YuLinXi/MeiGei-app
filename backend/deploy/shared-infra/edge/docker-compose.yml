@@ -11,6 +11,7 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv/site:ro # 静态页面（隐私政策等）
       - caddy_data:/data    # 证书持久化，重启不重签
       - caddy_config:/config
     networks:

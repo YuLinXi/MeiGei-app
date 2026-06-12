@@ -22,9 +22,9 @@ services:
     networks:
       - web                             # 与 edge 反代互通
       - dbnet                           # 与共享 Postgres 互通
-    # APNs 推送私钥（有 .p8 后取消注释，并在 .env.prod 设 APNS_KEY_PATH=/secrets/apns.p8）
-    # volumes:
-    #   - ./secrets/apns.p8:/secrets/apns.p8:ro
+    # APNs 推送私钥（2026-06-12 已启用；.p8 只在服务器 secrets/ 下，不入库，local-deploy.sh 的 rsync 已排除）
+    volumes:
+      - ./secrets/apns.p8:/secrets/apns.p8:ro
 
 # 两个网络都由共享基础设施预先创建（external），本栈仅接入、不负责创建
 networks:
