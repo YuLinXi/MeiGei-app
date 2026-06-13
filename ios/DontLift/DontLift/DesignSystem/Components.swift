@@ -1,50 +1,5 @@
 import SwiftUI
 
-// MARK: - 纸感按钮样式（跨屏复用）
-
-/// 主行动按钮：朱砂红实底 + 白字 + 纸感阴影 + 按压反馈。高 50pt、圆角 r-md。
-struct PrimaryButtonStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.isEnabled) private var isEnabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(Theme.Font.l2)
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 50)
-            .background(
-                (isEnabled ? Theme.Color.accent : Theme.Color.muted),
-                in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-            )
-            .shadow(color: Theme.Color.accent.opacity(isEnabled ? 0.22 : 0), radius: 7, x: 0, y: 4)
-            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.98 : 1))
-            .opacity(configuration.isPressed ? 0.92 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
-
-/// 次级 ghost 按钮：白底 + border 描边 + 近黑字。高 50pt、圆角 r-md。
-struct GhostButtonStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(Theme.Font.l2)
-            .foregroundStyle(Theme.Color.fg)
-            .frame(maxWidth: .infinity)
-            .frame(height: 50)
-            .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                    .stroke(Theme.Color.border, lineWidth: 1)
-            )
-            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.98 : 1))
-            .opacity(configuration.isPressed ? 0.92 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
-
 // MARK: - 圆形图标按钮（导航/菜单，38×38 白底 + border）
 
 struct CircleIconButton: View {
@@ -107,33 +62,6 @@ extension View {
                 RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                     .stroke(Theme.Color.border, lineWidth: 1)
             )
-    }
-}
-
-// MARK: - 搜索框（虚线 border2 边框 + 放大镜）
-
-struct PaperSearchBox: View {
-    let placeholder: String
-    @Binding var text: String
-    var trailingTag: String? = nil
-
-    var body: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: "magnifyingglass").foregroundStyle(Theme.Color.muted)
-            TextField(placeholder, text: $text)
-                .font(Theme.Font.l4)
-                .foregroundStyle(Theme.Color.fg)
-            if let tag = trailingTag {
-                Text(tag).eyebrowStyle()
-            }
-        }
-        .padding(.horizontal, 14)
-        .frame(height: 44)
-        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                .strokeBorder(Theme.Color.border2, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-        )
     }
 }
 
@@ -257,35 +185,3 @@ struct PaperConfirmDialog: View {
     }
 }
 
-// MARK: - 三宫格统计（中缝 1px border）
-
-struct StatTriple<Cell: View>: View {
-    let cells: [Cell]
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(cells.enumerated()), id: \.offset) { idx, cell in
-                if idx > 0 {
-                    Rectangle().fill(Theme.Color.border).frame(width: 1, height: 36)
-                }
-                cell.frame(maxWidth: .infinity)
-            }
-        }
-        .padding(.vertical, Theme.Spacing.md)
-        .cardStyle(padding: 0)
-    }
-}
-
-/// 单个统计格：大数字 + 小标签。
-struct StatCell: View {
-    let value: String
-    let label: String
-    var body: some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(Theme.Font.number(size: 20, weight: .bold))
-                .foregroundStyle(Theme.Color.fg)
-            Text(label).eyebrowStyle()
-        }
-    }
-}

@@ -11,6 +11,10 @@ struct TeamListView: View {
     @Environment(TeamService.self) private var teamService
     @State private var creating = false
     @State private var joining = false
+    /// Team 详情导航：用绑定式 navigationDestination(item:) 而非 NavigationLink(value:)。
+    /// 本工程是「全局唯一 NavigationStack 包 TabView」，类型注册式 navigationDestination(for:)
+    /// 从 TabView 子页注册不进外层 stack，value 链接点了不跳；绑定式可靠（与训练 tab 一致）。
+    @State private var selectedTeam: TeamDTO?
     @State private var error: String?
     @State private var actionToast: String?   // 退出/解散返回后的黑底结果 toast
 
@@ -26,7 +30,7 @@ struct TeamListView: View {
                             emptyState
                         } else {
                             ForEach(teamService.teams) { team in
-                                NavigationLink(value: team) {
+                                Button { selectedTeam = team } label: {
                                     teamCard(team)
                                 }
                                 .buttonStyle(.plain)
@@ -41,7 +45,7 @@ struct TeamListView: View {
         }
         // 自绘大标题头（与训练/动作 Tab 一致），隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
-        .navigationDestination(for: TeamDTO.self) { TeamDetailView(team: $0) }
+        .navigationDestination(item: $selectedTeam) { TeamDetailView(team: $0) }
         .sheet(isPresented: $creating) { CreateTeamSheet() }
         .sheet(isPresented: $joining) { JoinTeamSheet() }
         .overlay(alignment: .top) { resultToast }
@@ -480,6 +484,8 @@ struct TeamDetailView: View {
     @State private var dissolveInput = ""
     @State private var actionBusy = false
     @State private var actionFailed = false   // 详情页顶部红 toast（操作失败）
+    /// Team 计划三级页导航：绑定式，避免闭包式 NavigationLink 在嵌套 TabView 的 stack 里失灵。
+    @State private var showingPlans = false
 
     private enum ConfirmKind: Identifiable { case leave, dissolve; var id: Int { hashValue } }
 
@@ -535,6 +541,7 @@ struct TeamDetailView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(isPresented: $showingPlans) { TeamPlansView(team: team) }
         .overlay(alignment: .top) { failureToast }
         .task { await reload() }
         .alert("出错了", isPresented: .constant(error != nil)) {
@@ -662,9 +669,7 @@ struct TeamDetailView: View {
     // MARK: Team 计划入口
 
     private var planEntry: some View {
-        NavigationLink {
-            TeamPlansView(team: team)
-        } label: {
+        Button { showingPlans = true } label: {
             HStack(spacing: 9) {
                 Image(systemName: "doc.text")
                     .font(.system(size: 16))
@@ -1153,60 +1158,6 @@ struct ReactionRow: View {
             }
             Spacer()
         }
-    }
-}
-
-// MARK: - 打卡详情（保留供 deep link 用，本 change 不重做样式）
-
-struct CheckinDetailView: View {
-    @Environment(TeamService.self) private var teamService
-    @Environment(SessionStore.self) private var session
-
-    let checkin: TeamCheckinDTO
-    let isMine: Bool
-    @State private var reactions: [CheckinReactionDTO] = []
-    @State private var error: String?
-
-    private var summary: CheckinSummary { checkin.parsedSummary }
-
-    var body: some View {
-        // 必要的 List 用法：详情页结构稳定、且不在 Team feed 主视觉范围。
-        List {
-            Section {
-                LabeledContent("动作", value: "\(summary.exerciseCount)")
-                LabeledContent("总组数", value: "\(summary.totalSets)")
-                if summary.totalVolumeKg > 0 {
-                    LabeledContent("总容量", value: "\(formatKg(summary.totalVolumeKg)) kg")
-                }
-            } header: { Text(summary.title ?? "训练") }
-
-            ForEach(summary.exercises) { ex in
-                Section(ex.name) {
-                    ForEach(Array(ex.sets.enumerated()), id: \.offset) { idx, set in
-                        HStack {
-                            Text("第 \(idx + 1) 组").foregroundStyle(Theme.Color.muted)
-                            Spacer()
-                            Text(setText(set))
-                        }
-                        .font(.callout)
-                    }
-                }
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .background(Theme.Color.bg)
-        .navigationTitle(isMine ? "我的训练" : "队友训练")
-        .navigationBarTitleDisplayMode(.inline)
-        .task { reactions = (try? await teamService.reactions(checkinId: checkin.id)) ?? [] }
-        .alert("出错了", isPresented: .constant(error != nil)) {
-            Button("好") { error = nil }
-        } message: { Text(error ?? "") }
-    }
-
-    private func setText(_ s: CheckinSummary.SetSummary) -> String {
-        let w = s.weightKg.map { "\(formatKg($0)) kg" } ?? "—"
-        let r = s.reps.map { "\($0) 次" } ?? "—"
-        return "\(w) × \(r)"
     }
 }
 

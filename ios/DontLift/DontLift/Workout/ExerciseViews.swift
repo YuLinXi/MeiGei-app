@@ -52,6 +52,8 @@ struct ExerciseLibraryView: View {
     @State private var query = ""
     @State private var muscle: String = "all"
     @State private var showingCreate = false
+    /// 动作详情导航：绑定式 navigationDestination(item:)，避免类型注册式在嵌套 TabView 的 stack 里失灵。
+    @State private var selectedExercise: BuiltinExercise?
 
     private let chips: [LibraryChip] = [
         LibraryChip(id: "all",      title: "全部", muscle: nil),
@@ -117,7 +119,7 @@ struct ExerciseLibraryView: View {
         // 自绘大标题头（对齐设计稿 .nav，与首页一致），隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingCreate) { CustomExerciseEditorView() }
-        .navigationDestination(for: BuiltinExercise.self) { ExerciseDetailView(exercise: $0) }
+        .navigationDestination(item: $selectedExercise) { ExerciseDetailView(exercise: $0) }
     }
 
     // MARK: Header（设计稿 .nav：大标题「动作」+ 右侧圆形朱砂红 +）
@@ -206,7 +208,7 @@ struct ExerciseLibraryView: View {
             exList {
                 ForEach(Array(items.enumerated()), id: \.element.code) { idx, ex in
                     if idx > 0 { rowDivider }
-                    NavigationLink(value: ex) {
+                    Button { selectedExercise = ex } label: {
                         builtinRow(ex)
                     }
                     .buttonStyle(.plain)

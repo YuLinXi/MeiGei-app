@@ -72,7 +72,20 @@ struct ProfileView: View {
             onConfirm: { session.logout() }
         )
         #if DEBUG
-        .navigationDestination(isPresented: $showDesignSystem) { DesignSystemPreviewView() }
+        // DEBUG-only 开发工具页：用自带 NavigationStack 的 fullScreenCover 独立呈现，
+        // 而非挂在「全局 NavigationStack 包 TabView」的栈上 —— 后者会让 navigationDestination
+        // 从 TabView 子页注册时被判定为「misplaced / 将被忽略」(Xcode 运行时告警)。
+        .fullScreenCover(isPresented: $showDesignSystem) {
+            NavigationStack {
+                DesignSystemPreviewView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("关闭") { showDesignSystem = false }
+                                .tint(Theme.Color.accent)
+                        }
+                    }
+            }
+        }
         #endif
     }
 

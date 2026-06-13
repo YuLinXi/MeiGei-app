@@ -174,36 +174,3 @@ final class RestTimerController {
         }
     }
 }
-
-/// 训练页底部的休息计时条：剩余时间 + ±15s + 提前结束。
-struct RestTimerBar: View {
-    let controller: RestTimerController
-
-    var body: some View {
-        if controller.endDate != nil {
-            // 读 tick 让本视图随 ticker 每秒刷新。
-            let _ = controller.tick
-            HStack(spacing: 12) {
-                Image(systemName: "timer").font(.title3)
-                Text(format(controller.remaining))
-                    .font(.title3.monospacedDigit().weight(.semibold))
-                    .frame(minWidth: 56, alignment: .leading)
-                if let label = controller.contextLabel {
-                    Text(label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }
-                Spacer()
-                Button("−15") { controller.adjust(by: -15) }.buttonStyle(.bordered)
-                Button("+15") { controller.adjust(by: 15) }.buttonStyle(.bordered)
-                Button("结束") { controller.stop() }.buttonStyle(.borderedProminent)
-            }
-            .font(.subheadline)
-            .padding(.horizontal).padding(.vertical, 10)
-            .background(.bar)
-        }
-    }
-
-    private func format(_ seconds: TimeInterval) -> String {
-        let total = Int(seconds.rounded())
-        return String(format: "%d:%02d", total / 60, total % 60)
-    }
-}

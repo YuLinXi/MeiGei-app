@@ -14,6 +14,10 @@ struct PlanListView: View {
            sort: \Workout.startedAt, order: .reverse)
     private var workouts: [Workout]
     @State private var creatingNew = false
+    /// 计划详情导航：用绑定式 navigationDestination(item:) 而非 NavigationLink(value:)。
+    /// 本工程是「全局唯一 NavigationStack 包 TabView」，类型注册式 navigationDestination(for:)
+    /// 从 TabView 子页注册不进外层 stack，value 链接点了不跳；绑定式不依赖类型注册，可靠跳转。
+    @State private var selectedPlan: WorkoutPlan?
 
     /// 「进行中」= 最近 14 天内有 workout 关联 planId 的计划；
     /// 否则取最近更新的一个；若无任何计划则为 nil。判定逻辑复用 `WorkoutPlan.active`，与首页一致。
@@ -44,7 +48,7 @@ struct PlanListView: View {
                         } else {
                             VStack(spacing: Theme.Spacing.md) {
                                 ForEach(otherPlans) { plan in
-                                    NavigationLink(value: plan) { planCard(plan) }
+                                    Button { selectedPlan = plan } label: { planCard(plan) }
                                         .buttonStyle(.plain)
                                 }
                             }
@@ -62,7 +66,7 @@ struct PlanListView: View {
         }
         // 自绘大标题头（与训练/动作 Tab 一致），隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
-        .navigationDestination(for: WorkoutPlan.self) { PlanDetailView(plan: $0) }
+        .navigationDestination(item: $selectedPlan) { PlanDetailView(plan: $0) }
         .navigationDestination(isPresented: $creatingNew) {
             PlanEditorView(plan: nil)
         }
@@ -88,7 +92,7 @@ struct PlanListView: View {
     private func featuredCard(_ plan: WorkoutPlan) -> some View {
         let n = workouts.filter { $0.planId == plan.localId && $0.endedAt != nil }.count
         let total = max(8, n + 4)
-        NavigationLink(value: plan) {
+        Button { selectedPlan = plan } label: {
             HStack(spacing: 0) {
                 // 左侧朱砂红竖条
                 Rectangle().fill(Theme.Color.accent).frame(width: 4)

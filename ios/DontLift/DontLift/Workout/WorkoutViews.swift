@@ -89,8 +89,7 @@ struct WorkoutListView: View {
         // 工具栏左右上角入口均已移除：右上角原「搜索占位 + 加号菜单」、左上角「日历 / 训练历史」
         // （历史模块已删，留待后续单独立项）。开始训练唯一收敛到底部悬浮 CTA。
         .toolbar(.hidden, for: .navigationBar)
-        // 已完成训练 → 只读训练日志详情；进行中会话 → Live 记录界面。
-        .navigationDestination(for: Workout.self) { workoutDestination($0) }
+        // 已完成训练 / 进行中会话 → 经 openedSession 绑定式导航到对应页面。
         .navigationDestination(item: $openedSession) { workoutDestination($0) }
         .confirmationDialog("已有进行中的训练", isPresented: Binding(
             get: { conflict != nil },

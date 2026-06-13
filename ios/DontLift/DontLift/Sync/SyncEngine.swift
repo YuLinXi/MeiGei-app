@@ -123,7 +123,7 @@ final class SyncEngine {
 
     private func dto(from m: WorkoutPlan) -> WorkoutPlanDTO {
         let itemsJSON = (try? String(data: JSONCoding.encoder.encode(m.items), encoding: .utf8)) ?? "[]"
-        return WorkoutPlanDTO(id: m.localId, userId: nil, name: m.name, items: itemsJSON ?? "[]",
+        return WorkoutPlanDTO(id: m.localId, userId: nil, name: m.name, items: itemsJSON,
                               forkedFrom: m.forkedFrom, sharedToTeamId: m.sharedToTeamId,
                               createdAt: nil, updatedAt: m.updatedAt, deletedAt: m.deletedAt, version: m.version)
     }
