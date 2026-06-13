@@ -12,18 +12,6 @@
 - **WHEN** 动作详情页或庆祝弹窗存在 PR 数据
 - **THEN** PR 徽标/竖条/数值使用 `Theme.Color.accent`，不再使用品红
 
-### Requirement: 计划列表（PlanList）版式
-
-`PlanListView` SHALL 按「进行中 / 我的计划 / 推荐模板」三段渲染。进行中段 MUST 显示至多 1 张 featured plan-card：白底 `surface` + 1px `border` + 左侧 `accent` 竖条 + `paperShadow(.sm)`，含顶部 pill「`WEEK {n} / {total}`」+ 大标题 + 简介 + 周进度小条（5–6 段，已完成段 `accent` 着色）+ 3 列 meta（已完成 / 剩余 / 次/周）。MUST NOT 使用青色渐变或辉光。
-
-#### Scenario: 用户有激活计划
-- **WHEN** 用户当前激活计划存在
-- **THEN** 「进行中」段显示该 featured 卡（纸感样式），「我的计划」段显示其他草稿/未启用计划。
-
-#### Scenario: 用户无激活计划
-- **WHEN** 用户无激活计划
-- **THEN** 「进行中」段折叠（不渲染 eyebrow 与卡），用户进入页面直接看到「我的计划」与「推荐模板」段。
-
 ### Requirement: 计划详情（PlanDetail）版式
 
 `PlanDetailView` SHALL 顶部 navbar 显示返回按钮 + 三点菜单；下方 eyebrow（如「PLAN · 训练模板」）+ 大标题（计划名，多行 `Theme.Font` Hero/L1）+ 3 列 meta（动作数 / 组数 / 预计时长）。动作列表 SHALL 用 `ScrollView` + 自绘 row card，每行：左侧 mono 两位序号（`01`/`02`，`Theme.Color.accent` 着色）+ 中间动作名 + 组×次×重量 mono 副标 + 右侧 chevron/handle。
