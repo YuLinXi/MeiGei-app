@@ -4,8 +4,8 @@ import OSLog
 
 // MARK: - 计划列表（Screen 05，Neon 改版）
 
-/// 计划列表：「进行中」featured 卡 + 「我的计划」两段；「推荐模板」段在内置动作库
-/// 数据采集完成前不渲染（开关 `showRecommendedTemplates`）。
+/// 计划列表：单一「我的计划」列表——最近在用的计划置顶为富信息卡，其余普通行；
+/// 「推荐模板」段在内置动作库数据采集完成前不渲染（开关 `showRecommendedTemplates`）。
 struct PlanListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<WorkoutPlan> { $0.deletedAt == nil },
@@ -24,7 +24,7 @@ struct PlanListView: View {
     /// 数据就绪后置 `true` 即恢复整段（段标题 + `recommendedCard`），无需改动其它代码。
     private static let showRecommendedTemplates = false
 
-    /// 「进行中」= 最近 14 天内有 workout 关联 planId 的计划；
+    /// 最近在用的计划（列表置顶富卡）= 近 14 天内有 workout 关联 planId 的计划；
     /// 否则取最近更新的一个；若无任何计划则为 nil。判定逻辑复用 `WorkoutPlan.active`，与首页一致。
     private var activePlan: WorkoutPlan? {
         WorkoutPlan.active(in: plans, workouts: workouts)
@@ -42,16 +42,17 @@ struct PlanListView: View {
                 header
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                        if let active = activePlan {
-                            Text("进行中").eyebrowStyle()
-                            featuredCard(active)
-                        }
-
+                        // 单一「我的计划」列表：最近在用的计划置顶为富信息卡（featuredCard），
+                        // 其余按更新时间普通行展示。计划数为 1 时也只此一张富卡，不再出现
+                        // 「进行中」与「还没有计划」并存的矛盾。空态仅当确实没有任何计划。
                         Text("我的计划").eyebrowStyle()
-                        if otherPlans.isEmpty {
+                        if plans.isEmpty {
                             emptyMineCard
                         } else {
                             VStack(spacing: Theme.Spacing.md) {
+                                if let active = activePlan {
+                                    featuredCard(active)
+                                }
                                 ForEach(otherPlans) { plan in
                                     Button { selectedPlan = plan } label: { planCard(plan) }
                                         .buttonStyle(.plain)
