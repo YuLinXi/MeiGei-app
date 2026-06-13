@@ -41,5 +41,16 @@
 ## 五、发布前回归（对应 openspec 任务 5.3 / 5.4）
 
 - [ ] 5.3 真机验证：HealthKit 读写、Live Activity（休息计时灵动岛/锁屏）、Watch Smart Stack——建议在发 TestFlight 前或第一轮内部测试中过掉。
-- [ ] 5.4 TestFlight 灰度回归：真 Apple 登录 → 离线记录 → 同步 → Team 打卡 fan-out → APNs 推送 → 表情回应全链路。
+- [ ] 5.4 TestFlight 灰度回归（**2026-06-12 已过半**，服务器日志逐项核验）：
+  - [x] 真 Apple 登录（生产首个用户创建成功）
+  - [x] 离线记录 → 云同步（workouts push/pull 200，幂等重推正常）
+  - [x] APNs 设备令牌注册（`POST /devices/token` 200）
+  - [x] 建团（含邀请码）
+  - [ ] Team 打卡 fan-out（注意：须**先在团里**再完成训练才触发；首测时训练早于建团，checkin=0 属预期）
+  - [ ] APNs 真实投递 + 表情回应（需第二个账号入团：另一台手机装 TestFlight 包、用其自身 Apple ID 登录、邀请码入团）
+- 已知观察项：①国行 iOS 首次联网权限未授予时首启报「offline」（设置→别练了→无线数据）；②服务器拉 Apple JWKS 偶发超时致首次登录 401、重试即好，频发再优化。
 - 提醒：测试设备上的旧 MeiGei App 直接删掉（bundle ID 变了，沙盒数据不迁移）。
+
+## 六、正式上架（App Store 审核）前的已知缺口
+
+- [ ] **App 内账号删除入口**：用了 Sign in with Apple，App Review Guideline 5.1.1(v) 硬性要求 App 内可发起删除账号及数据。TestFlight 内部测试不查，正式提审前必须补（后端删除接口 + iOS 设置页入口）。
