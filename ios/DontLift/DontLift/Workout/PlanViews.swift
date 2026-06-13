@@ -4,7 +4,8 @@ import OSLog
 
 // MARK: - 计划列表（Screen 05，Neon 改版）
 
-/// 计划列表：「进行中」featured 卡 + 「我的计划」+ 「推荐模板」三段。
+/// 计划列表：「进行中」featured 卡 + 「我的计划」两段；「推荐模板」段在内置动作库
+/// 数据采集完成前不渲染（开关 `showRecommendedTemplates`）。
 struct PlanListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<WorkoutPlan> { $0.deletedAt == nil },
@@ -18,6 +19,10 @@ struct PlanListView: View {
     /// 本工程是「全局唯一 NavigationStack 包 TabView」，类型注册式 navigationDestination(for:)
     /// 从 TabView 子页注册不进外层 stack，value 链接点了不跳；绑定式不依赖类型注册，可靠跳转。
     @State private var selectedPlan: WorkoutPlan?
+
+    /// 「推荐模板」段开关：依赖尚未采集的内置动作库（见 CLAUDE.md 待办「数据工程未完」）。
+    /// 数据就绪后置 `true` 即恢复整段（段标题 + `recommendedCard`），无需改动其它代码。
+    private static let showRecommendedTemplates = false
 
     /// 「进行中」= 最近 14 天内有 workout 关联 planId 的计划；
     /// 否则取最近更新的一个；若无任何计划则为 nil。判定逻辑复用 `WorkoutPlan.active`，与首页一致。
@@ -54,8 +59,11 @@ struct PlanListView: View {
                             }
                         }
 
-                        Text("推荐模板").eyebrowStyle()
-                        recommendedCard
+                        // 内置动作库数据采集完成前不渲染「推荐模板」段（开关见 showRecommendedTemplates）。
+                        if Self.showRecommendedTemplates {
+                            Text("推荐模板").eyebrowStyle()
+                            recommendedCard
+                        }
 
                         Color.clear.frame(height: 32)
                     }
@@ -90,15 +98,17 @@ struct PlanListView: View {
 
     @ViewBuilder
     private func featuredCard(_ plan: WorkoutPlan) -> some View {
-        let n = workouts.filter { $0.planId == plan.localId && $0.endedAt != nil }.count
-        let total = max(8, n + 4)
+        // 关联此计划的已完成训练（用于「累计次数」与 eyebrow 的「上次训练」）。
+        // 全部可由本地记录重算，不展示 MVP 不支持的周计划/周期化语义。
+        let done = workouts.filter { $0.planId == plan.localId && $0.endedAt != nil }
+        let lastTrained = done.map(\.startedAt).max()
         Button { selectedPlan = plan } label: {
             HStack(spacing: 0) {
                 // 左侧朱砂红竖条
                 Rectangle().fill(Theme.Color.accent).frame(width: 4)
                 VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                     HStack {
-                        Text("WEEK \(min(n, total)) / \(total)")
+                        Text(lastTrained.map { "上次训练 · \($0.formatted(.relative(presentation: .named)))" } ?? "未开始")
                             .font(Theme.Font.mono(size: 11, weight: .semibold))
                             .padding(.horizontal, 10).padding(.vertical, 4)
                             .background(Theme.Color.accentSoft, in: Capsule())
@@ -109,14 +119,13 @@ struct PlanListView: View {
                     Text(plan.name)
                         .font(Theme.Font.l1)
                         .foregroundStyle(Theme.Color.fg)
-                    Text("\(plan.items.count) 个动作 · 严肃推/拉/腿循环")
+                    Text("\(plan.items.count) 个动作")
                         .font(Theme.Font.l4)
                         .foregroundStyle(Theme.Color.fg2)
-                    weekProgress(done: n, total: total)
                     HStack(spacing: Theme.Spacing.xl) {
-                        metaCol(title: "已完成", value: "\(n)")
-                        metaCol(title: "剩余",   value: "\(max(0, total - n))")
-                        metaCol(title: "次/周", value: "3")
+                        metaCol(title: "累计", value: "\(done.count) 次")
+                        metaCol(title: "总组数", value: "\(plan.totalSuggestedSets)")
+                        metaCol(title: "预计", value: "≈\(plan.estimatedMinutes) 分")
                     }
                 }
                 .padding(Theme.Spacing.lg)
@@ -131,18 +140,6 @@ struct PlanListView: View {
             .paperShadow(.sm, cornerRadius: Theme.Radius.lg)
         }
         .buttonStyle(.plain)
-    }
-
-    /// 周进度小条：total 段，前 done 段填 accent，其余 border2。
-    private func weekProgress(done: Int, total: Int) -> some View {
-        let n = min(max(total, 1), 8)
-        return HStack(spacing: 4) {
-            ForEach(0..<n, id: \.self) { i in
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(i < done ? Theme.Color.accent : Theme.Color.border2)
-                    .frame(height: 5)
-            }
-        }
     }
 
     private func metaCol(title: String, value: String) -> some View {
@@ -221,14 +218,9 @@ struct PlanDetailView: View {
         plan.items.sorted { $0.orderIndex < $1.orderIndex }
     }
 
-    private var totalSets: Int {
-        plan.items.reduce(0) { $0 + ($1.suggestedSets ?? 0) }
-    }
-
-    /// 粗估时长：组数 × (40s 训练 + 90s 休息) / 60。
-    private var estimatedMinutes: Int {
-        max(15, totalSets * 130 / 60)
-    }
+    // 总组数 / 预计时长下沉为 `WorkoutPlan` 扩展，与计划列表 featured 卡共用同一算法。
+    private var totalSets: Int { plan.totalSuggestedSets }
+    private var estimatedMinutes: Int { plan.estimatedMinutes }
 
     var body: some View {
         ZStack {
