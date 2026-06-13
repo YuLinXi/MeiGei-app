@@ -76,6 +76,17 @@ final class WorkoutPlan: Syncable {
 }
 
 extension WorkoutPlan {
+    /// 模板内建议组数之和（各动作项 `suggestedSets` 累加，nil 视为 0）。
+    /// 计划详情 statRow 与计划列表 featured 卡共用，避免两处算法漂移。
+    var totalSuggestedSets: Int {
+        items.reduce(0) { $0 + ($1.suggestedSets ?? 0) }
+    }
+
+    /// 粗估单次时长（分钟）：总组数 × (40s 训练 + 90s 休息) / 60，下限 15。
+    var estimatedMinutes: Int {
+        max(15, totalSuggestedSets * 130 / 60)
+    }
+
     /// 「进行中」计划判定——首页开始 CTA 与「计划」页共用同一份逻辑，避免两处漂移。
     /// 优先取近 14 天内有关联已完成训练的计划；否则退回最近更新的一个；无计划为 nil。
     /// - Parameters:
