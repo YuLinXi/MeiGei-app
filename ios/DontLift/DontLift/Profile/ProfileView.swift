@@ -20,6 +20,11 @@ struct ProfileView: View {
     @State private var versionTapCount = 0
     @State private var showDesignSystem = false
 
+    // 称呼行内编辑态
+    @State private var editingName = false
+    @State private var nameDraft = ""
+    @FocusState private var nameFieldFocused: Bool
+
     // 删号流程态
     @State private var deletionImpact: DeletionImpactDTO?
     @State private var loadingImpact = false
@@ -70,7 +75,7 @@ struct ProfileView: View {
                     LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                         header
                         statsGrid
-                        preferenceGroup
+                        personalInfoGroup
                         syncGroup
                         trainingPrefsGroup
                         aboutGroup
@@ -147,14 +152,14 @@ struct ProfileView: View {
 
     private var header: some View {
         let name = profile?.displayName ?? "已登录"
-        let years = trainingYears()
         return HStack(spacing: Theme.Spacing.md) {
             avatarCircle(initial: String(name.prefix(1)))
             VStack(alignment: .leading, spacing: 4) {
+                // 顶部称呼纯展示，不在此编辑——编辑统一进「个人资料」组。
                 Text(name)
                     .font(Theme.Font.display(size: 22, weight: .bold))
                     .foregroundStyle(Theme.Color.fg)
-                Text(subtitleText(years: years))
+                Text(headerSubtitle)
                     .font(Theme.Font.mono(size: 12))
                     .foregroundStyle(Theme.Color.muted)
             }
@@ -172,14 +177,18 @@ struct ProfileView: View {
         }
     }
 
-    private func subtitleText(years: Double) -> String {
-        "训练龄 \(String(format: "%.1f", years)) 年"
-    }
-
-    private func trainingYears() -> Double {
-        guard let earliest = workouts.map(\.startedAt).min() else { return 0 }
-        let secs = Date().timeIntervalSince(earliest)
-        return max(0, secs / (365.25 * 86_400))
+    /// 副标：加入月份 + 已记录次数（不再展示训练龄）。
+    private var headerSubtitle: String {
+        let joined = profile?.createdAt
+        let monthText: String
+        if let joined {
+            let fmt = DateFormatter()
+            fmt.dateFormat = "yyyy.MM"
+            monthText = "加入于 \(fmt.string(from: joined)) · "
+        } else {
+            monthText = ""
+        }
+        return "\(monthText)已记录 \(totalWorkouts) 次"
     }
 
     // MARK: - Stats Grid
@@ -206,13 +215,80 @@ struct ProfileView: View {
         Rectangle().fill(Theme.Color.border).frame(width: 1)
     }
 
-    // MARK: - 偏好分组
+    // MARK: - 个人资料分组（称呼可编辑 + 性别，均为资料、改即 PATCH 后端）
 
-    /// 偏好：性别（仅切肌群高亮图底图，纯本地、不同步）。
-    private var preferenceGroup: some View {
-        groupCard(title: "偏好") {
+    private var personalInfoGroup: some View {
+        groupCard(title: "个人资料") {
+            nameRow
+            rowDivider
             sexRow
         }
+    }
+
+    /// 称呼：点击进入行内编辑（输入框 + 保存/取消，1–20 字）；保存乐观本地写 + PATCH。
+    @ViewBuilder
+    private var nameRow: some View {
+        if editingName {
+            nameEditingRow
+        } else {
+            nameDisplayRow
+        }
+    }
+
+    private var nameDisplayRow: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "person")
+                .foregroundStyle(Theme.Color.fg2)
+                .frame(width: 24)
+            Text("称呼")
+                .font(Theme.Font.body(size: 14))
+                .foregroundStyle(Theme.Color.fg)
+            Spacer()
+            Text(profile?.displayName ?? "未设置")
+                .font(Theme.Font.body(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+        }
+        .padding(.horizontal, Theme.Spacing.md)
+        .frame(height: 48)
+        .contentShape(Rectangle())
+        .onTapGesture { beginEditName() }
+    }
+
+    private var nameEditingRow: some View {
+        let draft = nameDraft.trimmingCharacters(in: .whitespaces)
+        let valid = !draft.isEmpty && draft.count <= 20
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "person")
+                    .foregroundStyle(Theme.Color.accent)
+                    .frame(width: 24)
+                TextField("称呼", text: $nameDraft)
+                    .font(Theme.Font.body(size: 15))
+                    .foregroundStyle(Theme.Color.fg)
+                    .focused($nameFieldFocused)
+                    .submitLabel(.done)
+                    .onSubmit { if valid { saveName() } }
+            }
+            HStack {
+                Text(draft.count > 20 ? "称呼不超过 20 字" : "1–20 字")
+                    .font(Theme.Font.mono(size: 10))
+                    .foregroundStyle(draft.count > 20 ? Theme.Color.danger : Theme.Color.muted)
+                Spacer()
+                Button("取消") { cancelEditName() }
+                    .font(Theme.Font.body(size: 13))
+                    .foregroundStyle(Theme.Color.fg2)
+                Button("保存") { saveName() }
+                    .font(Theme.Font.body(size: 13, weight: .semibold))
+                    .foregroundStyle(valid ? Theme.Color.accent : Theme.Color.muted)
+                    .disabled(!valid)
+            }
+            .padding(.leading, 24 + Theme.Spacing.md)
+        }
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, 10)
     }
 
     private var sexRow: some View {
@@ -247,12 +323,37 @@ struct ProfileView: View {
             .onTapGesture { setSex(s) }
     }
 
+    private func beginEditName() {
+        nameDraft = profile?.displayName ?? ""
+        editingName = true
+        nameFieldFocused = true
+    }
+
+    private func cancelEditName() {
+        editingName = false
+        nameFieldFocused = false
+    }
+
+    /// 保存称呼：乐观本地写 + PATCH 上行（失败静默重试）。
+    private func saveName() {
+        let trimmed = nameDraft.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, trimmed.count <= 20, let profile = session.ensureProfile() else { return }
+        profile.displayName = trimmed
+        try? modelContext.save()
+        session.scheduleProfilePush()
+        Theme.Haptics.selection()
+        editingName = false
+        nameFieldFocused = false
+    }
+
+    /// 切换性别：资料字段，乐观本地写 + PATCH 上行（驱动肌群图 + 回灌后端）。
     private func setSex(_ s: BodySex) {
         // 用 ensureProfile 兜底：desync 场景下（token 在、本地档案缺失）@Query 查不到 profile，
         // 此处补建后再写，避免点击性别胶囊静默无效。
         guard let profile = session.ensureProfile(), profile.sex != s else { return }
         profile.sex = s
         try? modelContext.save()
+        session.scheduleProfilePush()
         Theme.Haptics.selection()
     }
 

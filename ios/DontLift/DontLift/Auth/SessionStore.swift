@@ -11,6 +11,13 @@ final class SessionStore {
     private(set) var token: String?
     private(set) var currentUserId: UUID?
 
+    /// 首登补全门控信号：后端画像称呼是否为空。
+    /// nil = 尚未拉取 `GET /me`（未知）；true = 需补全；false = 已补全。RootView 据此决定路由。
+    private(set) var needsProfileCompletion: Bool?
+
+    /// 画像上行待重试标记：乐观本地写后 PATCH 失败时置位，下次 refreshProfile 补传。
+    private static let pushPendingKey = "profile.pushPending"
+
     private let modelContext: ModelContext
 
     init(modelContext: ModelContext) {
@@ -29,12 +36,14 @@ final class SessionStore {
 
     var isLoggedIn: Bool { token != nil }
 
-    /// 登录成功：存 token + upsert 本地用户档案（首登写入 email/姓名）。
+    /// 登录成功：存 token + upsert 本地用户档案（首登写入 email/姓名，Apple 全名作补全页预填）。
+    /// 随后异步拉 `GET /me` 回灌并刷新首登门控信号（needsProfileCompletion）。
     func handleLogin(_ auth: AuthResponse, appleSub: String?, email: String?, displayName: String?) {
         Keychain.set(auth.token, for: Self.tokenKey)
         self.token = auth.token
         self.currentUserId = auth.userId
         upsertProfile(userId: auth.userId, appleSub: appleSub, email: email, displayName: displayName)
+        Task { await refreshProfile() }
     }
 
     func logout() {
@@ -107,5 +116,98 @@ final class SessionStore {
             modelContext.insert(profile)
         }
         try? modelContext.save()
+    }
+
+    // MARK: - 画像（GET /me 回灌 + PATCH 上行，服务端权威域）
+
+    /// 登录后 / 冷启动后拉后端画像并回灌本地，刷新首登门控信号。
+    /// 先补传上次失败的本地改动（避免随后回灌用服务端旧值覆盖本地未同步改动），
+    /// 仅在无待传时才以服务端值为准。失败（离线）保持本地、门控按本地称呼兜底判定。
+    func refreshProfile() async {
+        let flushed = await flushPendingProfilePush()
+        guard flushed else {
+            // 仍有待传：保留本地，门控按本地称呼判定，不拉服务端以免覆盖。
+            needsProfileCompletion = localDisplayNameMissing()
+            return
+        }
+        do {
+            let dto = try await ProfileAPI.me()
+            reconcile(dto)
+            needsProfileCompletion = (dto.displayName ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        } catch {
+            needsProfileCompletion = localDisplayNameMissing()
+        }
+    }
+
+    /// 首登补全提交：乐观本地写 + PATCH（必须成功才算补全）。成功后清门控。
+    /// 失败抛出供页面提示重试；本地已写入的值保留。
+    func submitProfileCompletion(displayName: String, sex: BodySex) async throws {
+        let name = displayName.trimmingCharacters(in: .whitespaces)
+        guard let profile = ensureProfile() else { throw APIError.unauthorized }
+        profile.displayName = name
+        profile.sex = sex
+        try? modelContext.save()
+
+        let patch = ProfilePatchRequest(displayName: name, sex: sex.rawValue)
+        let dto = try await ProfileAPI.update(patch)
+        reconcile(dto)
+        setPushPending(false)
+        needsProfileCompletion = false
+    }
+
+    /// 我的页二次编辑：调用方已乐观写本地 UserProfile 并 save，此处把当前本地画像 PATCH 上行。
+    /// 失败置 pending、静默重试（不抛错、不阻塞 UI）。
+    func scheduleProfilePush() {
+        setPushPending(true)
+        Task { await flushPendingProfilePush() }
+    }
+
+    /// 补传待同步的本地画像（全量 PATCH 令服务端向本地收敛）。无待传或成功返回 true。
+    @discardableResult
+    func flushPendingProfilePush() async -> Bool {
+        guard UserDefaults.standard.bool(forKey: Self.pushPendingKey) else { return true }
+        guard let profile = currentProfile() else { return true }
+        let name = (profile.displayName ?? "").trimmingCharacters(in: .whitespaces)
+        let patch = ProfilePatchRequest(
+            displayName: name.isEmpty ? nil : name,
+            sex: profile.sex.rawValue)
+        do {
+            let dto = try await ProfileAPI.update(patch)
+            reconcile(dto)
+            setPushPending(false)
+            return true
+        } catch {
+            return false   // 保持 pending，下次再试
+        }
+    }
+
+    /// 以服务端画像回灌本地。服务端权威；但称呼/性别为空时保留本地
+    /// （称呼空 = 未补全，保留 Apple 预填供补全页；性别空 = 未设置，保留本地默认）。
+    private func reconcile(_ dto: ProfileDTO) {
+        guard let profile = ensureProfile() else { return }
+        if let name = dto.displayName, !name.trimmingCharacters(in: .whitespaces).isEmpty {
+            profile.displayName = name
+        }
+        if let s = dto.sex, let bodySex = BodySex(rawValue: s) {
+            profile.sex = bodySex
+        }
+        if let email = dto.email { profile.email = email }
+        try? modelContext.save()
+    }
+
+    private func currentProfile() -> UserProfile? {
+        guard let userId = currentUserId else { return nil }
+        let descriptor = FetchDescriptor<UserProfile>(
+            predicate: #Predicate { $0.serverUserId == userId }
+        )
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func localDisplayNameMissing() -> Bool {
+        (currentProfile()?.displayName ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private func setPushPending(_ pending: Bool) {
+        UserDefaults.standard.set(pending, forKey: Self.pushPendingKey)
     }
 }

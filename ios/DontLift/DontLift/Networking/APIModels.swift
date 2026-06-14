@@ -14,6 +14,24 @@ struct AuthResponse: Decodable {
     let newUser: Bool
 }
 
+// MARK: - 用户画像（服务端权威域，非 LWW 同步）
+
+/// `GET /me` / `PATCH /account/profile` 响应。displayName 为空 = 称呼未补全（首登门控信号）。
+struct ProfileDTO: Decodable {
+    let userId: UUID
+    let displayName: String?
+    /// 可空：null 表示从未设置，客户端保留本地、展示按男。
+    let sex: String?
+    let email: String?
+}
+
+/// `PATCH /account/profile` 请求体。仅采集称呼 / 性别两字段，
+/// 合成的 Encodable 对 nil 走 encodeIfPresent → 自动省略未改字段（PATCH 语义）。
+struct ProfilePatchRequest: Encodable {
+    var displayName: String?
+    var sex: String?
+}
+
 /// 删号影响面（GET /account/deletion-impact）。
 struct DeletionImpactDTO: Decodable {
     let ownedTeams: Int

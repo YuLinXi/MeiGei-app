@@ -1,8 +1,8 @@
 import Foundation
 import SwiftData
 
-/// 生理性别。仅用于切换肌群高亮图的人体底图轮廓（♀肩窄/腰收/髋宽/长发）。
-/// 纯本地字段、不参与云同步（与 displayName/email 一致，profile 当前无同步域）。
+/// 生理性别。用户资料字段，存后端（驱动肌群高亮图底图轮廓：♀肩窄/腰收/髋宽/长发）。
+/// 经 `GET /me` 回灌、`PATCH /account/profile` 上行（服务端权威域，非 LWW 同步）。
 enum BodySex: String, Codable, CaseIterable, Identifiable {
     case male
     case female
@@ -23,7 +23,7 @@ final class UserProfile {
     /// 首登保存的邮箱，可能为中转邮箱。
     var email: String?
     var displayName: String?
-    /// 生理性别（仅切高亮图底图，默认男）。SwiftData 新增属性带默认值，轻量迁移安全。
+    /// 生理性别（资料 + 切高亮图底图，默认男）。SwiftData 新增属性带默认值，轻量迁移安全。
     var sex: BodySex = BodySex.male
     var createdAt: Date
 

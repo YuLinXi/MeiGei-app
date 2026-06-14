@@ -17,4 +17,7 @@ public class AppUser extends BaseEntity {
 
     /** 首登邮箱，持久化用于账号恢复线索。 */
     private String firstLoginEmail;
+
+    /** 生理性别（资料 + 驱动肌群图底图），取值 male/female，可空（null=未设置）。 */
+    private String sex;
 }
