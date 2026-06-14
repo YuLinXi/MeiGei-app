@@ -495,7 +495,6 @@ struct TeamDetailView: View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
             VStack(spacing: 0) {
-                navBar
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                         headerCard
@@ -540,48 +539,18 @@ struct TeamDetailView: View {
                     .zIndex(3)
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
+        // 子页统一导航栏：圆形返回 + ⋯（展开时 active/rotated 高亮，切换自定义 action sheet）。
+        .paperToolbar(title: team.name, onBack: { dismiss() }) {
+            CircleIconButton(systemName: "ellipsis", active: showActionSheet, rotated: showActionSheet) {
+                withAnimation(.easeOut(duration: 0.18)) { showActionSheet = true }
+            }
+        }
         .navigationDestination(isPresented: $showingPlans) { TeamPlansView(team: team) }
         .overlay(alignment: .top) { failureToast }
         .task { await reload() }
         .alert("出错了", isPresented: .constant(error != nil)) {
             Button("好") { error = nil }
         } message: { Text(error ?? "") }
-    }
-
-    // MARK: 自绘导航栏（返回 / 队名 / ⋯）
-
-    private var navBar: some View {
-        HStack {
-            Button { dismiss() } label: { navCircle("chevron.left") }
-                .buttonStyle(PressableButtonStyle())
-                .accessibilityLabel("返回")
-            Spacer(minLength: 8)
-            Text(team.name)
-                .font(Theme.Font.body(size: 15, weight: .heavy))
-                .tracking(-0.15)
-                .foregroundStyle(Theme.Color.fg)
-                .lineLimit(1)
-            Spacer(minLength: 8)
-            Button { withAnimation(.easeOut(duration: 0.18)) { showActionSheet = true } } label: {
-                navCircle("ellipsis", active: showActionSheet, rotated: true)
-            }
-            .buttonStyle(PressableButtonStyle())
-            .accessibilityLabel("更多操作")
-        }
-        .padding(.horizontal, Theme.Spacing.md)
-        .frame(height: 46)
-    }
-
-    private func navCircle(_ system: String, active: Bool = false, rotated: Bool = false) -> some View {
-        Image(systemName: system)
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(active ? Theme.Color.accent : Theme.Color.fg)
-            .rotationEffect(.degrees(rotated ? 90 : 0))
-            .frame(width: 32, height: 32)
-            .background(active ? Theme.Color.accentSoft : Theme.Color.surface, in: Circle())
-            .overlay(Circle().stroke(active ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
-            .paperShadow(.sm, cornerRadius: 16)
     }
 
     // MARK: 队头卡（左竖条 + 进度 pill + 邀请码 + monogram 头像栈）
@@ -1166,6 +1135,7 @@ struct ReactionRow: View {
 struct TeamPlansView: View {
     @Environment(TeamService.self) private var teamService
     @Environment(SyncEngine.self) private var syncEngine
+    @Environment(\.dismiss) private var dismiss
 
     let team: TeamDTO
     @State private var plans: [ServerPlanDTO] = []
@@ -1193,8 +1163,8 @@ struct TeamPlansView: View {
                 .padding(.top, Theme.Spacing.md)
             }
         }
-        .navigationTitle("Team 计划")
-        .navigationBarTitleDisplayMode(.inline)
+        // 子页统一导航栏：纸感圆形返回钮（取代系统蓝色箭头）。
+        .paperToolbar(title: "Team 计划", onBack: { dismiss() })
         .task { await reload() }
         .refreshable { await reload() }
         .overlay(alignment: .bottom) {

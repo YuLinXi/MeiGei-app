@@ -73,29 +73,9 @@ struct WorkoutDetailView: View {
                 .padding(.top, Theme.Spacing.sm)
             }
         }
-        .navigationTitle(workout.title ?? "训练")
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        // iOS 26 会给工具栏按钮自动套一层 Liquid Glass 圆形背景，与自绘纸感圆叠成「双环」；
-        // 用 sharedBackgroundVisibility(.hidden) 关掉系统背景，仅保留我们的圆（对齐 WorkoutLoggingView）。
-        .toolbar {
-            if #available(iOS 26.0, *) {
-                ToolbarItem(placement: .topBarLeading) {
-                    CircleIconButton(systemName: "chevron.left", action: { dismiss() }, size: 32)
-                }
-                .sharedBackgroundVisibility(.hidden)
-                ToolbarItem(placement: .topBarTrailing) {
-                    CircleIconButton(systemName: "ellipsis", action: { confirmingDelete = true }, size: 32)
-                }
-                .sharedBackgroundVisibility(.hidden)
-            } else {
-                ToolbarItem(placement: .topBarLeading) {
-                    CircleIconButton(systemName: "chevron.left", action: { dismiss() }, size: 32)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    CircleIconButton(systemName: "ellipsis", action: { confirmingDelete = true }, size: 32)
-                }
-            }
+        // 子页统一导航栏：返回 + ⋯ 删除（双环处理收口在 paperToolbar）。
+        .paperToolbar(title: workout.title ?? "训练", onBack: { dismiss() }) {
+            CircleIconButton(systemName: "ellipsis", action: { confirmingDelete = true })
         }
         .paperConfirmDialog(
             isPresented: $confirmingDelete,

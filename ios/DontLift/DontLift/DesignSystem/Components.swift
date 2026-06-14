@@ -1,22 +1,114 @@
 import SwiftUI
 
-// MARK: - 圆形图标按钮（导航/菜单，38×38 白底 + border）
+// MARK: - 圆形图标按钮（导航/菜单单一来源，36×36 白底 + border）
 
+/// 圆形图标外观：白底 + border 描边 + 圆形；支持 `active` 高亮态与 `rotated` 旋转态。
+/// 供点击版 `CircleIconButton` 与 Menu 版 `CircleIconMenu` 复用，确保两类入口像素一致。
+/// 图标字号按直径 ×0.42 推导（36→≈15），调用点不再硬编码图标字号。
+struct CircleIconLabel: View {
+    let systemName: String
+    var size: CGFloat = 36
+    var active: Bool = false
+    var rotated: Bool = false
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: size * 0.42, weight: .semibold))
+            .foregroundStyle(active ? Theme.Color.accent : Theme.Color.fg)
+            .rotationEffect(.degrees(rotated ? 90 : 0))
+            .frame(width: size, height: size)
+            .background(active ? Theme.Color.accentSoft : Theme.Color.surface, in: Circle())
+            .overlay(Circle().stroke(active ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
+    }
+}
+
+/// 点击触发的圆形图标按钮（返回 / 次级图标动作）。默认直径 36。
 struct CircleIconButton: View {
     let systemName: String
+    var size: CGFloat = 36
+    var active: Bool = false
+    var rotated: Bool = false
     let action: () -> Void
-    var size: CGFloat = 38
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: size * 0.4, weight: .semibold))
-                .foregroundStyle(Theme.Color.fg)
-                .frame(width: size, height: size)
-                .background(Theme.Color.surface, in: Circle())
-                .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
+            CircleIconLabel(systemName: systemName, size: size, active: active, rotated: rotated)
         }
         .buttonStyle(PressableButtonStyle())
+    }
+}
+
+/// Menu 版圆形图标按钮（⋯ 更多操作）：与点击版同一外观，吸收原各页本地 `menuButton`。
+struct CircleIconMenu<Content: View>: View {
+    let systemName: String
+    var size: CGFloat = 36
+    var active: Bool = false
+    var rotated: Bool = false
+    @ViewBuilder var menu: () -> Content
+
+    var body: some View {
+        Menu {
+            menu()
+        } label: {
+            CircleIconLabel(systemName: systemName, size: size, active: active, rotated: rotated)
+        }
+        .buttonStyle(PressableButtonStyle())
+    }
+}
+
+// MARK: - 子页统一 Header 容器
+
+/// 子页（push/sheet 二级及以上）纸感导航栏内容：左返回 / 中标题 / 右操作三槽位，
+/// 标题统一 `Theme.Font.l2`；iOS 26 双环处理集中收口在此。Tab 根页大标题范式不走此容器。
+struct PaperToolbarContent<Trailing: View>: ToolbarContent {
+    let title: String
+    let onBack: () -> Void
+    @ViewBuilder let trailing: () -> Trailing
+
+    @ToolbarContentBuilder
+    var body: some ToolbarContent {
+        // iOS 26 会给工具栏按钮自动套一层 Liquid Glass 圆形背景，与自绘纸感圆叠成「双环」；
+        // 用 sharedBackgroundVisibility(.hidden) 关掉系统背景，仅保留我们的圆。
+        if #available(iOS 26.0, *) {
+            ToolbarItem(placement: .topBarLeading) {
+                CircleIconButton(systemName: "chevron.left", action: onBack)
+            }
+            .sharedBackgroundVisibility(.hidden)
+            if !title.isEmpty {
+                ToolbarItem(placement: .principal) { titleText }
+            }
+            ToolbarItem(placement: .topBarTrailing) { trailing() }
+                .sharedBackgroundVisibility(.hidden)
+        } else {
+            ToolbarItem(placement: .topBarLeading) {
+                CircleIconButton(systemName: "chevron.left", action: onBack)
+            }
+            if !title.isEmpty {
+                ToolbarItem(placement: .principal) { titleText }
+            }
+            ToolbarItem(placement: .topBarTrailing) { trailing() }
+        }
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .font(Theme.Font.l2)
+            .foregroundStyle(Theme.Color.fg)
+            .lineLimit(1)
+    }
+}
+
+extension View {
+    /// 子页统一导航栏：传入标题、返回回调与可选右侧操作（`CircleIconButton` 或 `CircleIconMenu`）。
+    func paperToolbar<Trailing: View>(
+        title: String = "",
+        onBack: @escaping () -> Void,
+        @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() }
+    ) -> some View {
+        self
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
+            .toolbar { PaperToolbarContent(title: title, onBack: onBack, trailing: trailing) }
     }
 }
 

@@ -63,22 +63,25 @@ struct ProfileView: View {
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    header
-                    statsGrid
-                    syncGroup
-                    trainingPrefsGroup
-                    aboutGroup
-                    accountGroup
-                    Color.clear.frame(height: 32)
+            VStack(spacing: 0) {
+                pageTitle
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                        header
+                        statsGrid
+                        syncGroup
+                        trainingPrefsGroup
+                        aboutGroup
+                        accountGroup
+                        Color.clear.frame(height: 32)
+                    }
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.top, Theme.Spacing.md)
                 }
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.top, Theme.Spacing.md)
             }
         }
-        .navigationTitle("我的")
-        .navigationBarTitleDisplayMode(.inline)
+        // 自绘大标题头（对齐其它 Tab 根页范式 A），隐藏系统导航栏。
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             healthAuthorized = healthKit.isAuthorized
             await refreshNotificationStatus()
@@ -125,6 +128,20 @@ struct ProfileView: View {
     }
 
     // MARK: - Header
+
+    // 大标题头（对齐设计稿 .nav，与其它 Tab 根页一致）。
+    private var pageTitle: some View {
+        HStack {
+            Text("我的")
+                .font(Theme.Font.display(size: 36, weight: .heavy))
+                .tracking(-1.08)
+                .foregroundStyle(Theme.Color.fg)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
+    }
 
     private var header: some View {
         let name = profile?.displayName ?? "已登录"

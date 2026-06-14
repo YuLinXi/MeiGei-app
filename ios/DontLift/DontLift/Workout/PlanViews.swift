@@ -262,22 +262,11 @@ struct PlanDetailView: View {
         }
         // 对齐原型 .footer：scroll 与 footer 为兄弟（内容不穿底栏），底栏实底 + 顶部分隔线。
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            // 圆形返回 / ⋯ 菜单（沿用 WorkoutViews 既定约定；iOS 26 关掉系统 Liquid Glass 圆背景避免双环）。
-            if #available(iOS 26.0, *) {
-                ToolbarItem(placement: .topBarLeading) {
-                    CircleIconButton(systemName: "chevron.left", action: { dismiss() }, size: 32)
-                }
-                .sharedBackgroundVisibility(.hidden)
-                ToolbarItem(placement: .topBarTrailing) { menuButton }
-                    .sharedBackgroundVisibility(.hidden)
-            } else {
-                ToolbarItem(placement: .topBarLeading) {
-                    CircleIconButton(systemName: "chevron.left", action: { dismiss() }, size: 32)
-                }
-                ToolbarItem(placement: .topBarTrailing) { menuButton }
+        // 子页统一导航栏：圆形返回 + ⋯ 菜单（标题留空，计划名在内容区大字呈现）。
+        .paperToolbar(onBack: { dismiss() }) {
+            CircleIconMenu(systemName: "ellipsis") {
+                Button { editing = true } label: { Label("重命名计划", systemImage: "pencil") }
+                Button(role: .destructive) { confirmingDelete = true } label: { Label("删除计划", systemImage: "trash") }
             }
         }
         .paperConfirmDialog(
@@ -341,21 +330,6 @@ struct PlanDetailView: View {
             }
             Button("取消", role: .cancel) { pendingBuild = nil }
         } message: { _ in Text("同一时间只能有一个进行中的训练。继续既有训练，或丢弃后开始新的。") }
-    }
-
-    // 对齐原型 .navbar ⋯：圆形钮 + Menu（重命名 / 删除走二次确认）。点 dots 用 fg2。
-    private var menuButton: some View {
-        Menu {
-            Button { editing = true } label: { Label("重命名计划", systemImage: "pencil") }
-            Button(role: .destructive) { confirmingDelete = true } label: { Label("删除计划", systemImage: "trash") }
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.Color.fg2)
-                .frame(width: 32, height: 32)
-                .background(Theme.Color.surface, in: Circle())
-                .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
-        }
     }
 
     private var header: some View {
@@ -654,34 +628,12 @@ struct PlanEditorView: View {
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.top, Theme.Spacing.md)
         }
-        .navigationTitle(existing == nil ? "新建计划" : "编辑计划")
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        // 圆形返回按钮（沿用 WorkoutDetailView/PlanDetailView 既定约定；
-        // iOS 26 关掉系统 Liquid Glass 圆背景避免与自绘圆叠成双环）。
-        .toolbar {
-            if #available(iOS 26.0, *) {
-                ToolbarItem(placement: .topBarLeading) {
-                    CircleIconButton(systemName: "chevron.left", action: { dismiss() }, size: 32)
-                }
-                .sharedBackgroundVisibility(.hidden)
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }
-                        .font(Theme.Font.body(size: 15, weight: .semibold))
-                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .tint(Theme.Color.accent)
-                }
-            } else {
-                ToolbarItem(placement: .topBarLeading) {
-                    CircleIconButton(systemName: "chevron.left", action: { dismiss() }, size: 32)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }
-                        .font(Theme.Font.body(size: 15, weight: .semibold))
-                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .tint(Theme.Color.accent)
-                }
-            }
+        // 子页统一导航栏：圆形返回 + 右侧保存键（双环处理收口在 paperToolbar）。
+        .paperToolbar(title: existing == nil ? "新建计划" : "编辑计划", onBack: { dismiss() }) {
+            Button("保存") { save() }
+                .font(Theme.Font.body(size: 15, weight: .semibold))
+                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                .tint(Theme.Color.accent)
         }
     }
 

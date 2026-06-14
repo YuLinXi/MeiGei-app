@@ -1001,7 +1001,8 @@ struct ExerciseDetailView: View {
             }
             joinCTA
         }
-        .navigationBarTitleDisplayMode(.inline)
+        // 子页统一导航栏：纸感圆形返回钮（标题留空，动作名在内容区大字呈现）。
+        .paperToolbar(onBack: { dismiss() })
         .navigationDestination(item: $startedSession) { WorkoutLoggingView(workout: $0) }
     }
 

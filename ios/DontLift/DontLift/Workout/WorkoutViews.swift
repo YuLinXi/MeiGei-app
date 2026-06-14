@@ -604,9 +604,8 @@ struct WorkoutLoggingView: View {
                     .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
             }
         }
-        .navigationTitle(workout.isActive ? "记录中" : (workout.title ?? "训练"))
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
+        // 子页统一导航栏：仅圆形返回键（双环处理收口在 paperToolbar）。
+        .paperToolbar(title: workout.isActive ? "记录中" : (workout.title ?? "训练"), onBack: { dismiss() })
         // 动作 ⋯ 组间休息菜单：顶层浮层，按 anchor 定位于 ⋯ 下方；外部点击关闭。
         .overlayPreferenceValue(ExerciseMenuAnchorKey.self) { anchor in
             if let id = menuExerciseId,
@@ -628,22 +627,7 @@ struct WorkoutLoggingView: View {
                 .transition(.opacity)
             }
         }
-        .toolbar {
-            // 圆形返回键（对齐原型 .back：白底 + 描边 + 轻阴影）。
-            // iOS 26 工具栏会给按钮自动套一层 Liquid Glass 圆形背景，与自绘的纸感圆叠成「双环」；
-            // 用 sharedBackgroundVisibility(.hidden) 关掉系统背景，仅保留我们的圆。
-            if #available(iOS 26.0, *) {
-                ToolbarItem(placement: .topBarLeading) {
-                    CircleIconButton(systemName: "chevron.left", action: { dismiss() }, size: 32)
-                }
-                .sharedBackgroundVisibility(.hidden)
-            } else {
-                ToolbarItem(placement: .topBarLeading) {
-                    CircleIconButton(systemName: "chevron.left", action: { dismiss() }, size: 32)
-                }
-            }
-            // 组间休息已移入每个动作卡右上 ⋯ 菜单（动作级设置）；已完成训练只读，导航栏不再挂编辑入口。
-        }
+        // 组间休息已移入每个动作卡右上 ⋯ 菜单（动作级设置）；已完成训练只读，导航栏不再挂编辑入口。
         .paperConfirmDialog(
             isPresented: $confirmingFinish,
             title: "结束训练?",
