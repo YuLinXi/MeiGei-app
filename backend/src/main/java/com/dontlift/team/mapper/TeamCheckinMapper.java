@@ -23,4 +23,12 @@ public interface TeamCheckinMapper extends BaseMapper<TeamCheckin> {
 
     @Select("SELECT * FROM team_checkin WHERE team_id = #{teamId} AND checkin_date = #{date} ORDER BY created_at DESC")
     List<TeamCheckin> findByTeamAndDate(@Param("teamId") UUID teamId, @Param("date") LocalDate date);
+
+    // 账号删除：本人打卡 + 本人作为 owner 的团队的全部打卡（其 reactions 由 ON DELETE CASCADE 连带清理）
+    @Delete("""
+            DELETE FROM team_checkin
+            WHERE user_id = #{userId}
+               OR team_id IN (SELECT id FROM team WHERE owner_user_id = #{userId})
+            """)
+    int deleteByUserOrOwnedTeams(@Param("userId") UUID userId);
 }

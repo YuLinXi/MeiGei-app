@@ -35,6 +35,13 @@
 - [ ] App Store Connect 以新 bundle ID 新建 App「别练了」（改名后等于全新 App，旧 MeiGei 记录若建过则废弃）。
 - [ ] 填 **App 隐私**问卷（健康数据、账号信息）和**隐私政策 URL**——用了 HealthKit 这是硬要求。
   - **隐私政策页面已就绪（2026-06-12）**：`https://dontlift.peipadada.com/privacy` 已上线（源文件 `backend/deploy/shared-infra/edge/site/dontlift/privacy/index.html`，经 Caddy file_server 托管），ASC 表单里直接填此 URL；问卷本身仍需账号操作。
+
+### 上架硬卡点：账号删除与法律链接（change `profile-account-deletion-and-prefs`，2026-06-14）
+
+- [x] **App 内「删除账号」路径已补齐（Apple 5.1.1(v) 硬要求）**：「我的 → 账号 → 删除账号」二次确认后调 `DELETE /account`，后端单事务**物理硬删**该用户全部数据、团主删号连带解散团队；客户端成功后清本地 SwiftData + Keychain JWT 并回登录页。已用 dev token 端到端实测级联清零、影响面计数、重复删幂等（均 204）。
+- [x] **隐私政策 / 服务条款 App 内可达**：登录页底部法律链接与「我的 → 关于」组均经 `SFSafariViewController` 打开后端页面（URL 收敛于 `AppConfig`，单一来源）。
+  - ⚠️ **服务条款页尚未单独部署**：`AppConfig.termsOfServiceURL` 暂指向 `/privacy`。上线独立 `/terms` 页后改 `AppConfig` 一处即可。提交前建议补一份服务条款静态页。
+- [ ] **（可选，软阻塞）Apple 授权主动撤销凭据**：删号时若配 `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_KEY_PATH`（client_secret 签发用 .p8，可复用 APNs 同一 Key 或单独建），后端会调 Apple `/auth/revoke` 真正撤销授权；**凭据缺失时自动降级**（记 warn、跳过 revoke、仍完整删除本地数据并返回 2xx），不阻塞上架。登录持久化 `refresh_token` 同样依赖该凭据，缺失则老用户删号走 S2S 反向通知兜底。
 - [ ] Xcode：Product → Archive → Distribute App（App Store Connect）上传；TestFlight 页填测试信息。
   - **内部测试员（≤100 人）不需要 Beta 审核**，处理完即可安装；外部测试员才走 Beta App Review。
 
@@ -53,4 +60,4 @@
 
 ## 六、正式上架（App Store 审核）前的已知缺口
 
-- [ ] **App 内账号删除入口**：用了 Sign in with Apple，App Review Guideline 5.1.1(v) 硬性要求 App 内可发起删除账号及数据。TestFlight 内部测试不查，正式提审前必须补（后端删除接口 + iOS 设置页入口）。
+- [x] **App 内账号删除入口**（2026-06-14 完成，见第四节「上架硬卡点」小节）：后端 `DELETE /account` 级联硬删 + iOS「我的 → 账号 → 删除账号」二次确认入口已落地，满足 5.1.1(v)。

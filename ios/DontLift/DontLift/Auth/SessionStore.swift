@@ -43,6 +43,21 @@ final class SessionStore {
         currentUserId = nil
     }
 
+    /// 删号成功后：物理清空本地 SwiftData 全部用户数据 + 重置同步水位 + 清 Keychain JWT 并登出。
+    /// 与「退出登录」不同——退出仅清登录态、保留本地数据，删号则不留任何残留。
+    func wipeLocalDataAndLogout() {
+        // 覆盖 AppModelContainer.schema 的全部 @Model 类型（新增模型时须同步补充）
+        try? modelContext.delete(model: UserProfile.self)
+        try? modelContext.delete(model: CustomExercise.self)
+        try? modelContext.delete(model: WorkoutPlan.self)
+        try? modelContext.delete(model: Workout.self)
+        try? modelContext.delete(model: WorkoutExercise.self)
+        try? modelContext.delete(model: WorkoutSet.self)
+        try? modelContext.save()
+        SyncDomain.resetAllWatermarks()
+        logout()
+    }
+
     /// 从自有 JWT 的 payload.sub 解出 userId（后端 JwtService 以 sub = userId 签发）。base64url 需补位。
     static func userId(fromJWT token: String) -> UUID? {
         let parts = token.split(separator: ".")

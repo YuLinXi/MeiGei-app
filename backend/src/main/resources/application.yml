@@ -56,6 +56,11 @@ app:
     audiences: ${APPLE_AUDIENCES:com.yulinxi.app.DontLift}
     issuer: https://appleid.apple.com
     jwks-uri: https://appleid.apple.com/auth/keys
+    # 以下为签发 client_secret（换 refresh_token / 删号 revoke）所需凭据；留空则整体降级跳过（不阻断登录与删号）
+    client-id: ${APPLE_CLIENT_ID:com.yulinxi.app.DontLift}
+    team-id: ${APPLE_TEAM_ID:}
+    key-id: ${APPLE_KEY_ID:}
+    key-path: ${APPLE_KEY_PATH:}
   jwt:
     # 生产环境必须用 fly secrets 覆盖；HS256 要求 >= 32 字节
     secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}

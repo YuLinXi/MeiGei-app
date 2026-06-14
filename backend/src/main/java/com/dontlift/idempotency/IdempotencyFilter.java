@@ -11,7 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -78,8 +78,10 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             rec.setResponseStatus(status);
             rec.setResponseBody(body == null || body.isBlank() ? null : body);
             mapper.insert(rec);
-        } catch (DuplicateKeyException ignore) {
-            // 并发下首次已落库，忽略
+        } catch (DataIntegrityViolationException ignore) {
+            // 两种可忽略情形：① 并发下首次已落库（唯一键冲突）；
+            // ② DELETE /account 成功后 user 已被删，回写幂等键触发 FK 违例——
+            //    删号天然幂等（重复删为空操作），无需缓存结果，跳过即可，不应让回写失败破坏 2xx 响应。
         }
     }
 

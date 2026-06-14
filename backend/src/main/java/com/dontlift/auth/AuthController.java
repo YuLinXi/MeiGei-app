@@ -18,10 +18,10 @@ public class AuthController {
 
     private final AuthService authService;
 
-    /** 客户端 Apple 登录。 */
+    /** 客户端 Apple 登录。authorizationCode 可选，存在时后端换取并持久化 refresh_token 供删号 revoke。 */
     @PostMapping
     public AuthResponse login(@Valid @RequestBody AppleLoginRequest request) {
-        return authService.loginWithApple(request.identityToken());
+        return authService.loginWithApple(request.identityToken(), request.authorizationCode());
     }
 
     /** Apple 服务端到服务端撤销通知回调（无需自有 JWT，靠 Apple 签名校验）。 */

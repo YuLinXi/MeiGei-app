@@ -44,4 +44,12 @@ public interface TeamMemberMapper extends BaseMapper<TeamMember> {
 
     @Delete("DELETE FROM team_member WHERE team_id = #{teamId}")
     int deleteByTeam(@Param("teamId") UUID teamId);
+
+    // 账号删除：本人成员关系 + 本人作为 owner 的团队的全部成员关系
+    @Delete("""
+            DELETE FROM team_member
+            WHERE user_id = #{userId}
+               OR team_id IN (SELECT id FROM team WHERE owner_user_id = #{userId})
+            """)
+    int deleteByUserOrOwnedTeams(@Param("userId") UUID userId);
 }

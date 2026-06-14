@@ -2,6 +2,7 @@ package com.dontlift.workout.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.dontlift.workout.entity.Workout;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -11,6 +12,10 @@ import java.util.List;
 import java.util.UUID;
 
 public interface WorkoutMapper extends BaseMapper<Workout> {
+
+    // 账号删除：物理硬删该 user 全部训练（子树 workout_exercise/workout_set 由 ON DELETE CASCADE 连带清理）
+    @Delete("DELETE FROM workout WHERE user_id = #{userId}")
+    int deleteAllByUser(@Param("userId") UUID userId);
 
     // 写入墓碑：updateById 不会动 @TableLogic 字段，故显式 SQL
     @Update("""

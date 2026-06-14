@@ -12,6 +12,11 @@ final class HealthKitManager {
 
     var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
+    /// 是否已授权写入 Workout（供「我的」页 HealthKit 行展示连接态）。
+    var isAuthorized: Bool {
+        isAvailable && store.authorizationStatus(for: HKObjectType.workoutType()) == .sharingAuthorized
+    }
+
     /// 请求写入 Workout 的授权。可重复调用（已授权时系统直接回调）。
     func requestAuthorization() async {
         guard isAvailable else { return }

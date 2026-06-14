@@ -37,9 +37,11 @@ final class AuthService: NSObject {
             }
             let displayName = [credential.fullName?.givenName, credential.fullName?.familyName]
                 .compactMap { $0 }.joined(separator: " ")
+            let authorizationCode = credential.authorizationCode
+                .flatMap { String(data: $0, encoding: .utf8) }
             let auth: AuthResponse = try await APIClient.shared.send(
                 "POST", "/auth/apple",
-                body: AppleLoginRequest(identityToken: identityToken),
+                body: AppleLoginRequest(identityToken: identityToken, authorizationCode: authorizationCode),
                 authorized: false)
             session.handleLogin(auth, appleSub: credential.user,
                                 email: credential.email,
@@ -56,12 +58,13 @@ final class AuthService: NSObject {
         session.handleLogin(auth, appleSub: "dev", email: "dev@dontlift.local", displayName: "Dev")
     }
 
-    private func exchange(identityToken: String, email: String?, displayName: String?, appleSub: String?) {
+    private func exchange(identityToken: String, authorizationCode: String?,
+                          email: String?, displayName: String?, appleSub: String?) {
         Task {
             do {
                 let auth: AuthResponse = try await APIClient.shared.send(
                     "POST", "/auth/apple",
-                    body: AppleLoginRequest(identityToken: identityToken),
+                    body: AppleLoginRequest(identityToken: identityToken, authorizationCode: authorizationCode),
                     authorized: false
                 )
                 session.handleLogin(auth, appleSub: appleSub, email: email, displayName: displayName)
@@ -86,8 +89,11 @@ extension AuthService: ASAuthorizationControllerDelegate {
         }
         let displayName = [credential.fullName?.givenName, credential.fullName?.familyName]
             .compactMap { $0 }.joined(separator: " ")
+        let authorizationCode = credential.authorizationCode
+            .flatMap { String(data: $0, encoding: .utf8) }
         exchange(
             identityToken: identityToken,
+            authorizationCode: authorizationCode,
             email: credential.email,
             displayName: displayName.isEmpty ? nil : displayName,
             appleSub: credential.user

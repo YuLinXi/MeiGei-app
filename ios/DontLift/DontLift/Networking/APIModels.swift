@@ -4,12 +4,20 @@ import Foundation
 
 struct AppleLoginRequest: Encodable {
     let identityToken: String
+    /// 可选：仅首次/重新授权时 Apple 才下发。后端据此换取并持久化 refresh_token 供删号 revoke。
+    var authorizationCode: String?
 }
 
 struct AuthResponse: Decodable {
     let token: String
     let userId: UUID
     let newUser: Bool
+}
+
+/// 删号影响面（GET /account/deletion-impact）。
+struct DeletionImpactDTO: Decodable {
+    let ownedTeams: Int
+    let affectedMembers: Int
 }
 
 struct RegisterTokenRequest: Encodable {

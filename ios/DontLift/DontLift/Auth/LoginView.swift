@@ -10,6 +10,7 @@ struct LoginView: View {
     @State private var authService: AuthService?
     @State private var errorMessage: String?
     @State private var loading = false
+    @State private var legalURL: IdentifiableURL?
 
     var body: some View {
         ZStack {
@@ -42,6 +43,7 @@ struct LoginView: View {
         }
         .preferredColorScheme(.light)
         .onAppear { if authService == nil { authService = AuthService(session: session) } }
+        .safariSheet(url: $legalURL)
     }
 
     /// 品牌：App Icon 方块 + mono 小字距品牌名。
@@ -110,10 +112,10 @@ struct LoginView: View {
 
     private var legalSmallPrint: some View {
         HStack(spacing: 6) {
-            Button("服务条款") { /* 文档链接占位 */ }
+            Button("服务条款") { legalURL = IdentifiableURL(url: AppConfig.termsOfServiceURL) }
                 .foregroundStyle(Theme.Color.fg2)
             Text("·")
-            Button("隐私政策") { /* 文档链接占位 */ }
+            Button("隐私政策") { legalURL = IdentifiableURL(url: AppConfig.privacyPolicyURL) }
                 .foregroundStyle(Theme.Color.fg2)
         }
         .font(Theme.Font.body(size: 12))

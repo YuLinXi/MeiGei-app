@@ -29,10 +29,15 @@ public class AuthService {
     private final AppUserMapper appUserMapper;
     private final UserIdentityMapper userIdentityMapper;
     private final ObjectMapper objectMapper;
+    private final AppleClientSecretFactory appleClientSecretFactory;
+    private final AppleTokenClient appleTokenClient;
 
-    /** Apple 登录：校验 identityToken，首登建账户、老用户复用，签发自有 JWT。 */
+    /**
+     * Apple 登录：校验 identityToken，首登建账户、老用户复用，签发自有 JWT。
+     * authorizationCode 存在且凭据可用时，换取 refresh_token 持久化到 user_identity（供删号 revoke）。
+     */
     @Transactional
-    public AuthResponse loginWithApple(String identityToken) {
+    public AuthResponse loginWithApple(String identityToken, String authorizationCode) {
         JWTClaimsSet claims = appleTokenVerifier.verify(identityToken);
         String sub = claims.getSubject();
         String email = safeClaim(claims, "email");
@@ -63,7 +68,33 @@ public class AuthService {
             newUser = true;
         }
 
+        persistRefreshTokenIfPossible(identity.getId(), userId, authorizationCode);
+
         return new AuthResponse(jwtService.issue(userId), userId, newUser);
+    }
+
+    /**
+     * 用 authorizationCode 向 Apple 换取 refresh_token 并持久化。
+     * 无 code 或无 .p8 凭据时跳过，绝不阻断登录；refresh_token 不入日志。
+     */
+    private void persistRefreshTokenIfPossible(UUID identityId, UUID userId, String authorizationCode) {
+        if (authorizationCode == null || authorizationCode.isBlank() || !appleClientSecretFactory.available()) {
+            return;
+        }
+        try {
+            String clientSecret = appleClientSecretFactory.create();
+            String refreshToken = appleTokenClient.exchangeRefreshToken(
+                    appleClientSecretFactory.clientId(), clientSecret, authorizationCode);
+            if (refreshToken != null && !refreshToken.isBlank()) {
+                userIdentityMapper.updateRefreshToken(identityId, refreshToken);
+                log.info("已持久化 Apple refresh_token user={}", userId);
+            } else {
+                log.warn("Apple 未返回 refresh_token user={}", userId);
+            }
+        } catch (Exception e) {
+            // 换取失败不阻断登录（降级）
+            log.warn("换取 Apple refresh_token 异常（不阻断登录）user={}", userId, e);
+        }
     }
 
     /**
@@ -97,6 +128,8 @@ public class AuthService {
                 .eq(UserIdentity::getProvider, PROVIDER_APPLE)
                 .eq(UserIdentity::getProviderUserId, sub));
         if (identity == null) {
+            // 用户已被主动删号（AccountDeletionService 物理删了 user_identity）→ 幂等空操作，
+            // 与 S2S account-delete 反向通知对齐，不重复注销、不报错（D3.5）。
             return;
         }
         // 匿名化 PII + 软删用户与身份

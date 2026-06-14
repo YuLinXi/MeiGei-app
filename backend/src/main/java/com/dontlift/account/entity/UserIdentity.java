@@ -31,6 +31,9 @@ public class UserIdentity {
 
     private String email;
 
+    /** Apple refresh_token（由登录 authorizationCode 换取），仅用于删号时主动撤销授权；不入日志。可空。 */
+    private String appleRefreshToken;
+
     @TableField(fill = FieldFill.INSERT)
     private OffsetDateTime createdAt;
 

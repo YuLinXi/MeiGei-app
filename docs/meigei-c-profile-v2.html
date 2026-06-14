@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>别练了 · C 纸感极简 · 我的 v2</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#f4f2ec; --bg-warm:#efece5; --surface:#ffffff; --border:#e4ddd0; --border-2:#d8d2c6;
+    --fg:#1c1a17; --fg-2:#5e5950; --muted:#9a9486;
+    --accent:#d9482b; --accent-2:rgba(217,72,43,.08); --accent-3:rgba(217,72,43,.18); --frame:#d8d3c8;
+    --ok:#3f9a5a; --danger:#c43a20;
+    --sans:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue',sans-serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,monospace;
+    --fs-l1:22px; --fs-l2:15px; --fs-l3:14px; --fs-l4:12px; --fs-l5:10px; --fs-cap:9px; --fs-hero:30px; --fs-timer:56px;
+    --r-sm:8px; --r-md:13px; --r-lg:18px; --r-pill:999px;
+    --sh-sm:0 1px 4px rgba(28,26,23,.07),0 0 0 .5px rgba(28,26,23,.04);
+    --sh-md:0 4px 16px rgba(28,26,23,.09),0 0 0 .5px rgba(28,26,23,.05);
+    --sh-lg:0 8px 32px rgba(28,26,23,.12),0 0 0 .5px rgba(28,26,23,.05);
+  }
+  html,body{background:#e8e4dc;color:var(--fg);font-family:var(--sans);-webkit-font-smoothing:antialiased;line-height:1.5}
+  .page{max-width:1320px;margin:0 auto;padding:52px 36px 80px}
+  .doc-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+  .doc-h1{font-size:36px;font-weight:800;letter-spacing:-.03em;margin-top:12px}
+  .doc-sub{margin-top:12px;max-width:720px;color:var(--fg-2);font-size:14.5px;line-height:1.65}
+  .doc-sub b{color:var(--fg)}
+  .direction-pill{display:inline-flex;align-items:center;gap:10px;margin-top:20px;padding:9px 16px;border:1px solid var(--border-2);border-radius:var(--r-pill);background:var(--surface);box-shadow:var(--sh-sm);font-size:13px;color:var(--fg-2)}
+  .direction-pill .swatch{width:18px;height:18px;border-radius:50%;background:var(--accent)}
+  .direction-pill b{color:var(--fg)}
+  .main{margin-top:48px;display:grid;grid-template-columns:auto 1fr;gap:56px;align-items:start}
+  @media(max-width:960px){.main{grid-template-columns:1fr;justify-items:center}}
+  .frames{display:flex;gap:40px;align-items:flex-start}
+  @media(max-width:1180px){.frames{flex-wrap:wrap}}
+  .fcap{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--fg-2);margin-bottom:10px;text-align:center}
+  .fcap b{color:var(--accent)}
+  .iphone{width:320px;border-radius:52px;padding:12px;background:var(--frame);box-shadow:0 0 0 1px rgba(255,255,255,.6) inset,0 0 0 2px rgba(0,0,0,.12),var(--sh-lg),0 32px 64px -24px rgba(0,0,0,.22)}
+  .screen{position:relative;border-radius:40px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column}
+  .screen.tall{min-height:872px}
+  .screen.short{height:560px}
+  .di{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:112px;height:30px;background:#000;border-radius:17px;z-index:60}
+  .sb{position:relative;z-index:30;flex-shrink:0;height:48px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 26px 8px;font-size:var(--fs-l3);font-weight:600}
+  .sb .icons{display:flex;align-items:center;gap:5px}
+  .sb .bars{display:flex;align-items:flex-end;gap:1.5px;height:12px}.sb .bars b{width:2.5px;background:var(--fg);border-radius:1px;display:block}
+  .sb .bars b:nth-child(1){height:4px}.sb .bars b:nth-child(2){height:7px}.sb .bars b:nth-child(3){height:9px}.sb .bars b:nth-child(4){height:12px}
+  .sb .bat{width:23px;height:11px;border:1.3px solid var(--fg);border-radius:3.5px;position:relative;opacity:.75}
+  .sb .bat::after{content:"";position:absolute;left:2px;top:2px;bottom:2px;width:55%;background:var(--fg);border-radius:1.5px}
+  .nav{flex-shrink:0;padding:4px 18px 6px;text-align:center}
+  .nav .ct{font-size:var(--fs-l2);font-weight:700;letter-spacing:-.01em;color:var(--fg)}
+  .scroll{flex:1;display:flex;flex-direction:column;gap:10px;padding:8px 16px 12px}
+  .scroll > *{flex-shrink:0}
+  .me{display:flex;align-items:center;gap:14px;padding:8px 2px 8px}
+  .me .av{width:64px;height:64px;border-radius:50%;background:var(--accent-2);border:1px solid var(--accent-3);display:flex;align-items:center;justify-content:center;font-size:var(--fs-l1);font-weight:800;color:var(--accent);flex-shrink:0}
+  .me .nm{font-size:var(--fs-l1);font-weight:800;color:var(--fg);letter-spacing:-.02em}
+  .me .sub{font-family:var(--mono);font-size:var(--fs-l4);color:var(--muted);margin-top:4px;letter-spacing:.01em}
+  .stat2{display:grid;grid-template-columns:1fr 1fr;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;box-shadow:var(--sh-sm)}
+  .stat2 > div{padding:15px 4px;text-align:center;position:relative}
+  .stat2 > div + div::before{content:"";position:absolute;left:0;top:18%;height:64%;width:1px;background:var(--border)}
+  .stat2 .n{font-size:var(--fs-l1);font-weight:800;letter-spacing:-.025em;color:var(--fg);line-height:1}
+  .stat2 .k{font-family:var(--mono);font-size:var(--fs-cap);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:7px}
+  .seclbl{font-family:var(--mono);font-size:var(--fs-l5);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 2px 0}
+  .rows{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;box-shadow:var(--sh-sm)}
+  .row{display:flex;align-items:center;gap:12px;padding:0 14px;min-height:48px}
+  .row + .row{border-top:1px solid var(--border);margin-left:0}
+  .row.ind + .row.ind{position:relative}
+  .row.ind + .row.ind::before{content:"";position:absolute;left:56px;right:0;top:0;height:1px;background:var(--border)}
+  .row.ind + .row.ind{border-top:none}
+  .row .ic{width:28px;height:28px;border-radius:7px;background:var(--bg-warm);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .row .ic svg{width:15px;height:15px;stroke:var(--fg-2);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .row .ic.acc{background:var(--accent-2);border-color:var(--accent-3)}
+  .row .ic.acc svg{stroke:var(--accent)}
+  .row .g{flex:1;font-size:var(--fs-l2);font-weight:500;color:var(--fg);white-space:nowrap}
+  .row .v{font-family:var(--mono);font-size:var(--fs-l4);color:var(--muted)}
+  .row .v.ok{color:var(--ok);font-weight:600}
+  .row .v.warn{color:var(--danger);font-weight:600}
+  .chev{width:8px;height:8px;border-right:1.6px solid var(--muted);border-bottom:1.6px solid var(--muted);transform:rotate(-45deg);margin-left:2px;flex-shrink:0}
+  /* stepper */
+  .stp{display:flex;align-items:center;gap:0;border:1px solid var(--border-2);border-radius:var(--r-pill);background:var(--bg-warm);overflow:hidden;flex-shrink:0}
+  .stp button{width:30px;height:28px;border:none;background:transparent;color:var(--fg);font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .stp .val{min-width:46px;text-align:center;font-family:var(--mono);font-size:var(--fs-l3);font-weight:700;color:var(--fg);border-left:1px solid var(--border);border-right:1px solid var(--border);height:28px;line-height:28px}
+  /* toggle (on = accent active state) */
+  .tgl{width:42px;height:25px;border-radius:var(--r-pill);background:var(--accent);position:relative;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.04)}
+  .tgl::after{content:"";position:absolute;top:2px;left:19px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .tgl.off{background:var(--border-2)}
+  .tgl.off::after{left:2px}
+  /* authorize pill (CTA action point → accent) */
+  .pill-act{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:var(--r-pill);background:var(--accent);color:#fff;font-size:var(--fs-l4);font-weight:700;box-shadow:0 1px 4px rgba(217,72,43,.28);flex-shrink:0}
+  .sync-ic{width:15px;height:15px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  /* account group */
+  .row.act .g{font-weight:600}
+  .row.act.logout .g{color:var(--fg-2)}
+  .row.act.danger .g{color:var(--accent)}
+  .row.act .mini{font-family:var(--sans);font-size:var(--fs-l4);color:var(--muted);font-weight:400}
+  .tabs{margin-top:auto;flex-shrink:0;display:flex;justify-content:space-around;align-items:flex-start;padding:9px 6px 18px;border-top:1px solid var(--border);background:var(--surface)}
+  .tabs .tab{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted);font-size:var(--fs-l5)}
+  .tabs .tab svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .tabs .tab.on{color:var(--accent)}
+  /* delete confirm frame */
+  .scrim{position:absolute;inset:0;background:rgba(28,26,23,.34);backdrop-filter:blur(2px);z-index:40}
+  .alert{position:absolute;left:24px;right:24px;top:50%;transform:translateY(-50%);z-index:50;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-lg);overflow:hidden;text-align:center}
+  .alert .ab{padding:26px 22px 18px}
+  .alert .warn-ic{width:46px;height:46px;border-radius:50%;background:var(--accent-2);border:1px solid var(--accent-3);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+  .alert .warn-ic svg{width:24px;height:24px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .alert .at{font-size:var(--fs-l1);font-weight:800;color:var(--fg);letter-spacing:-.02em}
+  .alert .ax{font-size:var(--fs-l3);color:var(--fg-2);line-height:1.6;margin-top:10px}
+  .alert .ax b{color:var(--accent);font-weight:700}
+  .alert .acts{display:flex;flex-direction:column;border-top:1px solid var(--border)}
+  .alert .acts .b{padding:14px;font-size:var(--fs-l2);font-weight:700}
+  .alert .acts .b.del{color:#fff;background:var(--accent)}
+  .alert .acts .b.cancel{color:var(--fg-2);font-weight:600;border-top:1px solid var(--border)}
+  /* spec panel */
+  .panel{display:flex;flex-direction:column;gap:30px;padding-top:6px}
+  .panel-label{font-family:var(--mono);font-size:var(--fs-l5);letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+  .panel-label b{color:var(--accent)}
+  .callout{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-sm);overflow:hidden}
+  .callout-head{padding:14px 16px 12px;border-bottom:1px solid var(--border)}
+  .callout-head .ch-title{font-size:13.5px;font-weight:700;color:var(--fg)}
+  .callout-head .ch-sub{font-size:var(--fs-l4);color:var(--muted);margin-top:3px;line-height:1.5}
+  .callout-body{padding:16px}
+  .annotation{display:flex;align-items:flex-start;gap:8px;margin-top:9px;font-size:11.5px;color:var(--fg-2);line-height:1.55}
+  .annotation:first-child{margin-top:0}
+  .annotation .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:5px}
+  .annotation b{color:var(--fg);font-weight:600}
+  .tag{display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.04em;padding:2px 7px;border-radius:var(--r-pill);background:var(--accent-2);color:var(--accent);border:1px solid var(--accent-3);margin-left:6px;vertical-align:middle}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="doc-eyebrow">别练了 · DIRECTION C · SCREEN 19 · 我的 v2 · HIGH FIDELITY</div>
+  <h1 class="doc-h1">我的 · Tab 根页（v2 改版）</h1>
+  <p class="doc-sub">在 v1 基础上补齐<b>上架硬卡点</b>与可用性缺口：新增「训练偏好」「账号」两组、「关于」组加隐私政策/服务条款、HealthKit 由死展示改为<b>可发起授权</b>、删除账号走<b>二次确认</b>。退出与删除明确分级——退出 ghost、删除 danger。</p>
+  <div class="direction-pill"><span class="swatch"></span><span><b>Direction C</b> · Paper Minimal</span><span style="color:var(--muted)">·</span><span style="font-family:var(--mono);font-size:11px">复用全部 token，无裸值</span></div>
+
+  <div class="main">
+    <div class="frames">
+      <!-- 主帧 -->
+      <div>
+        <div class="fcap">主页面 · <b>我的</b>（完整长页）</div>
+        <div class="iphone"><div class="screen tall">
+          <div class="di"></div>
+          <div class="sb"><span>9:41</span><div class="icons"><div class="bars"><b></b><b></b><b></b><b></b></div><div class="bat"></div></div></div>
+          <div class="nav"><div class="ct">我的</div></div>
+          <div class="scroll">
+            <div class="me"><div class="av">YU</div><div><div class="nm">余林希</div><div class="sub">训练龄 1.3 年 · 加入于 2025.05</div></div></div>
+            <div class="stat2"><div><div class="n">42</div><div class="k">总训练</div></div><div><div class="n">7</div><div class="k">最长连续</div></div></div>
+
+            <div class="seclbl">训练偏好</div>
+            <div class="rows">
+              <div class="row ind"><div class="ic acc"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg></div><div class="g">休息时长</div><div class="stp"><button>−</button><span class="val">90s</span><button>+</button></div></div>
+              <div class="row ind"><div class="ic"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5"/><line x1="11" y1="6" x2="13" y2="6"/></svg></div><div class="g">震动反馈</div><div class="tgl"></div></div>
+              <div class="row ind"><div class="ic"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.5 21a1.8 1.8 0 0 0 3 0"/></svg></div><div class="g">通知</div><span class="v ok">已开启</span><span class="chev"></span></div>
+            </div>
+
+            <div class="seclbl">数据 · 同步</div>
+            <div class="rows">
+              <div class="row ind"><div class="ic"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></div><div class="g">HealthKit</div><span class="v warn">未授权</span><span class="pill-act">授权</span></div>
+              <div class="row ind"><div class="ic"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/></svg></div><div class="g">立即同步</div><span class="v">空闲 · 刚刚</span><svg class="sync-ic" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/></svg></div>
+            </div>
+
+            <div class="seclbl">关于</div>
+            <div class="rows">
+              <div class="row ind"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r="1"/></svg></div><div class="g">版本</div><span class="v">1.0 (1)</span></div>
+              <div class="row ind"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></div><div class="g">隐私政策</div><span class="chev"></span></div>
+              <div class="row ind"><div class="ic"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg></div><div class="g">服务条款</div><span class="chev"></span></div>
+            </div>
+
+            <div class="seclbl">账号</div>
+            <div class="rows">
+              <div class="row act logout"><div class="ic"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div><div class="g">退出登录 <span class="mini">· 保留本地数据</span></div></div>
+              <div class="row act danger"><div class="ic acc"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div><div class="g">删除账号</div></div>
+            </div>
+            <div style="height:6px"></div>
+          </div>
+          <div class="tabs">
+            <div class="tab"><svg viewBox="0 0 24 24"><path d="M6.5 9v6M17.5 9v6M4 10.5v3M20 10.5v3M6.5 12h11"/></svg>训练</div>
+            <div class="tab"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 9h6M9 13h6"/></svg>计划</div>
+            <div class="tab"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>动作</div>
+            <div class="tab"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.3"/><path d="M4 19c0-3 2.5-4.5 5-4.5s5 1.5 5 4.5M15 19c0-2 1-3.2 3-3.2s3 1.2 3 3.2"/></svg>Team</div>
+            <div class="tab on"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5"/></svg>我的</div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- 删除确认帧 -->
+      <div>
+        <div class="fcap">删除账号 · <b>二次确认</b></div>
+        <div class="iphone"><div class="screen short">
+          <div class="di"></div>
+          <div class="sb"><span>9:41</span><div class="icons"><div class="bars"><b></b><b></b><b></b><b></b></div><div class="bat"></div></div></div>
+          <div class="nav"><div class="ct">我的</div></div>
+          <div class="scroll" style="filter:saturate(.9)">
+            <div class="seclbl">账号</div>
+            <div class="rows">
+              <div class="row act logout"><div class="ic"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div><div class="g">退出登录</div></div>
+              <div class="row act danger"><div class="ic acc"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div><div class="g">删除账号</div></div>
+            </div>
+          </div>
+          <div class="scrim"></div>
+          <div class="alert">
+            <div class="ab">
+              <div class="warn-ic"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r=".6" fill="currentColor" stroke="none"/></svg></div>
+              <div class="at">删除账号？</div>
+              <div class="ax">你的账号与<b>全部训练数据</b>将被永久删除，<b>无法恢复</b>。将解散你创建的 <b>2 个团队</b>、影响 <b>8 名成员</b>。</div>
+            </div>
+            <div class="acts">
+              <div class="b del">删除账号</div>
+              <div class="b cancel">取消</div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div>
+        <div class="panel-label">01 · <b>档案 · 统计</b></div>
+        <div class="callout">
+          <div class="callout-head"><div class="ch-title">头像 + 名称 + 训练龄 · 加入时间</div><div class="ch-sub">统计：总训练数 / 最长连续天数</div></div>
+          <div class="callout-body">
+            <div class="annotation"><span class="dot"></span><span>头像首字朱砂红圆（同 Team 社交温度），<b>64pt</b>；统计大数 <b>--fs-l1 22 墨黑</b>，标签 mono eyebrow</span></div>
+            <div class="annotation"><span class="dot"></span><span>副标改 mono「训练龄 1.3 年 · <b>加入于 2025.05</b>」——新用户也有锚点，不再只剩「0.0 年」尴尬</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="panel-label">02 · <b>训练偏好</b> <span class="tag">新增组</span></div>
+        <div class="callout">
+          <div class="callout-head"><div class="ch-title">休息时长 · 震动 · 通知</div><div class="ch-sub">把 RestTimer 已存于 UserDefaults 的偏好暴露为 UI</div></div>
+          <div class="callout-body">
+            <div class="annotation"><span class="dot"></span><span><b>休息时长</b>用纸感 stepper（−/值/＋），即时落盘；<b>震动</b>用 iOS Toggle，开态=朱砂红（激活态，token 许可）</span></div>
+            <div class="annotation"><span class="dot"></span><span><b>通知</b>展示系统授权态「已开启」+ chevron，点击跳系统设置；不做 App 内细粒度开关</span></div>
+            <div class="annotation"><span class="dot"></span><span>分隔线从 <b>图标后 56px</b> 起（iOS inset grouped 质感），行高 48pt</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="panel-label">03 · <b>数据/同步 · HealthKit 可授权</b></div>
+        <div class="callout">
+          <div class="callout-head"><div class="ch-title">HealthKit 活行 + 立即同步</div><div class="ch-sub">死展示 → 可发起授权</div></div>
+          <div class="callout-body">
+            <div class="annotation"><span class="dot"></span><span><b>HealthKit</b>「未授权」danger 红字 + 朱砂红实底「<b>授权</b>」pill——明确这是可点击发起授权的活行（授权=行动点，用 accent）</span></div>
+            <div class="annotation"><span class="dot"></span><span>授权成功后 pill 消失、value 转「已连接」<b>绿色</b>（系统状态色，例外于朱砂红）</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="panel-label">04 · <b>关于 · 账号</b> <span class="tag">上架硬卡点</span></div>
+        <div class="callout">
+          <div class="callout-head"><div class="ch-title">隐私/条款入口 + 退出/删除分级 + 二次确认</div><div class="ch-sub">满足 App Store 5.1.1(v)</div></div>
+          <div class="callout-body">
+            <div class="annotation"><span class="dot"></span><span><b>隐私政策 / 服务条款</b>进「关于」组，chevron 行，SFSafariViewController 打开后端已上线页面</span></div>
+            <div class="annotation"><span class="dot"></span><span><b>退出</b>=ghost（fg-2，副文案「保留本地数据」）；<b>删除账号</b>=danger 朱砂红字——视觉分级杜绝误触</span></div>
+            <div class="annotation"><span class="dot"></span><span>删除走<b>二次确认</b> alert：警示图标 + 「永久删除·无法恢复·解散团队」，主按钮 danger 实底，取消在下</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
