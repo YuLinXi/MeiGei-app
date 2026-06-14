@@ -46,6 +46,8 @@ docker compose up -d
 
 ## 三、部署 DontLift 业务栈
 
+> 注：本项目**实际首次部署用的是 `backend/deploy/local-deploy.sh`**（rsync 同步，非 git clone），因此服务器 `/opt/DontLift-app` **不是 git 仓库**，后续更新见第五节、**不能 `git pull`**。下面的手动 clone 仅作全新服务器的通用参考。
+
 ```bash
 sudo mkdir -p /opt && cd /opt
 git clone <你的仓库地址> DontLift-app
@@ -79,10 +81,26 @@ crontab -e
 ```
 恢复：`gunzip -c backups/dontlift_xxx.sql.gz | docker exec -i shared-postgres psql -U dontlift -d dontlift`
 
-**更新 DontLift**（Flyway 自动跑新增 `V2__*.sql`）：
+**更新 DontLift**（Flyway 自动跑新增 `V2__*.sql` 等迁移）：
+
+> ⚠️ **服务器代码不是 git 仓库**（首次由本机同步上来，`/opt/DontLift-app` 下只有 `backend/`，无 `.git`）。**不要用 `git pull`**——用本机一键脚本，从本机仓库根目录执行：
+
 ```bash
-cd /opt/DontLift-app/backend && git pull
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+./backend/deploy/local-deploy.sh root@124.222.79.121
+# 内部：rsync 同步源码（排除 .env.prod/secrets）→ 远程 server-bootstrap.sh → docker compose up -d --build → health 自检
+```
+
+> ⚠️ **已知隐患**：`local-deploy.sh` 的 `rsync --delete` **未排除 `backups/`**，会误删服务器上的数据库备份。修脚本前，建议改用下面这套**不带 `--delete`、显式排除备份**的手动同步（2026-06-14 第二次发版实测可用）：
+
+```bash
+# 1) 本机仓库根目录：同步源码（保护密钥与备份，build/产物不传）
+rsync -rlptz --exclude='.env.prod' --exclude='secrets/' --exclude='backups/' \
+  --exclude='build/' --exclude='.gradle/' --exclude='.git/' --exclude='.idea/' \
+  backend/ root@124.222.79.121:/opt/DontLift-app/backend/
+# 2) 远程重建并启动（Flyway 启动时自动迁移）
+ssh root@124.222.79.121 'cd /opt/DontLift-app/backend && \
+  docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build'
+# 3) 验证：日志 Flyway 迁移 + Started、health UP、flyway_schema_history 到最新版本
 ```
 
 **加一套新服务**：见 `deploy/shared-infra/README.md` 的「新增一套服务」（建库 → 写 compose 接 web+dbnet → Caddyfile 加域名块热重载）。

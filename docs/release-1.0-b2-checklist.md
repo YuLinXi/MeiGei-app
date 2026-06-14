@@ -34,19 +34,19 @@
 
 - [x] 🤖 **A1 build 号递增到 2**（已完成）
   - `project.pbxproj` 中 8 处 `CURRENT_PROJECT_VERSION` 全部 `1 → 2`，`MARKETING_VERSION` 保持 `1.0`（app 与 widget 两 target 同号）。
-- [ ] 🤖 **A2 后端单测通过**
+- [x] 🤖 **A2 后端单测通过** ✅（2026-06-14 `BUILD SUCCESSFUL`）
   ```bash
   cd backend && export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
   ./gradlew test
   ```
-  本次新增了 `AccountDeletionServiceTest` / `ProfileServiceTest` / `AuthServiceRefreshTokenTest`，应全绿。
-- [ ] 🤖 **A3 iOS Release 编译验证**（不签名，排除非签名问题）
+  本次新增了 `AccountDeletionServiceTest` / `ProfileServiceTest` / `AuthServiceRefreshTokenTest`，已全绿。
+- [x] 🤖 **A3 iOS Release 编译验证** ✅（`BUILD SUCCEEDED`，Release 配置）
   ```bash
   cd ios/DontLift && xcodebuild -project DontLift.xcodeproj -scheme DontLift \
     -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
     -configuration Release CODE_SIGNING_ALLOWED=NO build
   ```
-- [ ] 🤖 **A4 提交版本 bump**（在 Archive 之前，保证发出去的代码=仓库某提交）
+- [x] 🤖 **A4 提交版本 bump** ✅（提交 `d9b3ed8`，**尚未 push**——按计划等 C 上传成功后与 tag 一起推）
   ```bash
   git add ios/DontLift/DontLift.xcodeproj/project.pbxproj
   git commit -m "chore(release): build 号递增至 2，准备第二次 TestFlight 发版 (1.0 build 2)"
@@ -56,41 +56,36 @@
 
 ## 阶段 B · 后端先行部署（生产服务器，必须先于 iOS）
 
-> 服务器:腾讯云轻量 `124.222.79.121`，Docker Compose 栈，剧本见 [`backend/DEPLOY.md`](../backend/DEPLOY.md) 第五节「更新 DontLift」。
-> 生产目录通常为 `/opt/DontLift-app`（若改名前为 `/opt/MeiGei-app`，以服务器实际为准）。
+> **✅ 2026-06-14 已完成部署，线上 Flyway 到 v3、health UP。**
+> 服务器:腾讯云轻量 `124.222.79.121`，Docker Compose 栈,生产目录 `/opt/DontLift-app/backend`。
+> ⚠️ **服务器代码不是 git 仓库**（首次由本机同步上来，无 `.git`），更新走 **rsync 从本机同步,不能 `git pull`**（DEPLOY.md 第五节已同步订正）。
 
-- [ ] 🧑 **B1 SSH 登录生产服务器**（凭据只在你手上）
-- [ ] 🤝 **B2 拉取新代码**
+- [x] 🤖 **B1 部署前基线检查**：目录定位、容器状态(`dontlift-app` Up)、Flyway 基线(部署前 v1)、health UP——确认部署前线上正常。
+- [x] 🤖 **B2 rsync 同步源码**（保护 `.env.prod`/`secrets/`/`backups/`，不传 build 产物；先 `-n` dry-run 校验不碰密钥再实跑）
   ```bash
-  cd /opt/DontLift-app && git pull
+  rsync -rlptz --exclude='.env.prod' --exclude='secrets/' --exclude='backups/' \
+    --exclude='build/' --exclude='.gradle/' --exclude='.git/' --exclude='.idea/' \
+    backend/ root@124.222.79.121:/opt/DontLift-app/backend/
   ```
-- [ ] 🧑 **B3（可选）启用 Apple 授权主动撤销（删号 revoke 完整路径）**
-  - 本次后端新增 `application.yml` 配置项 `app.apple.client-id / team-id / key-id / key-path`。
-  - **留空则自动降级**：删号仅删本地数据、不调 Apple `/auth/revoke`，**不阻断上架**。
-  - 若要启用完整 revoke：`.p8` **可复用第一次已上传的 APNs Key**（Team 级密钥，见 `backend/secrets/`），在 `.env.prod` 补这三个变量（**只写变量名，值填你自己的**）：
-    ```ini
-    APPLE_TEAM_ID=<你的 Apple Team ID>
-    APPLE_KEY_ID=<复用的 .p8 对应 Key ID>
-    APPLE_KEY_PATH=/app/secrets/<你的 .p8 文件名>
-    ```
-  - ⚠️ `.p8` 文件属主须为容器用户（第一次踩过坑：root 600 会 Permission denied）。
-- [ ] 🤝 **B4 重新构建并启动栈**（Flyway 启动时自动跑 V2/V3）
+  > 等效标准脚本 `./backend/deploy/local-deploy.sh root@124.222.79.121`，但该脚本的 `rsync --delete` **未排除 `backups/`** 会误删数据库备份，故本次改用上面这套手动 rsync。
+- [ ] 🧑 **B3（可选）启用 Apple 授权主动撤销** —— **本次未配，走降级**（删号只删本地数据、不调 Apple `/auth/revoke`，**不阻断上架**）。
+  - 若要启用：`.env.prod` 补 `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_KEY_PATH`（`.p8` 可复用已上传的 APNs Key，Team 级密钥），重新部署。值只写在服务器 `.env.prod`，不入库。
+  - ⚠️ `.p8` 文件属主须为容器用户（历史坑：root 600 会 Permission denied 降级 no-op）。
+- [x] 🤖 **B4 容器内重建并重启**（Flyway 启动时自动跑 V2/V3）
   ```bash
-  cd /opt/DontLift-app/backend
-  docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+  ssh root@124.222.79.121 'cd /opt/DontLift-app/backend && \
+    docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build'
   ```
-- [ ] 🤝 **B5 看日志确认迁移与启动**
-  ```bash
-  docker compose -f docker-compose.prod.yml logs -f app
-  ```
-  关注：Flyway 报告 `Migrating ... V2__add_apple_refresh_token`、`V3__profile_fields`，随后 Spring `Started ... UP`。
-- [ ] 🤝 **B6 线上验证**
-  ```bash
-  curl -s https://dontlift.peipadada.com/actuator/health      # 期望 {"status":"UP"}
-  # 确认迁移落库（schema 版本应到 V3）
-  docker exec -it shared-postgres psql -U dontlift -d dontlift -c "select version, description, success from flyway_schema_history order by installed_rank desc limit 3;"
-  ```
-  - 账号删除 / profile PATCH 等接口需 JWT 鉴权，真机登录后在阶段 E 回归，无需在此裸调。
+  容器内 gradle `BUILD SUCCESSFUL`，镜像重建，`dontlift-app` Recreated + Started。
+- [x] 🤖 **B5 迁移与启动确认**（日志核验）
+  - Flyway：`Migrating ... to version "2 - add apple refresh token"` → `"3 - profile fields"` → `Successfully applied 2 migrations, now at version v3`
+  - APNs 客户端正常初始化（无 no-op 降级）、`Started DontLiftApplication`，无 ERROR/Exception。
+- [x] 🤖 **B6 线上验证**
+  - health `https://dontlift.peipadada.com/actuator/health` → `{"status":"UP"}` ✅
+  - `flyway_schema_history` 到 **v3**，3 条全 `success = t` ✅
+  - 新列已落库：`app_user.sex`（CHECK `male`/`female`）、`user_identity.apple_refresh_token` ✅
+  - dev token `POST /auth/dev/token` → **404**（生产已关闭）✅
+  - 账号删除 / profile PATCH 等接口需 JWT 鉴权，留待阶段 E 真机回归。
 
 ---
 
