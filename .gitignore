@@ -11,3 +11,4 @@
 # Xcode 构建产物 / DerivedData（ios-sim-dev.sh 写入 ios/DontLift/build/sim-dd，可重建）
 **/build/
 **/DerivedData/
+.claude/worktrees/

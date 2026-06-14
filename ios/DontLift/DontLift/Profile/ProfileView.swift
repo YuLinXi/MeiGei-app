@@ -9,6 +9,7 @@ struct ProfileView: View {
     @Environment(SyncEngine.self) private var syncEngine
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(RestTimerController.self) private var restTimer
+    @Environment(\.modelContext) private var modelContext
 
     @Query private var profiles: [UserProfile]
     @Query(filter: #Predicate<Workout> { $0.deletedAt == nil && $0.endedAt != nil })
@@ -67,6 +68,7 @@ struct ProfileView: View {
                 LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     header
                     statsGrid
+                    preferenceGroup
                     syncGroup
                     trainingPrefsGroup
                     aboutGroup
@@ -191,6 +193,54 @@ struct ProfileView: View {
 
     private var statDivider: some View {
         Rectangle().fill(Theme.Color.border).frame(width: 1)
+    }
+
+    // MARK: - 偏好分组
+
+    /// 偏好：性别（仅切肌群高亮图底图，纯本地、不同步）。
+    private var preferenceGroup: some View {
+        groupCard(title: "偏好") {
+            sexRow
+        }
+    }
+
+    private var sexRow: some View {
+        let current = profile?.sex ?? .male
+        return HStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "figure.stand")
+                .foregroundStyle(Theme.Color.fg2)
+                .frame(width: 24)
+            Text("性别")
+                .font(Theme.Font.body(size: 14))
+                .foregroundStyle(Theme.Color.fg)
+            Spacer()
+            HStack(spacing: 6) {
+                ForEach(BodySex.allCases) { s in
+                    sexPill(s, selected: current == s)
+                }
+            }
+        }
+        .padding(.horizontal, Theme.Spacing.md)
+        .frame(height: 48)
+    }
+
+    private func sexPill(_ s: BodySex, selected: Bool) -> some View {
+        Text(s.displayName)
+            .font(Theme.Font.body(size: 13, weight: selected ? .semibold : .regular))
+            .foregroundStyle(selected ? Color.white : Theme.Color.fg2)
+            .frame(width: 40, height: 28)
+            .background(selected ? Theme.Color.accent : Theme.Color.surface2,
+                        in: Capsule())
+            .overlay(Capsule().stroke(selected ? Color.clear : Theme.Color.border, lineWidth: 1))
+            .contentShape(Capsule())
+            .onTapGesture { setSex(s) }
+    }
+
+    private func setSex(_ s: BodySex) {
+        guard let profile, profile.sex != s else { return }
+        profile.sex = s
+        try? modelContext.save()
+        Theme.Haptics.selection()
     }
 
     // MARK: - 数据 · 同步
