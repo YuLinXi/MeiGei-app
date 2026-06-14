@@ -159,7 +159,7 @@ struct TeamListView: View {
                 .foregroundStyle(Theme.Color.fg)
                 .padding(.top, 18)
 
-            Text("3 人小圈子，认真训练、互相督促。\n加入后，队友的每次打卡都会出现在这里。")
+            Text("和训练搭子一起，认真训练、互相督促。\n加入后，队友的每次打卡都会出现在这里。")
                 .font(Theme.Font.body(size: 12.5))
                 .foregroundStyle(Theme.Color.fg2)
                 .multilineTextAlignment(.center)
@@ -311,7 +311,7 @@ struct TeamListView: View {
             }
             .buttonStyle(PressableButtonStyle())
 
-            Text("3 人小圈子 · 建队自动生成邀请码")
+            Text("建队自动生成邀请码 · 分享给训练搭子")
                 .font(Theme.Font.mono(size: 10))
                 .tracking(0.5)
                 .foregroundStyle(Theme.Color.muted)
@@ -356,7 +356,7 @@ struct CreateTeamSheet: View {
                     .padding(.vertical, 13)
                     .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
-                TeamSheetHint(error ?? "3 人小圈子，建后自动生成邀请码", isError: error != nil)
+                TeamSheetHint(error ?? "建队后自动生成邀请码，分享给训练搭子", isError: error != nil)
                     .padding(.top, 7)
                 TeamSheetCTA(title: "创建 Team", enabled: canSubmit) { Task { await submit() } }
             }
