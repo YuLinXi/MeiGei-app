@@ -27,7 +27,8 @@ public class DevAuthController {
     public AuthResponse devToken() {
         AppUser user = new AppUser();
         user.setId(Uuid7.generate());
-        user.setDisplayName("dev-user");
+        // 不预设称呼：与真实 Apple 首登一致，留空 displayName，
+        // 令客户端走首登资料补全（昵称/性别）门控，便于联调验证该流程。
         appUserMapper.insert(user);
         return new AuthResponse(jwtService.issue(user.getId()), user.getId(), true);
     }
