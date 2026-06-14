@@ -192,17 +192,26 @@ struct PaperStepper: View {
 extension View {
     /// 纸感二次确认弹窗：以 `fullScreenCover`（透明背景）呈现，层级在 TabView 之上，
     /// scrim 覆盖底部 Tab Bar 使其不可操作。暗 scrim + 居中白卡（标题 + 说明 + 取消/确认两键）。
+    /// - Parameters:
+    ///   - secondaryTitle: 可选的次要动作（描边样式）。传入后按钮区改为「主（填充）/ 次（描边）」垂直堆叠。
+    ///   - onSecondary: 次要动作回调。
+    ///   - showCancel: 是否渲染独立「取消」按钮；为 false 时仅靠点蒙层取消（如训练冲突弹窗）。
     func paperConfirmDialog(
         isPresented: Binding<Bool>,
         title: String,
         message: String,
         confirmTitle: String,
         destructive: Bool = true,
+        secondaryTitle: String? = nil,
+        onSecondary: (() -> Void)? = nil,
+        showCancel: Bool = true,
         onConfirm: @escaping () -> Void
     ) -> some View {
         fullScreenCover(isPresented: isPresented) {
             PaperConfirmDialog(isPresented: isPresented, title: title, message: message,
-                               confirmTitle: confirmTitle, destructive: destructive, onConfirm: onConfirm)
+                               confirmTitle: confirmTitle, destructive: destructive,
+                               secondaryTitle: secondaryTitle, onSecondary: onSecondary,
+                               showCancel: showCancel, onConfirm: onConfirm)
                 .presentationBackground(.clear)
         }
         // 关闭系统的下滑入场动画（仅在开关时生效，不影响其它动画）；改由内部 scrim/卡片淡入。
@@ -216,6 +225,9 @@ struct PaperConfirmDialog: View {
     let message: String
     let confirmTitle: String
     var destructive: Bool = true
+    var secondaryTitle: String? = nil
+    var onSecondary: (() -> Void)? = nil
+    var showCancel: Bool = true
     let onConfirm: () -> Void
 
     /// 进出场都用淡入淡出（+ 轻微缩放）：fullScreenCover 自身瞬时呈现/移除，动画交给内部 `shown`。
@@ -253,27 +265,62 @@ struct PaperConfirmDialog: View {
                     .foregroundStyle(Theme.Color.muted)
                     .multilineTextAlignment(.center)
             }
-            HStack(spacing: Theme.Spacing.md) {
-                Button { close {} } label: {
-                    Text("取消")
-                        .font(Theme.Font.l2)
-                        .foregroundStyle(Theme.Color.fg)
-                        .frame(maxWidth: .infinity).frame(height: 50)
-                        .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-                }.buttonStyle(PressableButtonStyle())
-                Button { close { onConfirm() } } label: {
-                    Text(confirmTitle)
-                        .font(Theme.Font.l2)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity).frame(height: 50)
-                        .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-                }.buttonStyle(PressableButtonStyle())
-            }
+            buttons
         }
         .padding(Theme.Spacing.lg)
         .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .shadow(color: Theme.Color.fg.opacity(0.18), radius: 32, x: 0, y: 12)
         .padding(.horizontal, 40)
+    }
+
+    /// 有 `secondaryTitle` 时：主（填充）/ 次（描边）/ [取消] 垂直堆叠；否则保持「取消 | 确认」横排。
+    @ViewBuilder private var buttons: some View {
+        if let secondaryTitle {
+            VStack(spacing: Theme.Spacing.md) {
+                filledButton(confirmTitle) { close { onConfirm() } }
+                outlinedButton(secondaryTitle) { close { onSecondary?() } }
+                if showCancel { cancelButton }
+            }
+        } else {
+            HStack(spacing: Theme.Spacing.md) {
+                if showCancel { cancelButton }
+                filledButton(confirmTitle) { close { onConfirm() } }
+            }
+        }
+    }
+
+    /// 朱砂红填充 + 白字（主操作）。
+    private func filledButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(Theme.Font.l2)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity).frame(height: 50)
+                .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        }.buttonStyle(PressableButtonStyle())
+    }
+
+    /// 白底 + 描边 + 深字（次要操作）。
+    private func outlinedButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(Theme.Font.l2)
+                .foregroundStyle(Theme.Color.fg)
+                .frame(maxWidth: .infinity).frame(height: 50)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.Color.border, lineWidth: 1))
+        }.buttonStyle(PressableButtonStyle())
+    }
+
+    /// 暖底浅灰「取消」。
+    private var cancelButton: some View {
+        Button { close {} } label: {
+            Text("取消")
+                .font(Theme.Font.l2)
+                .foregroundStyle(Theme.Color.fg)
+                .frame(maxWidth: .infinity).frame(height: 50)
+                .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        }.buttonStyle(PressableButtonStyle())
     }
 }
 

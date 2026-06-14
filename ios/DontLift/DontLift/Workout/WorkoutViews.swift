@@ -16,8 +16,10 @@ struct WorkoutListView: View {
     /// 导航打开的会话（点横幅继续 / 新建后进入 Live 记录界面）。
     @State private var openedSession: Workout?
     /// 单一活跃会话守卫：存在进行中会话时暂存「继续 / 丢弃」冲突态与待新建闭包。
+    /// `showConflict` 仅驱动弹窗显隐，与数据分离——避免弹窗淡出关闭时清空 `conflict` 导致动作回调读到 nil。
     @State private var conflict: Workout?
     @State private var pendingBuild: (() -> Workout)?
+    @State private var showConflict = false
     /// 待删除的已完成训练（左滑删除二次确认）。
     @State private var pendingDelete: Workout?
     /// 待删训练行的全局坐标，供删除确认卡片定位于其正下方。
@@ -91,17 +93,27 @@ struct WorkoutListView: View {
         .toolbar(.hidden, for: .navigationBar)
         // 已完成训练 / 进行中会话 → 经 openedSession 绑定式导航到对应页面。
         .navigationDestination(item: $openedSession) { workoutDestination($0) }
-        .confirmationDialog("已有进行中的训练", isPresented: Binding(
-            get: { conflict != nil },
-            set: { if !$0 { conflict = nil; pendingBuild = nil } }), presenting: conflict) { existing in
-            Button("继续训练") { openedSession = existing; pendingBuild = nil }
-            Button("丢弃并开始新训练", role: .destructive) {
-                WorkoutSession.discard(existing, in: modelContext)
-                if let build = pendingBuild { commit(build) }
-                pendingBuild = nil
+        // 训练冲突二次确认：统一为纸感弹窗。无独立取消按钮，点蒙层即取消；
+        // 「丢弃并开始新训练」为主（红填充）、「继续训练」为次（描边）。
+        .paperConfirmDialog(
+            isPresented: $showConflict,
+            title: "已有进行中的训练",
+            message: "同一时间只能有一个进行中的训练。继续既有训练，或丢弃后开始新的。",
+            confirmTitle: "丢弃并开始新训练",
+            secondaryTitle: "继续训练",
+            onSecondary: {
+                if let existing = conflict { openedSession = existing }
+                clearConflict()
+            },
+            showCancel: false,
+            onConfirm: {
+                if let existing = conflict {
+                    WorkoutSession.discard(existing, in: modelContext)
+                    if let build = pendingBuild { commit(build) }
+                }
+                clearConflict()
             }
-            Button("取消", role: .cancel) { pendingBuild = nil }
-        } message: { _ in Text("同一时间只能有一个进行中的训练。继续既有训练，或丢弃后开始新的。") }
+        )
         // 删除二次确认：以 fullScreenCover（透明背景）呈现，层级高于 TabView，scrim 覆盖底部 Tab Bar 使其不可点；
         // 卡片按被删 Item 的全局坐标定位于其正下方，点击卡片外的 scrim 即取消，不另设取消按钮。
         .fullScreenCover(isPresented: Binding(
@@ -383,9 +395,16 @@ struct WorkoutListView: View {
         if let existing = WorkoutSession.activeSession(in: modelContext) {
             pendingBuild = build
             conflict = existing
+            showConflict = true
         } else {
             commit(build)
         }
+    }
+
+    /// 关闭冲突弹窗并清理冲突态（动作执行完或取消后调用）。
+    private func clearConflict() {
+        conflict = nil
+        pendingBuild = nil
     }
 
     private func commit(_ build: () -> Workout) {
