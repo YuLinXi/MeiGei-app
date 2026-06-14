@@ -211,6 +211,8 @@ struct PlanDetailView: View {
     /// 单一活跃会话守卫：冲突态 + 待新建闭包 + 导航打开的会话。
     @State private var conflict: Workout?
     @State private var pendingBuild: (() -> Workout)?
+    /// 仅驱动冲突弹窗显隐，与数据分离——避免弹窗淡出关闭时清空 `conflict` 致动作回调读到 nil。
+    @State private var showConflict = false
     @State private var startedSession: Workout?
 
     private static let log = Logger(subsystem: "com.yulinxi.app.DontLift", category: "PlanDetail")
@@ -319,17 +321,27 @@ struct PlanDetailView: View {
             PlanRenameSheet(plan: plan)
         }
         .navigationDestination(item: $startedSession) { WorkoutLoggingView(workout: $0) }
-        .confirmationDialog("已有进行中的训练", isPresented: Binding(
-            get: { conflict != nil },
-            set: { if !$0 { conflict = nil; pendingBuild = nil } }), presenting: conflict) { existing in
-            Button("继续训练") { startedSession = existing; pendingBuild = nil }
-            Button("丢弃并开始新训练", role: .destructive) {
-                WorkoutSession.discard(existing, in: modelContext)
-                if let build = pendingBuild { commit(build) }
-                pendingBuild = nil
+        // 训练冲突二次确认：统一为纸感弹窗。无独立取消按钮，点蒙层即取消；
+        // 「丢弃并开始新训练」为主（红填充）、「继续训练」为次（描边）。
+        .paperConfirmDialog(
+            isPresented: $showConflict,
+            title: "已有进行中的训练",
+            message: "同一时间只能有一个进行中的训练。继续既有训练，或丢弃后开始新的。",
+            confirmTitle: "丢弃并开始新训练",
+            secondaryTitle: "继续训练",
+            onSecondary: {
+                if let existing = conflict { startedSession = existing }
+                clearConflict()
+            },
+            showCancel: false,
+            onConfirm: {
+                if let existing = conflict {
+                    WorkoutSession.discard(existing, in: modelContext)
+                    if let build = pendingBuild { commit(build) }
+                }
+                clearConflict()
             }
-            Button("取消", role: .cancel) { pendingBuild = nil }
-        } message: { _ in Text("同一时间只能有一个进行中的训练。继续既有训练，或丢弃后开始新的。") }
+        )
     }
 
     private var header: some View {
@@ -553,9 +565,16 @@ struct PlanDetailView: View {
         if let existing = WorkoutSession.activeSession(in: modelContext) {
             pendingBuild = buildFromPlan
             conflict = existing
+            showConflict = true
         } else {
             commit(buildFromPlan)
         }
+    }
+
+    /// 关闭冲突弹窗并清理冲突态（动作执行完或取消后调用）。
+    private func clearConflict() {
+        conflict = nil
+        pendingBuild = nil
     }
 
     private func buildFromPlan() -> Workout {
