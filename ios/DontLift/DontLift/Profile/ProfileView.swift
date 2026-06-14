@@ -163,20 +163,14 @@ struct ProfileView: View {
     }
 
     private func avatarCircle(initial: String) -> some View {
-        let color = ProfileView.avatarPalette[abs(initial.hashValue) % ProfileView.avatarPalette.count]
-        return ZStack {
-            Circle().fill(color).frame(width: 64, height: 64)
+        // 头像统一用主色调（朱砂红），与全局单点强调一致。
+        ZStack {
+            Circle().fill(Theme.Color.accent).frame(width: 64, height: 64)
             Text(initial)
                 .font(Theme.Font.display(size: 28, weight: .bold))
                 .foregroundStyle(Theme.Color.bg)
         }
     }
-
-    private static let avatarPalette: [Color] = [
-        Theme.Color.accent,
-        Theme.Color.accent,
-        Theme.Color.ok,
-    ]
 
     private func subtitleText(years: Double) -> String {
         "训练龄 \(String(format: "%.1f", years)) 年"
