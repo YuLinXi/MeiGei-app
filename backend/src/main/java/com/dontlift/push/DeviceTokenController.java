@@ -1,6 +1,5 @@
 package com.dontlift.push;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dontlift.common.id.Uuid7;
 import com.dontlift.push.dto.RegisterTokenRequest;
 import com.dontlift.push.entity.DeviceToken;
@@ -23,24 +22,20 @@ public class DeviceTokenController {
 
     private final DeviceTokenMapper mapper;
 
-    /** 注册/更新本设备的 APNs token（token 唯一，重复注册则改归属与环境）。 */
+    /**
+     * 注册/更新本设备的 APNs token。token 唯一，重复注册则改归属与环境。
+     * 用原子 upsert（ON CONFLICT），避免登录与 didRegister 回调近乎同时注册同一 token 时
+     * 「先查后插」竞态撞 uq_apns_token。
+     */
     @PostMapping("/token")
     public ResponseEntity<Void> register(@Valid @RequestBody RegisterTokenRequest req) {
         UUID userId = SecurityUtils.currentUserId();
-        DeviceToken existing = mapper.selectOne(new LambdaQueryWrapper<DeviceToken>()
-                .eq(DeviceToken::getApnsToken, req.apnsToken()));
-        if (existing == null) {
-            DeviceToken dt = new DeviceToken();
-            dt.setId(Uuid7.generate());
-            dt.setUserId(userId);
-            dt.setApnsToken(req.apnsToken());
-            dt.setEnvironment(req.environment());
-            mapper.insert(dt);
-        } else {
-            existing.setUserId(userId);
-            existing.setEnvironment(req.environment());
-            mapper.updateById(existing);
-        }
+        DeviceToken dt = new DeviceToken();
+        dt.setId(Uuid7.generate());
+        dt.setUserId(userId);
+        dt.setApnsToken(req.apnsToken());
+        dt.setEnvironment(req.environment());
+        mapper.upsertByApnsToken(dt);
         return ResponseEntity.ok().build();
     }
 }
