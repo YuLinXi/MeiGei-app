@@ -143,42 +143,176 @@ struct TeamListView: View {
         .cardStyle()
     }
 
-    // 原型空态：居中标题「还没有 Team」+ 朱砂红「创建」主键 + 「用邀请码加入」次键。
+    // 原型空态（引导重设计）：虚化队友动态预览 → 价值三点 → 创建 / 加入双 CTA。
+    // 用 containerRelativeFrame 撑满一屏，Spacer 把 CTA 压到底部（margin-top:auto 等效）。
     private var emptyState: some View {
-        VStack(spacing: Theme.Spacing.md) {
-            Text("还没有 Team")
-                .font(Theme.Font.display(size: 22, weight: .bold))
+        VStack(spacing: 0) {
+            previewStack
+                .padding(.top, Theme.Spacing.sm)
+
+            Text("和训练搭子组队")
+                .font(Theme.Font.display(size: 22, weight: .heavy))
+                .tracking(-0.4)
                 .foregroundStyle(Theme.Color.fg)
-            Text("创建一个小队，或用邀请码加入训练搭子的圈子。")
-                .font(Theme.Font.body(size: 13))
+                .padding(.top, 18)
+
+            Text("3 人小圈子，认真训练、互相督促。\n加入后，队友的每次打卡都会出现在这里。")
+                .font(Theme.Font.body(size: 12.5))
                 .foregroundStyle(Theme.Color.fg2)
                 .multilineTextAlignment(.center)
-            VStack(spacing: Theme.Spacing.sm) {
-                Button { creating = true } label: {
-                    Text("创建 Team")
-                        .font(Theme.Font.body(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.Color.bg)
-                        .padding(.horizontal, Theme.Spacing.lg)
-                        .frame(height: 40)
-                        .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                }
-                .buttonStyle(.plain)
-                .paperShadow(.sm, cornerRadius: Theme.Radius.md)
-                Button { joining = true } label: {
-                    Text("用邀请码加入")
-                        .font(Theme.Font.body(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.Color.fg)
-                        .padding(.horizontal, Theme.Spacing.lg)
-                        .frame(height: 40)
-                        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.top, Theme.Spacing.sm)
+                .lineSpacing(2)
+                .padding(.top, Theme.Spacing.sm)
+
+            valueList
+                .padding(.top, Theme.Spacing.lg)
+
+            Spacer(minLength: Theme.Spacing.lg)
+
+            emptyCTAs
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 96)
+        .containerRelativeFrame(.vertical) { length, _ in length - 48 }
+    }
+
+    // 视觉引导区：2 张虚化背卡 + 1 张清晰前卡 + 朱砂红人群徽记（纯装饰，不请求数据）。
+    private var previewStack: some View {
+        ZStack {
+            ghostFeedCard(initial: "铁", reactions: ["🔥"])
+                .blur(radius: 1.6)
+                .opacity(0.34)
+                .rotationEffect(.degrees(-4.5))
+                .offset(x: -30, y: -37)
+            ghostFeedCard(initial: "L", reactions: ["💪"])
+                .blur(radius: 1)
+                .opacity(0.5)
+                .rotationEffect(.degrees(3.5))
+                .offset(x: 28, y: -27)
+            ghostFeedCard(initial: "周", reactions: ["🔥", "💪"])
+                .opacity(0.95)
+                .offset(y: 21)
+            groupEmblem
+                .offset(y: -40)
+        }
+        .frame(height: 138)
+    }
+
+    private func ghostFeedCard(initial: String, reactions: [String]) -> some View {
+        HStack(spacing: 9) {
+            Text(initial)
+                .font(Theme.Font.body(size: 11, weight: .bold))
+                .foregroundStyle(Theme.Color.fg2)
+                .frame(width: 30, height: 30)
+                .background(Theme.Color.surface2, in: Circle())
+                .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 6) {
+                Capsule().fill(Theme.Color.border2).frame(width: 78, height: 7)
+                Capsule().fill(Theme.Color.border).frame(width: 108, height: 6)
+            }
+            Spacer(minLength: 0)
+            HStack(spacing: 3) {
+                ForEach(reactions, id: \.self) { r in
+                    Text(r)
+                        .font(.system(size: 9))
+                        .frame(width: 19, height: 19)
+                        .background(Theme.Color.accentSoft, in: Circle())
+                        .overlay(Circle().stroke(Theme.Color.accentSofter, lineWidth: 1))
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .frame(width: 206)
+        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
+        .paperShadow(.sm, cornerRadius: Theme.Radius.md)
+    }
+
+    private var groupEmblem: some View {
+        Image(systemName: "person.2")
+            .font(.system(size: 23, weight: .semibold))
+            .foregroundStyle(Theme.Color.accent)
+            .frame(width: 58, height: 58)
+            .background(Theme.Color.surface, in: Circle())
+            .overlay(Circle().stroke(Theme.Color.accentSofter, lineWidth: 1.6))
+            .paperShadow(.md, cornerRadius: 29)
+    }
+
+    // 价值三点：为什么组队（朱砂红线性图标 + 标题 + 一行短描述）。
+    private var valueList: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            valueRow(icon: "arrow.triangle.2.circlepath",
+                     title: "训练即打卡",
+                     desc: "完成训练自动同步到队里，无需手动发动态。")
+            valueRow(icon: "flame",
+                     title: "互相鼓励",
+                     desc: "给队友的打卡点 🔥 💪 表情反应，看见彼此坚持。")
+            valueRow(icon: "arrow.triangle.branch",
+                     title: "共享计划",
+                     desc: "一键 Fork 队友发布的训练计划，直接开练。")
+        }
+    }
+
+    private func valueRow(icon: String, title: String, desc: String) -> some View {
+        HStack(alignment: .top, spacing: 11) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.Color.accent)
+                .frame(width: 30, height: 30)
+                .background(Theme.Color.accentSoft, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).stroke(Theme.Color.accentSofter, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(Theme.Font.body(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.fg)
+                Text(desc)
+                    .font(Theme.Font.body(size: 11))
+                    .foregroundStyle(Theme.Color.muted)
+                    .lineSpacing(1.5)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    // 双 CTA：主键「创建 Team」朱砂红实底 + 投影；次键「用邀请码加入」白底描边；脚注 mono。
+    private var emptyCTAs: some View {
+        VStack(spacing: Theme.Spacing.sm + 1) {
+            Button { creating = true } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "plus").font(.system(size: 15, weight: .bold))
+                    Text("创建 Team").font(Theme.Font.body(size: 15, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .shadow(color: Theme.Color.accent.opacity(0.4), radius: 12, x: 0, y: 6)
+            }
+            .buttonStyle(PressableButtonStyle())
+
+            Button { joining = true } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "arrow.right.to.line")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.Color.fg2)
+                    Text("用邀请码加入")
+                        .font(Theme.Font.body(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).stroke(Theme.Color.border2, lineWidth: 1))
+                .paperShadow(.sm, cornerRadius: Theme.Radius.md)
+            }
+            .buttonStyle(PressableButtonStyle())
+
+            Text("3 人小圈子 · 建队自动生成邀请码")
+                .font(Theme.Font.mono(size: 10))
+                .tracking(0.5)
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.top, 2)
+        }
     }
 
     private func reload() async {
