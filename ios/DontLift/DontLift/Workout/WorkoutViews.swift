@@ -27,8 +27,6 @@ struct WorkoutListView: View {
     /// 左滑删除协调器：同一时刻仅一张展开，点击别处自动收回（详见 SwipeDeleteList）。
     @State private var swipe = SwipeRowCoordinator()
 
-    /// 当前唯一进行中会话（首页横幅来源）。
-    private var activeSession: Workout? { workouts.first(where: { $0.isActive }) }
     /// 已完成训练（最近列表 / 统计仅看这些，进行中会话不混入）。
     private var finishedWorkouts: [Workout] { workouts.filter { $0.isFinished } }
 
@@ -78,14 +76,6 @@ struct WorkoutListView: View {
                 }
             }
             startCTA
-        }
-        // LIVE 悬浮胶囊：有活跃会话时浮于内容之上，可拖拽、吸附边缘、点击直达进行中页。
-        .overlay {
-            if let active = activeSession {
-                LiveSessionCapsule(title: active.title ?? "训练") {
-                    openedSession = active
-                }
-            }
         }
         // 首页 Header 用自绘大标题（训练 + YU 头像，对齐设计图 .nav），隐藏系统导航栏。
         // 工具栏左右上角入口均已移除：右上角原「搜索占位 + 加号菜单」、左上角「日历 / 训练历史」
