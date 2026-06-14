@@ -102,14 +102,17 @@ struct TeamListView: View {
                 .tracking(-1.08)
                 .foregroundStyle(Theme.Color.fg)
             Spacer(minLength: 0)
-            Menu {
-                Button("创建 Team") { creating = true }
-                Button("用邀请码加入") { joining = true }
-            } label: {
-                CircleAddLabel()
+            // 空态已有大号双 CTA，此时不再出右上 +，避免重复入口；有团队后才显示。
+            if !teamService.teams.isEmpty {
+                Menu {
+                    Button("创建 Team") { creating = true }
+                    Button("用邀请码加入") { joining = true }
+                } label: {
+                    CircleAddLabel()
+                }
+                .buttonStyle(PressableButtonStyle())
+                .accessibilityLabel("创建或加入 Team")
             }
-            .buttonStyle(PressableButtonStyle())
-            .accessibilityLabel("创建或加入 Team")
         }
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.top, 6)
@@ -163,10 +166,11 @@ struct TeamListView: View {
                 .lineSpacing(2)
                 .padding(.top, Theme.Spacing.sm)
 
-            valueList
-                .padding(.top, Theme.Spacing.lg)
+            Spacer(minLength: Theme.Spacing.xl)
 
-            Spacer(minLength: Theme.Spacing.lg)
+            valueList
+
+            Spacer(minLength: Theme.Spacing.xl)
 
             emptyCTAs
         }
@@ -239,7 +243,7 @@ struct TeamListView: View {
 
     // 价值三点：为什么组队（朱砂红线性图标 + 标题 + 一行短描述）。
     private var valueList: some View {
-        VStack(spacing: Theme.Spacing.md) {
+        VStack(spacing: Theme.Spacing.lg) {
             valueRow(icon: "arrow.triangle.2.circlepath",
                      title: "训练即打卡",
                      desc: "完成训练自动同步到队里，无需手动发动态。")
@@ -253,20 +257,20 @@ struct TeamListView: View {
     }
 
     private func valueRow(icon: String, title: String, desc: String) -> some View {
-        HStack(alignment: .top, spacing: 11) {
+        HStack(alignment: .top, spacing: 13) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Theme.Color.accent)
-                .frame(width: 30, height: 30)
-                .background(Theme.Color.accentSoft, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).stroke(Theme.Color.accentSofter, lineWidth: 1))
-            VStack(alignment: .leading, spacing: 2) {
+                .frame(width: 38, height: 38)
+                .background(Theme.Color.accentSoft, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(Theme.Color.accentSofter, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(Theme.Font.body(size: 13, weight: .bold))
+                    .font(Theme.Font.body(size: 16, weight: .bold))
                     .foregroundStyle(Theme.Color.fg)
                 Text(desc)
-                    .font(Theme.Font.body(size: 11))
-                    .foregroundStyle(Theme.Color.muted)
+                    .font(Theme.Font.body(size: 13))
+                    .foregroundStyle(Theme.Color.fg2)
                     .lineSpacing(1.5)
                     .fixedSize(horizontal: false, vertical: true)
             }
