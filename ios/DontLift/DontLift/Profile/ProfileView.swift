@@ -80,6 +80,7 @@ struct ProfileView: View {
                         trainingPrefsGroup
                         aboutGroup
                         accountGroup
+                        deleteAccountRow
                         Color.clear.frame(height: 32)
                     }
                     .padding(.horizontal, Theme.Spacing.lg)
@@ -547,24 +548,24 @@ struct ProfileView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+        }
+    }
 
-            rowDivider
-
-            // 删除账号（danger，先拉影响面再二次确认）
+    /// 删除账号（极弱化入口：无卡片背景、muted 小字、右对齐、无图标；
+    /// 红色危险感仅留在二次确认弹窗。先拉影响面再二次确认）
+    private var deleteAccountRow: some View {
+        HStack(spacing: 0) {
+            Spacer()
+            // 仅文字区域可点：Spacer 在 Button 外，按钮只包住文案本身
             Button { startDelete() } label: {
-                HStack(spacing: Theme.Spacing.md) {
-                    Image(systemName: "trash")
-                        .foregroundStyle(Theme.Color.danger).frame(width: 24)
+                HStack(spacing: Theme.Spacing.sm) {
                     Text("删除账号")
-                        .font(Theme.Font.body(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.Color.danger)
-                    Spacer()
+                        .font(Theme.Font.body(size: 11))
+                        .foregroundStyle(Theme.Color.muted)
                     if loadingImpact || deleting {
-                        ProgressView().tint(Theme.Color.danger)
+                        ProgressView().tint(Theme.Color.muted)
                     }
                 }
-                .padding(.horizontal, Theme.Spacing.md)
-                .frame(height: 48)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
