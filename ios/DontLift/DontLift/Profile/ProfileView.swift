@@ -237,7 +237,9 @@ struct ProfileView: View {
     }
 
     private func setSex(_ s: BodySex) {
-        guard let profile, profile.sex != s else { return }
+        // 用 ensureProfile 兜底：desync 场景下（token 在、本地档案缺失）@Query 查不到 profile，
+        // 此处补建后再写，避免点击性别胶囊静默无效。
+        guard let profile = session.ensureProfile(), profile.sex != s else { return }
         profile.sex = s
         try? modelContext.save()
         Theme.Haptics.selection()
