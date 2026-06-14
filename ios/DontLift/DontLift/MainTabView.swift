@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import UIKit
 
 /// 主界面 Tab：训练三件套 + Team + 我的（饮食模块已移出 MVP）。
@@ -6,6 +7,15 @@ struct MainTabView: View {
     @Environment(RestTimerController.self) private var restTimer
     @Environment(PRCelebrationCenter.self) private var prCelebration
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// 全局进行中会话（LIVE 悬浮胶囊来源）：未删除且未结束 = isActive。
+    /// 因 `Workout.isActive` 是计算属性不能进 `#Predicate`，此处直接展开其条件。
+    @Query(filter: #Predicate<Workout> { $0.deletedAt == nil && $0.endedAt == nil },
+           sort: \Workout.startedAt, order: .reverse)
+    private var activeWorkouts: [Workout]
+    private var activeSession: Workout? { activeWorkouts.first }
+    /// 全局胶囊点击 → push 进行中记录页（活跃会话必为 isActive，无需 finished 分流）。
+    @State private var openedSession: Workout?
 
     /// 休息全屏弹窗开/关动画：纯渐隐（无位移）。
     private var restAnim: Animation { .easeInOut(duration: reduceMotion ? 0.2 : 0.3) }
@@ -79,6 +89,17 @@ struct MainTabView: View {
             }
             .toolbarBackground(Theme.Color.bg, for: .navigationBar)
             .toolbarColorScheme(.light, for: .navigationBar)
+            // 全局 LIVE 悬浮胶囊：有进行中会话时浮于 TabView 之上、各 Tab 通用；
+            // 挂在 NavigationStack 内 → push 进 Live 记录页时被全屏页自然盖住。
+            .overlay {
+                if let active = activeSession {
+                    LiveSessionCapsule(title: active.title ?? "训练") {
+                        openedSession = active
+                    }
+                }
+            }
+            // 全局胶囊点击 → 绑定式导航进 Live 记录页（与各 Tab 内部的 openedSession 各自独立）。
+            .navigationDestination(item: $openedSession) { WorkoutLoggingView(workout: $0) }
         }
         .tint(Theme.Color.accent)
         // 休息全屏弹窗：挂在全局 NavigationStack 之上的 overlay，层级高于 push 页与 Tab Bar；
