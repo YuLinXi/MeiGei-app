@@ -14,6 +14,7 @@
 		BB00000000000000000000D0 /* RestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B2 /* RestActivityAttributes.swift */; };
 		BB00000000000000000000D1 /* EndRestIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B3 /* EndRestIntent.swift */; };
 		BB00000000000000000000E1 /* DontLiftWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000A2 /* DontLiftWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BB000000000000000000F2 /* MuscleMap in Frameworks */ = {isa = PBXBuildFile; productRef = BB000000000000000000F1 /* MuscleMap */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -89,6 +90,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BB000000000000000000F2 /* MuscleMap in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -172,6 +174,7 @@
 			);
 			name = DontLift;
 			packageProductDependencies = (
+				BB000000000000000000F1 /* MuscleMap */,
 			);
 			productName = DontLift;
 			productReference = 9A84F6DB2FB9F12600CCCA7E /* DontLift.app */;
@@ -277,6 +280,9 @@
 			);
 			mainGroup = 9A84F6D22FB9F12600CCCA7E;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				BB000000000000000000F0 /* XCRemoteSwiftPackageReference "MuscleMap" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9A84F6DC2FB9F12600CCCA7E /* Products */;
 			projectDirPath = "";
@@ -767,6 +773,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		BB000000000000000000F0 /* XCRemoteSwiftPackageReference "MuscleMap" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/melihcolpan/MuscleMap.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.6.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BB000000000000000000F1 /* MuscleMap */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BB000000000000000000F0 /* XCRemoteSwiftPackageReference "MuscleMap" */;
+			productName = MuscleMap;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9A84F6D32FB9F12600CCCA7E /* Project object */;
 }
