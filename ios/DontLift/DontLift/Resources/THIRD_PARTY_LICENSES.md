@@ -1,15 +1,16 @@
 # 第三方素材许可 · Third-Party Licenses
 
-## 肌群高亮图人体底图
+## 肌群高亮图（MuscleMap SDK）
 
-本 App 的肌群高亮图人体底图 path 数据来源于开源项目
-**react-native-body-highlighter**（https://github.com/HichamELBSI/react-native-body-highlighter），
-作为衍生作品使用，restyle 为纸感配色 + 三态染色。原项目以 MIT 许可证发布，全文如下：
+本 App 的动作详情页肌群高亮图基于开源 Swift Package
+**MuscleMap**（https://github.com/melihcolpan/MuscleMap），
+提供男/女 × 正/背的人体 SVG path 与 SwiftUI Canvas 绘制，restyle 为纸感配色 + 主/协同肌染色。
+原项目以 MIT 许可证发布，全文如下：
 
 ```
 MIT License
 
-Copyright (c) 2022 ELABBASSI Hicham
+Copyright (c) 2026 Melih Colpan
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

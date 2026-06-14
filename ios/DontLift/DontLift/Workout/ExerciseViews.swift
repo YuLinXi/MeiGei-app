@@ -990,17 +990,14 @@ struct ExerciseDetailView: View {
     private var sex: BodySex {
         profiles.first { $0.serverUserId == session.currentUserId }?.sex ?? .male
     }
-    /// 正/背展示面覆盖；nil 时用「亮区更多」默认。
-    @State private var sideOverride: Bool? = nil
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                if !exercise.primaryRegions.isEmpty { muscleMapSection }
                 titleSection
                 yourDataSection
                 if !exercise.formCues.isEmpty { cuesSection }
                 if !exercise.primaryRegions.isEmpty { targetMusclesSection }
+                if !exercise.primaryRegions.isEmpty { muscleMapSection }
                 Color.clear.frame(height: 24)
             }
             .padding(.horizontal, Theme.Spacing.lg)
@@ -1010,43 +1007,17 @@ struct ExerciseDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    // MARK: 高亮图
-
-    private var defaultBack: Bool {
-        let regs = exercise.primaryRegions + exercise.secondaryRegions
-        let f = regs.filter { $0.side == .front || $0.side == .both }.count
-        let b = regs.filter { $0.side == .back || $0.side == .both }.count
-        return b > f
-    }
-    private var showBack: Bool { sideOverride ?? defaultBack }
+    // MARK: 训练部位（正背肌群图）
 
     private var muscleMapSection: some View {
-        VStack(spacing: Theme.Spacing.sm) {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text("训练部位").eyebrowStyle()
             MuscleMapView(primary: exercise.primaryRegions,
                           secondary: exercise.secondaryRegions,
-                          sex: sex,
-                          side: showBack ? .back : .front)
-                .frame(height: 196)
+                          sex: sex)
                 .frame(maxWidth: .infinity)
-            sideToggle
-        }
-        .padding(.vertical, Theme.Spacing.md)
-        .frame(maxWidth: .infinity)
-        .cardStyle()
-    }
-
-    private var sideToggle: some View {
-        HStack(spacing: 4) {
-            ForEach([("正面", false), ("背面", true)], id: \.0) { label, back in
-                Button { sideOverride = back } label: {
-                    Text(label)
-                        .font(Theme.Font.mono(size: 11, weight: .semibold))
-                        .foregroundStyle(showBack == back ? Color.white : Theme.Color.muted)
-                        .padding(.horizontal, 14).padding(.vertical, 5)
-                        .background(showBack == back ? Theme.Color.accent : Theme.Color.surface2, in: Capsule())
-                }
-                .buttonStyle(.plain)
-            }
+                .padding(.vertical, Theme.Spacing.sm)
+                .cardStyle()
         }
     }
 
