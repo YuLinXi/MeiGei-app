@@ -34,15 +34,32 @@ struct BuiltinExercise: Identifiable, Hashable, Codable {
     let name: String
     let primaryMuscle: String
     let equipmentType: String
+    /// 主动肌细分区（高亮图染朱砂红）。默认空 → 高亮图隐藏（待任务 2.x 回填）。
+    var primaryRegions: [MuscleRegion] = []
+    /// 协同肌细分区（高亮图染浅红）。
+    var secondaryRegions: [MuscleRegion] = []
+    /// 动作要点（原创短句 3-5 条；详情页展示）。
+    var formCues: [String] = []
 
     var id: String { code }
 }
 
 extension BuiltinExercise {
-    /// 内置动作集（任务 3.1）。
-    /// 均为客观事实（动作名 + 主要肌群 + 器械类型），无营养/版权敏感数据；按肌群分组。
+    /// 内置动作集（对外）：在 `starterBase` 基础上按 `regionData` 回填细分肌群与要点。
+    /// 未命中 regionData 的动作保持空 region（高亮图隐藏），不影响浏览/筛选/记录。
+    static let starter: [BuiltinExercise] = starterBase.map { ex in
+        guard let d = regionData[ex.code] else { return ex }
+        var e = ex
+        e.primaryRegions = d.primary
+        e.secondaryRegions = d.secondary
+        e.formCues = d.cues
+        return e
+    }
+
+    /// 内置动作基础清单（仅 code/name/primaryMuscle/equipmentType）。
+    /// 均为客观事实，无营养/版权敏感数据；按肌群分组。
     /// `primaryMuscle` 取自 `MuscleGroup.rawValue`，`equipmentType` 取自 `EquipmentType.rawValue`。
-    static let starter: [BuiltinExercise] = [
+    private static let starterBase: [BuiltinExercise] = [
         // MARK: 胸
         .init(code: "BB_BENCH_PRESS", name: "杠铃卧推", primaryMuscle: "胸", equipmentType: "杠铃"),
         .init(code: "DB_BENCH_PRESS", name: "哑铃卧推", primaryMuscle: "胸", equipmentType: "哑铃"),
