@@ -72,6 +72,22 @@ final class SessionStore {
         return UUID(uuidString: sub)
     }
 
+    /// 取当前用户档案；若因 desync（token 在、SwiftData 档案被清空，如开发期重装 App）缺失，
+    /// 则按 currentUserId 懒补建一份最小档案。避免「currentUserId 有值却查不到 UserProfile」
+    /// 导致依赖档案的本地写入（如性别切换）静默失败。
+    @discardableResult
+    func ensureProfile() -> UserProfile? {
+        guard let userId = currentUserId else { return nil }
+        let descriptor = FetchDescriptor<UserProfile>(
+            predicate: #Predicate { $0.serverUserId == userId }
+        )
+        if let existing = try? modelContext.fetch(descriptor).first { return existing }
+        let profile = UserProfile(serverUserId: userId, appleSub: "")
+        modelContext.insert(profile)
+        try? modelContext.save()
+        return profile
+    }
+
     private func upsertProfile(userId: UUID, appleSub: String?, email: String?, displayName: String?) {
         let descriptor = FetchDescriptor<UserProfile>(
             predicate: #Predicate { $0.serverUserId == userId }

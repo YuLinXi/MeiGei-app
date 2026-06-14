@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Charts
 
 /// 选择动作的结果：内置 code 或自定义 id 二选一。
 struct ExercisePick: Identifiable, Hashable {
@@ -52,7 +53,7 @@ struct ExerciseLibraryView: View {
     @State private var query = ""
     @State private var muscle: String = "all"
     @State private var showingCreate = false
-    /// 动作详情导航：绑定式 navigationDestination(item:)，避免类型注册式在嵌套 TabView 的 stack 里失灵。
+    /// 动作详情导航：绑定式 navigationDestination(item:)，避免类型注册式（for:）在嵌套 TabView 的 stack 里失灵。
     @State private var selectedExercise: BuiltinExercise?
 
     private let chips: [LibraryChip] = [
@@ -975,143 +976,200 @@ extension String {
 
 // MARK: - 动作详情（设计稿 03）
 
+/// 动作详情（设计稿 v2）：纯浏览/查资料页——高亮图 + 标题 + 你的数据 + 要点 + 目标肌群。
+/// 不含任何写训练数据入口（旧「加入今日训练」CTA 已移除，加动作走 ExercisePicker / 计划编辑）。
 struct ExerciseDetailView: View {
     let exercise: BuiltinExercise
-    @Environment(\.modelContext) private var modelContext
+    @Environment(SessionStore.self) private var session
     @Environment(\.dismiss) private var dismiss
     @Query(filter: #Predicate<Workout> { $0.deletedAt == nil },
            sort: \Workout.startedAt, order: .reverse)
     private var workouts: [Workout]
-    /// 加入今日训练后导航进入的会话。
-    @State private var startedSession: Workout?
+    @Query private var profiles: [UserProfile]
 
+    /// 用户性别（仅切高亮图底图）。
+    private var sex: BodySex {
+        profiles.first { $0.serverUserId == session.currentUserId }?.sex ?? .male
+    }
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Theme.Color.bg.ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    cover
-                    title
-                    tipsCard
-                    musclesCard
-                    Color.clear.frame(height: 80)
-                }
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.top, Theme.Spacing.md)
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                titleSection
+                yourDataSection
+                if !exercise.formCues.isEmpty { cuesSection }
+                if !exercise.primaryRegions.isEmpty { targetMusclesSection }
+                if !exercise.primaryRegions.isEmpty { muscleMapSection }
+                Color.clear.frame(height: 24)
             }
-            joinCTA
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.top, Theme.Spacing.md)
         }
+        .background(Theme.Color.bg.ignoresSafeArea())
         // 子页统一导航栏：纸感圆形返回钮（标题留空，动作名在内容区大字呈现）。
         .paperToolbar(onBack: { dismiss() })
-        .navigationDestination(item: $startedSession) { WorkoutLoggingView(workout: $0) }
     }
 
-    // 顶部 cover：斜条纹「采集中」占位图（部位高亮图素材尚未采集，design.md Non-Goals）。
-    private var cover: some View {
-        ZStack {
-            Theme.Color.surface2
-            // 斜条纹纹理
-            Canvas { ctx, size in
-                let spacing: CGFloat = 14
-                let lineColor = Theme.Color.border2
-                var x: CGFloat = -size.height
-                while x <= size.width {
-                    var p = Path()
-                    p.move(to: CGPoint(x: x, y: size.height))
-                    p.addLine(to: CGPoint(x: x + size.height, y: 0))
-                    ctx.stroke(p, with: .color(lineColor), lineWidth: 1.5)
-                    x += spacing
-                }
-            }
-            VStack(spacing: 6) {
-                Image(systemName: "photo.badge.plus")
-                    .font(.system(size: 24, weight: .regular))
-                    .foregroundStyle(Theme.Color.muted)
-                Text("部位高亮图 · 采集中").eyebrowStyle()
-            }
+    // MARK: 训练部位（正背肌群图）
+
+    private var muscleMapSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text("训练部位").eyebrowStyle()
+            MuscleMapView(primary: exercise.primaryRegions,
+                          secondary: exercise.secondaryRegions,
+                          sex: sex)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Theme.Spacing.sm)
+                .cardStyle()
         }
-        .frame(height: 160)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg).stroke(Theme.Color.border, lineWidth: 1))
     }
 
-    private var title: some View {
-        VStack(alignment: .leading, spacing: 6) {
+    // MARK: 标题 + meta chip（不暴露内部 code）
+
+    private var titleSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
             Text(exercise.name)
                 .font(Theme.Font.display(size: 28, weight: .bold))
                 .foregroundStyle(Theme.Color.fg)
-            Text(exercise.code)
-                .font(Theme.Font.mono(size: 13, weight: .regular))
-                .foregroundStyle(Theme.Color.muted)
-            Text("\(exercise.primaryMuscle) · \(exercise.equipmentType)")
-                .eyebrowStyle()
-        }
-    }
-
-    private var tipsCard: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("FORM · 动作要点").eyebrowStyle()
-            // BuiltinExercise 暂无 tip 字段（任务 3.1 数据工程未完成），统一占位。
-            Text("暂无要点 · 数据采集中")
-                .font(Theme.Font.body(size: 13))
-                .foregroundStyle(Theme.Color.muted)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardStyle()
-    }
-
-    private var musclesCard: some View {
-        HStack(spacing: Theme.Spacing.md) {
-            muscleColumn(title: "PRIMARY · 主动肌", value: exercise.primaryMuscle)
-            muscleColumn(title: "SYNERGISTS · 协同", value: "—")
-        }
-    }
-
-    private func muscleColumn(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).eyebrowStyle()
-            Text(value)
-                .font(Theme.Font.body(size: 15, weight: .semibold))
-                .foregroundStyle(value == "—" ? Theme.Color.muted : Theme.Color.fg)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardStyle()
-    }
-
-    private var joinCTA: some View {
-        Button { addToTodayWorkout() } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "plus")
-                Text("加入今日训练")
+            HStack(spacing: 7) {
+                metaChip(exercise.primaryMuscle)
+                metaChip(exercise.equipmentType)
             }
-            .font(Theme.Font.body(size: 16, weight: .semibold))
-            .foregroundStyle(Theme.Color.bg)
-            .frame(maxWidth: .infinity).frame(height: 52)
-            .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-            .paperShadow(.md, cornerRadius: Theme.Radius.md)
         }
-        .buttonStyle(.plain)
-        .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.bottom, 16)
+    }
+    private func metaChip(_ s: String) -> some View {
+        Text(s)
+            .font(Theme.Font.body(size: 12, weight: .semibold))
+            .foregroundStyle(Theme.Color.fg2)
+            .padding(.horizontal, 11).padding(.vertical, 4)
+            .background(Theme.Color.surface, in: Capsule())
+            .overlay(Capsule().stroke(Theme.Color.border, lineWidth: 1))
     }
 
-    /// 加入今日训练：经单一活跃会话守卫——存在进行中会话则追加动作（即「继续」），
-    /// 否则新建唯一会话。随后导航进入 Live 记录界面。
-    private func addToTodayWorkout() {
-        let target = WorkoutSession.activeSession(in: modelContext) ?? {
-            let w = Workout(title: "训练")
-            modelContext.insert(w)
-            return w
-        }()
-        let ex = WorkoutExercise(builtinExerciseCode: exercise.code,
-                                 customExerciseId: nil,
-                                 exerciseName: exercise.name,
-                                 primaryMuscle: exercise.primaryMuscle,
-                                 orderIndex: target.exercises.count)
-        ex.sets = [WorkoutSet(setIndex: 0)]
-        target.exercises.append(ex)
-        target.markDirty()
-        try? modelContext.save()
-        startedSession = target
+    // MARK: 你的数据（全部按 workouts 重算，不持久化）
+
+    /// 含该动作、已结束、未软删的训练（按 startedAt 降序，沿用 workouts 排序）。
+    private var matching: [Workout] {
+        workouts.filter { $0.endedAt != nil && $0.exercises.contains { $0.historyKey == exercise.code } }
+    }
+
+    private var yourDataSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text("你的数据").eyebrowStyle()
+            if matching.isEmpty {
+                Text("还没练过 · 去训练里记录这个动作")
+                    .font(Theme.Font.body(size: 13))
+                    .foregroundStyle(Theme.Color.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .cardStyle()
+            } else {
+                dataCard
+            }
+        }
+    }
+
+    private var dataCard: some View {
+        let pr = PRStats.latestPR(for: exercise.code, in: workouts)
+        let last = matching.first
+        return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            HStack(spacing: Theme.Spacing.md) {
+                dataCell("上次", lastAgoText(last))
+                dataCell("最近一组", lastSetText(last))
+                dataCell("PR", pr.map { "\(formatKg($0.weightKg))kg" } ?? "—", accent: true)
+            }
+            miniChart
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+
+    private func dataCell(_ k: String, _ v: String, accent: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(k).font(Theme.Font.mono(size: 9)).foregroundStyle(Theme.Color.muted)
+            Text(v).font(Theme.Font.body(size: 16, weight: .bold))
+                .foregroundStyle(accent ? Theme.Color.accent : Theme.Color.fg)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 每训练日最大重量序列（按时间升序）。
+    private var chartData: [(idx: Int, weight: Double)] {
+        Array(matching.reversed()).enumerated().compactMap { i, w in
+            let mx = w.exercises.filter { $0.historyKey == exercise.code }
+                .flatMap { $0.sets }.compactMap { $0.weightKg }.max()
+            return mx.map { (i, $0) }
+        }
+    }
+
+    @ViewBuilder private var miniChart: some View {
+        let data = chartData
+        if data.count >= 2 {
+            Chart(data, id: \.idx) { p in
+                BarMark(x: .value("次", p.idx), y: .value("kg", p.weight))
+                    .foregroundStyle(Theme.Color.accentSofter)
+                    .cornerRadius(2)
+            }
+            .chartXAxis(.hidden).chartYAxis(.hidden)
+            .frame(height: 46)
+        }
+    }
+
+    private func lastAgoText(_ w: Workout?) -> String {
+        guard let d = w?.startedAt else { return "—" }
+        let cal = Calendar.current
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: cal.startOfDay(for: .now)).day ?? 0
+        if days <= 0 { return "今天" }
+        if days == 1 { return "昨天" }
+        return "\(days) 天前"
+    }
+    private func lastSetText(_ w: Workout?) -> String {
+        guard let w else { return "—" }
+        let sets = w.exercises.filter { $0.historyKey == exercise.code }.flatMap { $0.sets }
+        guard let s = sets.last(where: { $0.weightKg != nil && $0.reps != nil }),
+              let wt = s.weightKg, let r = s.reps else { return "—" }
+        return "\(formatKg(wt))×\(r)"
+    }
+
+    // MARK: 动作要点
+
+    private var cuesSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text("动作要点").eyebrowStyle()
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(exercise.formCues.enumerated()), id: \.offset) { i, cue in
+                    HStack(alignment: .top, spacing: 9) {
+                        Text("\(i + 1)").font(Theme.Font.mono(size: 11, weight: .bold))
+                            .foregroundStyle(Theme.Color.accent).frame(width: 14)
+                        Text(cue).font(Theme.Font.body(size: 13)).foregroundStyle(Theme.Color.fg2)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
+        }
+    }
+
+    // MARK: 目标肌群（与高亮图三态色同源）
+
+    private var targetMusclesSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text("目标肌群").eyebrowStyle()
+            VStack(alignment: .leading, spacing: 10) {
+                muscleRow(color: Theme.Color.accent, tag: "主动肌", regions: exercise.primaryRegions)
+                if !exercise.secondaryRegions.isEmpty {
+                    muscleRow(color: Theme.Color.accentSofter, tag: "协同肌", regions: exercise.secondaryRegions)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
+        }
+    }
+    private func muscleRow(color: Color, tag: String, regions: [MuscleRegion]) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Circle().fill(color).frame(width: 8, height: 8).padding(.top, 5)
+            Text(tag).font(Theme.Font.mono(size: 10)).foregroundStyle(Theme.Color.muted)
+                .frame(width: 44, alignment: .leading)
+            Text(regions.map(\.displayName).joined(separator: " · "))
+                .font(Theme.Font.body(size: 14, weight: .semibold)).foregroundStyle(Theme.Color.fg)
+        }
     }
 }
