@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - 训练录入专用数字键盘（自研，替代系统 decimalPad/numberPad）
 
 /// 训练进行中录入重量/次数的底部键盘。
-/// 键位：`0-9` · `.` · `⌫` · `上一项` · `下一项` + 浮动「收起」。
+/// 键位：`0-9` · `.` · `⌫` · `上一项` · `下一项` · `加一组` + 右上角图标「收起」。
 /// 无「完成」键——组打卡仍由每行右侧勾选按钮承担，与键盘解耦。
 struct WorkoutKeypad: View {
     /// 小数点是否可用：重量态 true、次数态 false（次数为整数，`.` 灰显无效）。
@@ -13,22 +13,36 @@ struct WorkoutKeypad: View {
     var onBackspace: () -> Void
     var onPrev: () -> Void
     var onNext: () -> Void
+    /// 「加一组」：在当前动作追加一组待填写组并聚焦其重量（高频操作不离键盘）。
+    var onAddSet: () -> Void
     var onDismiss: () -> Void
 
-    /// 单键高度；数字区 4 行、右侧导航键各跨 2 行，二者等高。
+    /// 单键高度；数字区 4 行、右侧导航列三等分对齐其总高。
     private let keyH: CGFloat = 52
     private let gap: CGFloat = 8
 
     private var gridHeight: CGFloat { keyH * 4 + gap * 3 }
-    private var navHeight: CGFloat { keyH * 2 + gap }
 
     var body: some View {
-        VStack(spacing: 6) {
+        // 「收起」按钮悬浮于面板上方（纸感底不覆盖它，二者留间隔）；
+        // 收起时按钮快速渐隐、面板下滑，避免按钮随面板慢慢滑到底「抢戏」。
+        VStack(spacing: 8) {
             dismissBar
-            HStack(alignment: .top, spacing: gap) {
-                numberGrid
-                navColumn
-            }
+                // 出现：随面板慢淡入（不突兀）；收起：快速淡出（不跟面板慢滑「抢戏」）。
+                .transition(.asymmetric(
+                    insertion: .opacity.animation(.easeOut(duration: 0.3)),
+                    removal: .opacity.animation(.easeOut(duration: 0.12))))
+            keypadPanel
+                // 面板整体上下滑 + 淡入淡出；曲线继承父视图 focused 动画（与 inset 收起、内容回流同步），不单独覆盖。
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
+    // 主键盘面板：数字区 + 导航列，纸感底 + 顶边 1px 细分隔线。
+    private var keypadPanel: some View {
+        HStack(alignment: .top, spacing: gap) {
+            numberGrid
+            navColumn
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.top, 8)
@@ -40,23 +54,22 @@ struct WorkoutKeypad: View {
         }
     }
 
-    // 顶部「收起」浮条：右上角 chevron + 文案。
+    // 顶部「收起」浮条：右上角苹果风「收键盘」图标按钮（键盘 + 向下箭头），悬浮于面板之上。
     private var dismissBar: some View {
         HStack {
             Spacer()
             Button(action: onDismiss) {
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.down").font(.system(size: 12, weight: .bold))
-                    Text("收起").font(Theme.Font.body(size: 13, weight: .semibold))
-                }
-                .foregroundStyle(Theme.Color.fg2)
-                .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(Theme.Color.surface, in: Capsule())
-                .overlay(Capsule().stroke(Theme.Color.border, lineWidth: 1))
+                Image(systemName: "keyboard.chevron.compact.down")
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .frame(width: 40, height: 30)
+                    .background(Theme.Color.surface, in: keyShape)
+                    .overlay(keyShape.stroke(Theme.Color.border, lineWidth: 1))
             }
             .buttonStyle(KeyPressStyle())
             .accessibilityLabel("收起键盘")
         }
+        .padding(.horizontal, Theme.Spacing.md)
     }
 
     // 4×3 数字区，底排 `. 0 ⌫`（对齐系统 decimalPad 肌肉记忆）。
@@ -79,11 +92,12 @@ struct WorkoutKeypad: View {
         .frame(height: gridHeight)
     }
 
-    // 右侧导航列：上一项 / 下一项，各跨 2 行高。
+    // 右侧导航列：上一项 / 下一项 / 加一组，三等分对齐数字区总高。
     private var navColumn: some View {
         VStack(spacing: gap) {
             navKey("上一项", systemImage: "chevron.up", action: onPrev)
             navKey("下一项", systemImage: "chevron.down", action: onNext)
+            navKey("加一组", systemImage: "plus", action: onAddSet)
         }
         .frame(width: 92, height: gridHeight)
     }

@@ -7,7 +7,7 @@ import UIKit
 /// 展开时上层会隐藏标题栏/Tab Bar 形成真全屏。磨砂遮罩虚化下方训练页但不离场，
 /// 点击空白不关闭，必须点「最小化」回到 FAB。开/关均为渐显/渐隐。
 /// 结构（自上而下，主簇垂直居中）：脉冲点 + 「组间休息 · REST」eyebrow → 大圆环
-/// （墙钟驱动消耗式红弧 + 读数 + 下一组预告）→ 调时三件套（−15s 减时 / 完成 / +15s 加时）
+/// （墙钟驱动消耗式红弧 + 读数 + 总时长 + 下一组预告）→ 调时三件套（−10s / 完成 ✓ / +10s，无文案）
 /// → 底部 pill（震动开关 / 最小化，常驻底部）。
 struct RestTimerSheet: View {
     let controller: RestTimerController
@@ -87,6 +87,10 @@ struct RestTimerSheet: View {
                     Text(formatMMSS(remaining))
                         .numStyle(size: 56 * k, weight: .bold)
                         .foregroundStyle(Theme.Color.fg)
+                    // 本次休息总时长（小一号，弱化）。
+                    Text(formatMMSS(total))
+                        .font(Theme.Font.mono(size: 12 * k, weight: .semibold))
+                        .foregroundStyle(Theme.Color.fg2)
                     if let nextHint = controller.nextHint {
                         Text(.init(nextHint))
                             .font(Theme.Font.body(size: 12 * k))
@@ -99,59 +103,46 @@ struct RestTimerSheet: View {
         }
     }
 
-    // MARK: - 调时三件套（−15s 减时 / 完成 / +15s 加时）
+    // MARK: - 调时三件套（−10s / 完成 ✓ / +10s，无文案）
 
     private var controls: some View {
-        HStack(alignment: .top, spacing: 26 * k) {
-            adjControl("−15s", caption: "减时") { controller.adjust(by: -15) }
+        HStack(alignment: .center, spacing: 26 * k) {
+            adjControl("−10s") { controller.adjust(by: -10) }
             doneControl
-            adjControl("+15s", caption: "加时") { controller.adjust(by: 15) }
+            adjControl("+10s") { controller.adjust(by: 10) }
         }
     }
 
-    /// ±15s：白底 ghost 圆键 + 下方说明（减时/加时）。
-    private func adjControl(_ title: String, caption: String, action: @escaping () -> Void) -> some View {
-        VStack(spacing: 9 * k) {
-            Button(action: action) {
-                Text(title)
-                    .font(Theme.Font.mono(size: 12 * k, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg)
-                    .frame(width: 54 * k, height: 54 * k)
-                    .background(Theme.Color.surface, in: Circle())
-                    .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
-                    .shadow(color: Theme.Color.fg.opacity(0.07), radius: 4, x: 0, y: 1)
-            }
-            .buttonStyle(PressableButtonStyle())
-            captionText(caption, color: Theme.Color.muted, weight: .regular)
+    /// ±10s：白底 ghost 圆键。
+    private func adjControl(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(Theme.Font.mono(size: 12 * k, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+                .frame(width: 54 * k, height: 54 * k)
+                .background(Theme.Color.surface, in: Circle())
+                .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
+                .shadow(color: Theme.Color.fg.opacity(0.07), radius: 4, x: 0, y: 1)
         }
+        .buttonStyle(PressableButtonStyle())
     }
 
     /// 完成：朱砂红实心圆 + 白色 ✓（与 set 完成勾同形同色），立即结束并收起。
     private var doneControl: some View {
-        VStack(spacing: 9 * k) {
-            Button {
-                if controller.hapticsEnabled { Theme.Haptics.notification(.success) }
-                controller.stop()
-                onDismiss()
-            } label: {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 28 * k, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 72 * k, height: 72 * k)
-                    .background(Theme.Color.accent, in: Circle())
-                    .shadow(color: Theme.Color.accent.opacity(0.35), radius: 10, x: 0, y: 6)
-            }
-            .buttonStyle(PressableButtonStyle())
-            captionText("完成", color: Theme.Color.accent, weight: .bold)
+        Button {
+            if controller.hapticsEnabled { Theme.Haptics.notification(.success) }
+            controller.stop()
+            onDismiss()
+        } label: {
+            Image(systemName: "checkmark")
+                .font(.system(size: 28 * k, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 72 * k, height: 72 * k)
+                .background(Theme.Color.accent, in: Circle())
+                .shadow(color: Theme.Color.accent.opacity(0.35), radius: 10, x: 0, y: 6)
         }
-    }
-
-    private func captionText(_ text: String, color: SwiftUI.Color, weight: Font.Weight) -> some View {
-        Text(text)
-            .font(Theme.Font.mono(size: 10 * k, weight: weight))
-            .tracking(0.04 * 10 * k)
-            .textCase(.uppercase)
-            .foregroundStyle(color)
+        .buttonStyle(PressableButtonStyle())
+        .accessibilityLabel("完成休息")
     }
 
     // MARK: - 底部 pill（震动开关 / 最小化）

@@ -558,6 +558,16 @@ struct WorkoutLoggingView: View {
     @State private var buffer: String = ""
     /// 「打字即覆盖」标志：聚焦已有值后首个数字键清空重填。
     @State private var pendingReplace: Bool = false
+    /// 各组行在屏幕(.global)坐标的 frame，用于判断聚焦组是否已在可视区内（避免无谓滚动）。
+    @State private var setRowFrames: [UUID: CGRect] = [:]
+    /// ScrollView 视口在 .global 坐标的 frame（顶边 = 可视区上界）。
+    @State private var scrollViewport: CGRect = .zero
+    /// 自研键盘顶边的 .global Y（0 = 键盘未显示/未测得）；作为可视区下界。
+    @State private var keypadTopY: CGFloat = 0
+    /// 休息悬浮按钮（FAB）拖动后的锚点（FAB 容器本地坐标，nil = 默认右下角）。
+    @State private var fabAnchor: CGPoint?
+    /// FAB 拖动中的实时位移（手势驱动，松手自动归零）；用 @GestureState 保证跟手不延迟。
+    @GestureState private var fabDrag: CGSize = .zero
 
     /// 是否允许编辑内容（勾选完成 / 改重量次数 / 加删动作）：仅进行中会话可编辑；
     /// 已完成训练一律只读，产品逻辑不支持二次编辑。
@@ -626,10 +636,22 @@ struct WorkoutLoggingView: View {
                     }
                     .padding(.horizontal, Theme.Spacing.lg)
                     .padding(.top, Theme.Spacing.sm)
+                    // 点击输入框外的空白区域：收起键盘（输入框/按钮的内层手势优先级更高，不受影响）。
+                    .contentShape(Rectangle())
+                    .onTapGesture { if focused != nil { dismissKeypad() } }
                 }
-                // 聚焦单元变化时把所在组滚入键盘上方可视区。
+                // 量取 ScrollView 视口（.global）：顶边作为可视区上界。
+                .background(
+                    GeometryReader { g in
+                        Color.clear
+                            .onChange(of: g.frame(in: .global)) { _, f in scrollViewport = f }
+                            .onAppear { scrollViewport = g.frame(in: .global) }
+                    }
+                )
+                // 聚焦单元变化时把所在组滚入键盘上方可视区；若已完整可见则不滚动。
                 .onChange(of: focused) { _, new in
                     guard let id = new?.setId else { return }
+                    if isRowFullyVisible(id) { return }
                     withAnimation(.easeOut(duration: 0.25)) {
                         proxy.scrollTo(id, anchor: .center)
                     }
@@ -643,22 +665,53 @@ struct WorkoutLoggingView: View {
                                       onBackspace: keypadBackspace,
                                       onPrev: keypadPrev,
                                       onNext: keypadNext,
+                                      onAddSet: keypadAddSet,
                                       onDismiss: dismissKeypad)
-                            .transition(.move(edge: .bottom))
+                            .background(
+                                GeometryReader { g in
+                                    Color.clear.preference(key: KeypadTopKey.self,
+                                                           value: g.frame(in: .global).minY)
+                                }
+                            )
+                            // 升降 transition 拆到 WorkoutKeypad 内部：收起按钮快速渐隐、面板下滑。
                     }
                 }
+                // preference 读取置于 safeAreaInset 之后：否则读不到键盘(外层 inset 内容)发出的 KeypadTopKey。
+                .onPreferenceChange(SetRowFramesKey.self) { setRowFrames = $0 }
+                .onPreferenceChange(KeypadTopKey.self) { keypadTopY = $0 }
             }
-            // 浮动 FAB（仅在 rest 进行中显示且未展开、且键盘未升起）。本屏无 Tab Bar，贴右下角常驻。
-            // 全屏休息弹窗已上提到全局 NavigationStack 的 overlay（层级高于 push 页与 Tab Bar）。
-            if restTimer.isRunning && !restTimer.isExpanded && focused == nil {
-                restFAB
-                    .padding(.trailing, Theme.Spacing.lg)
-                    .padding(.bottom, 28)
-                    // 「减弱动态效果」开启时只淡入淡出，不做缩放入场。
-                    .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
+            // 浮动 FAB（rest 进行中且未展开即显示）：可在页面内自由拖动；键盘升起时被顶到键盘上方，
+            // 不侵占键盘激活区。本屏无 Tab Bar，默认贴右下角。全屏休息弹窗已上提到全局 overlay。
+            if restTimer.isRunning && !restTimer.isExpanded {
+                GeometryReader { geo in
+                    restFAB
+                        .position(fabPosition(in: geo))
+                        // 键盘顶边变化时平滑被顶上去/落回（与键盘升降同一条弹簧）；拖动由手势驱动，不经此动画。
+                        .animation(.spring(response: 0.45, dampingFraction: 0.92), value: keypadTopY)
+                        .gesture(
+                            // 单一手势同时承担拖动与点按：实时位移跟手，松手按位移阈值区分「点按展开 / 落定」。
+                            DragGesture(minimumDistance: 0, coordinateSpace: .named("fabSpace"))
+                                .updating($fabDrag) { value, state, _ in state = value.translation }
+                                .onEnded { value in
+                                    let dist = hypot(value.translation.width, value.translation.height)
+                                    if dist < 10 {
+                                        withAnimation(sheetAnim) { restTimer.isExpanded = true }
+                                    } else {
+                                        let base = fabAnchor ?? fabDefault(in: geo)
+                                        fabAnchor = clampedFabPoint(
+                                            CGPoint(x: base.x + value.translation.width,
+                                                    y: base.y + value.translation.height), in: geo)
+                                    }
+                                }
+                        )
+                        // 「减弱动态效果」开启时只淡入淡出，不做缩放入场。
+                        .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
+                }
+                .coordinateSpace(name: "fabSpace")
             }
         }
-        .animation(.easeOut(duration: 0.22), value: focused == nil)
+        // 键盘升降统一用近临界阻尼弹簧：面板下滑 + inset 收起 + 上方内容回流 + FAB 共用一条曲线，贴近 iOS 原生键盘的平滑。
+        .animation(.spring(response: 0.45, dampingFraction: 0.92), value: focused == nil)
         // 子页统一导航栏：仅圆形返回键（双环处理收口在 paperToolbar）。
         .paperToolbar(title: workout.isActive ? "记录中" : (workout.title ?? "训练"), onBack: { dismiss() })
         // 动作 ⋯ 组间休息菜单：顶层浮层，按 anchor 定位于 ⋯ 下方；外部点击关闭。
@@ -852,40 +905,66 @@ struct WorkoutLoggingView: View {
 
     // MARK: FAB
 
+    /// FAB 半径（直径 58）。
+    private static let fabRadius: CGFloat = 29
+
+    /// 把落点钳制在安全区内：四周留边；键盘升起时下界抬到键盘顶之上，FAB 不侵占键盘激活区。
+    private func clampedFabPoint(_ p: CGPoint, in geo: GeometryProxy) -> CGPoint {
+        let r = Self.fabRadius
+        let margin: CGFloat = 12
+        let minX = margin + r
+        let maxX = max(minX, geo.size.width - margin - r)
+        let minY = margin + r
+        var maxY = geo.size.height - margin - r
+        if keypadTopY > 0 {   // 键盘升起：FAB 底边须在键盘顶上方
+            let keypadTopLocal = keypadTopY - geo.frame(in: .global).minY
+            maxY = min(maxY, keypadTopLocal - margin - r)
+        }
+        maxY = max(minY, maxY)
+        return CGPoint(x: min(max(p.x, minX), maxX), y: min(max(p.y, minY), maxY))
+    }
+
+    /// FAB 默认位置：右下角（贴 lg 右距、28 下距）。
+    private func fabDefault(in geo: GeometryProxy) -> CGPoint {
+        let r = Self.fabRadius
+        return CGPoint(x: geo.size.width - Theme.Spacing.lg - r,
+                       y: geo.size.height - 28 - r)
+    }
+
+    /// FAB 当前位置：锚点（或默认右下角）+ 实时拖动位移，统一过钳制（含键盘顶上界）。
+    private func fabPosition(in geo: GeometryProxy) -> CGPoint {
+        let base = fabAnchor ?? fabDefault(in: geo)
+        let moved = CGPoint(x: base.x + fabDrag.width, y: base.y + fabDrag.height)
+        return clampedFabPoint(moved, in: geo)
+    }
+
     private var restFAB: some View {
-        Button {
-            withAnimation(sheetAnim) { restTimer.isExpanded = true }
-        } label: {
-            TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                let total = restTimer.totalDuration
+        // 整块（圆底 + 计时文字）作为单一视图，由外层 .position 统一移动、拖动跟手不分层。
+        // 点按/拖动由调用点的单一 DragGesture 承担，故此处不再用 Button。无进度环（已移除动画与环形 UI）。
+        TimelineView(.periodic(from: .now, by: 1.0)) { _ in
                 let remaining = restTimer.remaining
-                let progress = total > 0 ? min(max(remaining / total, 0), 1) : 0
-                ZStack {
-                    Circle().fill(Theme.Color.surface)
-                    // 环形进度（消耗式 满→空），内嵌于 2px 实边之内（对齐原型 svg r=22）：
-                    // 轨道 accent-3（18% 朱砂红）+ 进度朱砂红，round 端点。
-                    ZStack {
-                        Circle().stroke(Theme.Color.accentSofter, lineWidth: 3)
-                        Circle()
-                            .trim(from: 0, to: progress)
-                            .stroke(Theme.Color.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                            .animation(.linear(duration: 0.3), value: progress)
-                    }
-                    .padding(4)
+                VStack(spacing: 0) {
+                    // 主体：剩余倒计时。
                     Text("\(Int(remaining.rounded()))s")
-                        .font(Theme.Font.number(size: 12, weight: .heavy))
+                        .font(Theme.Font.number(size: 17, weight: .heavy))
                         .foregroundStyle(Theme.Color.accent)
+                    // 底部小一号：本次休息总时长 MM:SS。
+                    Text(formatMMSS(restTimer.totalDuration))
+                        .font(Theme.Font.number(size: 10, weight: .semibold))
+                        .foregroundStyle(Theme.Color.fg2)
                 }
-                .frame(width: 52, height: 52)
+                .frame(width: 58, height: 58)
+                .background(Circle().fill(Theme.Color.surface))
                 .overlay(Circle().stroke(Theme.Color.accent, lineWidth: 2))
                 // box-shadow: 朱砂红辉光 22% + 中性 sh-md。
                 .shadow(color: Theme.Color.accent.opacity(0.22), radius: 9, x: 0, y: 4)
                 .shadow(color: Theme.Color.fg.opacity(Theme.ShadowLevel.md.opacity), radius: Theme.ShadowLevel.md.radius, x: 0, y: Theme.ShadowLevel.md.y)
             }
-        }
-        .buttonStyle(.plain)
+        // 整圆为命中区；VoiceOver 以按钮呈现，默认动作 = 展开休息弹窗。
+        .contentShape(Circle())
+        .accessibilityAddTraits(.isButton)
         .accessibilityLabel("休息计时，点按展开")
+        .accessibilityAction { withAnimation(sheetAnim) { restTimer.isExpanded = true } }
     }
 
     // MARK: actions
@@ -958,6 +1037,14 @@ struct WorkoutLoggingView: View {
         focused = nil
         buffer = ""
         pendingReplace = false
+    }
+
+    /// 目标组是否已完整落在「视口顶 ~ 键盘顶」之间（含少量余量）。
+    /// 仅当键盘已显示且测得其顶边时才判定；否则返回 false（保持原有滚动行为，首次聚焦必滚）。
+    private func isRowFullyVisible(_ id: UUID) -> Bool {
+        guard keypadTopY > 0, !scrollViewport.isEmpty, let f = setRowFrames[id] else { return false }
+        let pad: CGFloat = 8   // 余量：避免贴边时判为可见
+        return f.minY >= scrollViewport.minY + pad && f.maxY <= keypadTopY - pad
     }
 
     /// 某单元当前模型值的显示串（重量走 formatKg，次数走整数串）。
@@ -1048,6 +1135,18 @@ struct WorkoutLoggingView: View {
         let seq = sequence(for: ex)
         guard let idx = seq.firstIndex(of: cell), idx > 0 else { return }        // 首项保持
         focus(seq[idx - 1])
+    }
+
+    /// 「加一组」：在当前聚焦组所属动作追加一组（预填上一组重量），并聚焦其重量。
+    /// 与 ExerciseBlock.addSet 行为一致；高频操作不离键盘。
+    private func keypadAddSet() {
+        guard let cell = focused, let ex = exercise(containing: cell.setId) else { return }
+        let next = (ex.sets.map(\.setIndex).max() ?? -1) + 1
+        let lastWeight = ex.sets.sorted { $0.setIndex < $1.setIndex }.last?.weightKg
+        let newSet = WorkoutSet(setIndex: next, weightKg: lastWeight)
+        ex.sets.append(newSet)
+        touch()
+        focus(.weight(newSet.localId))
     }
 }
 
@@ -1166,6 +1265,23 @@ private struct ExerciseMenuAnchorKey: PreferenceKey {
     }
 }
 
+/// 各组行在 .global 坐标的 frame，按 set.localId 聚合冒泡到顶层，用于可视区判定。
+private struct SetRowFramesKey: PreferenceKey {
+    static let defaultValue: [UUID: CGRect] = [:]
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+
+/// 自研键盘顶边的 .global Y，冒泡到顶层作可视区下界。
+private struct KeypadTopKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let next = nextValue()
+        if next != 0 { value = next }
+    }
+}
+
 private struct ExerciseBlock: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var exercise: WorkoutExercise
@@ -1216,7 +1332,8 @@ private struct ExerciseBlock: View {
                 VStack(spacing: 0) {
                     ForEach(sortedSets) { set in
                         SetRow(set: set,
-                               isTodo: activeSetIndex == set.setIndex,
+                               // 键盘升起（任一组聚焦）时，待办弱提示让位给聚焦组，避免「双当前」。
+                               isTodo: activeSetIndex == set.setIndex && focused == nil,
                                readOnly: readOnly,
                                focusedField: focusedField(for: set),
                                editingText: editingText,
@@ -1226,6 +1343,13 @@ private struct ExerciseBlock: View {
                                    onFocus(field == .weight ? .weight(set.localId) : .reps(set.localId))
                                })
                         .id(set.localId)
+                        // 上报本行 .global frame，供父视图判断聚焦组是否已在可视区内。
+                        .background(
+                            GeometryReader { g in
+                                Color.clear.preference(key: SetRowFramesKey.self,
+                                                       value: [set.localId: g.frame(in: .global)])
+                            }
+                        )
                     }
                 }
                 .padding(.top, 4).padding(.bottom, 8)
