@@ -560,6 +560,10 @@ struct WorkoutLoggingView: View {
     @State private var pendingReplace: Bool = false
     /// 各组行在屏幕(.global)坐标的 frame，用于判断聚焦组是否已在可视区内（避免无谓滚动）。
     @State private var setRowFrames: [UUID: CGRect] = [:]
+    /// 当前打开「更多操作」菜单的组 localId（nil = 无）。顶层浮层据 anchor 定位、外部点击关闭。
+    @State private var menuSetId: UUID?
+    /// 待二次确认删除的组（nil = 无确认弹窗）。
+    @State private var confirmDeleteSet: WorkoutSet?
     /// ScrollView 视口在 .global 坐标的 frame（顶边 = 可视区上界）。
     @State private var scrollViewport: CGRect = .zero
     /// 自研键盘顶边的 .global Y（0 = 键盘未显示/未测得）；作为可视区下界。
@@ -638,7 +642,10 @@ struct WorkoutLoggingView: View {
                     .padding(.top, Theme.Spacing.sm)
                     // 点击输入框外的空白区域：收起键盘（输入框/按钮的内层手势优先级更高，不受影响）。
                     .contentShape(Rectangle())
-                    .onTapGesture { if focused != nil { dismissKeypad() } }
+                    .onTapGesture {
+                        if focused != nil { dismissKeypad() }
+                        if menuSetId != nil { menuSetId = nil }
+                    }
                 }
                 // 量取 ScrollView 视口（.global）：顶边作为可视区上界。
                 .background(
@@ -735,6 +742,25 @@ struct WorkoutLoggingView: View {
                 .transition(.opacity)
             }
         }
+        // 组级「更多操作」菜单：顶层浮层，按 ⋯ anchor 定位；外部点击关闭。当前仅「删除组」，结构预留更多项。
+        .overlayPreferenceValue(SetMenuAnchorKey.self) { anchor in
+            if let id = menuSetId, let set = setById(id), let anchor {
+                GeometryReader { proxy in
+                    let pt = proxy[anchor]
+                    let menuWidth: CGFloat = 180
+                    ZStack(alignment: .topLeading) {
+                        Color.black.opacity(0.001)
+                            .ignoresSafeArea()
+                            .onTapGesture { menuSetId = nil }
+                        setMenuCard(for: set)
+                            .frame(width: menuWidth)
+                            .offset(x: min(max(16, pt.x - menuWidth), proxy.size.width - menuWidth - 16),
+                                    y: pt.y + 8)
+                    }
+                }
+                .transition(.opacity)
+            }
+        }
         // 组间休息已移入每个动作卡右上 ⋯ 菜单（动作级设置）；已完成训练只读，导航栏不再挂编辑入口。
         .paperConfirmDialog(
             isPresented: $confirmingFinish,
@@ -743,9 +769,68 @@ struct WorkoutLoggingView: View {
             confirmTitle: "结束训练",
             onConfirm: { finish() }
         )
+        // 删除组二次确认（自定义纸感弹窗）。
+        .paperConfirmDialog(
+            isPresented: Binding(get: { confirmDeleteSet != nil },
+                                 set: { if !$0 { confirmDeleteSet = nil } }),
+            title: "删除这一组?",
+            message: confirmDeleteSet.map { "第 \($0.setIndex + 1) 组将被移除，后续组号自动顺延。" } ?? "",
+            confirmTitle: "删除",
+            onConfirm: { [set = confirmDeleteSet] in if let set { deleteSet(set) } }
+        )
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in addExercise(pick) }
         }
+    }
+
+    // MARK: 组级「更多操作」菜单 + 删除
+
+    /// 按 localId 在全部动作里查组（菜单浮层用）。
+    private func setById(_ id: UUID) -> WorkoutSet? {
+        workout.exercises.flatMap(\.sets).first { $0.localId == id }
+    }
+
+    /// 组级菜单卡：纸感小卡 + 操作项列表。目前仅「删除组」，按列表结构预留后续更多组级操作。
+    private func setMenuCard(for set: WorkoutSet) -> some View {
+        VStack(spacing: 0) {
+            setMenuItem(icon: "trash", title: "删除组", destructive: true) {
+                menuSetId = nil
+                confirmDeleteSet = set
+            }
+        }
+        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .stroke(Theme.Color.border, lineWidth: 1)
+        )
+        .shadow(color: Theme.Color.fg.opacity(0.14), radius: 24, x: 0, y: 10)
+    }
+
+    private func setMenuItem(icon: String, title: String, destructive: Bool = false,
+                             action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon).font(.system(size: 15, weight: .semibold))
+                Text(title).font(Theme.Font.l2)
+                Spacer()
+            }
+            .foregroundStyle(destructive ? Theme.Color.accent : Theme.Color.fg)
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// 删除某组：从聚合子树移除并落库，随后重排剩余组 setIndex 保持序号连续（第 1/2/3 组），最后即时落盘。
+    private func deleteSet(_ set: WorkoutSet) {
+        guard let ex = set.exercise else { return }
+        ex.sets.removeAll { $0.localId == set.localId }
+        modelContext.delete(set)
+        for (i, s) in ex.sets.sorted(by: { $0.setIndex < $1.setIndex }).enumerated() {
+            s.setIndex = i
+        }
+        Theme.Haptics.notification(.warning)
+        touch()
     }
 
     // MARK: 三联数
@@ -803,6 +888,7 @@ struct WorkoutLoggingView: View {
             ForEach(sorted) { ex in
                 ExerciseBlock(exercise: ex,
                               readOnly: !canEdit,
+                              menuSetId: menuSetId,
                               isExpanded: activeId == ex.localId,
                               isMenuOpen: menuExerciseId == ex.localId,
                               focused: focused,
@@ -816,6 +902,13 @@ struct WorkoutLoggingView: View {
                               },
                               onMoreTap: {
                                   menuExerciseId = (menuExerciseId == ex.localId) ? nil : ex.localId
+                              },
+                              onMoreSet: { set in
+                                  // 打开该组「更多操作」菜单：先收键盘（避免菜单被遮、且防删除聚焦组后 focused 悬空），
+                                  // 与动作级 ⋯ 菜单互斥。
+                                  if focused != nil { dismissKeypad() }
+                                  menuExerciseId = nil
+                                  withAnimation(.easeOut(duration: 0.18)) { menuSetId = set.localId }
                               },
                               onChange: touch,
                               onCompleteSet: {
@@ -1265,6 +1358,14 @@ private struct ExerciseMenuAnchorKey: PreferenceKey {
     }
 }
 
+/// 组行「更多操作」⋯ 按钮的位置锚点，供父视图顶层组级菜单浮层定位（仅当前打开行发布）。
+private struct SetMenuAnchorKey: PreferenceKey {
+    static let defaultValue: Anchor<CGPoint>? = nil
+    static func reduce(value: inout Anchor<CGPoint>?, nextValue: () -> Anchor<CGPoint>?) {
+        value = nextValue() ?? value
+    }
+}
+
 /// 各组行在 .global 坐标的 frame，按 set.localId 聚合冒泡到顶层，用于可视区判定。
 private struct SetRowFramesKey: PreferenceKey {
     static let defaultValue: [UUID: CGRect] = [:]
@@ -1287,6 +1388,8 @@ private struct ExerciseBlock: View {
     @Bindable var exercise: WorkoutExercise
     /// 只读态（已完成且未进入编辑）：隐藏菜单、禁用组内操作。
     var readOnly: Bool = false
+    /// 当前打开「更多操作」菜单的组 localId（父视图持有，跨动作卡共享），用于派生每行 ⋯ 高亮。
+    var menuSetId: UUID? = nil
     /// 手风琴：是否展开 set 列表（false 时折叠为单行摘要）。
     var isExpanded: Bool = true
     /// ⋯ 组间休息菜单是否打开（菜单本体由父视图顶层浮层渲染）。
@@ -1299,6 +1402,8 @@ private struct ExerciseBlock: View {
     var onFocus: (FocusedCell) -> Void = { _ in }
     var onToggleExpand: () -> Void = {}
     var onMoreTap: () -> Void = {}
+    /// 点击某组的「更多操作」⋯：由父视图打开该组的菜单浮层。
+    var onMoreSet: (WorkoutSet) -> Void = { _ in }
     let onChange: () -> Void
     let onCompleteSet: () -> Void
 
@@ -1337,8 +1442,10 @@ private struct ExerciseBlock: View {
                                readOnly: readOnly,
                                focusedField: focusedField(for: set),
                                editingText: editingText,
+                               isMenuOpen: menuSetId == set.localId,
                                onChange: onChange,
                                onComplete: onCompleteSet,
+                               onMore: { onMoreSet(set) },
                                onFocus: { field in
                                    onFocus(field == .weight ? .weight(set.localId) : .reps(set.localId))
                                })
@@ -1439,31 +1546,38 @@ private struct SetRow: View {
     let focusedField: SetField?
     /// 聚焦字段的编辑缓冲串（含 "0." / "72." 中间态）。
     let editingText: String
+    /// 本组「更多操作」菜单是否打开（⋯ 高亮 + 发布定位锚点，菜单本体由父视图顶层浮层渲染）。
+    var isMenuOpen: Bool = false
     let onChange: () -> Void
     let onComplete: () -> Void
+    /// 点击「更多操作」⋯：由父视图打开本组的菜单浮层。
+    let onMore: () -> Void
     /// 请求聚焦本组某字段。
     let onFocus: (SetField) -> Void
 
     /// 编辑高亮 = 本组有字段被聚焦。
     private var isEditing: Bool { focusedField != nil }
-    /// 弱强调（次序号/勾选环）：编辑中或待办。
+    /// 弱强调（次序号/勾选框）：编辑中或待办。
     private var emphasized: Bool { isEditing || isTodo }
 
     var body: some View {
-        // 原型 grid：[22 序号][1fr 重量][14 ×][1fr 次数][28 勾]。聚焦字段朱砂红高亮、待办仅弱提示。
+        // 原型 grid：[20 序号][重量窄][× ][次数窄][方形完成勾][弹性留白][⋯ 更多]。
+        // 完成勾紧跟次数框左对齐；⋯ 被弹性留白推到行尾。
         HStack(spacing: 8) {
             Text("\(set.setIndex + 1)")
                 .font(Theme.Font.mono(size: 13, weight: .bold))
-                .frame(width: 22)
+                .frame(width: 20)
                 .foregroundStyle(snColor)
             valueCell(text: weightDisplay, placeholder: "kg", focused: focusedField == .weight,
                       label: "重量", value: set.weightKg.map { "\(formatKg($0)) 公斤" })
                 .onTapGesture { if !readOnly { onFocus(.weight) } }
-            Text("×").font(Theme.Font.mono(size: 11)).foregroundStyle(Theme.Color.muted).frame(width: 14)
+            Text("×").font(Theme.Font.mono(size: 11)).foregroundStyle(Theme.Color.muted).frame(width: 12)
             valueCell(text: repsDisplay, placeholder: "次", focused: focusedField == .reps,
                       label: "次数", value: set.reps.map { "\($0) 次" })
                 .onTapGesture { if !readOnly { onFocus(.reps) } }
             checkButton
+            Spacer(minLength: 8)
+            if !readOnly { moreButton }
         }
         .opacity(set.completed ? 0.52 : 1)
         .padding(.horizontal, 15)
@@ -1478,14 +1592,14 @@ private struct SetRow: View {
         focusedField == .reps ? editingText : (set.reps.map(String.init) ?? "")
     }
 
+    /// 重量/次数输入框：定宽收窄（让右侧腾出完成勾 + 更多操作），居中数字。
     private func valueCell(text: String, placeholder: String, focused: Bool,
                            label: String, value: String?) -> some View {
         Text(text.isEmpty ? placeholder : text)
             .font(Theme.Font.number(size: 15, weight: .bold))
             .foregroundStyle(text.isEmpty ? Theme.Color.muted : Theme.Color.fg)
             .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .frame(height: 36)
+            .frame(width: 64, height: 36)
             .background(focused ? Theme.Color.accentSoft : (isEditing ? Theme.Color.surface : Theme.Color.bg),
                         in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .overlay(
@@ -1500,29 +1614,56 @@ private struct SetRow: View {
             .accessibilityAddTraits(.isButton)
     }
 
+    /// 完成按钮：圆角方形复选框。完成=朱砂红实心白勾；未完成=淡勾引导用户勾选。
     private var checkButton: some View {
         Button {
             set.completed.toggle()
             onChange()
             if set.completed { onComplete() }
         } label: {
+            let shape = RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
             ZStack {
                 if set.completed {
-                    Circle().fill(Theme.Color.accent)
+                    shape.fill(Theme.Color.accent)
                         .shadow(color: Theme.Color.accent.opacity(0.28), radius: 5, y: 2)
-                    Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
-                } else if emphasized {
-                    Circle().fill(Theme.Color.accent.opacity(0.18))
-                    Circle().stroke(Theme.Color.accent.opacity(0.4), lineWidth: 2)
+                    Image(systemName: "checkmark").font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
                 } else {
-                    Circle().stroke(Theme.Color.border, lineWidth: 1.5)
+                    shape.fill(Theme.Color.bg)
+                    shape.stroke(emphasized ? Theme.Color.accent.opacity(0.5) : Theme.Color.border,
+                                 lineWidth: emphasized ? 2 : 1.5)
+                    // 未完成态显示淡勾，引导用户勾选完成。
+                    Image(systemName: "checkmark").font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(emphasized ? Theme.Color.accent.opacity(0.5)
+                                         : Theme.Color.muted.opacity(0.4))
                 }
             }
-            .frame(width: 26, height: 26)
+            .frame(width: 36, height: 36)   // 与重量/次数输入框等高
         }
         .buttonStyle(.plain).disabled(readOnly)
-        .frame(width: 28)
+        .frame(width: 36)
+        .padding(.leading, 4)   // 与次数框多留一点间距（HStack spacing 8 + 4 = 12）
         .accessibilityLabel(set.completed ? "第 \(set.setIndex + 1) 组已完成" : "标记第 \(set.setIndex + 1) 组完成")
+    }
+
+    /// 组级「更多操作」⋯：打开父视图顶层菜单浮层（删除等组级操作的入口，便于后续扩展）。
+    private var moreButton: some View {
+        Button { onMore() } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(isMenuOpen ? .white : Theme.Color.muted)
+                .frame(width: 30, height: 30)
+                .background(isMenuOpen ? Theme.Color.accent : .clear, in: Circle())
+                // 视觉圆底 30，命中热区横向放大到 44×36 矩形（仅加宽不增高，避免只能精确点到 icon）。
+                .frame(width: 44, height: 36)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        // 发布 ⋯ 底部锚点，供父视图组级菜单浮层定位（仅打开行发布）。
+        .anchorPreference(key: SetMenuAnchorKey.self, value: .bottomTrailing) {
+            isMenuOpen ? $0 : nil
+        }
+        .accessibilityLabel("第 \(set.setIndex + 1) 组更多操作")
     }
 
     private var snColor: SwiftUI.Color { emphasized ? Theme.Color.accent : Theme.Color.muted }
