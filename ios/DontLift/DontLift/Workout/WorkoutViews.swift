@@ -508,6 +508,23 @@ func formatMinutes(_ seconds: Double) -> String {
 
 // MARK: - 训练进行中（设计稿 02）
 
+/// 训练录入的焦点单元：某组的重量或次数（按 `WorkoutSet.localId`）。
+/// 单一真相源：`nil` ⟺ 自研键盘收起；非 `nil` ⟺ 键盘升起、所在组高亮。
+enum FocusedCell: Equatable {
+    case weight(UUID)
+    case reps(UUID)
+
+    var setId: UUID {
+        switch self {
+        case .weight(let id), .reps(let id): return id
+        }
+    }
+    var isWeight: Bool { if case .weight = self { return true } else { return false } }
+}
+
+/// 组内可聚焦字段。
+enum SetField { case weight, reps }
+
 /// 训练进行中页（旧 WorkoutLoggingView 升级为新视觉，符号名保留以避免破坏 HistoryViews 等引用）。
 struct WorkoutLoggingView: View {
     @Environment(\.modelContext) private var modelContext
@@ -535,6 +552,12 @@ struct WorkoutLoggingView: View {
     @State private var restByExercise: [UUID: Int] = [:]
     /// 当前打开 ⋯ 菜单的动作 localId（nil = 无）。顶层浮层据 anchor 定位、外部点击关闭。
     @State private var menuExerciseId: UUID?
+    /// 自研数字键盘的焦点单元（nil = 键盘收起）。
+    @State private var focused: FocusedCell?
+    /// 当前聚焦单元的编辑缓冲串（含 "0." / "72." 等中间态，聚焦单元据此显示）。
+    @State private var buffer: String = ""
+    /// 「打字即覆盖」标志：聚焦已有值后首个数字键清空重填。
+    @State private var pendingReplace: Bool = false
 
     /// 是否允许编辑内容（勾选完成 / 改重量次数 / 加删动作）：仅进行中会话可编辑；
     /// 已完成训练一律只读，产品逻辑不支持二次编辑。
@@ -589,23 +612,45 @@ struct WorkoutLoggingView: View {
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             Theme.Color.bg.ignoresSafeArea()
-            ScrollView {
-                VStack(spacing: Theme.Spacing.md) {
-                    LiveHeaderView(startedAt: workout.startedAt,
-                                   timerStartedAt: workout.timerStartedAt,
-                                   endedAt: workout.endedAt,
-                                   onStart: { startTimerIfNeeded() },
-                                   onFinish: { confirmingFinish = true })
-                    triadStats
-                    exerciseList
-                    Color.clear.frame(height: 80)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: Theme.Spacing.md) {
+                        LiveHeaderView(startedAt: workout.startedAt,
+                                       timerStartedAt: workout.timerStartedAt,
+                                       endedAt: workout.endedAt,
+                                       onStart: { startTimerIfNeeded() },
+                                       onFinish: { confirmingFinish = true })
+                        triadStats
+                        exerciseList
+                        Color.clear.frame(height: 80)
+                    }
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.top, Theme.Spacing.sm)
                 }
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.top, Theme.Spacing.sm)
+                // 聚焦单元变化时把所在组滚入键盘上方可视区。
+                .onChange(of: focused) { _, new in
+                    guard let id = new?.setId else { return }
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        proxy.scrollTo(id, anchor: .center)
+                    }
+                }
+                // 自研数字键盘：仅当存在聚焦单元时从底部升起，并为内容预留底部安全区。
+                .safeAreaInset(edge: .bottom) {
+                    if focused != nil {
+                        WorkoutKeypad(decimalEnabled: focused?.isWeight ?? false,
+                                      onDigit: keypadDigit,
+                                      onDot: keypadDot,
+                                      onBackspace: keypadBackspace,
+                                      onPrev: keypadPrev,
+                                      onNext: keypadNext,
+                                      onDismiss: dismissKeypad)
+                            .transition(.move(edge: .bottom))
+                    }
+                }
             }
-            // 浮动 FAB（仅在 rest 进行中显示且未展开）。本屏无 Tab Bar，贴右下角常驻。
+            // 浮动 FAB（仅在 rest 进行中显示且未展开、且键盘未升起）。本屏无 Tab Bar，贴右下角常驻。
             // 全屏休息弹窗已上提到全局 NavigationStack 的 overlay（层级高于 push 页与 Tab Bar）。
-            if restTimer.isRunning && !restTimer.isExpanded {
+            if restTimer.isRunning && !restTimer.isExpanded && focused == nil {
                 restFAB
                     .padding(.trailing, Theme.Spacing.lg)
                     .padding(.bottom, 28)
@@ -613,6 +658,7 @@ struct WorkoutLoggingView: View {
                     .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
             }
         }
+        .animation(.easeOut(duration: 0.22), value: focused == nil)
         // 子页统一导航栏：仅圆形返回键（双环处理收口在 paperToolbar）。
         .paperToolbar(title: workout.isActive ? "记录中" : (workout.title ?? "训练"), onBack: { dismiss() })
         // 动作 ⋯ 组间休息菜单：顶层浮层，按 anchor 定位于 ⋯ 下方；外部点击关闭。
@@ -706,6 +752,9 @@ struct WorkoutLoggingView: View {
                               readOnly: !canEdit,
                               isExpanded: activeId == ex.localId,
                               isMenuOpen: menuExerciseId == ex.localId,
+                              focused: focused,
+                              editingText: buffer,
+                              onFocus: focus,
                               onToggleExpand: {
                                   withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                                       // 点已展开的项 → 全部折叠；点其它项 → 互斥展开它。
@@ -895,6 +944,111 @@ struct WorkoutLoggingView: View {
         workout.markDirty()
         try? modelContext.save()
     }
+
+    // MARK: 自研键盘 · 焦点与编辑
+
+    /// 聚焦某单元：载入现值入缓冲并进入「打字即覆盖」。
+    private func focus(_ cell: FocusedCell) {
+        focused = cell
+        buffer = currentText(for: cell)
+        pendingReplace = true
+    }
+
+    private func dismissKeypad() {
+        focused = nil
+        buffer = ""
+        pendingReplace = false
+    }
+
+    /// 某单元当前模型值的显示串（重量走 formatKg，次数走整数串）。
+    private func currentText(for cell: FocusedCell) -> String {
+        guard let s = set(for: cell.setId) else { return "" }
+        switch cell {
+        case .weight: return s.weightKg.map { formatKg($0) } ?? ""
+        case .reps:   return s.reps.map(String.init) ?? ""
+        }
+    }
+
+    private func set(for id: UUID) -> WorkoutSet? {
+        workout.exercises.flatMap(\.sets).first { $0.localId == id }
+    }
+
+    private func exercise(containing setId: UUID) -> WorkoutExercise? {
+        workout.exercises.first { $0.sets.contains { $0.localId == setId } }
+    }
+
+    /// 当前动作的聚焦序列：组0.重量 → 组0.次数 → 组1.重量 → …
+    private func sequence(for ex: WorkoutExercise) -> [FocusedCell] {
+        ex.sets.sorted { $0.setIndex < $1.setIndex }
+            .flatMap { [FocusedCell.weight($0.localId), FocusedCell.reps($0.localId)] }
+    }
+
+    // MARK: 自研键盘 · 按键
+
+    private func keypadDigit(_ d: Int) {
+        guard let cell = focused else { return }
+        var b = pendingReplace ? "" : buffer
+        pendingReplace = false
+        if cell.isWeight {
+            // 小数点后最多 2 位：超出则忽略本次按键。
+            if let dot = b.firstIndex(of: ".") {
+                let decimals = b.distance(from: b.index(after: dot), to: b.endIndex)
+                if decimals >= 2 { return }
+            } else if b.count >= 4 {
+                // 整数部分上限 4 位（≤9999kg，防御性）。
+                return
+            }
+        } else {
+            // 次数：整数上限 4 位。
+            if b.count >= 4 { return }
+        }
+        b += String(d)
+        buffer = b
+        writeBack()
+    }
+
+    private func keypadDot() {
+        guard let cell = focused, cell.isWeight else { return }   // 次数态无效
+        var b = pendingReplace ? "" : buffer
+        pendingReplace = false
+        guard !b.contains(".") else { return }                    // 单个小数点
+        b = b.isEmpty ? "0." : b + "."                            // 空缓冲补 0.
+        buffer = b
+        writeBack()
+    }
+
+    private func keypadBackspace() {
+        guard focused != nil else { return }
+        pendingReplace = false
+        if !buffer.isEmpty { buffer.removeLast() }
+        writeBack()
+    }
+
+    /// 缓冲写回模型（空串→nil），并走即时落盘（markDirty + save）。
+    private func writeBack() {
+        guard let cell = focused, let s = set(for: cell.setId) else { return }
+        switch cell {
+        case .weight: s.weightKg = buffer.isEmpty ? nil : Double(buffer)
+        case .reps:   s.reps = buffer.isEmpty ? nil : Int(buffer)
+        }
+        touch()
+    }
+
+    // MARK: 自研键盘 · 跳转
+
+    private func keypadNext() {
+        guard let cell = focused, let ex = exercise(containing: cell.setId) else { dismissKeypad(); return }
+        let seq = sequence(for: ex)
+        guard let idx = seq.firstIndex(of: cell) else { dismissKeypad(); return }
+        if idx + 1 < seq.count { focus(seq[idx + 1]) } else { dismissKeypad() }  // 末项收起
+    }
+
+    private func keypadPrev() {
+        guard let cell = focused, let ex = exercise(containing: cell.setId) else { return }
+        let seq = sequence(for: ex)
+        guard let idx = seq.firstIndex(of: cell), idx > 0 else { return }        // 首项保持
+        focus(seq[idx - 1])
+    }
 }
 
 // MARK: - LiveHeader: REC · MM:SS + 暂停/结束
@@ -1021,6 +1175,12 @@ private struct ExerciseBlock: View {
     var isExpanded: Bool = true
     /// ⋯ 组间休息菜单是否打开（菜单本体由父视图顶层浮层渲染）。
     var isMenuOpen: Bool = false
+    /// 自研键盘焦点单元（父视图持有），用于派生编辑高亮与聚焦字段。
+    var focused: FocusedCell? = nil
+    /// 聚焦单元的编辑缓冲串（仅聚焦字段据此显示）。
+    var editingText: String = ""
+    /// 请求聚焦某单元。
+    var onFocus: (FocusedCell) -> Void = { _ in }
     var onToggleExpand: () -> Void = {}
     var onMoreTap: () -> Void = {}
     let onChange: () -> Void
@@ -1031,6 +1191,11 @@ private struct ExerciseBlock: View {
     }
     private var activeSetIndex: Int? {
         sortedSets.first(where: { !$0.completed })?.setIndex
+    }
+    /// 该组当前被聚焦的字段（nil = 未聚焦本组）。
+    private func focusedField(for set: WorkoutSet) -> SetField? {
+        guard let f = focused, f.setId == set.localId else { return nil }
+        return f.isWeight ? .weight : .reps
     }
     private var doneCount: Int { sortedSets.filter(\.completed).count }
     private var isAllDone: Bool {
@@ -1051,10 +1216,16 @@ private struct ExerciseBlock: View {
                 VStack(spacing: 0) {
                     ForEach(sortedSets) { set in
                         SetRow(set: set,
-                               isActive: activeSetIndex == set.setIndex,
+                               isTodo: activeSetIndex == set.setIndex,
                                readOnly: readOnly,
+                               focusedField: focusedField(for: set),
+                               editingText: editingText,
                                onChange: onChange,
-                               onComplete: onCompleteSet)
+                               onComplete: onCompleteSet,
+                               onFocus: { field in
+                                   onFocus(field == .weight ? .weight(set.localId) : .reps(set.localId))
+                               })
+                        .id(set.localId)
                     }
                 }
                 .padding(.top, 4).padding(.bottom, 8)
@@ -1136,31 +1307,73 @@ private struct ExerciseBlock: View {
 
 private struct SetRow: View {
     @Bindable var set: WorkoutSet
-    let isActive: Bool
-    /// 只读态：禁用输入框与完成勾选。
+    /// 弱待办标记：该组为「第一个未完成组」（仅次序号/勾选弱提示，非编辑高亮）。
+    let isTodo: Bool
+    /// 只读态：禁用输入与完成勾选，不可聚焦。
     var readOnly: Bool = false
+    /// 本组当前被聚焦的字段（nil = 未聚焦本组）；非 nil ⟺ 编辑高亮落在本组。
+    let focusedField: SetField?
+    /// 聚焦字段的编辑缓冲串（含 "0." / "72." 中间态）。
+    let editingText: String
     let onChange: () -> Void
     let onComplete: () -> Void
+    /// 请求聚焦本组某字段。
+    let onFocus: (SetField) -> Void
+
+    /// 编辑高亮 = 本组有字段被聚焦。
+    private var isEditing: Bool { focusedField != nil }
+    /// 弱强调（次序号/勾选环）：编辑中或待办。
+    private var emphasized: Bool { isEditing || isTodo }
 
     var body: some View {
-        // 原型 grid：[22 序号][1fr 重量][14 ×][1fr 次数][28 勾]，激活行朱砂红 8% 底+描边。
+        // 原型 grid：[22 序号][1fr 重量][14 ×][1fr 次数][28 勾]。聚焦字段朱砂红高亮、待办仅弱提示。
         HStack(spacing: 8) {
             Text("\(set.setIndex + 1)")
                 .font(Theme.Font.mono(size: 13, weight: .bold))
                 .frame(width: 22)
                 .foregroundStyle(snColor)
-            numberField("kg", value: $set.weightKg).disabled(readOnly)
+            valueCell(text: weightDisplay, placeholder: "kg", focused: focusedField == .weight,
+                      label: "重量", value: set.weightKg.map { "\(formatKg($0)) 公斤" })
+                .onTapGesture { if !readOnly { onFocus(.weight) } }
             Text("×").font(Theme.Font.mono(size: 11)).foregroundStyle(Theme.Color.muted).frame(width: 14)
-            intField("次", value: $set.reps).disabled(readOnly)
+            valueCell(text: repsDisplay, placeholder: "次", focused: focusedField == .reps,
+                      label: "次数", value: set.reps.map { "\($0) 次" })
+                .onTapGesture { if !readOnly { onFocus(.reps) } }
             checkButton
         }
         .opacity(set.completed ? 0.52 : 1)
-        .padding(.horizontal, isActive ? 9 : 15)
-        .padding(.vertical, isActive ? 6 : 5)
-        .background(isActive ? Theme.Color.accentSoft : .clear,
-                    in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-        .padding(.horizontal, isActive ? 6 : 0)
-        .padding(.vertical, isActive ? 2 : 0)
+        .padding(.horizontal, 15)
+        .padding(.vertical, 5)
+    }
+
+    // 聚焦字段显示缓冲；否则显示模型格式化值。
+    private var weightDisplay: String {
+        focusedField == .weight ? editingText : (set.weightKg.map { formatKg($0) } ?? "")
+    }
+    private var repsDisplay: String {
+        focusedField == .reps ? editingText : (set.reps.map(String.init) ?? "")
+    }
+
+    private func valueCell(text: String, placeholder: String, focused: Bool,
+                           label: String, value: String?) -> some View {
+        Text(text.isEmpty ? placeholder : text)
+            .font(Theme.Font.number(size: 15, weight: .bold))
+            .foregroundStyle(text.isEmpty ? Theme.Color.muted : Theme.Color.fg)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .frame(height: 36)
+            .background(focused ? Theme.Color.accentSoft : (isEditing ? Theme.Color.surface : Theme.Color.bg),
+                        in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                    .stroke(focused ? Theme.Color.accent : Theme.Color.border,
+                            lineWidth: focused ? 1.5 : 1)
+            )
+            .contentShape(Rectangle())
+            .accessibilityElement()
+            .accessibilityLabel("第 \(set.setIndex + 1) 组 \(label)")
+            .accessibilityValue(value ?? "未填写")
+            .accessibilityAddTraits(.isButton)
     }
 
     private var checkButton: some View {
@@ -1174,7 +1387,7 @@ private struct SetRow: View {
                     Circle().fill(Theme.Color.accent)
                         .shadow(color: Theme.Color.accent.opacity(0.28), radius: 5, y: 2)
                     Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
-                } else if isActive {
+                } else if emphasized {
                     Circle().fill(Theme.Color.accent.opacity(0.18))
                     Circle().stroke(Theme.Color.accent.opacity(0.4), lineWidth: 2)
                 } else {
@@ -1188,43 +1401,5 @@ private struct SetRow: View {
         .accessibilityLabel(set.completed ? "第 \(set.setIndex + 1) 组已完成" : "标记第 \(set.setIndex + 1) 组完成")
     }
 
-    private var snColor: SwiftUI.Color { isActive ? Theme.Color.accent : Theme.Color.muted }
-
-    private func numberField(_ placeholder: String, value: Binding<Double?>) -> some View {
-        TextField("", text: Binding(
-            get: { value.wrappedValue.map { formatKg($0) } ?? "" },
-            set: { value.wrappedValue = Double($0.replacingOccurrences(of: ",", with: ".")); onChange() }
-        ), prompt: Text(placeholder).foregroundColor(Theme.Color.muted))
-        .keyboardType(.decimalPad)
-        .multilineTextAlignment(.center)
-        .font(Theme.Font.number(size: 15, weight: .bold))
-        .foregroundStyle(Theme.Color.fg)
-        .frame(maxWidth: .infinity)
-        .frame(height: 36)
-        .background(isActive ? Theme.Color.surface : Theme.Color.bg,
-                    in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                .stroke(isActive ? Theme.Color.accent.opacity(0.35) : Theme.Color.border, lineWidth: 1)
-        )
-    }
-
-    private func intField(_ placeholder: String, value: Binding<Int?>) -> some View {
-        TextField("", text: Binding(
-            get: { value.wrappedValue.map(String.init) ?? "" },
-            set: { value.wrappedValue = Int($0); onChange() }
-        ), prompt: Text(placeholder).foregroundColor(Theme.Color.muted))
-        .keyboardType(.numberPad)
-        .multilineTextAlignment(.center)
-        .font(Theme.Font.number(size: 15, weight: .bold))
-        .foregroundStyle(Theme.Color.fg)
-        .frame(maxWidth: .infinity)
-        .frame(height: 36)
-        .background(isActive ? Theme.Color.surface : Theme.Color.bg,
-                    in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                .stroke(isActive ? Theme.Color.accent.opacity(0.35) : Theme.Color.border, lineWidth: 1)
-        )
-    }
+    private var snColor: SwiftUI.Color { emphasized ? Theme.Color.accent : Theme.Color.muted }
 }
