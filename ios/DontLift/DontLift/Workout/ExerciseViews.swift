@@ -357,32 +357,40 @@ struct ExerciseLibraryView: View {
     private var rightArea: some View {
         let prWeights = PRStats.maxWeightByKey(in: workouts)
         return ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    Color.clear.frame(height: 0).id("LIB_TOP")
-                        .background(GeometryReader { geo in
-                            Color.clear.preference(key: LibScrollOffsetKey.self,
-                                                   value: geo.frame(in: .named("libScroll")).minY)
-                        })
-                    HorizontalChipPicker(items: equipChips, selection: $equip) { $0.title }
-                        .padding(.vertical, 8)
-                    if filteredBuiltin.isEmpty && filteredCustom.isEmpty {
-                        emptyState
-                    } else {
-                        ForEach(libRows) { row in
-                            libRowView(row, prWeights: prWeights)
+            VStack(spacing: 0) {
+                // 置顶器械轴：固定在右侧顶部，不随动作列表滚动
+                HorizontalChipPicker(items: equipChips, selection: $equip) { $0.title }
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.top, 2)
+                    .padding(.bottom, 8)
+                Rectangle().fill(Theme.Color.border).frame(height: 1)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        Color.clear.frame(height: 0).id("LIB_TOP")
+                        if filteredBuiltin.isEmpty && filteredCustom.isEmpty {
+                            emptyState
+                        } else {
+                            ForEach(Array(libRows.enumerated()), id: \.element.id) { idx, row in
+                                libRowView(row, prWeights: prWeights, isFirst: idx == 0)
+                            }
                         }
+                        Color.clear.frame(height: 40)
                     }
-                    Color.clear.frame(height: 40)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.top, 8)
+                    // 偏移测量挂在内容容器（非懒回收子视图）上，滚多远都持续上报
+                    .background(GeometryReader { geo in
+                        Color.clear.preference(key: LibScrollOffsetKey.self,
+                                               value: geo.frame(in: .named("libScroll")).minY)
+                    })
                 }
-                .padding(.horizontal, Theme.Spacing.md)
-                .padding(.top, 6)
+                .coordinateSpace(name: "libScroll")
+                .onPreferenceChange(LibScrollOffsetKey.self) { y in
+                    let show = y < -500
+                    if show != showBackToTop { showBackToTop = show }
+                }
             }
-            .coordinateSpace(name: "libScroll")
-            .onPreferenceChange(LibScrollOffsetKey.self) { y in
-                let show = y < -600
-                if show != showBackToTop { showBackToTop = show }
-            }
+            // FAB 叠在整块右侧区（VStack 受底部安全区约束 → 位于底导航之上，不被遮挡）
             .overlay(alignment: .bottomTrailing) {
                 if showBackToTop {
                     CircleIconButton(systemName: "chevron.up", size: 44) {
@@ -391,7 +399,7 @@ struct ExerciseLibraryView: View {
                     }
                     .paperShadow(.md, cornerRadius: 22)
                     .padding(.trailing, 14)
-                    .padding(.bottom, 18)
+                    .padding(.bottom, 14)
                     .transition(.opacity)
                     .accessibilityLabel("返回顶部")
                 }
@@ -434,10 +442,10 @@ struct ExerciseLibraryView: View {
     }
 
     @ViewBuilder
-    private func libRowView(_ row: LibRow, prWeights: [String: Double]) -> some View {
+    private func libRowView(_ row: LibRow, prWeights: [String: Double], isFirst: Bool) -> some View {
         switch row {
         case .header(let title):
-            sectionHeader(title)
+            sectionHeader(title, topGap: isFirst ? 2 : 14)
         case .builtin(let ex, let first, let last):
             Button { selectedExercise = ex } label: { builtinRow(ex, prWeights: prWeights) }
                 .buttonStyle(.plain)
@@ -544,13 +552,13 @@ struct ExerciseLibraryView: View {
 
     // MARK: 列表样式件
 
-    private func sectionHeader(_ title: String) -> some View {
+    private func sectionHeader(_ title: String, topGap: CGFloat = 14) -> some View {
         Text(title)
             .font(Theme.Font.mono(size: 10, weight: .regular))
             .tracking(0.1 * 10)
             .textCase(.uppercase)
             .foregroundStyle(Theme.Color.muted)
-            .padding(.top, 14)
+            .padding(.top, topGap)
             .padding(.bottom, 6)
             .padding(.leading, 2)
     }
