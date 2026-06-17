@@ -8,6 +8,16 @@ struct HorizontalChipPicker<Item: Identifiable & Hashable>: View {
     let items: [Item]
     @Binding var selection: Item.ID
     let label: (Item) -> String
+    /// 重复点击当前已激活 chip 时回调（selection 不变，故 onChange 不触发，用于「回顶」等场景）。
+    var onReselect: ((Item.ID) -> Void)? = nil
+
+    init(items: [Item], selection: Binding<Item.ID>,
+         onReselect: ((Item.ID) -> Void)? = nil, label: @escaping (Item) -> String) {
+        self.items = items
+        self._selection = selection
+        self.onReselect = onReselect
+        self.label = label
+    }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -25,7 +35,9 @@ struct HorizontalChipPicker<Item: Identifiable & Hashable>: View {
     private func chip(for item: Item) -> some View {
         let isSelected = selection == item.id
         Button {
-            if !isSelected {
+            if isSelected {
+                onReselect?(item.id)
+            } else {
                 selection = item.id
             }
         } label: {

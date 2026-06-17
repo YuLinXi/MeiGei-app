@@ -28,12 +28,6 @@ private enum LibrarySelection: Hashable {
     case head(String, String, String)          // L1 + L2 + L3 肌头
 }
 
-/// 动作库右侧滚动偏移哨兵：顶部哨兵在 libScroll 坐标空间的 minY（下滚后变负，< 阈值即显示返回顶部）。
-private struct LibScrollOffsetKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
-
 /// 行卡片切片：复刻纸感分组卡——surface 底 + 左右描边、首行顶边/末行底边、行间分隔线、首末圆角。
 /// 每行独立成视图以支持外层 LazyVStack 逐行懒加载。
 private struct RowCardSlice: ViewModifier {
@@ -76,8 +70,6 @@ struct ExerciseLibraryView: View {
     @State private var equip: String = "all"
     @State private var showingCreate = false
     @State private var selectedExercise: BuiltinExercise?
-    /// 下滚一段后显示「返回顶部」FAB。
-    @State private var showBackToTop = false
 
     /// 器械 chip（全部 + EquipmentType）。
     private let equipChips: [LibraryChip] =
@@ -358,8 +350,9 @@ struct ExerciseLibraryView: View {
         let prWeights = PRStats.maxWeightByKey(in: workouts)
         return ScrollViewReader { proxy in
             VStack(spacing: 0) {
-                // 置顶器械轴：固定在右侧顶部，不随动作列表滚动
-                HorizontalChipPicker(items: equipChips, selection: $equip) { $0.title }
+                // 置顶器械轴：固定在右侧顶部，不随动作列表滚动；重复点已激活 chip 也回顶
+                HorizontalChipPicker(items: equipChips, selection: $equip,
+                                     onReselect: { _ in scrollLibToTop(proxy) }) { $0.title }
                     .padding(.horizontal, Theme.Spacing.md)
                     .padding(.top, 2)
                     .padding(.bottom, 8)
@@ -378,34 +371,18 @@ struct ExerciseLibraryView: View {
                     }
                     .padding(.horizontal, Theme.Spacing.md)
                     .padding(.top, 8)
-                    // 偏移测量挂在内容容器（非懒回收子视图）上，滚多远都持续上报
-                    .background(GeometryReader { geo in
-                        Color.clear.preference(key: LibScrollOffsetKey.self,
-                                               value: geo.frame(in: .named("libScroll")).minY)
-                    })
-                }
-                .coordinateSpace(name: "libScroll")
-                .onPreferenceChange(LibScrollOffsetKey.self) { y in
-                    let show = y < -500
-                    if show != showBackToTop { showBackToTop = show }
                 }
             }
-            // FAB 叠在整块右侧区（VStack 受底部安全区约束 → 位于底导航之上，不被遮挡）
-            .overlay(alignment: .bottomTrailing) {
-                if showBackToTop {
-                    CircleIconButton(systemName: "chevron.up", size: 44) {
-                        Theme.Haptics.impact(.light)
-                        withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo("LIB_TOP", anchor: .top) }
-                    }
-                    .paperShadow(.md, cornerRadius: 22)
-                    .padding(.trailing, 14)
-                    .padding(.bottom, 14)
-                    .transition(.opacity)
-                    .accessibilityLabel("返回顶部")
-                }
-            }
-            .animation(.easeOut(duration: 0.2), value: showBackToTop)
+            // 左栏筛选切换 / 器械筛选切换 → 列表自动回顶
+            .onChange(of: selection) { _, _ in proxy.scrollTo("LIB_TOP", anchor: .top) }
+            .onChange(of: equip) { _, _ in proxy.scrollTo("LIB_TOP", anchor: .top) }
         }
+    }
+
+    /// 平滑回到动作列表顶部（用于重复点击已激活 chip）。
+    private func scrollLibToTop(_ proxy: ScrollViewProxy) {
+        Theme.Haptics.impact(.light)
+        withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo("LIB_TOP", anchor: .top) }
     }
 
     /// 扁平行模型：段头 / 内置行 / 自定义行（first/last 控制卡片切片圆角与分隔）。
