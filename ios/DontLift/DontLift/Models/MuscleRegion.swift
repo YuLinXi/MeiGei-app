@@ -20,6 +20,11 @@ enum MuscleRegion: String, CaseIterable, Identifiable, Codable, Hashable {
     case adductors    // 内收肌
     case hams         // 腘绳肌
     case calves       // 小腿
+    // 与解剖三级树对齐补齐的细分区（美术按 muscle-map-detailed-art 分批补绘，补绘前优雅回退父级）
+    case deltSide     // 三角肌中束
+    case rhomboids    // 菱形肌 / 中背
+    case gluteMed     // 臀中肌
+    case neck         // 颈部
 
     var id: String { rawValue }
 
@@ -42,6 +47,10 @@ enum MuscleRegion: String, CaseIterable, Identifiable, Codable, Hashable {
         case .adductors:  return "内收肌"
         case .hams:       return "腘绳肌"
         case .calves:     return "小腿"
+        case .deltSide:   return "三角肌中束"
+        case .rhomboids:  return "菱形肌"
+        case .gluteMed:   return "臀中肌"
+        case .neck:       return "颈部"
         }
     }
 
@@ -54,7 +63,13 @@ enum MuscleRegion: String, CaseIterable, Identifiable, Codable, Hashable {
             return .front
         case .deltRear, .triceps, .lats, .lowerBack, .glutes, .hams:
             return .back
-        case .traps, .forearms, .calves:
+        case .deltSide:
+            return .both
+        case .rhomboids:
+            return .back
+        case .gluteMed:
+            return .back
+        case .traps, .forearms, .calves, .neck:
             return .both
         }
     }

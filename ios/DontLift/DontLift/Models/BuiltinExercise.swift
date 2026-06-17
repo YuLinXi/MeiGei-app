@@ -24,8 +24,8 @@ enum EquipmentType: String, CaseIterable, Identifiable, Codable {
 struct BuiltinExercise: Identifiable, Hashable, Codable {
     let code: String
     let name: String
-    /// 浏览父级分类，取自 `ExerciseCategory.rawValue`（中文）。
-    let category: String
+    /// 浏览父级分类（L1 部位），取自 `ExerciseCategory.rawValue`（中文）。归一时由 `collapseL1` 收缩到 11。
+    var category: String
     /// 父级内子分类（中文，可空=该父级未细分/「全部」）。非空时必属 `category` 的允许子分类清单。
     var subcategory: String? = nil
     let equipmentType: String
@@ -40,20 +40,83 @@ struct BuiltinExercise: Identifiable, Hashable, Codable {
 }
 
 extension BuiltinExercise {
-    /// 内置动作集（对外）：在 `starterBase` 基础上按 `regionData` 回填细分肌群与要点。
-    static let starter: [BuiltinExercise] = starterBase.map { ex in
-        guard let d = regionData[ex.code] else { return ex }
-        var e = ex
-        e.primaryRegions = d.primary
-        e.secondaryRegions = d.secondary
-        e.formCues = d.cues
+    /// 内置动作集（对外）：在 `starterBase` 基础上 **归一到解剖三级树**——
+    /// ① L1 收缩到 11（`ExerciseCategory.collapseL1`）；
+    /// ② `primaryRegions`/要点：curated 走 `regionData`（含中束/臀中肌精修），导入条按旧 L1/subcategory 派生；
+    /// ③ `subcategory` 重锚为合法 L3 肌头 / 非解剖浏览子类（功能性按动作名关键词归桶），其余置 nil。
+    /// 浏览 L2 由 `primaryRegions` 经 `ExerciseCategory.regionOwner` 派生，与高亮同源。
+    static let starter: [BuiltinExercise] = starterBase.map(normalized)
+
+    /// 内置动作基础清单（原始 code/name/category/subcategory/equipmentType；category/subcategory 可能为旧 15 类形态）。
+    /// 真实归位在 `normalized` 单点完成，避免逐条改 900+ 导入字面量。
+    private static let starterBase: [BuiltinExercise] = curated + imported
+
+    /// curated（精修 153，已发布冻结）的 code 集合：用于动作库「同段 curated 优先」排序。
+    static let curatedCodes: Set<String> = Set(curated.map(\.code))
+
+    /// 把一条原始内置动作归一到解剖三级树。
+    private static func normalized(_ raw: BuiltinExercise) -> BuiltinExercise {
+        var e = raw
+        let oldCat = raw.category
+        let oldSub = raw.subcategory
+        // ① L1 收缩到 11
+        e.category = ExerciseCategory.collapseL1(oldCat)
+        // ② 高亮区 / 要点（L2 由 primaryRegions 派生）
+        if let d = regionData[raw.code] {
+            e.primaryRegions = refinedRegions(d.primary, oldSub: oldSub)
+            e.secondaryRegions = d.secondary
+            e.formCues = d.cues
+        } else {
+            e.primaryRegions = derivedRegions(oldCat: oldCat, oldSub: oldSub)
+            e.secondaryRegions = []
+            e.formCues = []
+        }
+        // ③ subcategory 重锚为合法 L3 / 非解剖浏览子类
+        e.subcategory = normalizedSubcategory(newCat: e.category, name: raw.name, oldSub: oldSub)
         return e
     }
 
-    /// 内置动作基础清单（code/name/category/subcategory/equipmentType）。
-    /// `category` 取自 `ExerciseCategory.rawValue`，`equipmentType` 取自 `EquipmentType.rawValue`。
-    /// 注：训记导入动作见 `BuiltinExercise+Imported.swift`，与本清单合并入 `starterBase`。
-    private static let starterBase: [BuiltinExercise] = curated + imported
+    /// 导入条（无 regionData）按旧 L1 / 旧 subcategory 派生主动肌区，落不到则空（归「L1→全部」）。
+    private static func derivedRegions(oldCat: String, oldSub: String?) -> [MuscleRegion] {
+        if let r = ExerciseCategory.regionForCollapsedL1(oldCat) { return [r] }
+        if oldCat == "颈部" { return [.neck] }   // 颈部旧无子类，整段归 L2「颈部肌」
+        if let sub = oldSub, let r = ExerciseCategory.regionForSubcategory(sub) { return [r] }
+        return []
+    }
+
+    /// 精修 curated 粗 regionData：把旧 subcategory 指向的更细区替换进 primary（中束→三角肌中束、臀中肌→臀中肌）。
+    /// 中背等 row 动作以 regionData(背阔) 为高亮真源，不强改。
+    private static func refinedRegions(_ base: [MuscleRegion], oldSub: String?) -> [MuscleRegion] {
+        guard let sub = oldSub else { return base }
+        switch ExerciseCategory.regionForSubcategory(sub) {
+        case .deltSide: return base.map { $0 == .deltFront ? .deltSide : $0 }
+        case .gluteMed: return base.map { $0 == .glutes ? .gluteMed : $0 }
+        default:        return base
+        }
+    }
+
+    /// subcategory 归一：合法 L3 肌头 / 非解剖浏览子类（功能性按动作名关键词归桶）保留，其余置 nil。
+    private static func normalizedSubcategory(newCat: String, name: String, oldSub: String?) -> String? {
+        if let sub = oldSub {
+            if ExerciseCategory.allHeads.contains(sub) { return sub }                      // L3 肌头
+            if let cat = ExerciseCategory(rawValue: newCat),
+               cat.browseSubcategories.contains(sub) { return sub }                         // 非解剖桶（热身拉伸 3）
+        }
+        if newCat == "功能性" { return functionalBucket(name) }                            // 功能性按名归 5 桶
+        return nil
+    }
+
+    /// 功能性动作按名归 5 个浏览子类（design D7）；命中不到落 nil（归「全部」，数据债不阻塞）。
+    private static func functionalBucket(_ name: String) -> String? {
+        let n = name
+        func has(_ ks: [String]) -> Bool { ks.contains { n.contains($0) } }
+        if has(["高翻", "悬垂翻", "抓举", "挺举", "翻", "火箭推", "波比", "土耳其", "推举深蹲", "借力推"]) { return "爆发奥举" }
+        if has(["Pallof", "帕洛夫", "巫师", "扭转", "抗旋", "旋转", "9090"]) { return "抗旋稳定" }
+        if has(["蚌", "螃蟹", "外展", "激活", "髋桥", "臀桥", "蚌式"]) { return "髋臀激活" }
+        if has(["农夫", "搬运", "甩", "摆荡", "壶铃甩", "负重行走"]) { return "负重搬运" }
+        if has(["熊爬", "下犬", "蝴蝶", "剪刀", "爬行", "爬", "动态", "猫", "鸟狗"]) { return "动态控制" }
+        return nil
+    }
 
     /// 原 MVP 精选 153 条（code 永久冻结，保证 historyKey 不断裂）。
     private static let curated: [BuiltinExercise] = [

@@ -19,30 +19,16 @@ struct LibraryChip: Identifiable, Hashable {
     let title: String
 }
 
-/// 动作分组（复合 推 / 拉 / 腿 + 单关节）。
-private enum LibraryGroup: String, CaseIterable {
-    case push = "复合 · 推"
-    case pull = "复合 · 拉"
-    case leg  = "复合 · 腿"
-    case iso  = "单关节"
-
-    static func classify(_ code: String) -> LibraryGroup {
-        switch code {
-        case "BB_BENCH_PRESS", "DB_BENCH_PRESS", "INCLINE_BB_PRESS", "PUSH_UP",
-             "OHP", "DB_SHOULDER_PRESS":
-            return .push
-        case "PULL_UP", "BB_ROW", "LAT_PULLDOWN", "DEADLIFT", "SEATED_CABLE_ROW", "FACE_PULL":
-            return .pull
-        case "BB_SQUAT", "LEG_PRESS", "ROMANIAN_DL", "HIP_THRUST":
-            return .leg
-        default:
-            return .iso
-        }
-    }
+/// 动作库左栏选择态（解剖三级树的当前下钻位置）。
+private enum LibrarySelection: Hashable {
+    case all                                   // 全部
+    case mine                                  // 我的（自定义）
+    case category(String)                      // L1 部位
+    case node(String, String)                  // L1 + L2（解剖肌肉 或 非解剖浏览子类）
+    case head(String, String, String)          // L1 + L2 + L3 肌头
 }
 
-/// 动作库 · Tab 根页（设计稿 Screen 10）：
-/// 自绘大标题头 + 真实搜索 + 部位 chip 筛选 + 分组列表（自定义→复合推/拉/腿→单关节），行右显示 PR。
+/// 动作库 · Tab 根页：训记式左栏（解剖三级树逐级手风琴）× 右侧器械 chip + 按树层级分段 + 中文模糊搜索。
 struct ExerciseLibraryView: View {
     @Query(sort: \CustomExercise.updatedAt, order: .reverse) private var custom: [CustomExercise]
     @Query(filter: #Predicate<Workout> { $0.deletedAt == nil },
@@ -50,67 +36,92 @@ struct ExerciseLibraryView: View {
     private var workouts: [Workout]
 
     @State private var query = ""
-    /// 部位轴：「all」或 `ExerciseCategory.rawValue`。
-    @State private var category: String = "all"
-    /// 子分类轴：「all」或当前父级的子分类中文名（仅父级有子分类时显示）。
-    @State private var subcategory: String = "all"
+    @State private var selection: LibrarySelection = .all
+    /// 手风琴展开态：展开中的 L1、展开中的 L2（单开）。
+    @State private var expandedCat: String? = nil
+    @State private var expandedNode: String? = nil
     /// 器械轴：「all」或 `EquipmentType.rawValue`。
     @State private var equip: String = "all"
     @State private var showingCreate = false
-    /// 动作详情导航：绑定式 navigationDestination(item:)，避免类型注册式（for:）在嵌套 TabView 的 stack 里失灵。
     @State private var selectedExercise: BuiltinExercise?
-
-    /// 部位 chip（全部 + 15 个 ExerciseCategory 父级）。
-    private let categoryChips: [LibraryChip] =
-        [LibraryChip(id: "all", title: "全部")]
-        + ExerciseCategory.allCases.map { LibraryChip(id: $0.rawValue, title: $0.rawValue) }
 
     /// 器械 chip（全部 + EquipmentType）。
     private let equipChips: [LibraryChip] =
         [LibraryChip(id: "all", title: "全部")]
         + EquipmentType.allCases.map { LibraryChip(id: $0.rawValue, title: $0.rawValue) }
 
-    /// 当前父级（非 all 时）。
-    private var selectedCategory: ExerciseCategory? { ExerciseCategory(rawValue: category) }
-
-    /// 当前父级的子分类 chip（全部 + 子分类）；父级无子分类则为空（不渲染该行）。
-    private var subChips: [LibraryChip] {
-        guard let c = selectedCategory, c.hasSubcategories else { return [] }
-        return [LibraryChip(id: "all", title: "全部")]
-            + c.subcategories.map { LibraryChip(id: $0, title: $0) }
-    }
-
-    /// 去空白后的搜索词；空则不参与名称过滤。
     private var trimmedQuery: String { query.trimmingCharacters(in: .whitespaces) }
+    private var searching: Bool { !trimmedQuery.isEmpty }
 
-    /// 库内动作总量（内置 + 自定义），用于搜索框占位。
-    private var totalCount: Int {
-        BuiltinExercise.starter.count + custom.filter { $0.deletedAt == nil }.count
-    }
+    /// 全部内置（已归一到解剖三级树）。
+    private var allBuiltin: [BuiltinExercise] { BuiltinExercise.starter }
+    private var allCustom: [CustomExercise] { custom.filter { $0.deletedAt == nil } }
+    private var totalCount: Int { allBuiltin.count + allCustom.count }
+
+    // MARK: 中文模糊多关键词 AND
 
     private func matchesQuery(_ name: String) -> Bool {
-        trimmedQuery.isEmpty || name.localizedCaseInsensitiveContains(trimmedQuery)
+        searching ? ExerciseSearch.matches(name, query: query) : true
     }
 
-    /// 双轴正交 + 子分类 + 搜索过滤内置动作。
-    private var builtinFiltered: [BuiltinExercise] {
-        BuiltinExercise.starter.filter { ex in
-            (category == "all" || ex.category == category)
-                && (subcategory == "all" || ex.subcategory == subcategory)
-                && (equip == "all" || ex.equipmentType == equip)
-                && matchesQuery(ex.name)
+    // MARK: 解剖归位辅助
+
+    /// 动作在某 L1 内命中的 L2 肌肉名（按 primaryRegions 经 regionOwner 派生）。空=该 L1 内无 L2（归「全部」段）。
+    private func muscleNames(_ ex: BuiltinExercise) -> [String] {
+        guard let cat = ExerciseCategory(rawValue: ex.category), cat.isAnatomical else { return [] }
+        var names: [String] = []
+        for r in ex.primaryRegions {
+            if let owner = ExerciseCategory.regionOwner[r], owner.category == cat,
+               !names.contains(owner.muscle.name) {
+                names.append(owner.muscle.name)
+            }
+        }
+        return names
+    }
+
+    // MARK: 过滤（器械 + 搜索恒定叠加；搜索态忽略左栏）
+
+    private func passesEquipAndQuery(_ equipType: String?, _ name: String) -> Bool {
+        (equip == "all" || equipType == equip) && matchesQuery(name)
+    }
+
+    private var filteredBuiltin: [BuiltinExercise] {
+        allBuiltin.filter { ex in
+            guard passesEquipAndQuery(ex.equipmentType, ex.name) else { return false }
+            if searching { return true }
+            switch selection {
+            case .all:                 return true
+            case .mine:                return false
+            case .category(let c):     return ex.category == c
+            case .node(let c, let n):
+                guard ex.category == c else { return false }
+                if let cat = ExerciseCategory(rawValue: c), cat.isAnatomical {
+                    return muscleNames(ex).contains(n)
+                }
+                return ex.subcategory == n
+            case .head(let c, let n, let h):
+                return ex.category == c && ex.subcategory == h && muscleNames(ex).contains(n)
+            }
         }
     }
 
-    /// 自定义动作无子分类：选了具体子分类时不显示自定义。
-    private var customFiltered: [CustomExercise] {
-        custom.filter { ex in
-            ex.deletedAt == nil
-                && (category == "all" || ex.primaryMuscle == category)
-                && subcategory == "all"
-                && (equip == "all" || ex.equipmentType == equip)
-                && matchesQuery(ex.name)
+    private var filteredCustom: [CustomExercise] {
+        allCustom.filter { ex in
+            guard passesEquipAndQuery(ex.equipmentType, ex.name) else { return false }
+            if searching { return true }
+            switch selection {
+            case .all, .mine:          return true
+            case .category(let c):     return ex.primaryMuscle == c
+            case .node, .head:         return false   // 自定义无肌肉/肌头粒度
+            }
         }
+    }
+
+    // MARK: 左栏数量角标（仅按部位归属计，不随器械/搜索变化）
+
+    private func builtinCount(_ c: ExerciseCategory) -> Int {
+        allBuiltin.filter { $0.category == c.rawValue }.count
+            + allCustom.filter { $0.primaryMuscle == c.rawValue }.count
     }
 
     var body: some View {
@@ -118,41 +129,20 @@ struct ExerciseLibraryView: View {
             Theme.Color.bg.ignoresSafeArea()
             VStack(spacing: 0) {
                 header
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10, pinnedViews: []) {
-                        searchBar
-                        // 器械轴（顶部 chip）
-                        HorizontalChipPicker(items: equipChips, selection: $equip) { $0.title }
-                            .padding(.horizontal, -Theme.Spacing.lg)
-                        // 部位轴（可滚动 chip）；切父级时重置子分类
-                        HorizontalChipPicker(items: categoryChips, selection: $category) { $0.title }
-                            .padding(.horizontal, -Theme.Spacing.lg)
-                            .onChange(of: category) { _, _ in subcategory = "all" }
-                        // 子分类轴（仅当前父级有子分类时展开）
-                        if !subChips.isEmpty {
-                            HorizontalChipPicker(items: subChips, selection: $subcategory) { $0.title }
-                                .padding(.horizontal, -Theme.Spacing.lg)
-                        }
-
-                        if builtinFiltered.isEmpty && customFiltered.isEmpty {
-                            emptyState
-                        } else {
-                            groupedList
-                        }
-                        Color.clear.frame(height: 32)
-                    }
-                    .padding(.horizontal, Theme.Spacing.lg)
-                    .padding(.top, 6)
+                searchBar.padding(.horizontal, Theme.Spacing.lg).padding(.bottom, 8)
+                HStack(spacing: 0) {
+                    leftRail
+                    Rectangle().fill(Theme.Color.border).frame(width: 1)
+                    rightArea
                 }
             }
         }
-        // 自绘大标题头（对齐设计稿 .nav，与首页一致），隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingCreate) { CustomExerciseEditorView() }
         .navigationDestination(item: $selectedExercise) { ExerciseDetailView(exercise: $0) }
     }
 
-    // MARK: Header（设计稿 .nav：大标题「动作」+ 右侧圆形朱砂红 +）
+    // MARK: Header
 
     private var header: some View {
         HStack {
@@ -168,7 +158,6 @@ struct ExerciseLibraryView: View {
         .padding(.bottom, 4)
     }
 
-    // 搜索框（真实可用）：暖底 + 实线次边框 + 放大镜 + 清除按钮。
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
@@ -200,9 +189,254 @@ struct ExerciseLibraryView: View {
         )
     }
 
+    // MARK: 左栏（解剖三级树逐级手风琴）
+
+    private var leftRail: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 2) {
+                railRow(title: "全部", level: 0, count: totalCount,
+                        selected: isAll, dimmed: searching) { selectAll() }
+                railRow(title: "我的", level: 0, count: allCustom.count,
+                        selected: isMine, dimmed: searching) { selectMine() }
+                Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.vertical, 4)
+                ForEach(ExerciseCategory.allCases) { cat in
+                    railRow(title: cat.rawValue, level: 0, count: builtinCount(cat),
+                            selected: isSelectedCat(cat), dimmed: searching,
+                            chevron: hasChildren(cat) ? (expandedCat == cat.rawValue ? .down : .right) : .none) {
+                        tapCategory(cat)
+                    }
+                    if expandedCat == cat.rawValue { childRows(cat) }
+                }
+                Color.clear.frame(height: 24)
+            }
+            .padding(.vertical, 8)
+            .padding(.leading, 8)
+            .padding(.trailing, 4)
+        }
+        .frame(width: 96)
+    }
+
+    /// L2/L3 子行（手风琴展开）。
+    @ViewBuilder
+    private func childRows(_ cat: ExerciseCategory) -> some View {
+        if cat.isAnatomical {
+            ForEach(cat.muscles) { m in
+                railRow(title: m.name, level: 1, count: nil,
+                        selected: isSelectedNode(cat, m.name), dimmed: searching,
+                        chevron: m.hasHeads ? (expandedNode == m.name ? .down : .right) : .none) {
+                    tapNode(cat, m.name, hasHeads: m.hasHeads)
+                }
+                if m.hasHeads && expandedNode == m.name {
+                    ForEach(m.heads, id: \.self) { h in
+                        railRow(title: h, level: 2, count: nil,
+                                selected: isSelectedHead(cat, m.name, h), dimmed: searching) {
+                            selectHead(cat, m.name, h)
+                        }
+                    }
+                }
+            }
+        } else {
+            ForEach(cat.browseSubcategories, id: \.self) { sub in
+                railRow(title: sub, level: 1, count: nil,
+                        selected: isSelectedNode(cat, sub), dimmed: searching) {
+                    selectNode(cat, sub)
+                }
+            }
+        }
+    }
+
+    private enum Chevron { case none, right, down }
+
+    private func railRow(title: String, level: Int, count: Int?, selected: Bool,
+                         dimmed: Bool, chevron: Chevron = .none,
+                         action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Text(title)
+                    .font(Theme.Font.body(size: level == 0 ? 13 : 12,
+                                          weight: selected ? .bold : (level == 0 ? .semibold : .regular)))
+                    .foregroundStyle(selected ? Theme.Color.accent
+                                     : (dimmed ? Theme.Color.muted : Theme.Color.fg))
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Spacer(minLength: 0)
+                if let count { Text("\(count)").font(Theme.Font.mono(size: 9)).foregroundStyle(Theme.Color.muted) }
+                switch chevron {
+                case .none:  EmptyView()
+                case .right: Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.Color.muted)
+                case .down:  Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.Color.accent)
+                }
+            }
+            .padding(.leading, CGFloat(level) * 9)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(selected ? Theme.Color.accentSoft : .clear,
+                        in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: 选中态判定
+
+    private var isAll: Bool { if case .all = selection { return true }; return false }
+    private var isMine: Bool { if case .mine = selection { return true }; return false }
+    private func isSelectedCat(_ c: ExerciseCategory) -> Bool {
+        if case .category(let x) = selection { return x == c.rawValue }; return false
+    }
+    private func isSelectedNode(_ c: ExerciseCategory, _ n: String) -> Bool {
+        if case .node(let x, let y) = selection { return x == c.rawValue && y == n }; return false
+    }
+    private func isSelectedHead(_ c: ExerciseCategory, _ n: String, _ h: String) -> Bool {
+        if case .head(let x, let y, let z) = selection { return x == c.rawValue && y == n && z == h }; return false
+    }
+    private func hasChildren(_ c: ExerciseCategory) -> Bool {
+        c.isAnatomical ? !c.muscles.isEmpty : !c.browseSubcategories.isEmpty
+    }
+
+    // MARK: 左栏交互（点哪级过滤到哪级 + 逐级手风琴）
+
+    private func selectAll() { selection = .all; expandedCat = nil; expandedNode = nil }
+    private func selectMine() { selection = .mine; expandedCat = nil; expandedNode = nil }
+    private func tapCategory(_ c: ExerciseCategory) {
+        selection = .category(c.rawValue)
+        expandedNode = nil
+        expandedCat = (hasChildren(c) && expandedCat != c.rawValue) ? c.rawValue : (hasChildren(c) ? c.rawValue : nil)
+    }
+    private func tapNode(_ c: ExerciseCategory, _ n: String, hasHeads: Bool) {
+        selection = .node(c.rawValue, n)
+        expandedNode = (hasHeads && expandedNode != n) ? n : (hasHeads ? n : nil)
+    }
+    private func selectNode(_ c: ExerciseCategory, _ n: String) {
+        selection = .node(c.rawValue, n)
+    }
+    private func selectHead(_ c: ExerciseCategory, _ n: String, _ h: String) {
+        selection = .head(c.rawValue, n, h)
+    }
+
+    // MARK: 右侧动作区（器械 chip + 按树层级分段）
+
+    private var rightArea: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 10) {
+                HorizontalChipPicker(items: equipChips, selection: $equip) { $0.title }
+                if filteredBuiltin.isEmpty && filteredCustom.isEmpty {
+                    emptyState
+                } else {
+                    segmentedList
+                }
+                Color.clear.frame(height: 32)
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.top, 6)
+        }
+    }
+
+    /// 右侧分段：搜索态/全部→按 L1；选 L1→按 L2；选 L2(有肌头)→按 L3；其余平铺。curated 同段优先。
+    @ViewBuilder
+    private var segmentedList: some View {
+        if !filteredCustom.isEmpty {
+            sectionHeader("我的 · 自定义")
+            exList {
+                ForEach(Array(filteredCustom.enumerated()), id: \.element.localId) { idx, ex in
+                    if idx > 0 { rowDivider }
+                    customRow(ex)
+                }
+            }
+        }
+        ForEach(builtinSegments, id: \.title) { seg in
+            if !seg.title.isEmpty { sectionHeader(seg.title) }
+            exList {
+                ForEach(Array(seg.items.enumerated()), id: \.element.code) { idx, ex in
+                    if idx > 0 { rowDivider }
+                    Button { selectedExercise = ex } label: { builtinRow(ex) }
+                        .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private struct Segment { let title: String; let items: [BuiltinExercise] }
+
+    /// curated 优先的稳定排序。
+    private func curatedFirst(_ items: [BuiltinExercise]) -> [BuiltinExercise] {
+        items.enumerated().sorted { a, b in
+            let ca = BuiltinExercise.curatedCodes.contains(a.element.code)
+            let cb = BuiltinExercise.curatedCodes.contains(b.element.code)
+            if ca != cb { return ca }
+            return a.offset < b.offset
+        }.map(\.element)
+    }
+
+    private var builtinSegments: [Segment] {
+        let items = filteredBuiltin
+        if items.isEmpty { return [] }
+        // 搜索态或「全部」→ 按 L1 分段
+        if searching || isAll {
+            return groupByL1(items)
+        }
+        switch selection {
+        case .category(let c):
+            guard let cat = ExerciseCategory(rawValue: c) else { return flat(items) }
+            if cat.isAnatomical { return groupByMuscle(items, cat: cat) }
+            return groupByBrowseSub(items, cat: cat)
+        case .node(let c, let n):
+            if let cat = ExerciseCategory(rawValue: c), cat.isAnatomical,
+               let m = cat.muscles.first(where: { $0.name == n }), m.hasHeads {
+                return groupByHead(items, muscle: m)
+            }
+            return flat(items)
+        default:
+            return flat(items)
+        }
+    }
+
+    private func flat(_ items: [BuiltinExercise]) -> [Segment] { [Segment(title: "", items: curatedFirst(items))] }
+
+    private func groupByL1(_ items: [BuiltinExercise]) -> [Segment] {
+        ExerciseCategory.allCases.compactMap { cat in
+            let sub = items.filter { $0.category == cat.rawValue }
+            return sub.isEmpty ? nil : Segment(title: cat.rawValue, items: curatedFirst(sub))
+        }
+    }
+
+    private func groupByMuscle(_ items: [BuiltinExercise], cat: ExerciseCategory) -> [Segment] {
+        var segs: [Segment] = []
+        for m in cat.muscles {
+            let sub = items.filter { muscleNames($0).first == m.name }
+            if !sub.isEmpty { segs.append(Segment(title: m.name, items: curatedFirst(sub))) }
+        }
+        let rest = items.filter { muscleNames($0).isEmpty }
+        if !rest.isEmpty { segs.append(Segment(title: "全部", items: curatedFirst(rest))) }
+        return segs
+    }
+
+    private func groupByBrowseSub(_ items: [BuiltinExercise], cat: ExerciseCategory) -> [Segment] {
+        var segs: [Segment] = []
+        for sub in cat.browseSubcategories {
+            let g = items.filter { $0.subcategory == sub }
+            if !g.isEmpty { segs.append(Segment(title: sub, items: curatedFirst(g))) }
+        }
+        let rest = items.filter { $0.subcategory == nil || !cat.browseSubcategories.contains($0.subcategory!) }
+        if !rest.isEmpty { segs.append(Segment(title: "全部", items: curatedFirst(rest))) }
+        return segs
+    }
+
+    private func groupByHead(_ items: [BuiltinExercise], muscle: Muscle) -> [Segment] {
+        var segs: [Segment] = []
+        for h in muscle.heads {
+            let g = items.filter { $0.subcategory == h }
+            if !g.isEmpty { segs.append(Segment(title: h, items: curatedFirst(g))) }
+        }
+        let rest = items.filter { $0.subcategory == nil || !muscle.heads.contains($0.subcategory!) }
+        if !rest.isEmpty { segs.append(Segment(title: "全部", items: curatedFirst(rest))) }
+        return segs
+    }
+
+    // MARK: 空态
+
     @ViewBuilder
     private var emptyState: some View {
-        let searching = !trimmedQuery.isEmpty
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             Text(searching ? "NO MATCH · 无匹配" : "EMPTY · 动作库").eyebrowStyle()
             Text(searching ? "没有匹配「\(trimmedQuery)」的动作" : "该部位暂无动作")
@@ -216,38 +450,8 @@ struct ExerciseLibraryView: View {
         .cardStyle()
     }
 
-    @ViewBuilder
-    private var groupedList: some View {
-        // 内置按分组拆分
-        let grouped = Dictionary(grouping: builtinFiltered) { LibraryGroup.classify($0.code) }
-        let orderedGroups: [LibraryGroup] = LibraryGroup.allCases.filter { grouped[$0]?.isEmpty == false }
+    // MARK: 列表样式件
 
-        if !customFiltered.isEmpty {
-            sectionHeader("我的 · 自定义")
-            exList {
-                ForEach(Array(customFiltered.enumerated()), id: \.element.localId) { idx, ex in
-                    if idx > 0 { rowDivider }
-                    customRow(ex)
-                }
-            }
-        }
-
-        ForEach(orderedGroups, id: \.self) { g in
-            sectionHeader(g.rawValue)
-            let items = grouped[g] ?? []
-            exList {
-                ForEach(Array(items.enumerated()), id: \.element.code) { idx, ex in
-                    if idx > 0 { rowDivider }
-                    Button { selectedExercise = ex } label: {
-                        builtinRow(ex)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    /// 分组标题（.grp）：等宽小字、宽字距、muted。
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .font(Theme.Font.mono(size: 10, weight: .regular))
@@ -258,10 +462,6 @@ struct ExerciseLibraryView: View {
             .padding(.leading, 2)
     }
 
-    /// 列表容器（.ex-list）：白底卡片 + 圆角裁切 + border + 纸感阴影。
-    /// 阴影作用在底层「不透明圆角矩形」上（有明确路径，GPU 走 shadowPath），
-    /// 避免把 `.shadow` 加在 `.clipShape` 后的复合视图上而触发离屏渲染——
-    /// 后者在 LazyVStack 滚动时会产生矩形色块/黑块残影。
     private func exList<C: View>(@ViewBuilder _ content: () -> C) -> some View {
         VStack(spacing: 0) { content() }
             .background(Theme.Color.surface)
@@ -278,13 +478,15 @@ struct ExerciseLibraryView: View {
             )
     }
 
-    /// 行分隔线（.ex + .ex border-top）：整行通栏，无左缩进。
     private var rowDivider: some View {
         Rectangle().fill(Theme.Color.border).frame(height: 1)
     }
 
     private func builtinRow(_ ex: BuiltinExercise) -> some View {
         let pr = PRStats.latestPR(for: ex.code, in: workouts)
+        let muscle = muscleNames(ex).first
+        let sub = [muscle, ex.subcategory].compactMap { $0 }.joined(separator: " · ")
+        let meta = sub.isEmpty ? "\(ex.category) · \(ex.equipmentType)" : "\(ex.category) · \(sub) · \(ex.equipmentType)"
         return HStack(spacing: 12) {
             avatar(String(ex.name.prefix(1)))
             VStack(alignment: .leading, spacing: 2) {
@@ -292,14 +494,13 @@ struct ExerciseLibraryView: View {
                     .font(Theme.Font.body(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
                     .lineLimit(1)
-                Text(ex.subcategory.map { "\(ex.category) · \($0) · \(ex.equipmentType)" } ?? "\(ex.category) · \(ex.equipmentType)")
+                Text(meta)
                     .font(Theme.Font.body(size: 12))
                     .foregroundStyle(Theme.Color.muted)
+                    .lineLimit(1)
             }
             Spacer(minLength: 8)
-            if let pr {
-                prPill("PR \(formatKg(pr.weightKg))")
-            }
+            if let pr { prPill("PR \(formatKg(pr.weightKg))") }
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 11)
@@ -320,15 +521,12 @@ struct ExerciseLibraryView: View {
                     .foregroundStyle(Theme.Color.muted)
             }
             Spacer(minLength: 8)
-            if let pr {
-                selfTag("\(formatKg(pr.weightKg)) kg")
-            }
+            if let pr { selfTag("\(formatKg(pr.weightKg)) kg") }
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 11)
     }
 
-    /// 行首方形首字头像（.av）：暖底 + border。
     private func avatar(_ ch: String) -> some View {
         Text(ch)
             .font(Theme.Font.body(size: 14, weight: .bold))
@@ -338,7 +536,6 @@ struct ExerciseLibraryView: View {
             .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
     }
 
-    /// 内置动作 PR 药丸（.pr）：朱砂红实心 + 白字。
     private func prPill(_ text: String) -> some View {
         Text(text)
             .font(Theme.Font.mono(size: 9, weight: .bold))
@@ -349,7 +546,6 @@ struct ExerciseLibraryView: View {
             .background(Theme.Color.accent, in: Capsule())
     }
 
-    /// 自定义动作重量药丸（.selftag）：朱砂红描边 + 红字、无填充。
     private func selfTag(_ text: String) -> some View {
         Text(text)
             .font(Theme.Font.mono(size: 9, weight: .bold))

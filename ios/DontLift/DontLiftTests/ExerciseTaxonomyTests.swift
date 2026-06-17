@@ -2,9 +2,9 @@
 //  ExerciseTaxonomyTests.swift
 //  DontLiftTests
 //
-//  动作分类法与内置动作数据契约（change exercise-library-taxonomy-import）：
-//  ExerciseCategory 两级肌群 + 子分类、EquipmentType 扩展、全库 code 唯一、
-//  非力量类无高亮、子分类归属合法。
+//  单一解剖三级树（change exercise-library-experience-upgrade）：
+//  L1 部位 11 → L2 肌肉 → L3 肌头；浏览与高亮同源；去噪后全库 code 唯一；
+//  subcategory 重锚为合法 L3；curated code 冻结不变；中文模糊多词搜索。
 //
 
 import Testing
@@ -12,27 +12,65 @@ import Testing
 
 struct ExerciseTaxonomyTests {
 
-    // MARK: 1.6 分类枚举契约
+    // MARK: 1.6 三级树契约
 
-    @Test func categoryRawValuesUnique() {
+    /// L1 恰为 11（解剖 8 + 非解剖 3），rawValue 唯一，且不含被收缩的旧单肌父级。
+    @Test func l1IsElevenParts() {
         let raws = ExerciseCategory.allCases.map(\.rawValue)
-        #expect(Set(raws).count == raws.count)
+        #expect(raws.count == 11)
+        #expect(Set(raws).count == 11)
+        for gone in ["二头", "三头", "前臂", "小腿", "斜方肌"] {
+            #expect(!raws.contains(gone), "旧单肌父级不应作为 L1: \(gone)")
+        }
+        for must in ["胸","背","肩","手臂","腿","臀","核心","颈部","有氧","功能性","热身拉伸"] {
+            #expect(raws.contains(must), "缺 L1: \(must)")
+        }
     }
 
-    /// 力量类父级的 region 并集恰好覆盖 16 个 MuscleRegion，且每个 region 归属唯一父级（分区）。
-    @Test func regionsPartitionAll16() {
+    /// 每个 region 归属唯一 L1/L2；全部解剖 L1 的 region 并集覆盖 20 区无重复。
+    @Test func regionsPartitionTreeUniquely() {
         var seen: [MuscleRegion] = []
         for c in ExerciseCategory.allCases { seen.append(contentsOf: c.regions) }
-        #expect(Set(seen).count == 16)
-        #expect(seen.count == 16)                       // 无重复归属
+        #expect(seen.count == 20)                       // 无重复归属
+        #expect(Set(seen).count == 20)
         #expect(Set(seen) == Set(MuscleRegion.allCases))
+        #expect(ExerciseCategory.regionOwner.count == 20)
     }
 
-    /// 非肌群父级（颈部/功能性/有氧/热身拉伸）region 为空。
-    @Test func nonMuscleCategoriesHaveNoRegions() {
-        for c in [ExerciseCategory.neck, .functional, .cardio, .mobility] {
-            #expect(c.regions.isEmpty)
+    /// 三级逐级归属合法：L2 属其 L1、L3 属其 L2，且各级名无重复。
+    @Test func treeLevelsWellFormed() {
+        for c in ExerciseCategory.allCases {
+            let muscleNames = c.muscles.map(\.name)
+            #expect(Set(muscleNames).count == muscleNames.count, "\(c.rawValue) L2 重名")
+            for m in c.muscles {
+                #expect(Set(m.heads).count == m.heads.count, "\(m.name) L3 重名")
+            }
         }
+        // 抽链校验：胸 → 胸大肌 → 上胸
+        let chest = ExerciseCategory.chest
+        #expect(chest.muscles.first?.name == "胸大肌")
+        #expect(chest.muscles.first?.heads == ["上胸", "中下胸"])
+    }
+
+    /// L3 按需不强配：部分 L2 无肌头（如背阔肌/肱二头肌）。
+    @Test func l3IsOptional() {
+        let lats = ExerciseCategory.back.muscles.first { $0.name == "背阔肌" }
+        #expect(lats?.heads.isEmpty == true)
+        let delt = ExerciseCategory.shoulders.muscles.first { $0.name == "三角肌" }
+        #expect(delt?.heads == ["前束", "中束", "后束"])
+    }
+
+    /// 非解剖 L1（有氧/功能性/热身拉伸）无 region；功能性/热身拉伸有浏览子类，有氧无。
+    @Test func nonAnatomicalParts() {
+        for c in [ExerciseCategory.cardio, .functional, .mobility] {
+            #expect(c.regions.isEmpty)
+            #expect(!c.isAnatomical)
+        }
+        #expect(ExerciseCategory.functional.browseSubcategories.count == 5)
+        #expect(ExerciseCategory.mobility.browseSubcategories.count == 3)
+        #expect(ExerciseCategory.cardio.browseSubcategories.isEmpty)
+        // 颈部为解剖 L1（有 neck 区）。
+        #expect(ExerciseCategory.neck.isAnatomical)
     }
 
     @Test func equipmentRawValuesUnique() {
@@ -41,26 +79,16 @@ struct ExerciseTaxonomyTests {
         #expect(raws.contains("史密斯") && raws.contains("悍马机") && raws.contains("弹力带") && raws.contains("悬挂"))
     }
 
-    /// 每个父级的子分类：父级内无重复；hasSubcategories 与清单一致。
-    @Test func subcategoriesValidPerCategory() {
-        for c in ExerciseCategory.allCases {
-            let subs = c.subcategories
-            #expect(Set(subs).count == subs.count)
-            #expect(c.hasSubcategories == !subs.isEmpty)
-        }
-        #expect(ExerciseCategory.chest.subcategories == ["上胸", "中下胸"])
-    }
+    // MARK: 2.3 内置动作数据契约
 
-    // MARK: 2.3 / 3.4 内置动作数据契约
-
-    /// 全库（curated 153 + imported）code 唯一——防 historyKey 碰撞。
+    /// 全库 code 唯一——防 historyKey 碰撞。
     @Test func allCodesUnique() {
         let codes = BuiltinExercise.starter.map(\.code)
         #expect(Set(codes).count == codes.count)
     }
 
-    /// 每条动作的 category / equipmentType 命中合法枚举值。
-    @Test func everyExerciseHasValidCategoryAndEquipment() {
+    /// 每条 category 命中 11 个 L1、equipmentType 合法。
+    @Test func everyExerciseHasValidL1AndEquipment() {
         let cats = Set(ExerciseCategory.allCases.map(\.rawValue))
         let equips = Set(EquipmentType.allCases.map(\.rawValue))
         for ex in BuiltinExercise.starter {
@@ -69,31 +97,87 @@ struct ExerciseTaxonomyTests {
         }
     }
 
-    /// 非空 subcategory 必属其 category 的允许子分类清单。
-    @Test func subcategoryBelongsToParent() {
+    /// 非空 subcategory 必属合法 L3 肌头 或 其 L1 的非解剖浏览子类。
+    @Test func subcategoryIsValidL3OrBucket() {
         for ex in BuiltinExercise.starter {
             guard let sub = ex.subcategory, let c = ExerciseCategory(rawValue: ex.category) else { continue }
-            #expect(c.subcategories.contains(sub), "子分类越界: \(ex.code) \(ex.category)/\(sub)")
+            let isHead = ExerciseCategory.allHeads.contains(sub)
+            let isBucket = c.browseSubcategories.contains(sub)
+            #expect(isHead || isBucket, "subcategory 越界: \(ex.code) \(ex.category)/\(sub)")
         }
     }
 
-    /// 老精选 code 仍在（防迁移误删/改名导致历史断裂的回归哨兵）。
-    @Test func curatedAnchorsPresent() {
+    /// 浏览与高亮同源：命中 chest 区者归「胸 → 胸大肌」。
+    @Test func browseHighlightSameSource() {
+        let bench = BuiltinExercise.starter.first { $0.code == "BB_BENCH_PRESS" }!
+        #expect(bench.category == "胸")
+        let owner = bench.primaryRegions.compactMap { ExerciseCategory.regionOwner[$0] }.first
+        #expect(owner?.category == .chest)
+        #expect(owner?.muscle.name == "胸大肌")
+    }
+
+    /// L1 收缩落位：原 二头/三头 动作落「手臂」、斜方肌落「背」、小腿落「腿」。
+    @Test func collapsedL1Landings() {
+        func cat(_ code: String) -> String? { BuiltinExercise.starter.first { $0.code == code }?.category }
+        #expect(cat("BB_CURL") == "手臂")            // 二头 → 手臂
+        #expect(cat("TRICEP_PUSHDOWN") == "手臂")    // 三头 → 手臂
+        #expect(cat("WRIST_CURL") == "手臂")         // 前臂 → 手臂
+        #expect(cat("SHRUG_BB") == "背")             // 斜方肌 → 背
+        #expect(cat("STANDING_CALF_RAISE") == "腿")  // 小腿 → 腿
+    }
+
+    /// curated 153 code 全部保留（去噪/归位均不删改已发布 code）。
+    @Test func curatedCodesPreserved() {
+        #expect(BuiltinExercise.curatedCodes.count == 153)
         let codes = Set(BuiltinExercise.starter.map(\.code))
+        #expect(BuiltinExercise.curatedCodes.isSubset(of: codes))
         for anchor in ["BB_BENCH_PRESS", "BB_SQUAT", "DEADLIFT", "PULL_UP", "HIP_THRUST", "PLANK"] {
             #expect(codes.contains(anchor), "缺失精选 code: \(anchor)")
         }
     }
 
-    /// 纯导入品类（有氧/热身拉伸/颈部）不带高亮 region（长尾未回填 → 高亮自动隐藏）。
-    @Test func cardioAndMobilityHaveNoRegions() {
-        for ex in BuiltinExercise.starter where ["有氧", "热身拉伸", "颈部"].contains(ex.category) {
+    // MARK: 3.x 去噪契约
+
+    /// 去噪后：无任何「（版本」字样；有氧不含「间歇·Tabata」。
+    @Test func denoised() {
+        for ex in BuiltinExercise.starter {
+            #expect(!ex.name.contains("（版本"), "残留版本名: \(ex.code) \(ex.name)")
+            #expect(!ex.name.contains("(版本"), "残留版本名: \(ex.code) \(ex.name)")
+        }
+        for ex in BuiltinExercise.starter where ex.category == "有氧" {
+            #expect(ex.subcategory != "间歇·Tabata", "有氧仍含 Tabata: \(ex.code)")
+        }
+    }
+
+    /// 有氧/热身拉伸无高亮 region（非力量动作）。
+    @Test func cardioMobilityNoRegions() {
+        for ex in BuiltinExercise.starter where ["有氧", "热身拉伸"].contains(ex.category) {
             #expect(ex.primaryRegions.isEmpty, "非力量动作不应带 region: \(ex.code)")
         }
     }
 
-    /// 库规模合理（curated 153 + 导入数百）。
-    @Test func libraryHasExpectedScale() {
+    /// 去噪后库规模合理（curated 153 + 导入约 866）。
+    @Test func libraryScale() {
         #expect(BuiltinExercise.starter.count >= 1000)
+        #expect(BuiltinExercise.starter.count <= 1040)
+    }
+
+    // MARK: 5.4 中文模糊多词搜索
+
+    @Test func searchMultiKeywordAND() {
+        // 顺序无关：两种词序都命中。
+        #expect(ExerciseSearch.matches("平板杠铃卧推", query: "杠铃 卧推"))
+        #expect(ExerciseSearch.matches("平板杠铃卧推", query: "卧推 杠铃"))
+        // 缺词不命中。
+        #expect(!ExerciseSearch.matches("平板杠铃卧推", query: "杠铃 飞鸟"))
+        // 空格容错（多空格 / 全角空格）。
+        #expect(ExerciseSearch.matches("平板杠铃卧推", query: "  杠铃   卧推 "))
+        #expect(ExerciseSearch.matches("平板杠铃卧推", query: "杠铃\u{3000}卧推"))
+        // 纯中文子串旧行为不回归。
+        #expect(ExerciseSearch.matches("哑铃飞鸟", query: "飞鸟"))
+        #expect(!ExerciseSearch.matches("哑铃飞鸟", query: "卧推"))
+        // 空 query 恒命中。
+        #expect(ExerciseSearch.matches("任意动作", query: ""))
+        #expect(ExerciseSearch.matches("任意动作", query: "   "))
     }
 }

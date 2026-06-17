@@ -40,6 +40,11 @@ struct MuscleMapView: View {
             case .adductors:  return .adductors
             case .hams:       return .hamstring
             case .calves:     return .calves
+            // 补齐区：美术未拆前优雅回退到最近 SDK 肌肉（deltSide→三角肌、菱形→中上背、臀中→臀、颈部→斜方）
+            case .deltSide:   return .deltoids
+            case .rhomboids:  return .upperBack
+            case .gluteMed:   return .gluteal
+            case .neck:       return .trapezius
             }
         }
     }

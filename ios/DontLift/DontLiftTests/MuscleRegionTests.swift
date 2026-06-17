@@ -2,8 +2,8 @@
 //  MuscleRegionTests.swift
 //  DontLiftTests
 //
-//  MuscleRegion 16 区契约：数量恰为 16、rawValue 唯一、每区有非空中文名，
-//  且 rawValue 仅含 ASCII 字母（高亮图资产/图层命名要逐字一致，不能含空格或中文）。
+//  MuscleRegion 高亮叶级契约：与解剖三级树对齐补区后共 20 区、rawValue 唯一且 ASCII、
+//  每区有中文名；curated 153 回填仍带主动肌与 ≥3 要点。
 //
 
 import Testing
@@ -11,8 +11,9 @@ import Testing
 
 struct MuscleRegionTests {
 
-    @Test func exactlySixteenRegions() {
-        #expect(MuscleRegion.allCases.count == 16)
+    /// 补 deltSide/rhomboids/gluteMed/neck 后共 20 区。
+    @Test func twentyRegions() {
+        #expect(MuscleRegion.allCases.count == 20)
     }
 
     @Test func rawValuesUnique() {
@@ -21,29 +22,27 @@ struct MuscleRegionTests {
     }
 
     @Test func everyRegionHasDisplayName() {
-        for r in MuscleRegion.allCases {
-            #expect(!r.displayName.isEmpty)
-        }
+        for r in MuscleRegion.allCases { #expect(!r.displayName.isEmpty) }
     }
 
+    /// 资产/图层名要求：仅 ASCII 字母（camelCase）。
     @Test func rawValuesAreAssetSafe() {
-        // 资产/图层名要求：仅 ASCII 字母（camelCase），无空格/中文/符号。
         for r in MuscleRegion.allCases {
             #expect(r.rawValue.allSatisfy { $0.isLetter && $0.isASCII })
         }
     }
 
+    /// 新增字段默认空：未回填的动作不误染高亮。
     @Test func builtinExerciseDefaultsEmptyRegions() {
-        // 新增字段默认空：未回填的动作不应误染高亮图。
-        let ex = BuiltinExercise(code: "X", name: "测试", primaryMuscle: "胸", equipmentType: "杠铃")
+        let ex = BuiltinExercise(code: "X", name: "测试", category: "胸", equipmentType: "杠铃")
         #expect(ex.primaryRegions.isEmpty)
         #expect(ex.secondaryRegions.isEmpty)
         #expect(ex.formCues.isEmpty)
     }
 
-    @Test func everyBuiltinEnrichedWithRegionsAndCues() {
-        // 153 条回填覆盖：每个内置动作都应有主动肌与 ≥3 条要点。
-        for ex in BuiltinExercise.starter {
+    /// curated 153 回填覆盖：每个 curated 动作都有主动肌与 ≥3 条要点（导入条不在此约束内）。
+    @Test func curatedEnrichedWithRegionsAndCues() {
+        for ex in BuiltinExercise.starter where BuiltinExercise.curatedCodes.contains(ex.code) {
             #expect(!ex.primaryRegions.isEmpty, "\(ex.code) 缺主动肌区")
             #expect(ex.formCues.count >= 3, "\(ex.code) 要点不足 3 条")
         }
