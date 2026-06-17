@@ -133,6 +133,8 @@ struct WorkoutSetDTO: Codable {
     var reps: Int?
     var completed: Bool?
     var note: String?
+    /// 组类型 raw（"working"/"warmup"）。解码缺失时由 SyncEngine 兜底 `working`，兼容旧后端/旧数据。
+    var setType: String?
 }
 
 struct WorkoutTreeDTO: Codable {

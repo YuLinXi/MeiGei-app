@@ -27,4 +27,7 @@ public class WorkoutSet {
     private Boolean completed;
 
     private String note;
+
+    /** 组类型（"working"/"warmup"）。WorkoutTree 内嵌实体，随 Jackson 自动序列化；DB 列默认 'working'。 */
+    private String setType;
 }

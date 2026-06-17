@@ -38,7 +38,7 @@ struct WorkoutDetailView: View {
         var out: [String: Double] = [:]
         let prNames = Set(personalRecords.map(\.exerciseName))
         for ex in sortedExercises where prNames.contains(ex.exerciseName) {
-            if let m = ex.sets.compactMap(\.weightKg).max() { out[ex.historyKey] = m }
+            if let m = ex.sets.filter(\.countsForStats).compactMap(\.weightKg).max() { out[ex.historyKey] = m }
         }
         return out
     }
@@ -53,7 +53,7 @@ struct WorkoutDetailView: View {
     /// 训练量 kg·rep：完成组的 重量 × 次数 之和。
     private var totalVolume: Double {
         workout.exercises.flatMap(\.sets).reduce(0.0) { acc, s in
-            guard s.completed, let w = s.weightKg, let r = s.reps else { return acc }
+            guard s.completed, s.countsForStats, let w = s.weightKg, let r = s.reps else { return acc }
             return acc + w * Double(r)
         }
     }
@@ -270,7 +270,17 @@ private struct ExerciseLogCard: View {
     var prMaxWeight: Double?
 
     private var sortedSets: [WorkoutSet] {
-        exercise.sets.sorted { $0.setIndex < $1.setIndex }
+        exercise.displaySortedSets
+    }
+    /// 只读徽章：热身组 `W`；正式组按「仅正式组」展示序相对序号 1..n。
+    private func badgeText(for set: WorkoutSet) -> String {
+        if set.setType == .warmup { return "W" }
+        var n = 0
+        for s in sortedSets where s.setType != .warmup {
+            n += 1
+            if s.localId == set.localId { return "\(n)" }
+        }
+        return "\(n)"
     }
 
     /// 卡头聚合：`N 组 · X.Xk`（N=完成组，容量=完成组的 重量×次数）。
@@ -278,7 +288,7 @@ private struct ExerciseLogCard: View {
         let done = sortedSets.filter(\.completed)
         let count = done.isEmpty ? sortedSets.count : done.count
         let vol = (done.isEmpty ? sortedSets : done).reduce(0.0) { acc, s in
-            guard let w = s.weightKg, let r = s.reps else { return acc }
+            guard s.countsForStats, let w = s.weightKg, let r = s.reps else { return acc }
             return acc + w * Double(r)
         }
         let volText = vol >= 1000 ? String(format: "%.1fk", vol / 1000) : String(format: "%.0f", vol)
@@ -313,7 +323,7 @@ private struct ExerciseLogCard: View {
                         Rectangle().fill(Theme.Color.border.opacity(0.55)).frame(height: 1)
                             .padding(.horizontal, 15)
                     }
-                    LogSetRow(set: set, isPR: set.setIndex == prSetIndex)
+                    LogSetRow(set: set, badgeText: badgeText(for: set), isPR: set.setIndex == prSetIndex)
                 }
             }
             .padding(.vertical, 3)
@@ -331,6 +341,8 @@ private struct ExerciseLogCard: View {
 
 private struct LogSetRow: View {
     let set: WorkoutSet
+    /// 序号徽章：热身组 `W`，正式组相对序号。
+    var badgeText: String = ""
     var isPR: Bool = false
 
     /// 缺值（未填重量/次数且未完成）视为略过组，整行降灰。
@@ -340,9 +352,9 @@ private struct LogSetRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Text("\(set.setIndex + 1)")
+            Text(badgeText)
                 .font(Theme.Font.mono(size: 11, weight: .bold))
-                .foregroundStyle(Theme.Color.muted)
+                .foregroundStyle(set.setType == .warmup ? Theme.Color.accent : Theme.Color.muted)
                 .frame(width: 22)
 
             HStack(alignment: .firstTextBaseline, spacing: 3) {
@@ -395,6 +407,7 @@ private struct LogSetRow: View {
     private var a11yLabel: String {
         let w = set.weightKg.map { "\(formatKg($0)) 公斤" } ?? "未记录重量"
         let r = set.reps.map { "\($0) 次" } ?? "未记录次数"
-        return "第 \(set.setIndex + 1) 组，\(w)，\(r)" + (isPR ? "，新纪录" : "")
+        let name = set.setType == .warmup ? "热身组" : "第 \(badgeText) 组"
+        return "\(name)，\(w)，\(r)" + (isPR ? "，新纪录" : "")
     }
 }

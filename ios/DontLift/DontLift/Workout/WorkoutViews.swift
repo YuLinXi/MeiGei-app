@@ -46,7 +46,7 @@ struct WorkoutListView: View {
         for w in asc {
             var hit: (String, Double)?
             for ex in w.exercises {
-                guard let m = ex.sets.compactMap(\.weightKg).max() else { continue }
+                guard let m = ex.sets.filter(\.countsForStats).compactMap(\.weightKg).max() else { continue }
                 let prior = best[ex.historyKey]
                 if prior == nil || m > prior! {
                     if hit == nil { hit = (ex.exerciseName, m) }
@@ -203,7 +203,7 @@ struct WorkoutListView: View {
         let series: [(idx: Int, vol: Double)] = Array(finishedWorkouts.prefix(8))
             .reversed().enumerated().map { item in
                 let vol = item.element.exercises
-                    .flatMap(\.sets)
+                    .flatMap(\.sets).filter(\.countsForStats)
                     .reduce(0.0) { $0 + (($1.weightKg ?? 0) * Double($1.reps ?? 0)) }
                 return (item.offset, vol)
             }
@@ -607,7 +607,7 @@ struct WorkoutLoggingView: View {
 
     private var currentVolume: Double {
         workout.exercises.flatMap(\.sets).reduce(0.0) { acc, s in
-            guard s.completed else { return acc }
+            guard s.completed, s.countsForStats else { return acc }
             return acc + (s.weightKg ?? 0) * Double(s.reps ?? 0)
         }
     }
@@ -794,7 +794,7 @@ struct WorkoutLoggingView: View {
             isPresented: Binding(get: { confirmDeleteSet != nil },
                                  set: { if !$0 { confirmDeleteSet = nil } }),
             title: "删除这一组?",
-            message: confirmDeleteSet.map { "第 \($0.setIndex + 1) 组将被移除，后续组号自动顺延。" } ?? "",
+            message: confirmDeleteSet.map { $0.setType == .warmup ? "该热身组将被移除。" : "第 \($0.setIndex + 1) 组将被移除，后续组号自动顺延。" } ?? "",
             confirmTitle: "删除",
             onConfirm: { [set = confirmDeleteSet] in if let set { deleteSet(set) } }
         )
@@ -1181,7 +1181,7 @@ struct WorkoutLoggingView: View {
 
     /// 当前动作的聚焦序列：组0.重量 → 组0.次数 → 组1.重量 → …
     private func sequence(for ex: WorkoutExercise) -> [FocusedCell] {
-        ex.sets.sorted { $0.setIndex < $1.setIndex }
+        ex.displaySortedSets
             .flatMap { [FocusedCell.weight($0.localId), FocusedCell.reps($0.localId)] }
     }
 
@@ -1256,9 +1256,9 @@ struct WorkoutLoggingView: View {
     /// 与 ExerciseBlock.addSet 行为一致；高频操作不离键盘。
     private func keypadAddSet() {
         guard let cell = focused, let ex = exercise(containing: cell.setId) else { return }
+        // 默认追加正式组，预填上一**正式**组重量（热身组不作预填源）。
         let next = (ex.sets.map(\.setIndex).max() ?? -1) + 1
-        let lastWeight = ex.sets.sorted { $0.setIndex < $1.setIndex }.last?.weightKg
-        let newSet = WorkoutSet(setIndex: next, weightKg: lastWeight)
+        let newSet = WorkoutSet(setIndex: next, weightKg: ex.lastWorkingWeight, setType: .working)
         ex.sets.append(newSet)
         touch()
         focus(.weight(newSet.localId))
@@ -1429,11 +1429,22 @@ private struct ExerciseBlock: View {
     let onChange: () -> Void
     let onCompleteSet: () -> Void
 
+    /// 展示序：热身组吸顶（warmup 段在前），段内按 setIndex 稳定升序。
     private var sortedSets: [WorkoutSet] {
-        exercise.sets.sorted { $0.setIndex < $1.setIndex }
+        exercise.displaySortedSets
     }
     private var activeSetIndex: Int? {
         sortedSets.first(where: { !$0.completed })?.setIndex
+    }
+    /// 每组徽章文案：热身组显 `W`；正式组按「仅正式组」在展示序里的相对序重新编号 1..n。
+    private func badgeText(for set: WorkoutSet) -> String {
+        if set.setType == .warmup { return "W" }
+        var n = 0
+        for s in sortedSets where s.setType != .warmup {
+            n += 1
+            if s.localId == set.localId { return "\(n)" }
+        }
+        return "\(n)"
     }
     /// 该组当前被聚焦的字段（nil = 未聚焦本组）。
     private func focusedField(for set: WorkoutSet) -> SetField? {
@@ -1459,6 +1470,7 @@ private struct ExerciseBlock: View {
                 VStack(spacing: 0) {
                     ForEach(sortedSets) { set in
                         SetRow(set: set,
+                               badgeText: badgeText(for: set),
                                // 键盘升起（任一组聚焦）时，待办弱提示让位给聚焦组，避免「双当前」。
                                isTodo: activeSetIndex == set.setIndex && focused == nil,
                                readOnly: readOnly,
@@ -1467,6 +1479,7 @@ private struct ExerciseBlock: View {
                                isMenuOpen: menuSetId == set.localId,
                                onChange: onChange,
                                onComplete: onCompleteSet,
+                               onToggleType: { toggleType(set) },
                                onMore: { onMoreSet(set) },
                                onFocus: { field in
                                    onFocus(field == .weight ? .weight(set.localId) : .reps(set.localId))
@@ -1551,15 +1564,26 @@ private struct ExerciseBlock: View {
     }
 
     private func addSet() {
+        // 默认追加正式组，预填上一**正式**组重量（热身组不作预填源）。
         let next = (exercise.sets.map(\.setIndex).max() ?? -1) + 1
-        let lastWeight = sortedSets.last?.weightKg
-        exercise.sets.append(WorkoutSet(setIndex: next, weightKg: lastWeight))
+        exercise.sets.append(WorkoutSet(setIndex: next, weightKg: exercise.lastWorkingWeight, setType: .working))
+        onChange()
+    }
+
+    /// 切换组类型 working ⇄ warmup：重排到对应段尾（赋最大 setIndex+1），并触发重排+重算编号。
+    private func toggleType(_ set: WorkoutSet) {
+        set.setType = (set.setType == .warmup) ? .working : .warmup
+        let maxIdx = exercise.sets.map(\.setIndex).max() ?? -1
+        set.setIndex = maxIdx + 1
+        Theme.Haptics.impact(.light)
         onChange()
     }
 }
 
 private struct SetRow: View {
     @Bindable var set: WorkoutSet
+    /// 徽章文案：热身组 `W`；正式组为「仅正式组」相对序号 1..n（由父视图据展示序计算）。
+    let badgeText: String
     /// 弱待办标记：该组为「第一个未完成组」（仅次序号/勾选弱提示，非编辑高亮）。
     let isTodo: Bool
     /// 只读态：禁用输入与完成勾选，不可聚焦。
@@ -1572,10 +1596,15 @@ private struct SetRow: View {
     var isMenuOpen: Bool = false
     let onChange: () -> Void
     let onComplete: () -> Void
+    /// 点击序号徽章：切换 working ⇄ warmup（只读态不可点）。
+    var onToggleType: () -> Void = {}
     /// 点击「更多操作」⋯：由父视图打开本组的菜单浮层。
     let onMore: () -> Void
     /// 请求聚焦本组某字段。
     let onFocus: (SetField) -> Void
+
+    /// 本组无障碍称谓：热身组「热身组」，正式组「第 N 组」。
+    private var rowName: String { set.setType == .warmup ? "热身组" : "第 \(badgeText) 组" }
 
     /// 编辑高亮 = 本组有字段被聚焦。
     private var isEditing: Bool { focusedField != nil }
@@ -1586,10 +1615,7 @@ private struct SetRow: View {
         // 原型 grid：[20 序号][重量窄][× ][次数窄][方形完成勾][弹性留白][⋯ 更多]。
         // 完成勾紧跟次数框左对齐；⋯ 被弹性留白推到行尾。
         HStack(spacing: 8) {
-            Text("\(set.setIndex + 1)")
-                .font(Theme.Font.mono(size: 13, weight: .bold))
-                .frame(width: 20)
-                .foregroundStyle(snColor)
+            badge
             valueCell(text: weightDisplay, placeholder: "kg", focused: focusedField == .weight,
                       label: "重量", value: set.weightKg.map { "\(formatKg($0)) 公斤" })
                 .onTapGesture { if !readOnly { onFocus(.weight) } }
@@ -1604,6 +1630,23 @@ private struct SetRow: View {
         .opacity(set.completed ? 0.52 : 1)
         .padding(.horizontal, 15)
         .padding(.vertical, 5)
+    }
+
+    /// 序号徽章：可点击切换组类型（只读态退化为静态文本）。热身组显 `W`（accent 强调）。
+    @ViewBuilder private var badge: some View {
+        let isWarmup = set.setType == .warmup
+        let label = Text(badgeText)
+            .font(Theme.Font.mono(size: 13, weight: .bold))
+            .frame(width: 20)
+            .foregroundStyle(isWarmup ? Theme.Color.accent : snColor)
+        if readOnly {
+            label
+        } else {
+            Button { onToggleType() } label: { label }
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .accessibilityLabel(isWarmup ? "热身组，点按切回正式组" : "\(rowName)，点按标为热身组")
+        }
     }
 
     // 聚焦字段显示缓冲；否则显示模型格式化值。
@@ -1631,7 +1674,7 @@ private struct SetRow: View {
             )
             .contentShape(Rectangle())
             .accessibilityElement()
-            .accessibilityLabel("第 \(set.setIndex + 1) 组 \(label)")
+            .accessibilityLabel("\(rowName) \(label)")
             .accessibilityValue(value ?? "未填写")
             .accessibilityAddTraits(.isButton)
     }
@@ -1665,7 +1708,7 @@ private struct SetRow: View {
         .buttonStyle(.plain).disabled(readOnly)
         .frame(width: 36)
         .padding(.leading, 4)   // 与次数框多留一点间距（HStack spacing 8 + 4 = 12）
-        .accessibilityLabel(set.completed ? "第 \(set.setIndex + 1) 组已完成" : "标记第 \(set.setIndex + 1) 组完成")
+        .accessibilityLabel(set.completed ? "\(rowName)已完成" : "标记\(rowName)完成")
     }
 
     /// 组级「更多操作」⋯：打开父视图顶层菜单浮层（删除等组级操作的入口，便于后续扩展）。
@@ -1685,7 +1728,7 @@ private struct SetRow: View {
         .anchorPreference(key: SetMenuAnchorKey.self, value: .bottomTrailing) {
             isMenuOpen ? $0 : nil
         }
-        .accessibilityLabel("第 \(set.setIndex + 1) 组更多操作")
+        .accessibilityLabel("\(rowName)更多操作")
     }
 
     private var snColor: SwiftUI.Color { emphasized ? Theme.Color.accent : Theme.Color.muted }

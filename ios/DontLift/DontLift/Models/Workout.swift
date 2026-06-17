@@ -98,6 +98,14 @@ final class WorkoutExercise {
     }
 }
 
+/// 组类型。当前仅 working/warmup；后续可 append dropset/failure 等，
+/// 统计判据为 `!= .warmup`，新增「正式类」case 无需改统计代码。
+enum WorkoutSetType: String, Codable, CaseIterable {
+    case working   // 正式组
+    case warmup    // 热身组
+    // 预留：case dropset / case failure ...
+}
+
 /// 一个动作下的单组记录（聚合子节点，不单独同步）。重量绝不自动预填（spec 约束）。
 @Model
 final class WorkoutSet {
@@ -107,6 +115,8 @@ final class WorkoutSet {
     var reps: Int?
     var completed: Bool
     var note: String?
+    /// 组类型 raw（默认 "working"）。SwiftData 轻量迁移：新属性带默认值，旧本地记录读出即 working。
+    var setTypeRaw: String
 
     var exercise: WorkoutExercise?
 
@@ -116,7 +126,8 @@ final class WorkoutSet {
         weightKg: Double? = nil,
         reps: Int? = nil,
         completed: Bool = false,
-        note: String? = nil
+        note: String? = nil,
+        setType: WorkoutSetType = .working
     ) {
         self.localId = localId
         self.setIndex = setIndex
@@ -124,5 +135,34 @@ final class WorkoutSet {
         self.reps = reps
         self.completed = completed
         self.note = note
+        self.setTypeRaw = setType.rawValue
+    }
+}
+
+// 计算属性放 extension：避免 @Model 宏对类体内带 get/set 的计算属性注入访问器导致解析错。
+extension WorkoutSet {
+    /// 组类型枚举视图：get 未知值兜底 `.working`（跨版本安全），set 写回 raw。
+    var setType: WorkoutSetType {
+        get { WorkoutSetType(rawValue: setTypeRaw) ?? .working }
+        set { setTypeRaw = newValue.rawValue }
+    }
+
+    /// 统计判据：`!= .warmup`，使将来新增的正式类组类型自动计入，无需改统计代码。
+    var countsForStats: Bool { setType != .warmup }
+}
+
+extension WorkoutExercise {
+    /// 展示用排序：热身组吸顶（warmup 段在前），段内按 setIndex 稳定升序（design.md D4）。
+    var displaySortedSets: [WorkoutSet] {
+        sets.sorted {
+            let lw = $0.setType == .warmup, rw = $1.setType == .warmup
+            if lw != rw { return lw }      // warmup 段在前
+            return $0.setIndex < $1.setIndex
+        }
+    }
+
+    /// 上一**正式**组重量（按 setIndex 取最后一个正式组），用于「加一组」预填源（热身组不作预填）。
+    var lastWorkingWeight: Double? {
+        sets.filter { $0.setType != .warmup }.sorted { $0.setIndex < $1.setIndex }.last?.weightKg
     }
 }

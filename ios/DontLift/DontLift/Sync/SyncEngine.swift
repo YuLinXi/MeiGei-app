@@ -196,7 +196,8 @@ final class SyncEngine {
                                              orderIndex: ex.orderIndex, note: ex.note),
                 sets: ex.sets.sorted { $0.setIndex < $1.setIndex }.map { st in
                     WorkoutSetDTO(id: st.localId, workoutExerciseId: ex.localId, setIndex: st.setIndex,
-                                  weightKg: st.weightKg, reps: st.reps, completed: st.completed, note: st.note)
+                                  weightKg: st.weightKg, reps: st.reps, completed: st.completed, note: st.note,
+                                  setType: st.setTypeRaw)
                 })
         }
         let w = WorkoutDTO(id: m.localId, userId: nil, planId: m.planId, title: m.title,
@@ -226,8 +227,10 @@ final class SyncEngine {
                                      primaryMuscle: node.exercise.primaryMuscle,
                                      orderIndex: node.exercise.orderIndex, note: node.exercise.note)
             ex.sets = node.sets.map {
-                WorkoutSet(localId: $0.id, setIndex: $0.setIndex, weightKg: $0.weightKg,
-                           reps: $0.reps, completed: $0.completed ?? false, note: $0.note)
+                // 解码缺失/未识别值兜底 working（兼容旧后端、旧数据、跨版本扩展类型）。
+                let type = $0.setType.flatMap(WorkoutSetType.init(rawValue:)) ?? .working
+                return WorkoutSet(localId: $0.id, setIndex: $0.setIndex, weightKg: $0.weightKg,
+                                  reps: $0.reps, completed: $0.completed ?? false, note: $0.note, setType: type)
             }
             return ex
         }

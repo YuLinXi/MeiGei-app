@@ -18,7 +18,7 @@ enum PRStats {
         for w in workouts where w.deletedAt == nil && w.endedAt != nil {
             for ex in w.exercises {
                 let key = ex.historyKey
-                for s in ex.sets {
+                for s in ex.sets where s.countsForStats {
                     guard let wt = s.weightKg, let r = s.reps, r > 0 else { continue }
                     if let cur = map[key] { if wt > cur { map[key] = wt } } else { map[key] = wt }
                 }
@@ -36,7 +36,7 @@ enum PRStats {
 
         for w in workouts where w.deletedAt == nil && w.endedAt != nil {
             for ex in w.exercises where ex.historyKey == exerciseKey {
-                for s in ex.sets {
+                for s in ex.sets where s.countsForStats {
                     guard let wt = s.weightKg, let r = s.reps, r > 0 else { continue }
                     allWeightsByDay.append((wt, w.startedAt))
                     if let cur = best {

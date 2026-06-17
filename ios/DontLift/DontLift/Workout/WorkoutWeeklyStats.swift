@@ -29,7 +29,8 @@ enum WorkoutWeeklyStats {
             guard w.startedAt >= start, w.startedAt < end else { continue }
             stats.sessionCount += 1
             for ex in w.exercises {
-                for s in ex.sets {
+                // 训练量/总组数/总次数仅统计正式组（热身组不计入），口径同 PR/曲线。
+                for s in ex.sets where s.countsForStats {
                     stats.setCount += 1
                     let kg = s.weightKg ?? 0
                     let reps = s.reps ?? 0

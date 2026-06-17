@@ -1367,7 +1367,7 @@ struct ExerciseDetailView: View {
     private var chartData: [(idx: Int, weight: Double)] {
         Array(matching.reversed()).enumerated().compactMap { i, w in
             let mx = w.exercises.filter { $0.historyKey == exercise.code }
-                .flatMap { $0.sets }.compactMap { $0.weightKg }.max()
+                .flatMap { $0.sets }.filter(\.countsForStats).compactMap { $0.weightKg }.max()
             return mx.map { (i, $0) }
         }
     }
