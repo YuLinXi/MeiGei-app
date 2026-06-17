@@ -274,7 +274,7 @@ private struct ExerciseLogCard: View {
     }
     /// 只读徽章：热身组 `W`；正式组按「仅正式组」展示序相对序号 1..n。
     private func badgeText(for set: WorkoutSet) -> String {
-        if set.setType == .warmup { return "W" }
+        if set.setType == .warmup { return "热" }
         var n = 0
         for s in sortedSets where s.setType != .warmup {
             n += 1
@@ -355,7 +355,9 @@ private struct LogSetRow: View {
             Text(badgeText)
                 .font(Theme.Font.mono(size: 11, weight: .bold))
                 .foregroundStyle(set.setType == .warmup ? Theme.Color.accent : Theme.Color.muted)
-                .frame(width: 22)
+                .frame(width: 22, height: 18)
+                .background(set.setType == .warmup ? Theme.Color.accentSoft : Color.clear,
+                            in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
 
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(set.weightKg.map(formatKg) ?? "—")

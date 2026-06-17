@@ -813,6 +813,13 @@ struct WorkoutLoggingView: View {
     /// 组级菜单卡：纸感小卡 + 操作项列表。目前仅「删除组」，按列表结构预留后续更多组级操作。
     private func setMenuCard(for set: WorkoutSet) -> some View {
         VStack(spacing: 0) {
+            setMenuItem(icon: "flame", title: set.setType == .warmup ? "改回正式组" : "标为热身组") {
+                menuSetId = nil
+                if let ex = exercise(containing: set.localId) {
+                    ex.toggleSetType(set); Theme.Haptics.impact(.light); touch()
+                }
+            }
+            Rectangle().fill(Theme.Color.border).frame(height: 1)
             setMenuItem(icon: "trash", title: "删除组", destructive: true) {
                 menuSetId = nil
                 confirmDeleteSet = set
@@ -1438,7 +1445,7 @@ private struct ExerciseBlock: View {
     }
     /// 每组徽章文案：热身组显 `W`；正式组按「仅正式组」在展示序里的相对序重新编号 1..n。
     private func badgeText(for set: WorkoutSet) -> String {
-        if set.setType == .warmup { return "W" }
+        if set.setType == .warmup { return "热" }
         var n = 0
         for s in sortedSets where s.setType != .warmup {
             n += 1
@@ -1570,11 +1577,9 @@ private struct ExerciseBlock: View {
         onChange()
     }
 
-    /// 切换组类型 working ⇄ warmup：重排到对应段尾（赋最大 setIndex+1），并触发重排+重算编号。
+    /// 切换组类型 working ⇄ warmup：复用模型方法（切类型 + 段尾重排），随后重算编号并落盘。
     private func toggleType(_ set: WorkoutSet) {
-        set.setType = (set.setType == .warmup) ? .working : .warmup
-        let maxIdx = exercise.sets.map(\.setIndex).max() ?? -1
-        set.setIndex = maxIdx + 1
+        exercise.toggleSetType(set)
         Theme.Haptics.impact(.light)
         onChange()
     }
@@ -1632,13 +1637,15 @@ private struct SetRow: View {
         .padding(.vertical, 5)
     }
 
-    /// 序号徽章：可点击切换组类型（只读态退化为静态文本）。热身组显 `W`（accent 强调）。
+    /// 序号徽章：可点击切换组类型（只读态退化为静态文本）。热身组显「热」（朱砂红浅底 pill）。
     @ViewBuilder private var badge: some View {
         let isWarmup = set.setType == .warmup
         let label = Text(badgeText)
             .font(Theme.Font.mono(size: 13, weight: .bold))
-            .frame(width: 20)
             .foregroundStyle(isWarmup ? Theme.Color.accent : snColor)
+            .frame(width: 22, height: 20)
+            .background(isWarmup ? Theme.Color.accentSoft : Color.clear,
+                        in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         if readOnly {
             label
         } else {

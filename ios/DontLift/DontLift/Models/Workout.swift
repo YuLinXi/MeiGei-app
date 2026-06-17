@@ -165,4 +165,10 @@ extension WorkoutExercise {
     var lastWorkingWeight: Double? {
         sets.filter { $0.setType != .warmup }.sorted { $0.setIndex < $1.setIndex }.last?.weightKg
     }
+
+    /// 切换某组 working ⇄ warmup，并重排到对应段尾（赋最大 setIndex+1）。仅改模型，保存由调用方负责。
+    func toggleSetType(_ set: WorkoutSet) {
+        set.setType = (set.setType == .warmup) ? .working : .warmup
+        set.setIndex = (sets.map(\.setIndex).max() ?? -1) + 1
+    }
 }
