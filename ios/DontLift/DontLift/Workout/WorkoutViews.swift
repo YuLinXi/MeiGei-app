@@ -739,7 +739,7 @@ struct WorkoutLoggingView: View {
         // 键盘升降统一用近临界阻尼弹簧：面板下滑 + inset 收起 + 上方内容回流 + FAB 共用一条曲线，贴近 iOS 原生键盘的平滑。
         .animation(.spring(response: 0.45, dampingFraction: 0.92), value: focused == nil)
         // 子页统一导航栏：仅圆形返回键（双环处理收口在 paperToolbar）。
-        .paperToolbar(title: workout.isActive ? "记录中" : (workout.title ?? "训练"), onBack: { dismiss() })
+        .paperToolbar(title: workout.isActive ? "训练进行中" : (workout.title ?? "训练"), onBack: { dismiss() })
         // 动作 ⋯ 组间休息菜单：顶层浮层，按 anchor 定位于 ⋯ 下方；外部点击关闭。
         .overlayPreferenceValue(ExerciseMenuAnchorKey.self) { anchor in
             if let id = menuExerciseId,
@@ -1609,7 +1609,7 @@ private struct SetRow: View {
     let onFocus: (SetField) -> Void
 
     /// 本组无障碍称谓：热身组「热身组」，正式组「第 N 组」。
-    private var rowName: String { set.setType == .warmup ? "热身组" : "第 \(badgeText) 组" }
+    private var rowName: String { self.set.setType == .warmup ? "热身组" : "第 \(badgeText) 组" }
 
     /// 编辑高亮 = 本组有字段被聚焦。
     private var isEditing: Bool { focusedField != nil }
@@ -1637,15 +1637,13 @@ private struct SetRow: View {
         .padding(.vertical, 5)
     }
 
-    /// 序号徽章：可点击切换组类型（只读态退化为静态文本）。热身组显「热」（朱砂红浅底 pill）。
+    /// 序号徽章：可点击切换组类型（只读态退化为静态文本）。热身组显「热」（朱砂红文字，无底色）。
     @ViewBuilder private var badge: some View {
         let isWarmup = set.setType == .warmup
         let label = Text(badgeText)
             .font(Theme.Font.mono(size: 13, weight: .bold))
             .foregroundStyle(isWarmup ? Theme.Color.accent : snColor)
             .frame(width: 22, height: 20)
-            .background(isWarmup ? Theme.Color.accentSoft : Color.clear,
-                        in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         if readOnly {
             label
         } else {

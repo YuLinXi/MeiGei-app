@@ -115,8 +115,8 @@ final class WorkoutSet {
     var reps: Int?
     var completed: Bool
     var note: String?
-    /// 组类型 raw（默认 "working"）。SwiftData 轻量迁移：新属性带默认值，旧本地记录读出即 working。
-    var setTypeRaw: String
+    /// 组类型 raw（默认 "working"）。SwiftData 轻量迁移：存储属性声明带默认值，旧本地记录读出即 working。
+    var setTypeRaw: String = WorkoutSetType.working.rawValue
 
     var exercise: WorkoutExercise?
 
