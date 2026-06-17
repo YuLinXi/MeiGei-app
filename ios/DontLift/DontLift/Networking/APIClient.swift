@@ -30,6 +30,8 @@ actor APIClient {
     private var seq = 0
     /// 取当前 JWT；登录后由 SessionStore 注入。
     var tokenProvider: (@Sendable () -> String?)?
+    /// 401 全局处理器：token 失效/过期时由 SessionStore 注入，触发登出回登录页，消灭「token 在但全请求 401」的幽灵态。
+    var onUnauthorized: (@Sendable () -> Void)?
 
     init(baseURL: URL = AppConfig.apiBaseURL, session: URLSession = .shared) {
         self.baseURL = baseURL
@@ -38,6 +40,28 @@ actor APIClient {
 
     func setTokenProvider(_ provider: @escaping @Sendable () -> String?) {
         self.tokenProvider = provider
+    }
+
+    func setUnauthorizedHandler(_ handler: @escaping @Sendable () -> Void) {
+        self.onUnauthorized = handler
+    }
+
+    /// 发请求，并对全新安装后「系统可达性尚未就绪」导致的秒拒 -1009 做有限重试（仅当调用方显式开启）。
+    /// 全新安装后第一笔请求（恰为登录）常在网络栈就绪前被立即判为 offline（~几十 ms），短延迟后重试即成功；
+    /// 真正离线时重试同样快速失败、不长时间挂起——故不全局开 `waitsForConnectivity`（那会让离线优先的 sync 请求长挂）。
+    private func fetch(_ req: URLRequest, id: Int, retryOnConnectivity: Bool) async throws -> (Data, URLResponse) {
+        guard retryOnConnectivity else { return try await session.data(for: req) }
+        let delaysMs = [300, 700]   // 首次失败后最多重试 2 次
+        var attempt = 0
+        while true {
+            do {
+                return try await session.data(for: req)
+            } catch let error as URLError where error.code == .notConnectedToInternet && attempt < delaysMs.count {
+                netLog.info("↻ #\(id, privacy: .public) -1009 离线（可达性未就绪），\(delaysMs[attempt], privacy: .public)ms 后重试 #\(attempt + 1, privacy: .public)")
+                try await Task.sleep(for: .milliseconds(delaysMs[attempt]))
+                attempt += 1
+            }
+        }
     }
 
     /// 日志辅助：JSON 数据美化为紧凑可读字符串（失败回退原文），超长截断避免刷屏。
@@ -60,10 +84,12 @@ actor APIClient {
         query: [URLQueryItem] = [],
         body: (any Encodable)? = nil,
         idempotencyKey: String? = nil,
-        authorized: Bool = true
+        authorized: Bool = true,
+        retryOnConnectivity: Bool = false
     ) async throws -> Response {
         let data = try await raw(method, path, query: query, body: body,
-                                 idempotencyKey: idempotencyKey, authorized: authorized)
+                                 idempotencyKey: idempotencyKey, authorized: authorized,
+                                 retryOnConnectivity: retryOnConnectivity)
         if Response.self == EmptyResponse.self {
             return EmptyResponse() as! Response
         }
@@ -82,10 +108,12 @@ actor APIClient {
         query: [URLQueryItem] = [],
         body: (any Encodable)? = nil,
         idempotencyKey: String? = nil,
-        authorized: Bool = true
+        authorized: Bool = true,
+        retryOnConnectivity: Bool = false
     ) async throws -> Data {
         try await raw(method, path, query: query, body: body,
-                      idempotencyKey: idempotencyKey, authorized: authorized)
+                      idempotencyKey: idempotencyKey, authorized: authorized,
+                      retryOnConnectivity: retryOnConnectivity)
     }
 
     private func raw(
@@ -94,7 +122,8 @@ actor APIClient {
         query: [URLQueryItem],
         body: (any Encodable)?,
         idempotencyKey: String?,
-        authorized: Bool
+        authorized: Bool,
+        retryOnConnectivity: Bool = false
     ) async throws -> Data {
         var comps = URLComponents(url: baseURL.appformatPath(path), resolvingAgainstBaseURL: false)!
         if !query.isEmpty { comps.queryItems = query }
@@ -131,7 +160,7 @@ actor APIClient {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await session.data(for: req)
+            (data, response) = try await fetch(req, id: id, retryOnConnectivity: retryOnConnectivity)
         } catch {
             let ms = Int(Date().timeIntervalSince(started) * 1000)
             netLog.error("❌ #\(id, privacy: .public) \(method, privacy: .public) \(endpoint, privacy: .public) · ⏱\(ms, privacy: .public)ms · 网络异常：\(error.localizedDescription, privacy: .public)")
@@ -154,6 +183,8 @@ actor APIClient {
             return data
         case 401:
             netLog.error("❌ #\(id, privacy: .public) 401 \(method, privacy: .public) \(endpoint, privacy: .public) · ⏱\(ms, privacy: .public)ms · 登录失效")
+            // 仅对带鉴权的请求触发全局登出（登录/造 token 等 authorized=false 的 401 是凭据问题，不应登出）。
+            if authorized { onUnauthorized?() }
             throw APIError.unauthorized
         default:
             let bodyStr = String(data: data, encoding: .utf8) ?? ""

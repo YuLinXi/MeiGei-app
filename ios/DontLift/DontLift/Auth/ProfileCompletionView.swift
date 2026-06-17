@@ -43,6 +43,9 @@ struct ProfileCompletionView: View {
                     failLine(errorMessage)
                         .padding(.top, Theme.Spacing.sm)
                 }
+                signOutLink
+                    .padding(.top, Theme.Spacing.md)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.top, Theme.Spacing.xl)
@@ -169,6 +172,22 @@ struct ProfileCompletionView: View {
         .frame(maxWidth: .infinity)
         .frame(height: 52)
         .background(Theme.Color.accent.opacity(0.9), in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+    }
+
+    /// 逃生出口：补全页是登录后的硬门，提供「退出登录 / 换账号」兜底——
+    /// 防止异常态（如失效 token 被路由到此页、或想换 Apple 账号）被无出口困住。
+    private var signOutLink: some View {
+        Button {
+            Theme.Haptics.selection()
+            session.logout()
+        } label: {
+            Text("退出登录 / 换账号")
+                .font(Theme.Font.body(size: 13))
+                .foregroundStyle(Theme.Color.fg2)
+                .underline()
+        }
+        .buttonStyle(.plain)
+        .disabled(submitting)
     }
 
     private func failLine(_ message: String) -> some View {

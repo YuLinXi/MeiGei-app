@@ -40,3 +40,11 @@
 - [x] 7.1 后端 `./gradlew test` 通过；iOS `xcodebuild` 编译通过。
 - [ ] 7.2 端到端联调：首登门控 → 补全 → 后端落库 → 重登 `GET /me` 回灌不再弹页；中途杀 App 再登仍拦；女性用户肌群图正确；换设备读回一致。
 - [ ] 7.3 归档前核对：与已归档 `profile-account-deletion-and-prefs` 是否改同一 `profile-ui` requirement，避免归档回退（见 memory「归档 sync 重叠坑」）。
+
+## 8. iOS · 删除重装登录态修复（决策 7，方案 A + 三条地基）
+
+- [x] 8.1 重装首启清孤儿 token：`SessionStore.init` 早期 `clearOrphanTokenOnFreshInstall()`——UserDefaults 哨兵 `session.hasLaunchedBefore` 缺失即重装首启，先 `Keychain.delete(jwt)` 再读 token，随后置位哨兵；早于 `token`/`currentUserId` 赋值。
+- [x] 8.2 全局 401 → 登出：`APIClient` 新增 `onUnauthorized` 钩子，401（且 `authorized=true`）时触发；`SessionStore.init` 经 `setUnauthorizedHandler` 注入 `Task { @MainActor in self?.logout() }`，回登录页消灭幽灵态。`refreshProfile` 对 `APIError.unauthorized` 单独 catch 不动门控。
+- [x] 8.3 `ProfileCompletionView` 加「退出登录 / 换账号」逃生出口（`signOutLink` → `session.logout()`，提交中禁用），防无出口死锁。
+- [x] 8.4 `refreshProfile()` 区分失败与成功且称呼空：失败/离线时仅在「本地有称呼」放行（`needsProfileCompletion=false`），本地无称呼则保持门控不动，绝不置 true；`loadingGate` 加 5 次有限重试让瞬时失败自愈。`logout()` 顺带清门控避免再登路由闪烁。
+- [ ] 8.5 真机验证：①已登录+补全 → 删除重装 → 回登录页要求重新 Apple 登录、登录后不弹补全页；②正常重启仍保持登录；③模拟过期/失效 token 任一请求 401 → 自动回登录页；④补全页「退出登录」可逃生；⑤离线冷启动（有本地画像）不被误踢补全页。

@@ -18,10 +18,17 @@ final class SessionStore {
     /// 画像上行待重试标记：乐观本地写后 PATCH 失败时置位，下次 refreshProfile 补传。
     private static let pushPendingKey = "profile.pushPending"
 
+    /// 重装/全新安装检测哨兵：iOS Keychain 跨「删除重装」存活，而 UserDefaults 随重装清空。
+    /// 故「哨兵缺失」恰等价于「重装/全新安装首启」。
+    private static let launchedBeforeKey = "session.hasLaunchedBefore"
+
     private let modelContext: ModelContext
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
+        // 删除重装 = 干净重来：重装首启先清掉残留 Keychain JWT，使重装后回登录页重新 Apple 登录，
+        // 而非以孤儿 token 误判为已登录（会跳过登录、且因本地数据已清空而误弹补全页，甚至失效 token 死锁）。
+        Self.clearOrphanTokenOnFreshInstall()
         self.token = Keychain.get(Self.tokenKey)
         // 重启后 handleLogin 不会再走一遍。currentUserId 直接从 JWT 的 sub 解出（与 token 同生命周期），
         // 避免 SwiftData 档案被清空（如开发期重装 App）导致 token 在、currentUserId 却为 nil 的 desync。
@@ -31,7 +38,22 @@ final class SessionStore {
         }
         // provider 直接读 Keychain：线程安全且非 actor 隔离，避免捕获 MainActor 状态。
         let key = Self.tokenKey
-        Task { await APIClient.shared.setTokenProvider { Keychain.get(key) } }
+        Task { [weak self] in
+            await APIClient.shared.setTokenProvider { Keychain.get(key) }
+            // 全局 401 → 登出回登录页（token 失效/过期时兜底，含把人困在补全页的失效 token）。
+            await APIClient.shared.setUnauthorizedHandler {
+                Task { @MainActor in self?.logout() }
+            }
+        }
+    }
+
+    /// 重装/全新安装首启清除孤儿 token：哨兵缺失即重装首启，删 Keychain JWT 后置位哨兵；
+    /// 正常重启（哨兵已置位）则原样保留登录态。
+    private static func clearOrphanTokenOnFreshInstall() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: launchedBeforeKey) else { return }
+        Keychain.delete(tokenKey)
+        defaults.set(true, forKey: launchedBeforeKey)
     }
 
     var isLoggedIn: Bool { token != nil }
@@ -50,6 +72,8 @@ final class SessionStore {
         Keychain.delete(Self.tokenKey)
         token = nil
         currentUserId = nil
+        // 清门控：避免再次登录时 refreshProfile 返回前残留上次会话的判定值导致路由闪烁。
+        needsProfileCompletion = nil
     }
 
     /// 删号成功后：物理清空本地 SwiftData 全部用户数据 + 重置同步水位 + 清 Keychain JWT 并登出。
@@ -126,16 +150,25 @@ final class SessionStore {
     func refreshProfile() async {
         let flushed = await flushPendingProfilePush()
         guard flushed else {
-            // 仍有待传：保留本地，门控按本地称呼判定，不拉服务端以免覆盖。
-            needsProfileCompletion = localDisplayNameMissing()
+            // 仍有待传：保留本地、不拉服务端以免覆盖。本地有称呼则放行（离线优先），
+            // 无称呼也不误判为「需补全」（保持门控不动，停在加载态重试）。
+            if !localDisplayNameMissing() { needsProfileCompletion = false }
             return
         }
         do {
             let dto = try await ProfileAPI.me()
             reconcile(dto)
+            // 唯一判定真相：GET /me 成功且后端称呼为空 = 需补全。
             needsProfileCompletion = (dto.displayName ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        } catch APIError.unauthorized {
+            // 401 已由全局处理器触发登出回登录页；此处不动门控（即将离开本视图）。
+            return
         } catch {
-            needsProfileCompletion = localDisplayNameMissing()
+            // GET /me 失败（网络/超时）：严格区分「拿不到服务端数据」与「确认无名字」。
+            // 本地已有称呼（正常离线重启）→ 放行进主 App，离线优先；
+            // 本地无称呼（罕见：有 token 但 SwiftData 为空且离线）→ 不置 true，保持门控不动停在加载态重试，
+            // 绝不把「拉取失败」误判成「用户未填称呼」而弹补全页。
+            if !localDisplayNameMissing() { needsProfileCompletion = false }
         }
     }
 

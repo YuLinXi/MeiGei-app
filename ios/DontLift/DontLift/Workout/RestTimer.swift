@@ -165,7 +165,9 @@ final class RestTimerController {
         let content = UNMutableNotificationContent()
         content.title = "休息结束"
         content.body = contextLabel.map { "继续：\($0)" } ?? "开始下一组"
-        content.sound = .default
+        // 后台/锁屏到点的提醒音用自定义 caf（与前台 playEndSound 同源），而非系统默认音。
+        // 注意：通知声音仍服从静音键，静音下无声——突破静音需 Critical Alerts 特权（健身场景大概率被拒），不做。
+        content.sound = UNNotificationSound(named: UNNotificationSoundName("rest_complete.caf"))
         content.interruptionLevel = .timeSensitive
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
         center.add(UNNotificationRequest(identifier: Self.notificationId, content: content, trigger: trigger))

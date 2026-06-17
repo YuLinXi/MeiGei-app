@@ -42,7 +42,8 @@ final class AuthService: NSObject {
             let auth: AuthResponse = try await APIClient.shared.send(
                 "POST", "/auth/apple",
                 body: AppleLoginRequest(identityToken: identityToken, authorizationCode: authorizationCode),
-                authorized: false)
+                authorized: false,
+                retryOnConnectivity: true)   // 全新安装首笔请求常因可达性未就绪秒拒 -1009，重试规避
             session.handleLogin(auth, appleSub: credential.user,
                                 email: credential.email,
                                 displayName: displayName.isEmpty ? nil : displayName)
@@ -65,7 +66,8 @@ final class AuthService: NSObject {
                 let auth: AuthResponse = try await APIClient.shared.send(
                     "POST", "/auth/apple",
                     body: AppleLoginRequest(identityToken: identityToken, authorizationCode: authorizationCode),
-                    authorized: false
+                    authorized: false,
+                    retryOnConnectivity: true   // 全新安装首笔请求常因可达性未就绪秒拒 -1009，重试规避
                 )
                 session.handleLogin(auth, appleSub: appleSub, email: email, displayName: displayName)
                 continuation?.resume()

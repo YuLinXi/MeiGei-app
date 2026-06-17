@@ -100,3 +100,39 @@
 #### Scenario: 存量本地默认性别回填后端
 - **WHEN** 老用户本地 `sex` 有值而后端从未存过，用户首次触发画像 PATCH
 - **THEN** 该 `sex` 值随 PATCH 上送并持久化到后端。
+
+### Requirement: 删除重装后回到登录页（清孤儿登录态）
+
+iOS Keychain 在删除并重装 App 后仍存活，而 SwiftData / UserDefaults 被清空。客户端 SHALL 在「重装 / 全新安装首启」时清除残留 Keychain JWT，使重装后回到登录页、重新走 Apple 登录，MUST NOT 直接以残留 token 判定为已登录。判定「重装首启」SHALL 使用 UserDefaults 哨兵位（随重装清空、Keychain 不清空，故哨兵缺失等价于重装首启）。称呼随重新登录后的 `GET /me` 回填，MUST NOT 因 SwiftData 被清空而误弹补全页。
+
+#### Scenario: 重装后回到登录页
+- **WHEN** 用户已登录并补全称呼，删除 App 后重装并冷启动
+- **THEN** 检测到 UserDefaults 哨兵缺失（重装首启），清除残留 Keychain JWT，显示登录页要求重新 Apple 登录，而非直接进入主 App 或补全页。
+
+#### Scenario: 正常重启不清 token
+- **WHEN** 已安装的 App 正常退出后再启动（哨兵位存在）
+- **THEN** 保留 Keychain JWT，维持登录态，不要求重新登录。
+
+### Requirement: 登录态对失效 token 的防御
+
+客户端 MUST NOT 把「Keychain 存在 token」无条件视为有效登录态而不设任何失效兜底。任何 REST 请求返回 401（token 过期 / 失效）SHALL 触发登出（清 Keychain JWT 并回到登录页），杜绝「token 在但所有请求 401」的幽灵态。首登补全页 SHALL 提供「退出登录 / 换账号」出口，作为任何异常态（含失效 token 被路由到补全页）的兜底逃生，避免无出口死锁。
+
+#### Scenario: 请求遇 401 自动登出
+- **WHEN** 任一携带 JWT 的 REST 请求返回 401
+- **THEN** 客户端清除本地登录态并回到登录页，不停留在功能不可用的已登录界面。
+
+#### Scenario: 补全页可退出
+- **WHEN** 用户处于首登补全页
+- **THEN** 页面提供「退出登录 / 换账号」入口，点击后清登录态回到登录页，不被无出口的补全页困住。
+
+### Requirement: 画像拉取失败不误判为未补全
+
+客户端判定「是否需要补全」时 SHALL 严格区分「`GET /me` 成功且称呼确为空」与「`GET /me` 失败（网络 / 401 / 超时）」。仅前者 SHALL 判定需要补全并路由到补全页；后者 MUST NOT 据此判定需补全（不得因本地无数据就误弹补全页），应停留在加载态并重试 / 兜底。
+
+#### Scenario: 拉取失败不弹补全页
+- **WHEN** 登录后 `GET /me` 因网络或超时失败，且本地无画像（如刚重装）
+- **THEN** 客户端停留在加载态并重试，MUST NOT 路由到补全页，避免把「拿不到服务端数据」误判成「用户未填称呼」。
+
+#### Scenario: 拉取成功且称呼空才补全
+- **WHEN** `GET /me` 成功返回且 `displayName` 去空白后为空
+- **THEN** 路由到补全页（此为唯一判定需补全的条件）。
