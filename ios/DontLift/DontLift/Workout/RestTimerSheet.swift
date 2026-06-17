@@ -160,6 +160,17 @@ struct RestTimerSheet: View {
             }
             .buttonStyle(PressableButtonStyle())
 
+            // 声音：功能开关 + 持久化（控制前台结束提醒音，无视静音键）。
+            Button {
+                controller.soundEnabled.toggle()
+                if controller.soundEnabled { Theme.Haptics.impact(.light) }
+            } label: {
+                footPillLabel(icon: "speaker.wave.2", text: "声音") {
+                    toggleSwitch(on: controller.soundEnabled)
+                }
+            }
+            .buttonStyle(PressableButtonStyle())
+
             // 最小化：收回 FAB。
             Button(action: onDismiss) {
                 footPillLabel(icon: "arrow.down.right.and.arrow.up.left", text: "最小化") { EmptyView() }

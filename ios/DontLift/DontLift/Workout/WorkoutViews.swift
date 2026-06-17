@@ -7,6 +7,7 @@ import Charts
 /// 训练首页：本周 hero + 三宫格 + 最近训练列表 + 悬浮 CTA。
 struct WorkoutListView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(RestTimerController.self) private var restTimer
     @Query(filter: #Predicate<Workout> { $0.deletedAt == nil },
            sort: \Workout.startedAt, order: .reverse)
     private var workouts: [Workout]
@@ -99,6 +100,7 @@ struct WorkoutListView: View {
             onConfirm: {
                 if let existing = conflict {
                     WorkoutSession.discard(existing, in: modelContext)
+                    restTimer.stop()   // 丢弃旧会话即停止其可能进行中的休息计时全套。
                     if let build = pendingBuild { commit(build) }
                 }
                 clearConflict()
@@ -586,6 +588,23 @@ struct WorkoutLoggingView: View {
         workout.exercises.filter { ex in ex.sets.contains { !$0.completed } }.count
     }
 
+    /// 未勾选完成的组数（结束训练强确认据此变文案）。
+    private var remainingSetCount: Int {
+        workout.exercises.flatMap(\.sets).filter { !$0.completed }.count
+    }
+
+    /// 结束确认弹窗标题：有未完成组时强警示，否则常规。
+    private var finishConfirmTitle: String {
+        remainingSetCount > 0 ? "还有 \(remainingSetCount) 组未完成" : "结束训练?"
+    }
+
+    /// 结束确认弹窗说明：有未完成组时追加「确定结束吗」。
+    private var finishConfirmMessage: String {
+        remainingSetCount > 0
+            ? "确定结束训练吗?将归档本次训练并计算 PR"
+            : "将归档本次训练并计算 PR"
+    }
+
     private var currentVolume: Double {
         workout.exercises.flatMap(\.sets).reduce(0.0) { acc, s in
             guard s.completed else { return acc }
@@ -762,10 +781,11 @@ struct WorkoutLoggingView: View {
             }
         }
         // 组间休息已移入每个动作卡右上 ⋯ 菜单（动作级设置）；已完成训练只读，导航栏不再挂编辑入口。
+        // 始终弹出二次确认；有未完成组时文案升级为强警示（finishConfirmTitle/Message）。
         .paperConfirmDialog(
             isPresented: $confirmingFinish,
-            title: "结束训练?",
-            message: "将归档本次训练并计算 PR",
+            title: finishConfirmTitle,
+            message: finishConfirmMessage,
             confirmTitle: "结束训练",
             onConfirm: { finish() }
         )
@@ -1085,9 +1105,11 @@ struct WorkoutLoggingView: View {
         touch()
     }
 
-    /// 结束训练（二次确认后调用）：置 endedAt + HealthKit 写入，再统一重算派生数据。
+    /// 结束训练（二次确认后调用）：先收束休息计时（FAB/弹窗/通知/灵动岛），
+    /// 再置 endedAt + HealthKit 写入，最后统一重算派生数据。
     private func finish() {
         Theme.Haptics.notification(.success)
+        restTimer.stop()   // 结束训练即停止进行中的休息计时全套，避免倒计时/灵动岛残留。
         let endedAt = Date.now
         workout.endedAt = endedAt
         touch()
@@ -1322,9 +1344,9 @@ private struct LiveHeaderView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("开始训练")
             } else {
-                // 进行中仅有「停止训练」（朱砂红实心胶囊，全屏唯一此形态）。
+                // 进行中仅有「结束训练」（朱砂红实心胶囊，全屏唯一此形态）。
                 Button(action: onFinish) {
-                    Text("停止训练")
+                    Text("结束训练")
                         .font(Theme.Font.body(size: 12, weight: .bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 16)
@@ -1332,7 +1354,7 @@ private struct LiveHeaderView: View {
                         .background(Theme.Color.accent, in: Capsule())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("停止训练")
+                .accessibilityLabel("结束训练")
             }
         }
         .padding(.horizontal, 14)

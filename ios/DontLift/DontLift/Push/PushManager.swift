@@ -59,6 +59,11 @@ extension PushManager: UNUserNotificationCenterDelegate {
                                 willPresent notification: UNNotification) async
         -> UNNotificationPresentationOptions {
         handleRemoteNotification(notification.request.content.userInfo)
+        // 休息结束本地通知：前台声音由 RestTimer 的 AVAudioPlayer 负责（无视静音键），
+        // 这里抑制通知自带声音，避免前台双响；横幅仍展示。
+        if notification.request.identifier == RestTimerController.notificationId {
+            return [.banner]
+        }
         return [.banner, .sound]
     }
 

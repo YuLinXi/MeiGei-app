@@ -609,6 +609,7 @@ struct TeamDetailView: View {
     @Environment(TeamService.self) private var teamService
     @Environment(SessionStore.self) private var session
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     let team: TeamDTO
     @State private var members: [TeamMemberDTO] = []
@@ -686,6 +687,14 @@ struct TeamDetailView: View {
         .navigationDestination(isPresented: $showingPlans) { TeamPlansView(team: team) }
         .overlay(alignment: .top) { failureToast }
         .task { await reload() }
+        // 同步周期完成后重拉今日动态：删训练经同步使后端撤销 checkin，此处反映移除（无需手动下拉）。
+        .onReceive(NotificationCenter.default.publisher(for: .dontliftSyncCompleted)) { _ in
+            Task { await reload() }
+        }
+        // 回前台兜底刷新：删除/同步若在后台完成，切回前台时反映最新动态。
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await reload() } }
+        }
         .alert("出错了", isPresented: .constant(error != nil)) {
             Button("好") { error = nil }
         } message: { Text(error ?? "") }

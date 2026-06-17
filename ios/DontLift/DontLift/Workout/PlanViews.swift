@@ -197,6 +197,7 @@ struct PlanDetailView: View {
     @Bindable var plan: WorkoutPlan
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(RestTimerController.self) private var restTimer
 
     @State private var pickingExercise = false
     @State private var editingItem: PlanItem?
@@ -337,6 +338,7 @@ struct PlanDetailView: View {
             onConfirm: {
                 if let existing = conflict {
                     WorkoutSession.discard(existing, in: modelContext)
+                    restTimer.stop()   // 丢弃旧会话即停止其可能进行中的休息计时全套。
                     if let build = pendingBuild { commit(build) }
                 }
                 clearConflict()

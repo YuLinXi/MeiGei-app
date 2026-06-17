@@ -1,4 +1,5 @@
 import ActivityKit
+import AVFoundation
 import Foundation
 import SwiftUI
 import UserNotifications
@@ -27,6 +28,12 @@ final class RestTimerController {
         didSet { UserDefaults.standard.set(hapticsEnabled, forKey: Self.hapticsKey) }
     }
 
+    /// 休息结束时是否在前台播放提醒音效（全屏弹窗底部「声音」开关控制），持久化到 UserDefaults，默认开。
+    /// 经 `AVAudioSession.playback` 播放，无视静音键（健身场景刚需）；后台到点的声音由本地通知承载。
+    var soundEnabled: Bool {
+        didSet { UserDefaults.standard.set(soundEnabled, forKey: Self.soundKey) }
+    }
+
     /// 本次休息结束时刻；nil 表示当前无计时。
     private(set) var endDate: Date?
     /// 本次休息原始总时长（秒），用于 RestTimerSheet 圆环进度比例。
@@ -43,15 +50,22 @@ final class RestTimerController {
 
     private var ticker: Timer?
     private var activity: Activity<RestActivityAttributes>?
+    /// 提醒音效播放器（懒加载并预备，复用同一实例）。
+    private var audioPlayer: AVAudioPlayer?
     private static let durationKey = "dontlift.rest.defaultDuration"
     private static let hapticsKey = "dontlift.rest.hapticsEnabled"
-    private static let notificationId = "dontlift.rest.timer"
+    private static let soundKey = "dontlift.rest.soundEnabled"
+    /// 休息结束本地通知标识（PushManager 据此在前台抑制其声音，避免与前台音效双响）。
+    static let notificationId = "dontlift.rest.timer"
+    /// Live Activity 到点后自动消失的宽限秒数：给「00:00 + 一声提醒」留出可见窗口再收回。
+    private static let dismissGrace: TimeInterval = 2
 
     init() {
         let saved = UserDefaults.standard.double(forKey: Self.durationKey)
         defaultDuration = saved > 0 ? saved : 90
         // 未设置过时默认开（object 取不到 → nil → true）。
         hapticsEnabled = (UserDefaults.standard.object(forKey: Self.hapticsKey) as? Bool) ?? true
+        soundEnabled = (UserDefaults.standard.object(forKey: Self.soundKey) as? Bool) ?? true
         observeExternalEnd()
     }
 
@@ -76,13 +90,14 @@ final class RestTimerController {
         startActivity(totalDuration: secs, endDate: end, label: label)
     }
 
-    /// 调整剩余时间（±秒，不低于 0），重排通知并更新 Live Activity。
+    /// 调整剩余时间（±秒，不低于 0），重排通知并重建 Live Activity。
     func adjust(by delta: TimeInterval) {
         guard let current = endDate else { return }
         let newEnd = max(Date.now, current.addingTimeInterval(delta))
         endDate = newEnd
         scheduleNotification(after: newEnd.timeIntervalSinceNow)
-        updateActivity(endDate: newEnd)
+        // 已预约 .after 的 Live Activity 不可再 update，整体重建以反映新结束时刻并重排自动消失。
+        startActivity(totalDuration: totalDuration, endDate: newEnd, label: contextLabel)
     }
 
     /// 提前结束 / 取消休息：清状态、撤销待发通知、结束 Live Activity。
@@ -112,10 +127,34 @@ final class RestTimerController {
 
     private func onTick() {
         tick = .now
-        // 前台到点：本地通知同刻触发即为前台提醒，这里负责收起计时条并（按开关）震动。
+        // 前台到点：收起计时条，播一声提醒音（无视静音键）+ 按开关震动。
+        // 同刻本地通知由 PushManager 在前台抑制其声音，避免双响。
         if let endDate, endDate.timeIntervalSinceNow <= 0 {
             clear()
+            playEndSound()
             if hapticsEnabled { Theme.Haptics.notification(.success) }
+        }
+    }
+
+    /// 前台播放一声休息结束提醒音：`AVAudioSession.playback` + duck，无视静音键、瞬时压低背景音乐。
+    private func playEndSound() {
+        guard soundEnabled else { return }
+        if audioPlayer == nil,
+           let url = Bundle.main.url(forResource: "rest_complete", withExtension: "caf") {
+            audioPlayer = try? AVAudioPlayer(contentsOf: url)
+            audioPlayer?.prepareToPlay()
+        }
+        guard let player = audioPlayer else { return }
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, options: [.duckOthers, .mixWithOthers])
+        try? session.setActive(true)
+        player.currentTime = 0
+        player.play()
+        // 播完释放会话，让被 duck 的用户音乐恢复（不常驻激活）。
+        let releaseAfter = player.duration + 0.3
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(releaseAfter))
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
     }
 
@@ -139,16 +178,13 @@ final class RestTimerController {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         let attributes = RestActivityAttributes(totalDuration: totalDuration)
         let state = RestActivityAttributes.ContentState(endDate: endDate, nextExercise: label)
-        activity = try? Activity.request(
-            attributes: attributes,
-            content: ActivityContent(state: state, staleDate: endDate),
-            pushType: nil)
-    }
-
-    private func updateActivity(endDate: Date) {
-        guard let activity else { return }
-        let state = RestActivityAttributes.ContentState(endDate: endDate, nextExercise: contextLabel)
-        Task { await activity.update(ActivityContent(state: state, staleDate: endDate)) }
+        let content = ActivityContent(state: state, staleDate: endDate)
+        guard let act = try? Activity.request(attributes: attributes, content: content, pushType: nil) else { return }
+        activity = act
+        // 启动即预约「到点后自动消失」：把 dismiss 时机交给系统，后台/锁屏无需唤醒即可收回灵动岛。
+        // ended 态下 Text(timerInterval:) 仍自走倒计时，灵动岛在 endDate+grace 前持续显示后自动隐去。
+        // 注意：end 后 activity 不可再 update，故 adjust(±10s) 走整体重建（见 adjust）。
+        Task { await act.end(content, dismissalPolicy: .after(endDate.addingTimeInterval(Self.dismissGrace))) }
     }
 
     private func endActivity() {

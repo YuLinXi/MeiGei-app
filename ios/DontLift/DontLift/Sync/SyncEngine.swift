@@ -1,6 +1,12 @@
 import Foundation
 import SwiftData
 
+extension Notification.Name {
+    /// 一轮 `syncAll()` 完成（push/pull 走完一遍）后广播；供服务端权威域（如 Team 今日动态）据此重拉，
+    /// 保证「删训练 → 同步后端撤销 checkin → Team feed 反映移除」的有序刷新。
+    static let dontliftSyncCompleted = Notification.Name("dontlift.sync.completed")
+}
+
 /// 离线优先同步引擎（design.md D2/D3/D4）。
 ///
 /// 流程：每个域先 push 本地待同步项（带幂等键），再按 since 水位 pull 增量。
@@ -31,6 +37,8 @@ final class SyncEngine {
         await runSafely { try await self.syncWorkoutPlans() }
         await runSafely { try await self.syncWorkouts() }
         try? modelContext.save()
+        // 同步周期完成：广播给服务端权威域刷新（失败项仍 pending，下轮再播）。
+        NotificationCenter.default.post(name: .dontliftSyncCompleted, object: nil)
     }
 
     private func runSafely(_ op: () async throws -> Void) async {
