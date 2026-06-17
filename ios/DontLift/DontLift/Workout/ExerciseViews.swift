@@ -301,11 +301,15 @@ struct ExerciseLibraryView: View {
     private func tapCategory(_ c: ExerciseCategory) {
         selection = .category(c.rawValue)
         expandedNode = nil
-        expandedCat = (hasChildren(c) && expandedCat != c.rawValue) ? c.rawValue : (hasChildren(c) ? c.rawValue : nil)
+        guard hasChildren(c) else { expandedCat = nil; return }
+        // 再次点击已展开的一级 → 收起；否则展开（并收起其他一级）
+        expandedCat = (expandedCat == c.rawValue) ? nil : c.rawValue
     }
     private func tapNode(_ c: ExerciseCategory, _ n: String, hasHeads: Bool) {
         selection = .node(c.rawValue, n)
-        expandedNode = (hasHeads && expandedNode != n) ? n : (hasHeads ? n : nil)
+        guard hasHeads else { expandedNode = nil; return }
+        // 再次点击已展开的二级 → 收起；否则展开（并收起其他二级）
+        expandedNode = (expandedNode == n) ? nil : n
     }
     private func selectNode(_ c: ExerciseCategory, _ n: String) {
         selection = .node(c.rawValue, n)
