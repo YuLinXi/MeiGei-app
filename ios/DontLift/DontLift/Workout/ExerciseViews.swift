@@ -360,7 +360,10 @@ struct ExerciseLibraryView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     Color.clear.frame(height: 0).id("LIB_TOP")
-                    topSentinel
+                        .background(GeometryReader { geo in
+                            Color.clear.preference(key: LibScrollOffsetKey.self,
+                                                   value: geo.frame(in: .named("libScroll")).minY)
+                        })
                     HorizontalChipPicker(items: equipChips, selection: $equip) { $0.title }
                         .padding(.vertical, 8)
                     if filteredBuiltin.isEmpty && filteredCustom.isEmpty {
@@ -395,15 +398,6 @@ struct ExerciseLibraryView: View {
             }
             .animation(.easeOut(duration: 0.2), value: showBackToTop)
         }
-    }
-
-    /// 顶部滚动偏移哨兵（在 libScroll 坐标空间报 minY；下滚后 minY 变负）。
-    private var topSentinel: some View {
-        GeometryReader { geo in
-            Color.clear.preference(key: LibScrollOffsetKey.self,
-                                   value: geo.frame(in: .named("libScroll")).minY)
-        }
-        .frame(height: 0)
     }
 
     /// 扁平行模型：段头 / 内置行 / 自定义行（first/last 控制卡片切片圆角与分隔）。
