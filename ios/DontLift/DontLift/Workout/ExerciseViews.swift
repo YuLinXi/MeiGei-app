@@ -28,6 +28,38 @@ private enum LibrarySelection: Hashable {
     case head(String, String, String)          // L1 + L2 + L3 肌头
 }
 
+/// 动作库右侧滚动偏移哨兵：顶部哨兵在 libScroll 坐标空间的 minY（下滚后变负，< 阈值即显示返回顶部）。
+private struct LibScrollOffsetKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+/// 行卡片切片：复刻纸感分组卡——surface 底 + 左右描边、首行顶边/末行底边、行间分隔线、首末圆角。
+/// 每行独立成视图以支持外层 LazyVStack 逐行懒加载。
+private struct RowCardSlice: ViewModifier {
+    let first: Bool
+    let last: Bool
+    private var shape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            topLeadingRadius: first ? Theme.Radius.md : 0,
+            bottomLeadingRadius: last ? Theme.Radius.md : 0,
+            bottomTrailingRadius: last ? Theme.Radius.md : 0,
+            topTrailingRadius: first ? Theme.Radius.md : 0,
+            style: .continuous)
+    }
+    func body(content: Content) -> some View {
+        content
+            .background(Theme.Color.surface)
+            .overlay(alignment: .top)      { if first { hline } }
+            .overlay(alignment: .bottom)   { hline }
+            .overlay(alignment: .leading)  { vline }
+            .overlay(alignment: .trailing) { vline }
+            .clipShape(shape)
+    }
+    private var hline: some View { Rectangle().fill(Theme.Color.border).frame(height: 1) }
+    private var vline: some View { Rectangle().fill(Theme.Color.border).frame(width: 1) }
+}
+
 /// 动作库 · Tab 根页：训记式左栏（解剖三级树逐级手风琴）× 右侧器械 chip + 按树层级分段 + 中文模糊搜索。
 struct ExerciseLibraryView: View {
     @Query(sort: \CustomExercise.updatedAt, order: .reverse) private var custom: [CustomExercise]
@@ -44,6 +76,8 @@ struct ExerciseLibraryView: View {
     @State private var equip: String = "all"
     @State private var showingCreate = false
     @State private var selectedExercise: BuiltinExercise?
+    /// 下滚一段后显示「返回顶部」FAB。
+    @State private var showBackToTop = false
 
     /// 器械 chip（全部 + EquipmentType）。
     private let equipChips: [LibraryChip] =
@@ -318,45 +352,105 @@ struct ExerciseLibraryView: View {
         selection = .head(c.rawValue, n, h)
     }
 
-    // MARK: 右侧动作区（器械 chip + 按树层级分段）
+    // MARK: 右侧动作区（器械 chip + 按树层级分段，逐行懒加载 + 返回顶部）
 
     private var rightArea: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 10) {
-                HorizontalChipPicker(items: equipChips, selection: $equip) { $0.title }
-                if filteredBuiltin.isEmpty && filteredCustom.isEmpty {
-                    emptyState
-                } else {
-                    segmentedList
+        let prWeights = PRStats.maxWeightByKey(in: workouts)
+        return ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    Color.clear.frame(height: 0).id("LIB_TOP")
+                    topSentinel
+                    HorizontalChipPicker(items: equipChips, selection: $equip) { $0.title }
+                        .padding(.vertical, 8)
+                    if filteredBuiltin.isEmpty && filteredCustom.isEmpty {
+                        emptyState
+                    } else {
+                        ForEach(libRows) { row in
+                            libRowView(row, prWeights: prWeights)
+                        }
+                    }
+                    Color.clear.frame(height: 40)
                 }
-                Color.clear.frame(height: 32)
+                .padding(.horizontal, Theme.Spacing.md)
+                .padding(.top, 6)
             }
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.top, 6)
+            .coordinateSpace(name: "libScroll")
+            .onPreferenceChange(LibScrollOffsetKey.self) { y in
+                let show = y < -600
+                if show != showBackToTop { showBackToTop = show }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if showBackToTop {
+                    CircleIconButton(systemName: "chevron.up", size: 44) {
+                        Theme.Haptics.impact(.light)
+                        withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo("LIB_TOP", anchor: .top) }
+                    }
+                    .paperShadow(.md, cornerRadius: 22)
+                    .padding(.trailing, 14)
+                    .padding(.bottom, 18)
+                    .transition(.opacity)
+                    .accessibilityLabel("返回顶部")
+                }
+            }
+            .animation(.easeOut(duration: 0.2), value: showBackToTop)
         }
     }
 
-    /// 右侧分段：搜索态/全部→按 L1；选 L1→按 L2；选 L2(有肌头)→按 L3；其余平铺。curated 同段优先。
-    @ViewBuilder
-    private var segmentedList: some View {
-        if !filteredCustom.isEmpty {
-            sectionHeader("自定义")
-            exList {
-                ForEach(Array(filteredCustom.enumerated()), id: \.element.localId) { idx, ex in
-                    if idx > 0 { rowDivider }
-                    customRow(ex)
-                }
+    /// 顶部滚动偏移哨兵（在 libScroll 坐标空间报 minY；下滚后 minY 变负）。
+    private var topSentinel: some View {
+        GeometryReader { geo in
+            Color.clear.preference(key: LibScrollOffsetKey.self,
+                                   value: geo.frame(in: .named("libScroll")).minY)
+        }
+        .frame(height: 0)
+    }
+
+    /// 扁平行模型：段头 / 内置行 / 自定义行（first/last 控制卡片切片圆角与分隔）。
+    private enum LibRow: Identifiable {
+        case header(String)
+        case builtin(BuiltinExercise, Bool, Bool)
+        case custom(CustomExercise, Bool, Bool)
+        var id: String {
+            switch self {
+            case .header(let t):        return "h:" + t
+            case .builtin(let e, _, _): return "b:" + e.code
+            case .custom(let e, _, _):  return "c:" + e.localId.uuidString
             }
         }
-        ForEach(builtinSegments, id: \.title) { seg in
-            if !seg.title.isEmpty { sectionHeader(seg.title) }
-            exList {
-                ForEach(Array(seg.items.enumerated()), id: \.element.code) { idx, ex in
-                    if idx > 0 { rowDivider }
-                    Button { selectedExercise = ex } label: { builtinRow(ex) }
-                        .buttonStyle(.plain)
-                }
+    }
+
+    /// 把分段 + 自定义摊平成逐行（作为外层 LazyVStack 直接子视图 → 真·懒加载）。
+    private var libRows: [LibRow] {
+        var rows: [LibRow] = []
+        let customs = filteredCustom
+        if !customs.isEmpty {
+            rows.append(.header("自定义"))
+            for (i, ex) in customs.enumerated() {
+                rows.append(.custom(ex, i == 0, i == customs.count - 1))
             }
+        }
+        for seg in builtinSegments {
+            if !seg.title.isEmpty { rows.append(.header(seg.title)) }
+            for (i, ex) in seg.items.enumerated() {
+                rows.append(.builtin(ex, i == 0, i == seg.items.count - 1))
+            }
+        }
+        return rows
+    }
+
+    @ViewBuilder
+    private func libRowView(_ row: LibRow, prWeights: [String: Double]) -> some View {
+        switch row {
+        case .header(let title):
+            sectionHeader(title)
+        case .builtin(let ex, let first, let last):
+            Button { selectedExercise = ex } label: { builtinRow(ex, prWeights: prWeights) }
+                .buttonStyle(.plain)
+                .modifier(RowCardSlice(first: first, last: last))
+        case .custom(let ex, let first, let last):
+            customRow(ex, prWeights: prWeights)
+                .modifier(RowCardSlice(first: first, last: last))
         }
     }
 
@@ -462,32 +556,12 @@ struct ExerciseLibraryView: View {
             .tracking(0.1 * 10)
             .textCase(.uppercase)
             .foregroundStyle(Theme.Color.muted)
-            .padding(.top, 4)
+            .padding(.top, 14)
+            .padding(.bottom, 6)
             .padding(.leading, 2)
     }
 
-    private func exList<C: View>(@ViewBuilder _ content: () -> C) -> some View {
-        VStack(spacing: 0) { content() }
-            .background(Theme.Color.surface)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                    .stroke(Theme.Color.border, lineWidth: 1)
-            )
-            .background(
-                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                    .fill(Theme.Color.surface)
-                    .shadow(color: Theme.Color.fg.opacity(Theme.ShadowLevel.sm.opacity),
-                            radius: Theme.ShadowLevel.sm.radius, x: 0, y: Theme.ShadowLevel.sm.y)
-            )
-    }
-
-    private var rowDivider: some View {
-        Rectangle().fill(Theme.Color.border).frame(height: 1)
-    }
-
-    private func builtinRow(_ ex: BuiltinExercise) -> some View {
-        let pr = PRStats.latestPR(for: ex.code, in: workouts)
+    private func builtinRow(_ ex: BuiltinExercise, prWeights: [String: Double]) -> some View {
         let muscle = muscleNames(ex).first
         let sub = [muscle, ex.subcategory].compactMap { $0 }.joined(separator: " · ")
         let meta = sub.isEmpty ? "\(ex.category) · \(ex.equipmentType)" : "\(ex.category) · \(sub) · \(ex.equipmentType)"
@@ -504,15 +578,14 @@ struct ExerciseLibraryView: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            if let pr { prPill("PR \(formatKg(pr.weightKg))") }
+            if let w = prWeights[ex.code] { prPill("PR \(formatKg(w))") }
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 11)
         .contentShape(Rectangle())
     }
 
-    private func customRow(_ ex: CustomExercise) -> some View {
-        let pr = PRStats.latestPR(for: ex.localId.uuidString, in: workouts)
+    private func customRow(_ ex: CustomExercise, prWeights: [String: Double]) -> some View {
         return HStack(spacing: 12) {
             avatar(String(ex.name.prefix(1)))
             VStack(alignment: .leading, spacing: 2) {
@@ -525,7 +598,7 @@ struct ExerciseLibraryView: View {
                     .foregroundStyle(Theme.Color.muted)
             }
             Spacer(minLength: 8)
-            if let pr { selfTag("\(formatKg(pr.weightKg)) kg") }
+            if let w = prWeights[ex.localId.uuidString] { selfTag("\(formatKg(w)) kg") }
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 11)
