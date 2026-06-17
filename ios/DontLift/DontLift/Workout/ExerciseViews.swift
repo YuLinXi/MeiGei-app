@@ -196,7 +196,7 @@ struct ExerciseLibraryView: View {
             VStack(alignment: .leading, spacing: 2) {
                 railRow(title: "全部", level: 0, count: totalCount,
                         selected: isAll, dimmed: searching) { selectAll() }
-                railRow(title: "我的", level: 0, count: allCustom.count,
+                railRow(title: "自定义", level: 0, count: allCustom.count,
                         selected: isMine, dimmed: searching) { selectMine() }
                 Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.vertical, 4)
                 ForEach(ExerciseCategory.allCases) { cat in
@@ -213,7 +213,7 @@ struct ExerciseLibraryView: View {
             .padding(.leading, 8)
             .padding(.trailing, 4)
         }
-        .frame(width: 96)
+        .frame(width: 104)
     }
 
     /// L2/L3 子行（手风琴展开）。
@@ -253,13 +253,13 @@ struct ExerciseLibraryView: View {
         Button(action: action) {
             HStack(spacing: 3) {
                 Text(title)
-                    .font(Theme.Font.body(size: level == 0 ? 13 : 12,
+                    .font(Theme.Font.body(size: level == 0 ? 16 : (level == 1 ? 14 : 13),
                                           weight: selected ? .bold : (level == 0 ? .semibold : .regular)))
                     .foregroundStyle(selected ? Theme.Color.accent
                                      : (dimmed ? Theme.Color.muted : Theme.Color.fg))
                     .lineLimit(1).minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
-                if let count { Text("\(count)").font(Theme.Font.mono(size: 9)).foregroundStyle(Theme.Color.muted) }
+                if let count { Text("\(count)").font(Theme.Font.mono(size: 10)).foregroundStyle(Theme.Color.muted) }
                 switch chevron {
                 case .none:  EmptyView()
                 case .right: Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.Color.muted)
@@ -267,7 +267,7 @@ struct ExerciseLibraryView: View {
                 }
             }
             .padding(.leading, CGFloat(level) * 9)
-            .padding(.vertical, 6)
+            .padding(.vertical, 7)
             .padding(.horizontal, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(selected ? Theme.Color.accentSoft : .clear,
@@ -336,7 +336,7 @@ struct ExerciseLibraryView: View {
     @ViewBuilder
     private var segmentedList: some View {
         if !filteredCustom.isEmpty {
-            sectionHeader("我的 · 自定义")
+            sectionHeader("自定义")
             exList {
                 ForEach(Array(filteredCustom.enumerated()), id: \.element.localId) { idx, ex in
                     if idx > 0 { rowDivider }
