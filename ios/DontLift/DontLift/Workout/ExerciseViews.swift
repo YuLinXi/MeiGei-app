@@ -13,11 +13,10 @@ struct ExercisePick: Identifiable, Hashable {
 
 // MARK: - 3.4 动作库（Screen 04，Neon 改版）
 
-/// 动作库筛选 chip 项。
+/// 动作库筛选 chip 项（id="all" 或 ExerciseCategory/EquipmentType/子分类的中文值）。
 struct LibraryChip: Identifiable, Hashable {
     let id: String
     let title: String
-    let muscle: MuscleGroup?  // nil = 全部
 }
 
 /// 动作分组（复合 推 / 拉 / 腿 + 单关节）。
@@ -51,23 +50,34 @@ struct ExerciseLibraryView: View {
     private var workouts: [Workout]
 
     @State private var query = ""
-    @State private var muscle: String = "all"
+    /// 部位轴：「all」或 `ExerciseCategory.rawValue`。
+    @State private var category: String = "all"
+    /// 子分类轴：「all」或当前父级的子分类中文名（仅父级有子分类时显示）。
+    @State private var subcategory: String = "all"
+    /// 器械轴：「all」或 `EquipmentType.rawValue`。
+    @State private var equip: String = "all"
     @State private var showingCreate = false
     /// 动作详情导航：绑定式 navigationDestination(item:)，避免类型注册式（for:）在嵌套 TabView 的 stack 里失灵。
     @State private var selectedExercise: BuiltinExercise?
 
-    private let chips: [LibraryChip] = [
-        LibraryChip(id: "all",      title: "全部", muscle: nil),
-        LibraryChip(id: "chest",    title: "胸",   muscle: .chest),
-        LibraryChip(id: "back",     title: "背",   muscle: .back),
-        LibraryChip(id: "leg",      title: "腿",   muscle: .legs),
-        LibraryChip(id: "shoulder", title: "肩",   muscle: .shoulders),
-        LibraryChip(id: "arm",      title: "手臂", muscle: .arms),
-        LibraryChip(id: "core",     title: "核心", muscle: .core),
-    ]
+    /// 部位 chip（全部 + 15 个 ExerciseCategory 父级）。
+    private let categoryChips: [LibraryChip] =
+        [LibraryChip(id: "all", title: "全部")]
+        + ExerciseCategory.allCases.map { LibraryChip(id: $0.rawValue, title: $0.rawValue) }
 
-    private var selectedMuscle: MuscleGroup? {
-        chips.first(where: { $0.id == muscle })?.muscle
+    /// 器械 chip（全部 + EquipmentType）。
+    private let equipChips: [LibraryChip] =
+        [LibraryChip(id: "all", title: "全部")]
+        + EquipmentType.allCases.map { LibraryChip(id: $0.rawValue, title: $0.rawValue) }
+
+    /// 当前父级（非 all 时）。
+    private var selectedCategory: ExerciseCategory? { ExerciseCategory(rawValue: category) }
+
+    /// 当前父级的子分类 chip（全部 + 子分类）；父级无子分类则为空（不渲染该行）。
+    private var subChips: [LibraryChip] {
+        guard let c = selectedCategory, c.hasSubcategories else { return [] }
+        return [LibraryChip(id: "all", title: "全部")]
+            + c.subcategories.map { LibraryChip(id: $0, title: $0) }
     }
 
     /// 去空白后的搜索词；空则不参与名称过滤。
@@ -78,19 +88,28 @@ struct ExerciseLibraryView: View {
         BuiltinExercise.starter.count + custom.filter { $0.deletedAt == nil }.count
     }
 
-    /// 同时按部位 chip 与搜索词（名称子串，忽略大小写）过滤内置动作。
+    private func matchesQuery(_ name: String) -> Bool {
+        trimmedQuery.isEmpty || name.localizedCaseInsensitiveContains(trimmedQuery)
+    }
+
+    /// 双轴正交 + 子分类 + 搜索过滤内置动作。
     private var builtinFiltered: [BuiltinExercise] {
         BuiltinExercise.starter.filter { ex in
-            (selectedMuscle == nil || ex.primaryMuscle == selectedMuscle?.rawValue)
-                && (trimmedQuery.isEmpty || ex.name.localizedCaseInsensitiveContains(trimmedQuery))
+            (category == "all" || ex.category == category)
+                && (subcategory == "all" || ex.subcategory == subcategory)
+                && (equip == "all" || ex.equipmentType == equip)
+                && matchesQuery(ex.name)
         }
     }
 
+    /// 自定义动作无子分类：选了具体子分类时不显示自定义。
     private var customFiltered: [CustomExercise] {
         custom.filter { ex in
             ex.deletedAt == nil
-                && (selectedMuscle == nil || ex.primaryMuscle == selectedMuscle?.rawValue)
-                && (trimmedQuery.isEmpty || ex.name.localizedCaseInsensitiveContains(trimmedQuery))
+                && (category == "all" || ex.primaryMuscle == category)
+                && subcategory == "all"
+                && (equip == "all" || ex.equipmentType == equip)
+                && matchesQuery(ex.name)
         }
     }
 
@@ -102,8 +121,18 @@ struct ExerciseLibraryView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10, pinnedViews: []) {
                         searchBar
-                        HorizontalChipPicker(items: chips, selection: $muscle) { $0.title }
+                        // 器械轴（顶部 chip）
+                        HorizontalChipPicker(items: equipChips, selection: $equip) { $0.title }
                             .padding(.horizontal, -Theme.Spacing.lg)
+                        // 部位轴（可滚动 chip）；切父级时重置子分类
+                        HorizontalChipPicker(items: categoryChips, selection: $category) { $0.title }
+                            .padding(.horizontal, -Theme.Spacing.lg)
+                            .onChange(of: category) { _, _ in subcategory = "all" }
+                        // 子分类轴（仅当前父级有子分类时展开）
+                        if !subChips.isEmpty {
+                            HorizontalChipPicker(items: subChips, selection: $subcategory) { $0.title }
+                                .padding(.horizontal, -Theme.Spacing.lg)
+                        }
 
                         if builtinFiltered.isEmpty && customFiltered.isEmpty {
                             emptyState
@@ -263,7 +292,7 @@ struct ExerciseLibraryView: View {
                     .font(Theme.Font.body(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
                     .lineLimit(1)
-                Text("\(ex.primaryMuscle) · \(ex.equipmentType)")
+                Text(ex.subcategory.map { "\(ex.category) · \($0) · \(ex.equipmentType)" } ?? "\(ex.category) · \(ex.equipmentType)")
                     .font(Theme.Font.body(size: 12))
                     .foregroundStyle(Theme.Color.muted)
             }
@@ -568,7 +597,7 @@ private enum WheelKind: Equatable {
     var placeholder: String { self == .muscle ? "选择肌群" : "选择器械" }
     var options: [String] {
         switch self {
-        case .muscle:    return MuscleGroup.allCases.map(\.rawValue)
+        case .muscle:    return ExerciseCategory.allCases.map(\.rawValue)
         case .equipment: return EquipmentType.allCases.map(\.rawValue)
         }
     }
@@ -621,14 +650,10 @@ private struct WheelPicker: View {
 /// 既作分组键、ScrollView 定位锚点，也作右侧快捷索引项。
 private enum PickerGroup: Hashable {
     case personal
-    case muscle(MuscleGroup)
+    case muscle(ExerciseCategory)
 
-    /// 分组与右侧索引的固定顺序：个人 / 胸 / 背 / 腿 / 臀 / 肩 / 手臂 / 核心 / 全身。
-    static let order: [PickerGroup] = [
-        .personal,
-        .muscle(.chest), .muscle(.back), .muscle(.legs), .muscle(.glutes),
-        .muscle(.shoulders), .muscle(.arms), .muscle(.core), .muscle(.fullBody),
-    ]
+    /// 分组与右侧索引顺序：个人 + 全部 ExerciseCategory 父级（枚举声明序）。
+    static let order: [PickerGroup] = [.personal] + ExerciseCategory.allCases.map { .muscle($0) }
 
     /// 组头标题（朱砂红 mono）。
     var title: String {
@@ -638,17 +663,11 @@ private enum PickerGroup: Hashable {
         }
     }
 
-    /// 右侧快捷索引单字（个人 = ★，多字肌群取代表字）。
+    /// 右侧快捷索引单字（个人 = ★，肌群取首字）。
     var indexLabel: String {
         switch self {
         case .personal: return "★"
-        case .muscle(let m):
-            switch m {
-            case .arms:     return "臂"
-            case .core:     return "核"
-            case .fullBody: return "全"
-            default:        return m.rawValue   // 胸/背/肩/腿/臀 本就单字
-            }
+        case .muscle(let m): return String(m.rawValue.prefix(1))
         }
     }
 }
@@ -927,12 +946,12 @@ struct ExercisePickerView: View {
 
         for case let .muscle(m) in PickerGroup.order {
             let rows = BuiltinExercise.starter
-                .filter { $0.primaryMuscle == m.rawValue && match($0.name) }
+                .filter { $0.category == m.rawValue && match($0.name) }
                 .map { ex in
                     PickerRow(id: "b-\(ex.code)", name: ex.name,
-                              muscle: ex.primaryMuscle, equipment: ex.equipmentType, isCustom: false,
+                              muscle: ex.category, equipment: ex.equipmentType, isCustom: false,
                               pick: ExercisePick(builtinCode: ex.code, customId: nil,
-                                                 name: ex.name, primaryMuscle: ex.primaryMuscle))
+                                                 name: ex.name, primaryMuscle: ex.category))
                 }
             if !rows.isEmpty { dict[.muscle(m)] = rows }
         }
@@ -1031,7 +1050,8 @@ struct ExerciseDetailView: View {
                 .font(Theme.Font.display(size: 28, weight: .bold))
                 .foregroundStyle(Theme.Color.fg)
             HStack(spacing: 7) {
-                metaChip(exercise.primaryMuscle)
+                metaChip(exercise.category)
+                if let sub = exercise.subcategory { metaChip(sub) }
                 metaChip(exercise.equipmentType)
             }
         }

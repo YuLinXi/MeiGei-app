@@ -16,6 +16,8 @@ struct DontLiftApp: App {
     init() {
         let container = AppModelContainer.make()
         self.modelContainer = container
+        // 同名动作历史合并（一次性本地迁移，幂等）：把旧手填记录挂到同名内置动作 code，避免历史断裂。
+        ExerciseHistoryMerge.run(in: container.mainContext)
         let session = SessionStore(modelContext: container.mainContext)
         _session = State(initialValue: session)
         _syncEngine = State(initialValue: SyncEngine(modelContext: container.mainContext))
