@@ -3,7 +3,7 @@ import Foundation
 /// 动作浏览的 **L1 部位**（动作库左栏部位轴）。取代旧 `MuscleGroup`（粗 8 类）。
 /// rawValue 为中文，直接作为 `BuiltinExercise.category` 存储值（前后端一致）。
 ///
-/// 单一解剖三级树：`L1 部位 → L2 肌肉（Muscle）→ L3 肌头/肌区（Muscle.heads，按需）`。
+/// 单一解剖三级树：`L1 部位 → L2 肌肉（MuscleNode）→ L3 肌头/肌区（MuscleNode.heads，按需）`。
 /// 解剖类（8）有 `muscles`（每块肌肉经 `regions` 与高亮叶级 `MuscleRegion` 对齐）；
 /// 非解剖类（有氧/功能性/热身拉伸）无 `muscles`、不显高亮，改用 `browseSubcategories` 提供浏览下钻。
 /// 浏览归位与高亮染色 **同源** 于动作的 `primaryRegions`（+ `subcategory` 肌头），不再维护两套脱节的树。
@@ -29,34 +29,34 @@ enum ExerciseCategory: String, CaseIterable, Identifiable, Codable, Hashable {
 
     /// **L2 肌肉层**（仅解剖类）。每块肌肉经 `regions` 对齐高亮叶级、经 `heads` 下挂 L3 肌头（可空）。
     /// 全部解剖类的 `regions` 并集恰好覆盖全部力量类 `MuscleRegion`，每个 region 归属唯一 L1/L2。
-    var muscles: [Muscle] {
+    var muscles: [MuscleNode] {
         switch self {
         case .chest:
-            return [Muscle("胸大肌", [.chest], heads: ["上胸", "中下胸"])]
+            return [MuscleNode("胸大肌", [.chest], heads: ["上胸", "中下胸"])]
         case .back:
-            return [Muscle("背阔肌", [.lats]),
-                    Muscle("斜方肌", [.traps]),
-                    Muscle("菱形肌", [.rhomboids]),
-                    Muscle("竖脊肌", [.lowerBack])]
+            return [MuscleNode("背阔肌", [.lats]),
+                    MuscleNode("斜方肌", [.traps]),
+                    MuscleNode("菱形肌", [.rhomboids]),
+                    MuscleNode("竖脊肌", [.lowerBack])]
         case .shoulders:
-            return [Muscle("三角肌", [.deltFront, .deltSide, .deltRear], heads: ["前束", "中束", "后束"])]
+            return [MuscleNode("三角肌", [.deltFront, .deltSide, .deltRear], heads: ["前束", "中束", "后束"])]
         case .arms:
-            return [Muscle("肱二头肌", [.biceps]),
-                    Muscle("肱三头肌", [.triceps]),
-                    Muscle("前臂", [.forearms])]
+            return [MuscleNode("肱二头肌", [.biceps]),
+                    MuscleNode("肱三头肌", [.triceps]),
+                    MuscleNode("前臂", [.forearms])]
         case .legs:
-            return [Muscle("股四头肌", [.quads]),
-                    Muscle("腘绳肌", [.hams]),
-                    Muscle("内收肌", [.adductors]),
-                    Muscle("小腿", [.calves])]
+            return [MuscleNode("股四头肌", [.quads]),
+                    MuscleNode("腘绳肌", [.hams]),
+                    MuscleNode("内收肌", [.adductors]),
+                    MuscleNode("小腿", [.calves])]
         case .glutes:
-            return [Muscle("臀大肌", [.glutes]),
-                    Muscle("臀中肌", [.gluteMed])]
+            return [MuscleNode("臀大肌", [.glutes]),
+                    MuscleNode("臀中肌", [.gluteMed])]
         case .core:
-            return [Muscle("腹直肌", [.abs], heads: ["上腹", "下腹"]),
-                    Muscle("腹斜肌", [.obliques])]
+            return [MuscleNode("腹直肌", [.abs], heads: ["上腹", "下腹"]),
+                    MuscleNode("腹斜肌", [.obliques])]
         case .neck:
-            return [Muscle("颈部肌", [.neck])]
+            return [MuscleNode("颈部肌", [.neck])]
         case .cardio, .functional, .mobility:
             return []
         }
@@ -78,7 +78,7 @@ enum ExerciseCategory: String, CaseIterable, Identifiable, Codable, Hashable {
 }
 
 /// **L2 肌肉**（解剖 L1 下的肌肉节点）。`regions` 对齐高亮叶级、`heads` 为 L3 肌头（按需，可空）。
-struct Muscle: Hashable, Identifiable {
+struct MuscleNode: Hashable, Identifiable {
     let name: String
     let regions: [MuscleRegion]
     let heads: [String]
@@ -97,8 +97,8 @@ struct Muscle: Hashable, Identifiable {
 
 extension ExerciseCategory {
     /// 高亮叶级 `region` → 它归属的 (L1, L2 肌肉)。每个 region 归属唯一 L1/L2。
-    static let regionOwner: [MuscleRegion: (category: ExerciseCategory, muscle: Muscle)] = {
-        var map: [MuscleRegion: (ExerciseCategory, Muscle)] = [:]
+    static let regionOwner: [MuscleRegion: (category: ExerciseCategory, muscle: MuscleNode)] = {
+        var map: [MuscleRegion: (ExerciseCategory, MuscleNode)] = [:]
         for cat in ExerciseCategory.allCases {
             for m in cat.muscles {
                 for r in m.regions { map[r] = (cat, m) }

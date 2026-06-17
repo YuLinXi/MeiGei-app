@@ -422,7 +422,7 @@ struct ExerciseLibraryView: View {
         return segs
     }
 
-    private func groupByHead(_ items: [BuiltinExercise], muscle: Muscle) -> [Segment] {
+    private func groupByHead(_ items: [BuiltinExercise], muscle: MuscleNode) -> [Segment] {
         var segs: [Segment] = []
         for h in muscle.heads {
             let g = items.filter { $0.subcategory == h }
