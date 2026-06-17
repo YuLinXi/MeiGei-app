@@ -81,16 +81,23 @@ crontab -e
 ```
 恢复：`gunzip -c backups/dontlift_xxx.sql.gz | docker exec -i shared-postgres psql -U dontlift -d dontlift`
 
-**更新 DontLift**（Flyway 自动跑新增 `V2__*.sql` 等迁移）：
+**更新 DontLift**（例行发版，Flyway 自动跑新增 `V4__*.sql` 等迁移）：
 
-> ⚠️ **服务器代码不是 git 仓库**（首次由本机同步上来，`/opt/DontLift-app` 下只有 `backend/`，无 `.git`）。**不要用 `git pull`**——用本机一键脚本，从本机仓库根目录执行：
+> ⚠️ **服务器代码不是 git 仓库**（首次由本机同步上来，`/opt/DontLift-app` 下只有 `backend/`，无 `.git`）。**不要用 `git pull`**。
+
+**推荐：一键发版更新脚本**（从本机仓库根目录执行）：
 
 ```bash
-./backend/deploy/local-deploy.sh root@124.222.79.121
-# 内部：rsync 同步源码（排除 .env.prod/secrets）→ 远程 server-bootstrap.sh → docker compose up -d --build → health 自检
+./backend/deploy/release-update.sh                 # 默认 root@124.222.79.121
+# 或自定义目标/健康检查地址：
+./backend/deploy/release-update.sh root@<ip> https://<域名>/actuator/health
 ```
 
-> ⚠️ **已知隐患**：`local-deploy.sh` 的 `rsync --delete` **未排除 `backups/`**，会误删服务器上的数据库备份。修脚本前，建议改用下面这套**不带 `--delete`、显式排除备份**的手动同步（2026-06-14 第二次发版实测可用）：
+该脚本只重建 app，**不碰共享 PG / Caddy**，按序：① 迁移前备份 DB → ② rsync 源码（不带 `--delete`，排除机密/备份/构建产物）→ ③ 远程 `up -d --build`（Flyway 启动自动迁移）→ ④ 公网 HTTPS 校验 `health=UP` → ⑤ 打印 `flyway_schema_history` 最新版本确认迁移已应用。
+
+> 何时用 `local-deploy.sh` 而非本脚本：`local-deploy.sh` 会跑整个 `server-bootstrap.sh`（重装 Docker 检查、覆盖 `/opt/stacks` 的 Caddyfile、重启共享 PG），适合**首次部署 / 重建基础设施**；**例行 app 更新一律用 `release-update.sh`**（更小步、不动共享基础设施，避免把线上 Caddyfile 覆盖回仓库旧版）。两者的 rsync 均已排除 `backups/`、`secrets/`、`.env.prod`。
+
+若需手动逐步执行（等价于 `release-update.sh` 第 ②③ 步）：
 
 ```bash
 # 1) 本机仓库根目录：同步源码（保护密钥与备份，build/产物不传）
