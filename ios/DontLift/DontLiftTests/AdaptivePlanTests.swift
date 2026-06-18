@@ -1,0 +1,160 @@
+//
+//  AdaptivePlanTests.swift
+//  DontLiftTests
+//
+//  训练计划严格/自适应模式（change workout-plan-adaptive-mode）：
+//  开始训练落值（PlanPrefill）、自适应回写合并（PlanWriteback）、统计口径收紧（countsForStats）。
+//
+
+import Testing
+import SwiftData
+@testable import DontLift
+
+@MainActor
+struct AdaptivePlanTests {
+
+    // MARK: 测试数据工具
+
+    /// 造一个已完成训练：单动作 + 若干 (重量, 次数, 完成, 类型) 组。
+    private func makeWorkout(historyKey code: String, name: String = "卧推",
+                             startedAt: Date,
+                             sets: [(w: Double?, r: Int?, done: Bool, type: WorkoutSetType)],
+                             planId: UUID? = nil, planItemId: UUID? = nil) -> Workout {
+        let w = Workout(planId: planId, startedAt: startedAt, endedAt: startedAt.addingTimeInterval(3600))
+        let ex = WorkoutExercise(builtinExerciseCode: code, exerciseName: name, orderIndex: 0,
+                                 planItemId: planItemId)
+        ex.sets = sets.enumerated().map { idx, s in
+            WorkoutSet(setIndex: idx, weightKg: s.w, reps: s.r, completed: s.done, setType: s.type)
+        }
+        w.exercises = [ex]
+        return w
+    }
+
+    // MARK: - countsForStats 收紧
+
+    @Test func countsForStatsRequiresCompletedAndNonWarmup() {
+        let done = WorkoutSet(setIndex: 0, weightKg: 60, reps: 8, completed: true, setType: .working)
+        let notDone = WorkoutSet(setIndex: 1, weightKg: 60, reps: 8, completed: false, setType: .working)
+        let warmupDone = WorkoutSet(setIndex: 2, weightKg: 20, reps: 12, completed: true, setType: .warmup)
+        #expect(done.countsForStats)
+        #expect(!notDone.countsForStats)        // 未打勾的预填组不计入
+        #expect(!warmupDone.countsForStats)     // 热身组不计入
+    }
+
+    // MARK: - PlanPrefill 开始训练落值
+
+    @Test func strictModePrefillsPlanValues() {
+        let item = PlanItem(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0,
+                            suggestedSets: 4, suggestedReps: 8, suggestedWeightKg: 60)
+        let sets = PlanPrefill.sets(for: item, mode: .strict, history: [])
+        #expect(sets.count == 4)
+        #expect(sets.allSatisfy { $0.weightKg == 60 && $0.reps == 8 && !$0.completed })
+    }
+
+    @Test func adaptivePrefillsFromHistoryFirst() {
+        let key = "BB_BENCH"
+        let history = [makeWorkout(historyKey: key, startedAt: Date(timeIntervalSince1970: 1000),
+                                   sets: [(62.5, 8, true, .working), (62.5, 8, true, .working), (62.5, 7, true, .working)])]
+        let item = PlanItem(builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 0,
+                            suggestedSets: 3, suggestedReps: 8, suggestedWeightKg: 60)
+        let sets = PlanPrefill.sets(for: item, mode: .adaptive, history: history)
+        #expect(sets.count == 3)
+        #expect(sets[0].weightKg == 62.5 && sets[0].reps == 8)   // 历史优先，非计划 60
+        #expect(sets[2].reps == 7)                                // 逐组对位
+    }
+
+    @Test func adaptiveFallsBackToPlanWhenNoHistory() {
+        let item = PlanItem(builtinExerciseCode: "NEW", exerciseName: "新动作", orderIndex: 0,
+                            suggestedSets: 2, suggestedReps: 10, suggestedWeightKg: 40)
+        let sets = PlanPrefill.sets(for: item, mode: .adaptive, history: [])
+        #expect(sets.count == 2)
+        #expect(sets.allSatisfy { $0.weightKg == 40 && $0.reps == 10 })
+    }
+
+    @Test func adaptiveIgnoresIncompleteHistorySets() {
+        let key = "BB_BENCH"
+        // 上次只有第 1 组打勾，第 2 组未完成（不应作为历史回填源）。
+        let history = [makeWorkout(historyKey: key, startedAt: Date(timeIntervalSince1970: 1000),
+                                   sets: [(70, 5, true, .working), (70, 5, false, .working)])]
+        let item = PlanItem(builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 0,
+                            suggestedSets: 2, suggestedReps: 8, suggestedWeightKg: 50)
+        let sets = PlanPrefill.sets(for: item, mode: .adaptive, history: history)
+        #expect(sets[0].weightKg == 70)   // 第 1 组来自历史 completed
+        #expect(sets[1].weightKg == 50)   // 第 2 组无历史 completed → 回退计划值
+    }
+
+    // MARK: - PlanWriteback 回写合并
+
+    /// 重量/次数如实写回顶组；组数只增不减。
+    @Test func mergeWritesTopSetAndMaxSets() {
+        let key = "BB_BENCH"
+        let itemId = UUID()
+        let plan = [PlanItem(itemId: itemId, builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 0,
+                             suggestedSets: 5, suggestedReps: 8, suggestedWeightKg: 60)]
+        // 本次完成 3 组：60×8, 60×8, 65×5（顶组 65×5）。计划现 5 组。
+        let w = makeWorkout(historyKey: key, startedAt: Date(timeIntervalSince1970: 2000),
+                            sets: [(60, 8, true, .working), (60, 8, true, .working), (65, 5, true, .working)],
+                            planItemId: itemId)
+        let result = PlanWriteback.merge(planItems: plan, workout: w)
+        let updated = result.newItems.first { $0.itemId == itemId }!
+        #expect(updated.suggestedWeightKg == 65)   // 顶组重量，如实
+        #expect(updated.suggestedReps == 5)        // 顶组次数，如实
+        #expect(updated.suggestedSets == 5)        // max(5, 3) 只增不减，不缩到 3
+        #expect(result.changed)
+    }
+
+    /// deload：重量可降（如实），但组数不降。
+    @Test func mergeWeightCanDecreaseSetsCannot() {
+        let key = "BB_BENCH"
+        let itemId = UUID()
+        let plan = [PlanItem(itemId: itemId, builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 0,
+                             suggestedSets: 4, suggestedReps: 8, suggestedWeightKg: 80)]
+        let w = makeWorkout(historyKey: key, startedAt: Date(timeIntervalSince1970: 2000),
+                            sets: [(70, 10, true, .working)], planItemId: itemId)
+        let updated = PlanWriteback.merge(planItems: plan, workout: w).newItems.first { $0.itemId == itemId }!
+        #expect(updated.suggestedWeightKg == 70)   // 重量如实下降
+        #expect(updated.suggestedSets == 4)        // 组数不降 max(4,1)
+    }
+
+    /// 训练中新增动作 append 进计划；跳过的动作保留。
+    @Test func mergeAddsNewExerciseKeepsSkipped() {
+        let keptId = UUID()
+        let plan = [PlanItem(itemId: keptId, builtinExerciseCode: "SQUAT", exerciseName: "深蹲", orderIndex: 0,
+                             suggestedSets: 3, suggestedReps: 5, suggestedWeightKg: 100)]
+        // 本次没练深蹲，却练了一个不在计划里的新动作。
+        let w = makeWorkout(historyKey: "CURL", name: "弯举", startedAt: Date(timeIntervalSince1970: 2000),
+                            sets: [(20, 12, true, .working)], planItemId: nil)
+        let result = PlanWriteback.merge(planItems: plan, workout: w)
+        #expect(result.newItems.count == 2)                                   // 深蹲保留 + 弯举新增
+        #expect(result.newItems.contains { $0.exerciseName == "深蹲" })        // 跳过的保留
+        #expect(result.newItems.contains { $0.exerciseName == "弯举" })        // 新增 append
+        #expect(result.diffs.contains { $0.kind == .added && $0.exerciseName == "弯举" })
+        #expect(result.diffs.contains { $0.kind == .kept && $0.exerciseName == "深蹲" })
+    }
+
+    /// 仅热身/未完成组的动作不回写。
+    @Test func mergeSkipsExerciseWithoutCompletedWorkingSets() {
+        let itemId = UUID()
+        let plan = [PlanItem(itemId: itemId, builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0,
+                             suggestedSets: 3, suggestedReps: 8, suggestedWeightKg: 60)]
+        let w = makeWorkout(historyKey: "BB_BENCH", startedAt: Date(timeIntervalSince1970: 2000),
+                            sets: [(20, 12, true, .warmup), (60, 8, false, .working)], planItemId: itemId)
+        let result = PlanWriteback.merge(planItems: plan, workout: w)
+        let item = result.newItems.first { $0.itemId == itemId }!
+        #expect(item.suggestedWeightKg == 60)   // 未变（无 completed 正式组）
+        #expect(item.suggestedSets == 3)
+        #expect(!result.changed)                // 无实际改动
+    }
+
+    /// 去重：训练中新增动作的 historyKey 命中已有计划项时，认作更新而非重复新增。
+    @Test func mergeDedupesByHistoryKey() {
+        let plan = [PlanItem(itemId: UUID(), builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0,
+                             suggestedSets: 3, suggestedReps: 8, suggestedWeightKg: 60)]
+        // planItemId=nil（如先删再手动加回），但 historyKey 仍命中。
+        let w = makeWorkout(historyKey: "BB_BENCH", startedAt: Date(timeIntervalSince1970: 2000),
+                            sets: [(65, 6, true, .working)], planItemId: nil)
+        let result = PlanWriteback.merge(planItems: plan, workout: w)
+        #expect(result.newItems.count == 1)                 // 不新增重复项
+        #expect(result.newItems[0].suggestedWeightKg == 65) // 更新已有项
+    }
+}

@@ -4,6 +4,9 @@ import com.dontlift.common.id.Uuid7;
 import com.dontlift.common.web.AppException;
 import com.dontlift.workout.entity.WorkoutPlan;
 import com.dontlift.workout.mapper.WorkoutPlanMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,10 +19,12 @@ public class TeamPlanService {
 
     private final WorkoutPlanMapper planMapper;
     private final TeamService teamService;
+    private final ObjectMapper objectMapper;
 
-    public TeamPlanService(WorkoutPlanMapper planMapper, TeamService teamService) {
+    public TeamPlanService(WorkoutPlanMapper planMapper, TeamService teamService, ObjectMapper objectMapper) {
         this.planMapper = planMapper;
         this.teamService = teamService;
+        this.objectMapper = objectMapper;
     }
 
     /** 把自己的模板发布到所在 Team（全员可见）。 */
@@ -54,11 +59,33 @@ public class TeamPlanService {
         copy.setId(Uuid7.generate());
         copy.setUserId(userId);
         copy.setName(src.getName());
-        copy.setItems(src.getItems()); // 复制 jsonb 快照
+        // Fork 规则（design.md D8）：复制 动作+组数+次数，清空重量（最私人）；副本默认自适应。
+        copy.setItems(stripWeights(src.getItems()));
+        copy.setMode("adaptive");
         copy.setForkedFrom(src.getId());
         copy.setSharedToTeamId(null); // 副本默认私有
         planMapper.insert(copy);
         return copy;
+    }
+
+    /** 把 items jsonb 里每个计划项的 suggestedWeightKg 置 null（camelCase，与 iOS 编码一致）。 */
+    private String stripWeights(String itemsJson) {
+        if (itemsJson == null || itemsJson.isBlank()) {
+            return itemsJson;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(itemsJson);
+            if (root.isArray()) {
+                for (JsonNode node : root) {
+                    if (node instanceof ObjectNode obj && obj.has("suggestedWeightKg")) {
+                        obj.putNull("suggestedWeightKg");
+                    }
+                }
+            }
+            return objectMapper.writeValueAsString(root);
+        } catch (Exception e) {
+            return itemsJson; // 解析失败回退原样，不阻断 Fork
+        }
     }
 
     private WorkoutPlan ownPlanOrThrow(UUID userId, UUID planId) {

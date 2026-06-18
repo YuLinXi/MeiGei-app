@@ -534,6 +534,7 @@ struct WorkoutLoggingView: View {
     @Environment(RestTimerController.self) private var restTimer
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(PRCelebrationCenter.self) private var prCelebration
+    @Environment(PlanWritebackCenter.self) private var planWriteback
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var workout: Workout
@@ -1119,11 +1120,43 @@ struct WorkoutLoggingView: View {
         restTimer.stop()   // 结束训练即停止进行中的休息计时全套，避免倒计时/灵动岛残留。
         let endedAt = Date.now
         workout.endedAt = endedAt
+        cleanupIncompleteSets()   // 落值方案：清理未打勾预填残组（design.md D6）
         touch()
         // 时长以计时起点为基准（排除开始前空闲）；旧数据无 timerStartedAt 时回退 startedAt。
         let startedAt = workout.timerStartedAt ?? workout.startedAt
         Task { await healthKit.saveStrengthWorkout(start: startedAt, end: endedAt) }
+        applyAdaptiveWriteback()  // 自适应模式：实绩 upsert 回写来源计划（design.md D4）
         recomputeDerived()
+    }
+
+    /// 清理未打勾的预填残组（落值方案 D6）：删除 `completed=false` 的组，
+    /// 并移除因此变空的动作，保证训练记录与回写只含真实发生的数据。
+    private func cleanupIncompleteSets() {
+        for ex in workout.exercises {
+            let incomplete = ex.sets.filter { !$0.completed }
+            for s in incomplete { modelContext.delete(s) }
+            ex.sets.removeAll { !$0.completed }
+        }
+        let empty = workout.exercises.filter { $0.sets.isEmpty }
+        for ex in empty { modelContext.delete(ex) }
+        workout.exercises.removeAll { $0.sets.isEmpty }
+    }
+
+    /// 自适应回写：把本次实绩 upsert 合并回来源计划（仅 adaptive 计划、有实际改动时）。
+    /// 经计划本地编辑 markDirty 走同步域 LWW；回执 + 撤销由 PlanWritebackCenter 呈现。
+    private func applyAdaptiveWriteback() {
+        guard let planId = workout.planId else { return }
+        let plans = (try? modelContext.fetch(FetchDescriptor<WorkoutPlan>())) ?? []
+        guard let plan = plans.first(where: { $0.localId == planId && $0.deletedAt == nil }),
+              plan.mode == .adaptive else { return }
+        let snapshot = plan.items
+        let result = PlanWriteback.merge(planItems: plan.items, workout: workout)
+        guard result.changed else { return }
+        plan.items = result.newItems
+        plan.markDirty()
+        try? modelContext.save()
+        planWriteback.present(.init(planLocalId: plan.localId, planName: plan.name,
+                                    diffs: result.diffs, snapshot: snapshot))
     }
 
     /// 重算派生数据：PR 检测（命中弹庆祝）+ Team 打卡（按 localId 幂等：训练结束时首次创建摘要）。

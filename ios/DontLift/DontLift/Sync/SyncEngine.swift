@@ -132,6 +132,7 @@ final class SyncEngine {
     private func dto(from m: WorkoutPlan) -> WorkoutPlanDTO {
         let itemsJSON = (try? String(data: JSONCoding.encoder.encode(m.items), encoding: .utf8)) ?? "[]"
         return WorkoutPlanDTO(id: m.localId, userId: nil, name: m.name, items: itemsJSON,
+                              mode: m.modeRaw,
                               forkedFrom: m.forkedFrom, sharedToTeamId: m.sharedToTeamId,
                               createdAt: nil, updatedAt: m.updatedAt, deletedAt: m.deletedAt, version: m.version)
     }
@@ -139,6 +140,8 @@ final class SyncEngine {
     private func applyServer(_ dto: WorkoutPlanDTO, to m: WorkoutPlan) {
         m.name = dto.name
         m.items = decodeItems(dto.items)
+        // 解码缺失/未识别值兜底 adaptive（兼容旧后端、旧数据）。
+        m.modeRaw = dto.mode.flatMap(WorkoutPlanMode.init(rawValue:))?.rawValue ?? WorkoutPlanMode.adaptive.rawValue
         m.forkedFrom = dto.forkedFrom
         m.sharedToTeamId = dto.sharedToTeamId
         m.updatedAt = dto.updatedAt
@@ -193,7 +196,8 @@ final class SyncEngine {
                                              builtinExerciseCode: ex.builtinExerciseCode,
                                              customExerciseId: ex.customExerciseId,
                                              exerciseName: ex.exerciseName, primaryMuscle: ex.primaryMuscle,
-                                             orderIndex: ex.orderIndex, note: ex.note),
+                                             orderIndex: ex.orderIndex, note: ex.note,
+                                             planItemId: ex.planItemId),
                 sets: ex.sets.sorted { $0.setIndex < $1.setIndex }.map { st in
                     WorkoutSetDTO(id: st.localId, workoutExerciseId: ex.localId, setIndex: st.setIndex,
                                   weightKg: st.weightKg, reps: st.reps, completed: st.completed, note: st.note,
@@ -225,7 +229,8 @@ final class SyncEngine {
                                      customExerciseId: node.exercise.customExerciseId,
                                      exerciseName: node.exercise.exerciseName,
                                      primaryMuscle: node.exercise.primaryMuscle,
-                                     orderIndex: node.exercise.orderIndex, note: node.exercise.note)
+                                     orderIndex: node.exercise.orderIndex, note: node.exercise.note,
+                                     planItemId: node.exercise.planItemId)
             ex.sets = node.sets.map {
                 // 解码缺失/未识别值兜底 working（兼容旧后端、旧数据、跨版本扩展类型）。
                 let type = $0.setType.flatMap(WorkoutSetType.init(rawValue:)) ?? .working

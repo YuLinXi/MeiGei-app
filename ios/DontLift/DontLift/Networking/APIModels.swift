@@ -89,6 +89,8 @@ struct WorkoutPlanDTO: Codable {
     var name: String
     /// 注意：后端 items 是 jsonb **字符串**，非数组。
     var items: String
+    /// 计划模式 raw（"strict"/"adaptive"）。解码缺失时兜底 `adaptive`，兼容旧后端/旧数据。
+    var mode: String?
     var forkedFrom: UUID?
     var sharedToTeamId: UUID?
     var createdAt: Date?
@@ -123,6 +125,8 @@ struct WorkoutExerciseDTO: Codable {
     var primaryMuscle: String?
     var orderIndex: Int
     var note: String?
+    /// 来源计划项 itemId（自适应回写合并主键）。解码缺失为 nil（临时新增/旧数据）。
+    var planItemId: UUID?
 }
 
 struct WorkoutSetDTO: Codable {

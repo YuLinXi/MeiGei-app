@@ -71,6 +71,9 @@ final class WorkoutExercise {
     var primaryMuscle: String?
     var orderIndex: Int
     var note: String?
+    /// 来源计划项 `PlanItem.itemId`（自适应回写的合并主键，design.md D3）。
+    /// nil = 训练中临时新增、非来自计划的动作。SwiftData 轻量迁移：optional 默认 nil。
+    var planItemId: UUID?
 
     var workout: Workout?
 
@@ -85,6 +88,7 @@ final class WorkoutExercise {
         primaryMuscle: String? = nil,
         orderIndex: Int,
         note: String? = nil,
+        planItemId: UUID? = nil,
         sets: [WorkoutSet] = []
     ) {
         self.localId = localId
@@ -94,6 +98,7 @@ final class WorkoutExercise {
         self.primaryMuscle = primaryMuscle
         self.orderIndex = orderIndex
         self.note = note
+        self.planItemId = planItemId
         self.sets = sets
     }
 }
@@ -147,8 +152,10 @@ extension WorkoutSet {
         set { setTypeRaw = newValue.rawValue }
     }
 
-    /// 统计判据：`!= .warmup`，使将来新增的正式类组类型自动计入，无需改统计代码。
-    var countsForStats: Bool { setType != .warmup }
+    /// 统计判据：正式组**且已完成**（`setType != .warmup && completed`）。
+    /// 「非 warmup」使将来新增的正式类组类型自动计入；「completed」保证落值后未打勾的
+    /// 预填残组不污染训练量/PR（design.md D2）。纯「热身/正式」展示判断应直接用 `setType`。
+    var countsForStats: Bool { setType != .warmup && completed }
 }
 
 extension WorkoutExercise {

@@ -202,6 +202,7 @@ struct PlanDetailView: View {
     @State private var pickingExercise = false
     @State private var editingItem: PlanItem?
     @State private var editing = false
+    @State private var showingMode = false
     @State private var confirmingDelete = false
     @State private var decodeError: String?
     /// 待删除动作行（左滑删除二次确认）+ 该行全局坐标，供确认卡定位于其正下方。
@@ -269,6 +270,9 @@ struct PlanDetailView: View {
         .paperToolbar(onBack: { dismiss() }) {
             CircleIconMenu(systemName: "ellipsis") {
                 Button { editing = true } label: { Label("重命名计划", systemImage: "pencil") }
+                Button { showingMode = true } label: {
+                    Label("计划模式 · \(plan.mode == .strict ? "严格" : "自适应")", systemImage: "slider.horizontal.3")
+                }
                 Button(role: .destructive) { confirmingDelete = true } label: { Label("删除计划", systemImage: "trash") }
             }
         }
@@ -320,6 +324,9 @@ struct PlanDetailView: View {
         }
         .sheet(isPresented: $editing) {
             PlanRenameSheet(plan: plan)
+        }
+        .sheet(isPresented: $showingMode) {
+            PlanModeSheet(plan: plan)
         }
         .navigationDestination(item: $startedSession) { WorkoutLoggingView(workout: $0) }
         // 训练冲突二次确认：统一为纸感弹窗。无独立取消按钮，点蒙层即取消；
@@ -546,6 +553,7 @@ struct PlanDetailView: View {
     }
 
     private func duplicate() {
+        // Fork 规则（design.md D8）：复制 动作 + 组数 + 次数，清空重量（重量最私人）；副本默认自适应。
         let copy = WorkoutPlan(name: plan.name + " · 副本",
                                items: plan.items.map {
                                    PlanItem(itemId: UUID(),
@@ -555,8 +563,9 @@ struct PlanDetailView: View {
                                             orderIndex: $0.orderIndex,
                                             suggestedSets: $0.suggestedSets,
                                             suggestedReps: $0.suggestedReps,
-                                            suggestedWeightKg: $0.suggestedWeightKg)
+                                            suggestedWeightKg: nil)
                                },
+                               mode: .adaptive,
                                forkedFrom: plan.localId)
         modelContext.insert(copy)
         try? modelContext.save()
@@ -581,15 +590,22 @@ struct PlanDetailView: View {
 
     private func buildFromPlan() -> Workout {
         let w = Workout(planId: plan.localId, title: plan.name)
+        let mode = plan.mode
+        // 自适应历史回填：取已完成训练（本会话尚未建，无需排除自身）。严格模式不需历史。
+        let history: [Workout] = (mode == .adaptive)
+            ? (try? modelContext.fetch(FetchDescriptor<Workout>(
+                predicate: #Predicate { $0.deletedAt == nil && $0.endedAt != nil }))) ?? []
+            : []
         for (i, item) in orderedItems.enumerated() {
             let ex = WorkoutExercise(
                 builtinExerciseCode: item.builtinExerciseCode,
                 customExerciseId: item.customExerciseId,
                 exerciseName: item.exerciseName,
-                orderIndex: i
+                orderIndex: i,
+                planItemId: item.itemId   // 自适应回写合并主键（design.md D3）
             )
-            let count = max(1, item.suggestedSets ?? 3)
-            ex.sets = (0..<count).map { idx in WorkoutSet(setIndex: idx) }
+            // 按模式落值（design.md D1/D4）：严格整组复制预设；自适应历史优先→回退预设。
+            ex.sets = PlanPrefill.sets(for: item, mode: mode, history: history)
             w.exercises.append(ex)
         }
         return w
@@ -789,6 +805,79 @@ struct PlanItemEditorView: View {
         }
         .frame(maxWidth: .infinity)
         .cardStyle()
+    }
+}
+
+// MARK: - 计划模式选择 sheet（task 6.2/6.3）
+
+/// 计划模式标识 + 规则说明 + 切换（切到严格模式校验必填）。
+struct PlanModeSheet: View {
+    @Bindable var plan: WorkoutPlan
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.Color.bg.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    Text("PLAN MODE").eyebrowStyle()
+                    option(.adaptive, "自适应模式",
+                           "完成训练后，实绩会自动更新此计划：组数只增不减、重量/次数按实绩更新、训练中新增的动作并入计划、跳过的动作保留（需手动删）。")
+                    option(.strict, "严格模式",
+                           "照剧本执行：开始训练时整组复制预设（组数/次数/重量），完成后不回写。需为每个动作填写组数与次数。")
+                    if let error {
+                        Text(error).font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.danger)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                }
+                .padding(Theme.Spacing.lg)
+            }
+            .navigationTitle("计划模式")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { dismiss() }.tint(Theme.Color.accent)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    @ViewBuilder private func option(_ m: WorkoutPlanMode, _ title: String, _ desc: String) -> some View {
+        let selected = plan.mode == m
+        Button { select(m) } label: {
+            HStack(alignment: .top, spacing: Theme.Spacing.md) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.muted)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(Theme.Font.l2).foregroundStyle(Theme.Color.fg)
+                    Text(desc).font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// 切换模式。切到严格模式前校验：每个动作 MUST 有组数与次数（spec）。
+    private func select(_ m: WorkoutPlanMode) {
+        if m == .strict {
+            let missing = plan.items.filter { $0.suggestedSets == nil || $0.suggestedReps == nil }
+            if !missing.isEmpty {
+                error = "切换严格模式前，请先补齐这些动作的组数与次数：" + missing.map(\.exerciseName).joined(separator: "、")
+                return
+            }
+        }
+        error = nil
+        plan.mode = m
+        plan.markDirty()
+        try? modelContext.save()
     }
 }
 

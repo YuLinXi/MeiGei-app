@@ -6,6 +6,7 @@ import UIKit
 struct MainTabView: View {
     @Environment(RestTimerController.self) private var restTimer
     @Environment(PRCelebrationCenter.self) private var prCelebration
+    @Environment(PlanWritebackCenter.self) private var planWriteback
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// 全局进行中会话（LIVE 悬浮胶囊来源）：未删除且未结束 = isActive。
@@ -124,6 +125,15 @@ struct MainTabView: View {
         )) {
             if let records = prCelebration.records {
                 PRCelebrationSheet(records: records, summary: prCelebration.summary)
+            }
+        }
+        // 自适应回写回执：同样挂在稳定根层，避免结束训练导航切换致一闪即逝。
+        .sheet(isPresented: Binding(
+            get: { planWriteback.receipt != nil },
+            set: { if !$0 { planWriteback.receipt = nil } }
+        )) {
+            if let receipt = planWriteback.receipt {
+                PlanWritebackSheet(receipt: receipt)
             }
         }
     }

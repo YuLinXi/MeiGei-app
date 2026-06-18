@@ -24,6 +24,9 @@ public class WorkoutPlan extends BaseEntity implements UserOwned {
     /** jsonb：[{itemId, exerciseRef, order, suggestedSets, suggestedReps, suggestedWeight}]。 */
     private String items;
 
+    /** 计划模式："strict"（照剧本）/"adaptive"（活文档，实绩回写）。默认 adaptive。 */
+    private String mode;
+
     private UUID forkedFrom;
 
     private UUID sharedToTeamId;

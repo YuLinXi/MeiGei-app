@@ -34,4 +34,7 @@ public class WorkoutExercise {
     private Integer orderIndex;
 
     private String note;
+
+    /** 来源计划项 PlanItem.itemId（自适应回写合并主键）；null=临时新增/旧数据。 */
+    private UUID planItemId;
 }

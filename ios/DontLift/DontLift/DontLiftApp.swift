@@ -12,6 +12,7 @@ struct DontLiftApp: App {
     @State private var restTimer = RestTimerController()
     @State private var healthKit = HealthKitManager()
     @State private var prCelebration = PRCelebrationCenter()
+    @State private var planWriteback = PlanWritebackCenter()
 
     init() {
         let container = AppModelContainer.make()
@@ -34,6 +35,7 @@ struct DontLiftApp: App {
                 .environment(restTimer)
                 .environment(healthKit)
                 .environment(prCelebration)
+                .environment(planWriteback)
                 .preferredColorScheme(.light)
                 .task(id: session.isLoggedIn) {
                     if session.isLoggedIn { await healthKit.requestAuthorization() }

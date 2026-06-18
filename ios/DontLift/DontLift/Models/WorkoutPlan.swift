@@ -1,6 +1,14 @@
 import Foundation
 import SwiftData
 
+/// 训练计划模式。`strict`=照剧本执行（开始训练整组复制预设、完成不回写）；
+/// `adaptive`=活文档（首次用预设落值、完成后实绩 upsert 回写计划）。
+/// 可扩展枚举：未识别值兜底 `.adaptive`（跨版本安全）。
+enum WorkoutPlanMode: String, Codable, CaseIterable {
+    case strict     // 严格模式
+    case adaptive   // 自适应模式（默认）
+}
+
 /// 训练计划模板里的单个动作项。每项带稳定 `itemId`（design.md D5），
 /// 供编辑、Fork、diff 时定位。整体以 jsonb 文档随计划读写。
 struct PlanItem: Codable, Identifiable, Hashable {
@@ -49,6 +57,8 @@ final class WorkoutPlan: Syncable {
 
     var name: String
     var items: [PlanItem]
+    /// 计划模式 raw（默认 "adaptive"）。SwiftData 轻量迁移：存储属性带默认值，旧本地记录读出即 adaptive。
+    var modeRaw: String = WorkoutPlanMode.adaptive.rawValue
     /// Fork 来源软指针；原模板增删不影响副本。
     var forkedFrom: UUID?
     /// 发布到的 Team；nil 表示私有。
@@ -58,6 +68,7 @@ final class WorkoutPlan: Syncable {
         localId: UUID = UUID(),
         name: String,
         items: [PlanItem] = [],
+        mode: WorkoutPlanMode = .adaptive,
         forkedFrom: UUID? = nil,
         sharedToTeamId: UUID? = nil,
         now: Date = .now
@@ -70,12 +81,19 @@ final class WorkoutPlan: Syncable {
         self.syncStatusRaw = SyncStatus.pendingCreate.rawValue
         self.name = name
         self.items = items
+        self.modeRaw = mode.rawValue
         self.forkedFrom = forkedFrom
         self.sharedToTeamId = sharedToTeamId
     }
 }
 
 extension WorkoutPlan {
+    /// 计划模式枚举视图：get 未知值兜底 `.adaptive`（跨版本安全），set 写回 raw。
+    var mode: WorkoutPlanMode {
+        get { WorkoutPlanMode(rawValue: modeRaw) ?? .adaptive }
+        set { modeRaw = newValue.rawValue }
+    }
+
     /// 模板内建议组数之和（各动作项 `suggestedSets` 累加，nil 视为 0）。
     /// 计划详情 statRow 与计划列表 featured 卡共用，避免两处算法漂移。
     var totalSuggestedSets: Int {
