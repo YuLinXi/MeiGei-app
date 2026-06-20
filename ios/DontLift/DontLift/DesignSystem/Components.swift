@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - 圆形图标按钮（导航/菜单单一来源，36×36 白底 + border）
 
@@ -108,7 +109,69 @@ extension View {
         self
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
+            // 隐藏系统返回钮会连带禁用左边缘侧滑返回手势；在此单一收口处恢复，全 push 子页通吃。
+            .background(SwipeBackEnabler())
             .toolbar { PaperToolbarContent(title: title, onBack: onBack, trailing: trailing) }
+    }
+}
+
+// MARK: - 侧滑返回手势恢复
+
+/// `interactivePopGestureRecognizer` 的接管 delegate（全局单例，长生命周期）。
+/// `interactivePopGestureRecognizer.delegate` 为 weak，必须由长生命引用持有，否则手势行为回退。
+/// 本工程是「全局唯一 NavigationStack 包 TabView」，全栈共享同一 `UINavigationController`，
+/// 故单例持有其 weak 引用即可；`shouldBegin` 只依赖运行时 `viewControllers.count`，不缓存栈状态。
+final class SwipeBackGestureDelegate: NSObject, UIGestureRecognizerDelegate {
+    static let shared = SwipeBackGestureDelegate()
+    weak var navigationController: UINavigationController?
+
+    /// 根页保护：仅当栈深 > 1 时允许侧滑开始，避免 Tab 根页误触发 pop。
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        (navigationController?.viewControllers.count ?? 0) > 1
+    }
+
+    /// 允许与页面内部横滑控件（ScrollView / List / Swift Charts）并存——边缘手势仅占最左 ~20pt，互不抢占。
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        true
+    }
+}
+
+/// 零尺寸、透明、不拦截触摸的隐形挂载点：探到所在 `UINavigationController`，
+/// 把 `interactivePopGestureRecognizer.delegate` 接管为 `SwipeBackGestureDelegate.shared`。
+/// 接管幂等（指向同一逻辑），子页零改动即获侧滑返回。
+struct SwipeBackEnabler: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> SwipeBackProbeController { SwipeBackProbeController() }
+    func updateUIViewController(_ uiViewController: SwipeBackProbeController, context: Context) {}
+}
+
+final class SwipeBackProbeController: UIViewController {
+    override func loadView() {
+        // 透明且不参与命中测试，纯探针，绝不覆盖或拦截页面内容。
+        let v = UIView()
+        v.backgroundColor = .clear
+        v.isUserInteractionEnabled = false
+        view = v
+    }
+
+    override func didMove(toParent parent: UIViewController?) {
+        super.didMove(toParent: parent)
+        installSwipeBackGesture()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        installSwipeBackGesture()
+    }
+
+    private func installSwipeBackGesture() {
+        // 首帧 navigationController 可能尚为 nil，async 兜底竞态。
+        DispatchQueue.main.async { [weak self] in
+            guard let nav = self?.navigationController else { return }
+            SwipeBackGestureDelegate.shared.navigationController = nav
+            nav.interactivePopGestureRecognizer?.delegate = SwipeBackGestureDelegate.shared
+            nav.interactivePopGestureRecognizer?.isEnabled = true
+        }
     }
 }
 
