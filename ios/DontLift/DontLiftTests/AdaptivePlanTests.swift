@@ -6,6 +6,7 @@
 //  开始训练落值（PlanPrefill）、自适应回写合并（PlanWriteback）、统计口径收紧（countsForStats）。
 //
 
+import Foundation
 import Testing
 import SwiftData
 @testable import DontLift
@@ -102,6 +103,63 @@ struct AdaptivePlanTests {
         let sets = PlanPrefill.sets(for: item, mode: .adaptive, history: history)
         #expect(sets[0].weightKg == 70)   // 第 1 组来自历史 completed
         #expect(sets[1].weightKg == 50)   // 第 2 组无历史 completed → 回退计划值
+    }
+
+    // MARK: - PlanPrescriptionPreview 下次有效处方
+
+    @Test func prescriptionPreviewUsesHistoryAndMatchesPrefillSets() {
+        let key = "BB_BENCH"
+        let date = Date(timeIntervalSince1970: 1000)
+        let history = [makeWorkout(historyKey: key, startedAt: date,
+                                   sets: [(62.5, 8, true, .working), (65, 5, true, .working)])]
+        let item = PlanItem(builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 0,
+                            suggestedSets: 2, suggestedReps: 8, suggestedWeightKg: 60)
+
+        let preview = PlanPrescriptionPreview.make(for: item, mode: .adaptive, history: history)
+        let prefill = PlanPrefill.sets(for: item, mode: .adaptive, history: history)
+
+        #expect(preview.sets.count == prefill.count)
+        #expect(preview.sets[0].weightKg == prefill[0].weightKg)
+        #expect(preview.sets[1].reps == prefill[1].reps)
+        #expect(preview.summaryText == "下次 2 组 · 65 kg × 5")
+        if case .history(let sourceDate) = preview.source {
+            #expect(sourceDate == date)
+        } else {
+            #expect(Bool(false))
+        }
+    }
+
+    @Test func prescriptionPreviewUsesPlanPresetWhenNoHistory() {
+        let item = PlanItem(builtinExerciseCode: "ROW", exerciseName: "划船", orderIndex: 0,
+                            suggestedSets: 4, suggestedReps: 10, suggestedWeightKg: nil)
+
+        let preview = PlanPrescriptionPreview.make(for: item, mode: .adaptive, history: [])
+
+        #expect(preview.source == .planPreset)
+        #expect(preview.summaryText == "下次 4 组 × 10")
+        #expect(preview.sets.count == PlanPrefill.sets(for: item, mode: .adaptive, history: []).count)
+    }
+
+    @Test func prescriptionPreviewUsesDefaultWhenPlanSetsAndHistoryAreMissing() {
+        let item = PlanItem(builtinExerciseCode: "FLY", exerciseName: "飞鸟", orderIndex: 0,
+                            suggestedSets: nil, suggestedReps: PlanDefaults.suggestedReps)
+
+        let preview = PlanPrescriptionPreview.make(for: item, mode: .adaptive, history: [])
+
+        #expect(preview.source == .defaultValue)
+        #expect(preview.summaryText == "下次 4 组 × 10")
+        #expect(preview.sets.count == PlanDefaults.suggestedSets)
+    }
+
+    @Test func prescriptionPreviewUsesStrictSourceForStrictPlans() {
+        let item = PlanItem(builtinExerciseCode: "PRESS", exerciseName: "肩推", orderIndex: 0,
+                            suggestedSets: 3, suggestedReps: 8, suggestedWeightKg: 40)
+
+        let preview = PlanPrescriptionPreview.make(for: item, mode: .strict, history: [])
+
+        #expect(preview.source == .strict)
+        #expect(preview.summaryText == "下次 3 组 · 40 kg × 8")
+        #expect(preview.sets.count == 3)
     }
 
     // MARK: - PlanWriteback 回写合并

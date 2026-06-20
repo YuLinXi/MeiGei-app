@@ -35,6 +35,19 @@ struct PlanListView: View {
         return plans.filter { $0.localId != active.localId }
     }
 
+    private func completedWorkouts(for plan: WorkoutPlan) -> [Workout] {
+        workouts.filter { $0.planId == plan.localId && $0.endedAt != nil }
+    }
+
+    private func behaviorSummary(for plan: WorkoutPlan, completed: [Workout]) -> String {
+        switch plan.mode {
+        case .strict:
+            "严格执行 · 不回写"
+        case .adaptive:
+            completed.isEmpty ? "默认 4×10 起步 · 完成后自动更新" : "下次依据：上次完成实绩"
+        }
+    }
+
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
@@ -101,7 +114,7 @@ struct PlanListView: View {
     private func featuredCard(_ plan: WorkoutPlan) -> some View {
         // 关联此计划的已完成训练（用于「累计次数」与 eyebrow 的「上次训练」）。
         // 全部可由本地记录重算，不展示 MVP 不支持的周计划/周期化语义。
-        let done = workouts.filter { $0.planId == plan.localId && $0.endedAt != nil }
+        let done = completedWorkouts(for: plan)
         let lastTrained = done.map(\.startedAt).max()
         Button { selectedPlan = plan } label: {
             HStack(spacing: 0) {
@@ -123,6 +136,9 @@ struct PlanListView: View {
                     Text("\(plan.items.count) 个动作")
                         .font(Theme.Font.l4)
                         .foregroundStyle(Theme.Color.fg2)
+                    Text(behaviorSummary(for: plan, completed: done))
+                        .font(Theme.Font.mono(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.Color.muted)
                     HStack(spacing: Theme.Spacing.xl) {
                         metaCol(title: "累计", value: "\(done.count) 次")
                         metaCol(title: "总组数", value: "\(plan.totalSuggestedSets)")
@@ -151,12 +167,19 @@ struct PlanListView: View {
     }
 
     private func planCard(_ plan: WorkoutPlan) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(plan.name)
-                    .font(Theme.Font.body(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg)
-                Text("\(plan.items.count) 个动作 · \(plan.updatedAt.formatted(.relative(presentation: .named)))")
+        let done = completedWorkouts(for: plan)
+        return HStack {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(plan.name)
+                        .font(Theme.Font.body(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.Color.fg)
+                    modePill(plan.mode)
+                }
+                Text("\(plan.items.count) 个动作 · \(plan.totalSuggestedSets) 组")
+                    .font(Theme.Font.mono(size: 11))
+                    .foregroundStyle(Theme.Color.muted)
+                Text(behaviorSummary(for: plan, completed: done))
                     .font(Theme.Font.mono(size: 11))
                     .foregroundStyle(Theme.Color.muted)
             }
@@ -165,6 +188,15 @@ struct PlanListView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
+    }
+
+    private func modePill(_ mode: WorkoutPlanMode) -> some View {
+        Text(mode.displayName)
+            .font(Theme.Font.mono(size: 10, weight: .bold))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Theme.Color.surface2, in: Capsule())
+            .foregroundStyle(mode == .adaptive ? Theme.Color.accent : Theme.Color.muted)
     }
 
     private var emptyMineCard: some View {
@@ -198,6 +230,9 @@ struct PlanDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(RestTimerController.self) private var restTimer
+    @Query(filter: #Predicate<Workout> { $0.deletedAt == nil && $0.endedAt != nil },
+           sort: \Workout.startedAt, order: .reverse)
+    private var finishedWorkouts: [Workout]
 
     @State private var pickingExercise = false
     @State private var editingItem: PlanItem?
@@ -236,6 +271,7 @@ struct PlanDetailView: View {
                 VStack(alignment: .leading, spacing: 11) {
                     header
                     statRow
+                    modeInfoCard
                     sectionLabel
 
                     if let err = decodeError {
@@ -271,9 +307,6 @@ struct PlanDetailView: View {
         .paperToolbar(onBack: { dismiss() }) {
             CircleIconMenu(systemName: "ellipsis") {
                 Button { editing = true } label: { Label("重命名计划", systemImage: "pencil") }
-                Button { showingMode = true } label: {
-                    Label("计划模式 · \(plan.mode.displayName)", systemImage: "slider.horizontal.3")
-                }
                 Button(role: .destructive) { confirmingDelete = true } label: { Label("删除计划", systemImage: "trash") }
             }
         }
@@ -419,7 +452,7 @@ struct PlanDetailView: View {
 
     // 对齐原型 .seclbl：mono 10/.1em/uppercase/muted。
     private var sectionLabel: some View {
-        Text("动作")
+        Text("动作处方")
             .font(Theme.Font.mono(size: 10))
             .tracking(1.0)
             .textCase(.uppercase)
@@ -433,6 +466,8 @@ struct PlanDetailView: View {
     private func planItemRow(_ item: PlanItem) -> some View {
         // 序号按当前顺序推出（动作数极少，firstIndex 开销可忽略）。
         let index = (orderedItems.firstIndex { $0.itemId == item.itemId } ?? 0) + 1
+        let preview = PlanPrescriptionPreview.make(for: item, mode: plan.mode,
+                                                   history: finishedWorkouts, planId: plan.localId)
         return HStack(spacing: 11) {
             Text(String(format: "%02d", index))
                 .font(Theme.Font.mono(size: 12, weight: .bold))
@@ -444,16 +479,58 @@ struct PlanDetailView: View {
                     .foregroundStyle(Theme.Color.fg)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Text(subtitle(item))
+                Text(preview.summaryText)
                     .font(Theme.Font.mono(size: 12))
                     .foregroundStyle(Theme.Color.muted)
+                Text(preview.detailText)
+                    .font(Theme.Font.body(size: 12))
+                    .foregroundStyle(Theme.Color.fg2)
             }
             Spacer(minLength: 0)
+            sourceBadge(preview.badgeText)
             Image(systemName: "ellipsis")
                 .font(.system(size: 17))
                 .foregroundStyle(Theme.Color.muted)
         }
         .cardStyle()
+    }
+
+    private var modeInfoCard: some View {
+        Button { showingMode = true } label: {
+            HStack(alignment: .top, spacing: Theme.Spacing.md) {
+                Image(systemName: plan.mode == .adaptive ? "arrow.triangle.2.circlepath" : "lock")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.Color.accent)
+                    .frame(width: 22, height: 22)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(plan.mode == .adaptive ? "自适应计划" : "严格计划")
+                        .font(Theme.Font.body(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg)
+                    Text(plan.mode == .adaptive
+                         ? "开始训练会按下方处方预填；完成后继续跟随实绩更新，跳过动作会保留。"
+                         : "开始训练会复制计划预设；完成后不回写，每个动作需有组数与次数。")
+                        .font(Theme.Font.body(size: 12))
+                        .foregroundStyle(Theme.Color.fg2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Text("规则")
+                    .font(Theme.Font.mono(size: 11, weight: .bold))
+                    .foregroundStyle(Theme.Color.accent)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func sourceBadge(_ text: String) -> some View {
+        Text(text)
+            .font(Theme.Font.mono(size: 10, weight: .bold))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(Theme.Color.accentSoft, in: Capsule())
+            .foregroundStyle(Theme.Color.accent)
     }
 
     private var emptyExercisesCard: some View {
@@ -865,7 +942,14 @@ struct PlanModeSheet: View {
     @Bindable var plan: WorkoutPlan
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @State private var draftMode: WorkoutPlanMode
     @State private var error: String?
+    @State private var confirmingChange = false
+
+    init(plan: WorkoutPlan) {
+        self.plan = plan
+        _draftMode = State(initialValue: plan.mode)
+    }
 
     var body: some View {
         NavigationStack {
@@ -886,16 +970,24 @@ struct PlanModeSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }.tint(Theme.Color.accent)
+                    Button("确定") { requestConfirm() }.tint(Theme.Color.accent)
                 }
             }
         }
         .presentationDetents([.medium, .large])
+        .paperConfirmDialog(
+            isPresented: $confirmingChange,
+            title: "确认切换计划模式？",
+            message: confirmMessage,
+            confirmTitle: "确认切换",
+            destructive: false,
+            onConfirm: { applyDraftMode() }
+        )
     }
 
     @ViewBuilder private func option(_ m: WorkoutPlanMode) -> some View {
-        let selected = plan.mode == m
-        Button { select(m) } label: {
+        let selected = draftMode == m
+        Button { selectDraft(m) } label: {
             HStack(alignment: .top, spacing: Theme.Spacing.md) {
                 Image(systemName: selected ? "largecircle.fill.circle" : "circle")
                     .font(.system(size: 18))
@@ -912,9 +1004,23 @@ struct PlanModeSheet: View {
         .buttonStyle(.plain)
     }
 
-    /// 切换模式。切到严格模式前校验：每个动作 MUST 有组数与次数（spec）。
-    private func select(_ m: WorkoutPlanMode) {
-        if m == .strict {
+    private var confirmMessage: String {
+        "将「\(plan.name)」从\(plan.mode.displayName)模式切换为\(draftMode.displayName)模式。切换后开始训练与完成回写规则会按新模式执行。"
+    }
+
+    /// 点选只改 sheet 内草稿，不写计划实体。
+    private func selectDraft(_ m: WorkoutPlanMode) {
+        draftMode = m
+        error = nil
+    }
+
+    /// 点击「确定」后才校验与二次确认；确认前不写入 `WorkoutPlan.mode`。
+    private func requestConfirm() {
+        guard draftMode != plan.mode else {
+            dismiss()
+            return
+        }
+        if draftMode == .strict {
             let missing = PlanPrefill.missingStrictRequiredItems(in: plan.items)
             if !missing.isEmpty {
                 error = "切换严格模式前，请先补齐这些动作的组数与次数：" + missing.map(\.exerciseName).joined(separator: "、")
@@ -922,9 +1028,14 @@ struct PlanModeSheet: View {
             }
         }
         error = nil
-        plan.mode = m
+        confirmingChange = true
+    }
+
+    private func applyDraftMode() {
+        plan.mode = draftMode
         plan.markDirty()
         try? modelContext.save()
+        dismiss()
     }
 }
 

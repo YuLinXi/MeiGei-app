@@ -37,6 +37,17 @@ enum PlanPrefill {
         return []
     }
 
+    /// 历史里某动作最近一次 completed 正式组所在训练日期；供计划详情展示来源说明。
+    static func lastCompletedWorkoutDate(forHistoryKey key: String, in history: [Workout]) -> Date? {
+        let finished = history.filter { $0.isFinished }.sorted { $0.startedAt > $1.startedAt }
+        for w in finished {
+            for ex in w.exercises where ex.historyKey == key {
+                if ex.sets.contains(where: { $0.countsForStats }) { return w.startedAt }
+            }
+        }
+        return nil
+    }
+
     /// 为一个计划项生成开始训练时的落值组。新建组一律 `completed=false`。
     static func sets(for item: PlanItem, mode: WorkoutPlanMode, history: [Workout]) -> [WorkoutSet] {
         if mode == .strict {
@@ -59,6 +70,109 @@ enum PlanPrefill {
             // 自适应超出历史的组 / 无历史：用计划预设落值（可能为 nil 即留空）。
             return WorkoutSet(setIndex: idx, weightKg: item.suggestedWeightKg, reps: item.suggestedReps)
         }
+    }
+}
+
+// MARK: - 下次训练处方预览（task 6.9）
+
+/// 计划详情页展示的「下次有效处方」。它用 `PlanPrefill.sets` 生成预览组，
+/// 保证页面所见与点击「开始这次训练」后的实际落值一致。
+struct PlanPrescriptionPreview {
+    enum Source: Equatable {
+        case strict
+        case history(Date)
+        case planPreset
+        case defaultValue
+        case kept(Date)
+
+        var badgeText: String {
+            switch self {
+            case .strict: "严格"
+            case .history: "历史"
+            case .planPreset: "预设"
+            case .defaultValue: "默认"
+            case .kept: "保留"
+            }
+        }
+
+        var detailText: String {
+            switch self {
+            case .strict:
+                "严格执行 · 完成后不更新"
+            case .history(let date):
+                "来自上次完成 · \(date.formatted(.relative(presentation: .named)))"
+            case .planPreset:
+                "计划预设"
+            case .defaultValue:
+                "默认起步"
+            case .kept:
+                "上次未练 · 已保留"
+            }
+        }
+    }
+
+    let sets: [WorkoutSet]
+    let source: Source
+
+    var badgeText: String { source.badgeText }
+    var detailText: String { source.detailText }
+
+    var summaryText: String {
+        guard !sets.isEmpty else { return "缺少组数/次数" }
+        let countText = "下次 \(sets.count) 组"
+        guard let representative = representativeSet else { return countText }
+
+        switch (representative.weightKg, representative.reps) {
+        case let (.some(weight), .some(reps)):
+            return "\(countText) · \(formatKg(weight)) kg × \(reps)"
+        case let (.some(weight), .none):
+            return "\(countText) · \(formatKg(weight)) kg"
+        case let (.none, .some(reps)):
+            return "\(countText) × \(reps)"
+        case (.none, .none):
+            return countText
+        }
+    }
+
+    /// 用最重组作为摘要代表；无重量时取第一组有次数的组。
+    private var representativeSet: WorkoutSet? {
+        let weighted = sets.filter { $0.weightKg != nil }
+        if !weighted.isEmpty {
+            return weighted.max { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
+        }
+        return sets.first { $0.reps != nil } ?? sets.first
+    }
+
+    static func make(for item: PlanItem, mode: WorkoutPlanMode, history: [Workout], planId: UUID? = nil) -> PlanPrescriptionPreview {
+        let sets = PlanPrefill.sets(for: item, mode: mode, history: history)
+        if mode == .strict {
+            return PlanPrescriptionPreview(sets: sets, source: .strict)
+        }
+
+        let source: Source
+        if let keptDate = lastPlanWorkoutSkippedDate(for: item, in: history, planId: planId) {
+            source = .kept(keptDate)
+        } else if let historyDate = PlanPrefill.lastCompletedWorkoutDate(forHistoryKey: item.historyKey, in: history) {
+            source = .history(historyDate)
+        } else if item.suggestedSets != nil {
+            source = .planPreset
+        } else {
+            source = .defaultValue
+        }
+        return PlanPrescriptionPreview(sets: sets, source: source)
+    }
+
+    /// 最近一次同计划训练里没完成该动作时，展示「保留」心智。
+    private static func lastPlanWorkoutSkippedDate(for item: PlanItem, in history: [Workout], planId: UUID?) -> Date? {
+        guard let planId else { return nil }
+        guard let lastPlanWorkout = history
+            .filter({ $0.isFinished && $0.planId == planId })
+            .max(by: { $0.startedAt < $1.startedAt }) else { return nil }
+
+        let didComplete = lastPlanWorkout.exercises.contains { ex in
+            ex.historyKey == item.historyKey && ex.sets.contains(where: { $0.countsForStats })
+        }
+        return didComplete ? nil : lastPlanWorkout.startedAt
     }
 }
 

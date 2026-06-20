@@ -30,13 +30,14 @@
 
 ## 6. UI
 - [x] 6.1 必填校验：严格模式由 `PlanItemEditorView` stepper（组数/次数恒有值）天然满足；`PlanModeSheet` 切严格时校验缺失项
-- [x] 6.2 计划详情：三点菜单「计划模式 · 严格/自适应」标识 + `PlanModeSheet` 规则说明入口
-- [x] 6.3 `PlanModeSheet.select`：切严格校验缺组数/次数并提示补齐
+- [x] 6.2 计划详情：正文模式说明卡展示严格/自适应标识 + `PlanModeSheet` 规则说明入口；右上角更多菜单不展示计划模式入口
+- [x] 6.3 `PlanModeSheet.select`：点选仅更新草稿；点击「确定」后校验缺组数/次数、展示二次确认，确认后才保存模式并标脏
 - [x] 6.4 `PlanWritebackSheet`（根层 MainTabView 呈现）：diff 回执（更新/新增/已保留）+「撤销此次更新」
 - [x] 6.5 创建计划默认 `adaptive`（`WorkoutPlan` init 默认值；PlanEditorView 未覆盖）
 - [x] 6.6 新建计划页加入严格 / 自适应模式选择与说明，保存时写入所选模式
 - [x] 6.7 计划列表 featured 卡与计划详情 statRow 移除预计时长，原位置展示当前计划模式
 - [x] 6.8 计划中添加动作默认写入 `suggestedSets=4`、`suggestedReps=10`；`PlanItemEditorView` 新项默认 4×10；自适应无历史 fallback 4 组
+- [x] 6.9 计划页展示「下次有效处方」：新增纯逻辑预览 helper（与 `PlanPrefill` 落值一致），计划详情动作行展示下次处方 + 来源标签/说明，计划列表所有卡展示模式 + 行为摘要
 
 ## 7. Fork / Team 联动
 - [x] 7.1 本地 `duplicate()` + 后端 `TeamPlanService.fork`：复制 动作+组数+次数，清空 `suggestedWeightKg`，新计划默认 `adaptive`
@@ -47,3 +48,4 @@
 - [~] 8.3a `AdaptivePlanTests`：已补自适应无历史 fallback 4 组、默认 4×10 常量测试；执行阻塞：`DontLift` scheme 未配置 test action，直接 build `DontLiftTests` 被 `MuscleMap_MuscleMap.bundle` / `MuscleMap` module 解析挡住
 - [x] 8.3 后端 `./gradlew compileJava` ✅ BUILD SUCCESSFUL；iOS `xcodebuild -project DontLift.xcodeproj -scheme DontLift -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -configuration Debug CODE_SIGNING_ALLOWED=NO build` ✅ BUILD SUCCEEDED
 - [ ] 8.4 端到端（环境阻塞：需 iOS runtime + 真机多设备）：自适应训练→回执→撤销；严格训练→计划不变；多设备 LWW
+- [x] 8.5 `AdaptivePlanTests`：已补下次有效处方预览来源（历史/预设/默认/严格）并确认预览组与 `PlanPrefill.sets` 一致；iOS build ✅ BUILD SUCCEEDED；`DontLiftTests` build-for-testing ✅ TEST BUILD SUCCEEDED（test 执行仍需可用 simulator 运行目的地）
