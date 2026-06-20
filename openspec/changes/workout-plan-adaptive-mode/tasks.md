@@ -34,6 +34,9 @@
 - [x] 6.3 `PlanModeSheet.select`：切严格校验缺组数/次数并提示补齐
 - [x] 6.4 `PlanWritebackSheet`（根层 MainTabView 呈现）：diff 回执（更新/新增/已保留）+「撤销此次更新」
 - [x] 6.5 创建计划默认 `adaptive`（`WorkoutPlan` init 默认值；PlanEditorView 未覆盖）
+- [x] 6.6 新建计划页加入严格 / 自适应模式选择与说明，保存时写入所选模式
+- [x] 6.7 计划列表 featured 卡与计划详情 statRow 移除预计时长，原位置展示当前计划模式
+- [x] 6.8 计划中添加动作默认写入 `suggestedSets=4`、`suggestedReps=10`；`PlanItemEditorView` 新项默认 4×10；自适应无历史 fallback 4 组
 
 ## 7. Fork / Team 联动
 - [x] 7.1 本地 `duplicate()` + 后端 `TeamPlanService.fork`：复制 动作+组数+次数，清空 `suggestedWeightKg`，新计划默认 `adaptive`
@@ -41,5 +44,6 @@
 ## 8. 验证
 - [x] 8.1 `AdaptivePlanTests`：回写合并器各分支（更新/新增/保留/去重/组数 max/顶组/deload 下降）
 - [x] 8.2 `AdaptivePlanTests`：`countsForStats` 收紧（未打勾/热身组不计）+ PlanPrefill 历史/回退/忽略未完成
-- [~] 8.3 后端 `./gradlew compileJava` ✅ BUILD SUCCESSFUL；**iOS 编译本机阻塞**（无 iOS Simulator runtime，仅占位 iOS 26.4 device）。已用 DTO/模型构造点全量核查替代，SourceKit 报错均为跨文件索引误报
+- [~] 8.3a `AdaptivePlanTests`：已补自适应无历史 fallback 4 组、默认 4×10 常量测试；执行阻塞：`DontLift` scheme 未配置 test action，直接 build `DontLiftTests` 被 `MuscleMap_MuscleMap.bundle` / `MuscleMap` module 解析挡住
+- [x] 8.3 后端 `./gradlew compileJava` ✅ BUILD SUCCESSFUL；iOS `xcodebuild -project DontLift.xcodeproj -scheme DontLift -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -configuration Debug CODE_SIGNING_ALLOWED=NO build` ✅ BUILD SUCCEEDED
 - [ ] 8.4 端到端（环境阻塞：需 iOS runtime + 真机多设备）：自适应训练→回执→撤销；严格训练→计划不变；多设备 LWW

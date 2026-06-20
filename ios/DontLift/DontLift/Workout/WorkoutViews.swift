@@ -25,6 +25,8 @@ struct WorkoutListView: View {
     @State private var pendingDelete: Workout?
     /// 待删训练行的全局坐标，供删除确认卡片定位于其正下方。
     @State private var deleteRect: CGRect = .zero
+    /// 严格计划缺失必填预设时，阻止开始训练并展示原因。
+    @State private var strictStartError: String?
     /// 左滑删除协调器：同一时刻仅一张展开，点击别处自动收回（详见 SwipeDeleteList）。
     @State private var swipe = SwipeRowCoordinator()
 
@@ -105,6 +107,18 @@ struct WorkoutListView: View {
                 }
                 clearConflict()
             }
+        )
+        .paperConfirmDialog(
+            isPresented: Binding(
+                get: { strictStartError != nil },
+                set: { if !$0 { strictStartError = nil } }
+            ),
+            title: "计划还不能开始",
+            message: strictStartError ?? "",
+            confirmTitle: "知道了",
+            destructive: false,
+            showCancel: false,
+            onConfirm: { strictStartError = nil }
         )
         // 删除二次确认：以 fullScreenCover（透明背景）呈现，层级高于 TabView，scrim 覆盖底部 Tab Bar 使其不可点；
         // 卡片按被删 Item 的全局坐标定位于其正下方，点击卡片外的 scrim 即取消，不另设取消按钮。
@@ -412,16 +426,27 @@ struct WorkoutListView: View {
     }
 
     private func start(from plan: WorkoutPlan) {
+        if plan.mode == .strict {
+            let missing = PlanPrefill.missingStrictRequiredItems(in: plan.items)
+            guard missing.isEmpty else {
+                strictStartError = PlanPrefill.strictRequirementMessage(for: missing)
+                return
+            }
+        }
         Theme.Haptics.impact(.medium)
         beginSession {
             let w = Workout(planId: plan.localId, title: plan.name)
-            for item in plan.items.sorted(by: { $0.orderIndex < $1.orderIndex }) {
+            let mode = plan.mode
+            let history = mode == .adaptive ? finishedWorkouts : []
+            let orderedItems = plan.items.sorted(by: { $0.orderIndex < $1.orderIndex })
+            for (i, item) in orderedItems.enumerated() {
                 let ex = WorkoutExercise(builtinExerciseCode: item.builtinExerciseCode,
                                          customExerciseId: item.customExerciseId,
                                          exerciseName: item.exerciseName,
-                                         primaryMuscle: nil, orderIndex: item.orderIndex)
-                let count = max(item.suggestedSets ?? 1, 1)
-                ex.sets = (0..<count).map { WorkoutSet(setIndex: $0, weightKg: nil, reps: item.suggestedReps) }
+                                         primaryMuscle: nil,
+                                         orderIndex: i,
+                                         planItemId: item.itemId)
+                ex.sets = PlanPrefill.sets(for: item, mode: mode, history: history)
                 w.exercises.append(ex)
             }
             return w

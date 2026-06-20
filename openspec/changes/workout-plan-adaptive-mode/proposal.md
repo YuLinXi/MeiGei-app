@@ -13,6 +13,9 @@
 
 - **预填改为「落值」而非占位**：开始训练时把预填值**真正写进** `WorkoutSet.weightKg/reps`（`completed=false`），用户符合预期时只需打勾、无需重输；「有值」与「做了没」彻底由 `completed` 区分。
 - **计划新增模式字段**：`WorkoutPlan` 增 `modeRaw: String`（默认 `"adaptive"`），由可扩展枚举 `WorkoutPlanMode { strict, adaptive }` 承载（raw-string 存储，复刻 `SyncStatus`/`setTypeRaw` 风格）。
+- **新建计划即选择模式**：新建计划页在名称下方提供严格 / 自适应模式选择与说明，文案与编辑页模式说明保持一致；默认自适应。
+- **计划展示去掉预计时间**：计划列表与计划详情不再展示按公式推导的预计时长，原预计时长位置改为展示当前计划模式。
+- **新增动作默认 4×10**：计划里添加动作时直接保存 `suggestedSets=4`、`suggestedReps=10`，并在从计划开始训练时直接生成 4 个预设组；无历史且无计划组数的 fallback 也按 4 组。
 - **严格模式**：必填 = 动作 + 组数 + 次数（重量选填）；`buildFromPlan()` 按 `suggestedSets` 建组并**整组落值** `suggestedReps/suggestedWeightKg`；完成训练不触发回写。
 - **自适应模式（默认）**：必填 = 仅动作；首次/无历史时用计划预设落值；完成训练后对来源计划做一次 **upsert 合并回写**（规则见下）。
 - **动作级来源 id（合并地基）**：`WorkoutExercise` 增 `planItemId: UUID?`，`buildFromPlan()` 把 `PlanItem.itemId` 带入；训练中临时新增的动作 `planItemId = nil`。它是区分「更新已有项 / 新增项」的合并主键。
@@ -31,14 +34,14 @@
 <!-- 无新增 capability -->
 
 ### Modified Capabilities
-- `workout-tracking`: 新增「训练计划模式（严格 / 自适应）」「自适应模式实绩回写计划」「开始训练预填落值与未打勾组清理」「计划 Fork 字段规则」四条 requirement；修改「计划详情版式」（模式标识与说明）、并将「统计仅计正式组」口径收紧为「正式组且已完成」。
+- `workout-tracking`: 新增「训练计划模式（严格 / 自适应）」「自适应模式实绩回写计划」「开始训练预填落值与未打勾组清理」「计划 Fork 字段规则」四条 requirement；修改「计划详情版式」（模式标识与说明、移除预计时长）、并将「统计仅计正式组」口径收紧为「正式组且已完成」。
 
 ## Impact
 
 - **数据模型（iOS）**：`Models/WorkoutPlan.swift` 加 `modeRaw` + `WorkoutPlanMode` 枚举；`Models/Workout.swift` 的 `WorkoutExercise` 加 `planItemId: UUID?`，`WorkoutSet.countsForStats` 收紧为 `setType != .warmup && completed`。
 - **开始训练（iOS）**：`Workout/PlanViews.swift` 的 `buildFromPlan()` 改为带 `itemId`、按模式落值（严格全落值 / 自适应首次落值）。
 - **完成训练（iOS）**：结束训练流程新增「自适应回写 + 未打勾组清理」步骤；新增回写合并器（upsert + max + 顶组代表值）与「撤销」快照。
-- **回执 UI（iOS）**：完成训练页新增计划更新 diff 卡 + 撤销按钮；计划详情页加模式标识与说明。
+- **回执 UI（iOS）**：完成训练页新增计划更新 diff 卡 + 撤销按钮；计划详情页加模式标识与说明；计划列表 / 详情移除预计时长，展示当前计划模式。
 - **统计（iOS）**：`countsForStats` 收紧后，`PRStats` / `WorkoutWeeklyStats` / `ExerciseViews` 历史曲线自动只计已完成正式组；需复查所有 `countsForStats` 调用点确认加 `completed` 无展示副作用（详见 design 待验证项）。
 - **数据模型（后端）**：`workout_plan` 加 `mode text NOT NULL DEFAULT 'adaptive'`；`workout_exercise` 加 `plan_item_id uuid NULL`（顺延下一个可用 Flyway 版本号，注意与并行的组类型 change 不冲突）；对应实体加字段，随聚合树 / 同步 DTO 上线。
 - **同步契约**：`WorkoutPlan` 仍走同步域（jsonb items + 计划级字段 LWW）；回写是对 `WorkoutPlan` 的本地编辑 → `markDirty` → 正常 LWW 上行。`WorkoutExercise.planItemId` 随 workout 聚合整树全量替换，无独立信封。

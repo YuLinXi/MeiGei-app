@@ -51,6 +51,17 @@ struct AdaptivePlanTests {
         #expect(sets.allSatisfy { $0.weightKg == 60 && $0.reps == 8 && !$0.completed })
     }
 
+    @Test func strictModeDoesNotCreateFallbackSetsWhenRequiredPresetMissing() {
+        let missingSets = PlanItem(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0,
+                                   suggestedSets: nil, suggestedReps: 8, suggestedWeightKg: 60)
+        let missingReps = PlanItem(builtinExerciseCode: "SQUAT", exerciseName: "深蹲", orderIndex: 1,
+                                   suggestedSets: 3, suggestedReps: nil, suggestedWeightKg: 100)
+
+        #expect(PlanPrefill.missingStrictRequiredItems(in: [missingSets, missingReps]).count == 2)
+        #expect(PlanPrefill.sets(for: missingSets, mode: .strict, history: []).isEmpty)
+        #expect(PlanPrefill.sets(for: missingReps, mode: .strict, history: []).isEmpty)
+    }
+
     @Test func adaptivePrefillsFromHistoryFirst() {
         let key = "BB_BENCH"
         let history = [makeWorkout(historyKey: key, startedAt: Date(timeIntervalSince1970: 1000),
@@ -69,6 +80,16 @@ struct AdaptivePlanTests {
         let sets = PlanPrefill.sets(for: item, mode: .adaptive, history: [])
         #expect(sets.count == 2)
         #expect(sets.allSatisfy { $0.weightKg == 40 && $0.reps == 10 })
+    }
+
+    @Test func adaptiveDefaultsToFourSetsWhenPlanAndHistoryAreEmpty() {
+        let item = PlanItem(builtinExerciseCode: "NEW", exerciseName: "新动作", orderIndex: 0,
+                            suggestedSets: nil, suggestedReps: PlanDefaults.suggestedReps, suggestedWeightKg: nil)
+        let sets = PlanPrefill.sets(for: item, mode: .adaptive, history: [])
+        #expect(PlanDefaults.suggestedSets == 4)
+        #expect(PlanDefaults.suggestedReps == 10)
+        #expect(sets.count == 4)
+        #expect(sets.allSatisfy { $0.reps == 10 && !$0.completed })
     }
 
     @Test func adaptiveIgnoresIncompleteHistorySets() {
@@ -101,6 +122,25 @@ struct AdaptivePlanTests {
         #expect(updated.suggestedReps == 5)        // 顶组次数，如实
         #expect(updated.suggestedSets == 5)        // max(5, 3) 只增不减，不缩到 3
         #expect(result.changed)
+    }
+
+    /// 本次实绩与计划建议完全一致时，不应标脏回写或弹更新回执。
+    @Test func mergeDoesNotMarkChangedWhenValuesAreUnchanged() {
+        let key = "BB_BENCH"
+        let itemId = UUID()
+        let plan = [PlanItem(itemId: itemId, builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 0,
+                             suggestedSets: 3, suggestedReps: 8, suggestedWeightKg: 60)]
+        let w = makeWorkout(historyKey: key, startedAt: Date(timeIntervalSince1970: 2000),
+                            sets: [(60, 8, true, .working), (60, 8, true, .working), (60, 8, true, .working)],
+                            planItemId: itemId)
+
+        let result = PlanWriteback.merge(planItems: plan, workout: w)
+
+        #expect(!result.changed)
+        #expect(!result.diffs.contains { $0.kind == .updated })
+        #expect(result.newItems.first?.suggestedSets == 3)
+        #expect(result.newItems.first?.suggestedReps == 8)
+        #expect(result.newItems.first?.suggestedWeightKg == 60)
     }
 
     /// deload：重量可降（如实），但组数不降。

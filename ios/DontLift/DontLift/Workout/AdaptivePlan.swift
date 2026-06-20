@@ -15,6 +15,15 @@ extension PlanItem {
 /// 从计划生成今日训练时，按模式为每个计划项落值出 `WorkoutSet`（design.md D1/D4）。
 /// 严格模式：整组复制计划预设。自适应模式：历史优先（上次同序号 completed 实绩）→ 回退计划预设。
 enum PlanPrefill {
+    /// 严格模式要求每个动作都有组数与次数；开始训练和切换模式都应复用同一校验。
+    static func missingStrictRequiredItems(in items: [PlanItem]) -> [PlanItem] {
+        items.filter { ($0.suggestedSets ?? 0) <= 0 || $0.suggestedReps == nil }
+    }
+
+    static func strictRequirementMessage(for missing: [PlanItem]) -> String {
+        "严格模式开始训练前，请先补齐这些动作的组数与次数：" + missing.map(\.exerciseName).joined(separator: "、")
+    }
+
     /// 历史里某动作「上次」已完成正式组的逐组 `(重量, 次数)`，按 setIndex 升序；无则空。
     /// 取最近一个含该 key 且有完成正式组的 finished workout。
     static func lastCompletedSets(forHistoryKey key: String, in history: [Workout]) -> [(weightKg: Double?, reps: Int?)] {
@@ -30,17 +39,24 @@ enum PlanPrefill {
 
     /// 为一个计划项生成开始训练时的落值组。新建组一律 `completed=false`。
     static func sets(for item: PlanItem, mode: WorkoutPlanMode, history: [Workout]) -> [WorkoutSet] {
+        if mode == .strict {
+            guard let count = item.suggestedSets, count > 0, item.suggestedReps != nil else { return [] }
+            return (0..<count).map {
+                WorkoutSet(setIndex: $0, weightKg: item.suggestedWeightKg, reps: item.suggestedReps)
+            }
+        }
+
         let last = (mode == .adaptive)
             ? lastCompletedSets(forHistoryKey: item.historyKey, in: history)
             : []
-        // 组数：计划 suggestedSets 优先；自适应无 suggestedSets 时退回历史组数；再无则 3。
-        let count = max(1, item.suggestedSets ?? (last.isEmpty ? 3 : last.count))
+        // 自适应组数：计划 suggestedSets 优先；无 suggestedSets 时退回历史组数；再无则默认 4。
+        let count = max(1, item.suggestedSets ?? (last.isEmpty ? PlanDefaults.suggestedSets : last.count))
         return (0..<count).map { idx in
             if mode == .adaptive, idx < last.count {
                 // 自适应历史优先：用上次同序号 completed 实绩落值。
                 return WorkoutSet(setIndex: idx, weightKg: last[idx].weightKg, reps: last[idx].reps)
             }
-            // 严格模式 / 自适应超出历史的组 / 无历史：用计划预设落值（可能为 nil 即留空）。
+            // 自适应超出历史的组 / 无历史：用计划预设落值（可能为 nil 即留空）。
             return WorkoutSet(setIndex: idx, weightKg: item.suggestedWeightKg, reps: item.suggestedReps)
         }
     }
@@ -105,8 +121,11 @@ enum PlanWriteback {
                 items[idx].suggestedWeightKg = top.weightKg                              // 重量如实
                 items[idx].suggestedReps = top.reps                                      // 次数如实
                 touchedItemIds.insert(items[idx].itemId)
-                diffs.append(ItemDiff(kind: .updated, exerciseName: ex.exerciseName,
-                                      oldText: before, newText: summary(items[idx])))
+                let after = summary(items[idx])
+                if after != before {
+                    diffs.append(ItemDiff(kind: .updated, exerciseName: ex.exerciseName,
+                                          oldText: before, newText: after))
+                }
             } else {
                 let newItem = PlanItem(itemId: UUID(),
                                        builtinExerciseCode: ex.builtinExerciseCode,

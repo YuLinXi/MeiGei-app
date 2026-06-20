@@ -9,6 +9,31 @@ enum WorkoutPlanMode: String, Codable, CaseIterable {
     case adaptive   // 自适应模式（默认）
 }
 
+extension WorkoutPlanMode {
+    var displayName: String {
+        switch self {
+        case .strict: "严格"
+        case .adaptive: "自适应"
+        }
+    }
+
+    var title: String { "\(displayName)模式" }
+
+    var detailText: String {
+        switch self {
+        case .adaptive:
+            "完成训练后，实绩会自动更新此计划：组数只增不减、重量/次数按实绩更新、训练中新增的动作并入计划、跳过的动作保留（需手动删）。"
+        case .strict:
+            "照剧本执行：开始训练时整组复制预设（组数/次数/重量），完成后不回写。需为每个动作填写组数与次数。"
+        }
+    }
+}
+
+enum PlanDefaults {
+    static let suggestedSets = 4
+    static let suggestedReps = 10
+}
+
 /// 训练计划模板里的单个动作项。每项带稳定 `itemId`（design.md D5），
 /// 供编辑、Fork、diff 时定位。整体以 jsonb 文档随计划读写。
 struct PlanItem: Codable, Identifiable, Hashable {
@@ -98,11 +123,6 @@ extension WorkoutPlan {
     /// 计划详情 statRow 与计划列表 featured 卡共用，避免两处算法漂移。
     var totalSuggestedSets: Int {
         items.reduce(0) { $0 + ($1.suggestedSets ?? 0) }
-    }
-
-    /// 粗估单次时长（分钟）：总组数 × (40s 训练 + 90s 休息) / 60，下限 15。
-    var estimatedMinutes: Int {
-        max(15, totalSuggestedSets * 130 / 60)
     }
 
     /// 「进行中」计划判定——首页开始 CTA 与「计划」页共用同一份逻辑，避免两处漂移。

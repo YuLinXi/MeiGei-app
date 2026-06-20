@@ -126,7 +126,7 @@ struct PlanListView: View {
                     HStack(spacing: Theme.Spacing.xl) {
                         metaCol(title: "累计", value: "\(done.count) 次")
                         metaCol(title: "总组数", value: "\(plan.totalSuggestedSets)")
-                        metaCol(title: "预计", value: "≈\(plan.estimatedMinutes) 分")
+                        metaCol(title: "模式", value: plan.mode.displayName)
                     }
                 }
                 .padding(Theme.Spacing.lg)
@@ -216,6 +216,8 @@ struct PlanDetailView: View {
     /// 仅驱动冲突弹窗显隐，与数据分离——避免弹窗淡出关闭时清空 `conflict` 致动作回调读到 nil。
     @State private var showConflict = false
     @State private var startedSession: Workout?
+    /// 严格计划缺失必填预设时，阻止开始训练并展示原因。
+    @State private var strictStartError: String?
 
     private static let log = Logger(subsystem: "com.yulinxi.app.DontLift", category: "PlanDetail")
 
@@ -223,9 +225,8 @@ struct PlanDetailView: View {
         plan.items.sorted { $0.orderIndex < $1.orderIndex }
     }
 
-    // 总组数 / 预计时长下沉为 `WorkoutPlan` 扩展，与计划列表 featured 卡共用同一算法。
+    // 总组数下沉为 `WorkoutPlan` 扩展，与计划列表 featured 卡共用同一算法。
     private var totalSets: Int { plan.totalSuggestedSets }
-    private var estimatedMinutes: Int { plan.estimatedMinutes }
 
     var body: some View {
         ZStack {
@@ -271,7 +272,7 @@ struct PlanDetailView: View {
             CircleIconMenu(systemName: "ellipsis") {
                 Button { editing = true } label: { Label("重命名计划", systemImage: "pencil") }
                 Button { showingMode = true } label: {
-                    Label("计划模式 · \(plan.mode == .strict ? "严格" : "自适应")", systemImage: "slider.horizontal.3")
+                    Label("计划模式 · \(plan.mode.displayName)", systemImage: "slider.horizontal.3")
                 }
                 Button(role: .destructive) { confirmingDelete = true } label: { Label("删除计划", systemImage: "trash") }
             }
@@ -305,7 +306,9 @@ struct PlanDetailView: View {
             ExercisePickerView { pick in
                 var items = plan.items
                 items.append(PlanItem(builtinExerciseCode: pick.builtinCode, customExerciseId: pick.customId,
-                                      exerciseName: pick.name, orderIndex: items.count))
+                                      exerciseName: pick.name, orderIndex: items.count,
+                                      suggestedSets: PlanDefaults.suggestedSets,
+                                      suggestedReps: PlanDefaults.suggestedReps))
                 plan.items = items
                 plan.markDirty()
                 try? modelContext.save()
@@ -351,6 +354,18 @@ struct PlanDetailView: View {
                 clearConflict()
             }
         )
+        .paperConfirmDialog(
+            isPresented: Binding(
+                get: { strictStartError != nil },
+                set: { if !$0 { strictStartError = nil } }
+            ),
+            title: "计划还不能开始",
+            message: strictStartError ?? "",
+            confirmTitle: "知道了",
+            destructive: false,
+            showCancel: false,
+            onConfirm: { strictStartError = nil }
+        )
     }
 
     private var header: some View {
@@ -376,7 +391,7 @@ struct PlanDetailView: View {
             statDivider
             statCell(n: "\(totalSets)", k: "总组数")
             statDivider
-            statCell(n: "≈\(estimatedMinutes)", k: "分钟")
+            statCell(n: plan.mode.displayName, k: "模式")
         }
         .cardStyle(padding: 0)
     }
@@ -573,6 +588,13 @@ struct PlanDetailView: View {
 
     /// 单一活跃会话守卫：存在进行中会话时弹「继续 / 丢弃」，否则新建并进入。
     private func startWorkout() {
+        if plan.mode == .strict {
+            let missing = PlanPrefill.missingStrictRequiredItems(in: plan.items)
+            guard missing.isEmpty else {
+                strictStartError = PlanPrefill.strictRequirementMessage(for: missing)
+                return
+            }
+        }
         if let existing = WorkoutSession.activeSession(in: modelContext) {
             pendingBuild = buildFromPlan
             conflict = existing
@@ -643,10 +665,12 @@ struct PlanEditorView: View {
 
     private let existing: WorkoutPlan?
     @State private var name: String
+    @State private var mode: WorkoutPlanMode
 
     init(plan: WorkoutPlan?) {
         self.existing = plan
         _name = State(initialValue: plan?.name ?? "")
+        _mode = State(initialValue: plan?.mode ?? .adaptive)
     }
 
     var body: some View {
@@ -660,6 +684,11 @@ struct PlanEditorView: View {
                     .padding(Theme.Spacing.md)
                     .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
                     .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    Text("计划模式").eyebrowStyle()
+                    modeOption(.adaptive)
+                    modeOption(.strict)
+                }
                 Spacer()
             }
             .padding(.horizontal, Theme.Spacing.lg)
@@ -678,13 +707,34 @@ struct PlanEditorView: View {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         if let existing {
             existing.name = trimmed
+            existing.mode = mode
             existing.markDirty()
         } else {
-            let plan = WorkoutPlan(name: trimmed)
+            let plan = WorkoutPlan(name: trimmed, mode: mode)
             modelContext.insert(plan)
         }
         try? modelContext.save()
         dismiss()
+    }
+
+    @ViewBuilder private func modeOption(_ candidate: WorkoutPlanMode) -> some View {
+        let selected = mode == candidate
+        Button { mode = candidate } label: {
+            HStack(alignment: .top, spacing: Theme.Spacing.md) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.muted)
+                    .frame(width: 24, height: 24)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(candidate.title).font(Theme.Font.l2).foregroundStyle(Theme.Color.fg)
+                    Text(candidate.detailText).font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -746,8 +796,8 @@ struct PlanItemEditorView: View {
     init(item: PlanItem, onSave: @escaping (PlanItem) -> Void) {
         self.original = item
         self.onSave = onSave
-        _sets = State(initialValue: item.suggestedSets ?? 3)
-        _reps = State(initialValue: item.suggestedReps ?? 10)
+        _sets = State(initialValue: item.suggestedSets ?? PlanDefaults.suggestedSets)
+        _reps = State(initialValue: item.suggestedReps ?? PlanDefaults.suggestedReps)
         _weight = State(initialValue: item.suggestedWeightKg.map { formatKg($0) } ?? "")
     }
 
@@ -822,11 +872,8 @@ struct PlanModeSheet: View {
             ZStack {
                 Theme.Color.bg.ignoresSafeArea()
                 VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                    Text("PLAN MODE").eyebrowStyle()
-                    option(.adaptive, "自适应模式",
-                           "完成训练后，实绩会自动更新此计划：组数只增不减、重量/次数按实绩更新、训练中新增的动作并入计划、跳过的动作保留（需手动删）。")
-                    option(.strict, "严格模式",
-                           "照剧本执行：开始训练时整组复制预设（组数/次数/重量），完成后不回写。需为每个动作填写组数与次数。")
+                    option(.adaptive)
+                    option(.strict)
                     if let error {
                         Text(error).font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.danger)
                             .fixedSize(horizontal: false, vertical: true)
@@ -846,7 +893,7 @@ struct PlanModeSheet: View {
         .presentationDetents([.medium, .large])
     }
 
-    @ViewBuilder private func option(_ m: WorkoutPlanMode, _ title: String, _ desc: String) -> some View {
+    @ViewBuilder private func option(_ m: WorkoutPlanMode) -> some View {
         let selected = plan.mode == m
         Button { select(m) } label: {
             HStack(alignment: .top, spacing: Theme.Spacing.md) {
@@ -854,8 +901,8 @@ struct PlanModeSheet: View {
                     .font(.system(size: 18))
                     .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.muted)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title).font(Theme.Font.l2).foregroundStyle(Theme.Color.fg)
-                    Text(desc).font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.muted)
+                    Text(m.title).font(Theme.Font.l2).foregroundStyle(Theme.Color.fg)
+                    Text(m.detailText).font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -868,7 +915,7 @@ struct PlanModeSheet: View {
     /// 切换模式。切到严格模式前校验：每个动作 MUST 有组数与次数（spec）。
     private func select(_ m: WorkoutPlanMode) {
         if m == .strict {
-            let missing = plan.items.filter { $0.suggestedSets == nil || $0.suggestedReps == nil }
+            let missing = PlanPrefill.missingStrictRequiredItems(in: plan.items)
             if !missing.isEmpty {
                 error = "切换严格模式前，请先补齐这些动作的组数与次数：" + missing.map(\.exerciseName).joined(separator: "、")
                 return
