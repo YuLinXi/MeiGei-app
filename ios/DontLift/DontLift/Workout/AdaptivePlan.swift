@@ -179,11 +179,30 @@ struct PlanWritebackSheet: View {
     let receipt: PlanWritebackCenter.Receipt
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @State private var contentHeight: CGFloat = 360
 
     private var changed: [PlanWriteback.ItemDiff] { receipt.diffs.filter { $0.kind != .kept } }
     private var kept: [PlanWriteback.ItemDiff] { receipt.diffs.filter { $0.kind == .kept } }
 
     var body: some View {
+        content
+            .background(
+                GeometryReader { proxy in
+                    Color.clear.preference(key: PlanWritebackSheetHeightKey.self, value: proxy.size.height)
+                }
+            )
+            .onPreferenceChange(PlanWritebackSheetHeightKey.self) { height in
+                guard abs(contentHeight - height) > 0.5 else { return }
+                contentHeight = height
+            }
+            .frame(maxWidth: .infinity)
+            .presentationBackground(Theme.Color.surface)
+            .presentationCornerRadius(26)
+            .presentationDragIndicator(.hidden)
+            .presentationDetents([.height(contentHeight)])
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             Capsule().fill(Theme.Color.border2)
                 .frame(width: 38, height: 5)
@@ -191,13 +210,13 @@ struct PlanWritebackSheet: View {
                 .padding(.top, 10).padding(.bottom, 16)
 
             Text("已更新计划")
-                .font(Theme.Font.mono(size: 10, weight: .bold))
-                .tracking(0.2 * 10).textCase(.uppercase)
+                .font(Theme.Font.mono(size: 12, weight: .bold))
+                .tracking(0.2 * 12).textCase(.uppercase)
                 .foregroundStyle(Theme.Color.accent)
             Text("「\(receipt.planName)」")
-                .font(Theme.Font.display(size: 20, weight: .heavy))
+                .font(Theme.Font.display(size: 26, weight: .heavy))
                 .foregroundStyle(Theme.Color.fg)
-                .padding(.top, 4)
+                .padding(.top, 6)
 
             VStack(spacing: 0) {
                 ForEach(Array(changed.enumerated()), id: \.element.id) { idx, d in
@@ -209,60 +228,56 @@ struct PlanWritebackSheet: View {
 
             if !kept.isEmpty {
                 Text("已保留未训练的 \(kept.count) 个动作（需手动删除）")
-                    .font(Theme.Font.body(size: 12))
+                    .font(Theme.Font.body(size: 15))
                     .foregroundStyle(Theme.Color.muted)
-                    .padding(.top, 14)
+                    .padding(.top, 16)
             }
 
             HStack(spacing: 12) {
                 Button { undo() } label: {
                     Text("撤销此次更新")
-                        .font(Theme.Font.display(size: 15, weight: .bold))
+                        .font(Theme.Font.display(size: 18, weight: .bold))
                         .foregroundStyle(Theme.Color.fg)
-                        .frame(maxWidth: .infinity).padding(.vertical, 15)
+                        .frame(maxWidth: .infinity).padding(.vertical, 17)
                         .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
                 }
                 .buttonStyle(PressableButtonStyle())
                 Button { dismiss() } label: {
                     Text("好")
-                        .font(Theme.Font.display(size: 15, weight: .bold))
+                        .font(Theme.Font.display(size: 18, weight: .bold))
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity).padding(.vertical, 15)
+                        .frame(maxWidth: .infinity).padding(.vertical, 17)
                         .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                 }
                 .buttonStyle(PressableButtonStyle())
             }
             .padding(.top, 20)
         }
-        .padding(.horizontal, 20).padding(.bottom, 26)
-        .presentationBackground(Theme.Color.surface)
-        .presentationCornerRadius(26)
-        .presentationDragIndicator(.hidden)
-        .presentationDetents([.medium])
+        .padding(.horizontal, 24).padding(.bottom, 30)
     }
 
     @ViewBuilder private func row(_ d: PlanWriteback.ItemDiff) -> some View {
         HStack(spacing: Theme.Spacing.md) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(d.exerciseName)
-                    .font(Theme.Font.display(size: 15, weight: .bold))
+                    .font(Theme.Font.display(size: 19, weight: .bold))
                     .foregroundStyle(Theme.Color.fg)
                 if d.kind == .updated, let o = d.oldText, let n = d.newText {
                     Text("\(o) → \(n)")
-                        .font(Theme.Font.body(size: 12))
+                        .font(Theme.Font.body(size: 15))
                         .foregroundStyle(Theme.Color.muted)
                 } else if d.kind == .added, let n = d.newText {
-                    Text(n).font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.muted)
+                    Text(n).font(Theme.Font.body(size: 15)).foregroundStyle(Theme.Color.muted)
                 }
             }
             Spacer(minLength: 0)
             Text(d.kind == .added ? "新增" : "更新")
-                .font(Theme.Font.mono(size: 10, weight: .bold))
-                .tracking(0.06 * 10).textCase(.uppercase)
+                .font(Theme.Font.mono(size: 12, weight: .bold))
+                .tracking(0.06 * 12).textCase(.uppercase)
                 .foregroundStyle(Theme.Color.accent)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
     }
 
     /// 撤销：把计划项还原至回写前快照并标脏（重新同步该还原）。
@@ -275,4 +290,10 @@ struct PlanWritebackSheet: View {
         }
         dismiss()
     }
+}
+
+/// 测量回写回执 sheet 内容自然高度，避免短内容落在固定 medium detent 中产生大块上下留白。
+private struct PlanWritebackSheetHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }

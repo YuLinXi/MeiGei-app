@@ -72,7 +72,7 @@ struct ProfileView: View {
             VStack(spacing: 0) {
                 pageTitle
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                         header
                         statsGrid
                         personalInfoGroup
@@ -398,8 +398,7 @@ struct ProfileView: View {
     // MARK: - 训练偏好
 
     private var trainingPrefsGroup: some View {
-        @Bindable var restTimer = restTimer
-        return groupCard(title: "训练偏好") {
+        groupCard(title: "训练偏好") {
             // 默认休息时长
             HStack(spacing: Theme.Spacing.md) {
                 Image(systemName: "timer").foregroundStyle(Theme.Color.fg2).frame(width: 24)
@@ -407,7 +406,7 @@ struct ProfileView: View {
                     .font(Theme.Font.body(size: 14))
                     .foregroundStyle(Theme.Color.fg)
                 Spacer()
-                durationStepper(value: $restTimer.defaultDuration)
+                durationStepper(value: restTimerDefaultDurationBinding)
             }
             .padding(.horizontal, Theme.Spacing.md)
             .frame(height: 48)
@@ -421,7 +420,7 @@ struct ProfileView: View {
                     .font(Theme.Font.body(size: 14))
                     .foregroundStyle(Theme.Color.fg)
                 Spacer()
-                Toggle("", isOn: $restTimer.hapticsEnabled)
+                Toggle("", isOn: restTimerHapticsBinding)
                     .labelsHidden()
                     .tint(Theme.Color.accent)
             }
@@ -449,6 +448,20 @@ struct ProfileView: View {
             .contentShape(Rectangle())
             .onTapGesture { openSystemSettings() }
         }
+    }
+
+    private var restTimerDefaultDurationBinding: Binding<TimeInterval> {
+        Binding(
+            get: { restTimer.defaultDuration },
+            set: { restTimer.defaultDuration = $0 }
+        )
+    }
+
+    private var restTimerHapticsBinding: Binding<Bool> {
+        Binding(
+            get: { restTimer.hapticsEnabled },
+            set: { restTimer.hapticsEnabled = $0 }
+        )
     }
 
     /// 休息时长加减器（步进 15s，范围 15…600s）。
