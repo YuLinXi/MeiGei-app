@@ -448,26 +448,17 @@ private struct TeamSheetBar: View {
     let onConfirm: () -> Void
 
     var body: some View {
-        HStack {
-            Button("取消", action: onCancel)
-                .font(Theme.Font.body(size: 15))
-                .foregroundStyle(Theme.Color.muted)
-            Spacer()
-            Text(title)
-                .font(Theme.Font.body(size: 17, weight: .bold))
-                .foregroundStyle(Theme.Color.fg)
-            Spacer()
-            Button(confirmText, action: onConfirm)
-                .font(Theme.Font.body(size: 15, weight: .bold))
-                .foregroundStyle(confirmEnabled ? Theme.Color.accent : Theme.Color.muted)
-                .disabled(!confirmEnabled)
-        }
-        .padding(.horizontal, 18)
-        .padding(.top, 15)
-        .padding(.bottom, 13)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Theme.Color.border).frame(height: 1)
-        }
+        PaperSheetHeader(
+            title: title,
+            cancelTitle: "取消",
+            confirmTitle: confirmText,
+            confirmEnabled: confirmEnabled,
+            topPadding: 15,
+            bottomPadding: 13,
+            background: Theme.Color.surface,
+            onCancel: onCancel,
+            onConfirm: onConfirm
+        )
     }
 }
 

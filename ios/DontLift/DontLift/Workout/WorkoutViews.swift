@@ -600,6 +600,8 @@ struct WorkoutLoggingView: View {
     @State private var fabAnchor: CGPoint?
     /// FAB 拖动中的实时位移（手势驱动，松手自动归零）；用 @GestureState 保证跟手不延迟。
     @GestureState private var fabDrag: CGSize = .zero
+    /// 显式动作排序面板。
+    @State private var showingOrderEditor = false
 
     /// 是否允许编辑内容（勾选完成 / 改重量次数 / 加删动作）：仅进行中会话可编辑；
     /// 已完成训练一律只读，产品逻辑不支持二次编辑。
@@ -635,6 +637,12 @@ struct WorkoutLoggingView: View {
         workout.exercises.flatMap(\.sets).reduce(0.0) { acc, s in
             guard s.completed, s.countsForStats else { return acc }
             return acc + (s.weightKg ?? 0) * Double(s.reps ?? 0)
+        }
+    }
+
+    private var workoutOrderItems: [ExerciseOrderItem] {
+        workout.exercises.sorted { $0.orderIndex < $1.orderIndex }.map {
+            ExerciseOrderItem(id: $0.localId, title: $0.exerciseName, subtitle: orderSubtitle(for: $0))
         }
     }
 
@@ -680,6 +688,7 @@ struct WorkoutLoggingView: View {
                                        onStart: { startTimerIfNeeded() },
                                        onFinish: { confirmingFinish = true })
                         triadStats
+                        exerciseSectionHeader
                         exerciseList
                         Color.clear.frame(height: 80)
                     }
@@ -827,6 +836,11 @@ struct WorkoutLoggingView: View {
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in addExercise(pick) }
         }
+        .sheet(isPresented: $showingOrderEditor) {
+            ExerciseOrderEditorSheet(title: "调整动作顺序",
+                                     items: workoutOrderItems,
+                                     onCommit: applyWorkoutExerciseOrder)
+        }
     }
 
     // MARK: 组级「更多操作」菜单 + 删除
@@ -921,6 +935,41 @@ struct WorkoutLoggingView: View {
     }
 
     // MARK: 动作分组
+
+    private var exerciseSectionHeader: some View {
+        Group {
+            if canEdit && workout.exercises.count > 1 {
+                HStack {
+                    Text("训练动作")
+                        .font(Theme.Font.mono(size: 10))
+                        .tracking(1.0)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Theme.Color.muted)
+                    Spacer(minLength: 8)
+                    Button {
+                        prepareForOrderEditing()
+                        showingOrderEditor = true
+                    } label: {
+                        Label("排序", systemImage: "arrow.up.arrow.down")
+                            .font(Theme.Font.body(size: 12, weight: .bold))
+                            .foregroundStyle(Theme.Color.accent)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("调整训练动作顺序")
+                }
+                .padding(.horizontal, 2)
+            }
+        }
+    }
+
+    private func orderSubtitle(for ex: WorkoutExercise) -> String {
+        let total = ex.sets.count
+        let done = ex.sets.filter(\.completed).count
+        if total == 0 { return "暂无组" }
+        if done == 0 { return "计划 \(total) 组" }
+        if done == total { return "已完成 \(total) 组" }
+        return "\(done)/\(total) 组"
+    }
 
     /// 手风琴默认展开项：第一个仍有未完成 set 的动作，否则第一个动作。
     private var defaultExpandedId: UUID? {
@@ -1128,6 +1177,22 @@ struct WorkoutLoggingView: View {
         workout.exercises.removeAll { $0.localId == ex.localId }
         modelContext.delete(ex)
         touch()
+    }
+
+    private func prepareForOrderEditing() {
+        if focused != nil { dismissKeypad() }
+        menuExerciseId = nil
+        menuSetId = nil
+    }
+
+    private func applyWorkoutExerciseOrder(_ orderedIds: [UUID]) {
+        var byId = Dictionary(uniqueKeysWithValues: workout.exercises.map { ($0.localId, $0) })
+        var sorted = orderedIds.compactMap { byId.removeValue(forKey: $0) }
+        sorted.append(contentsOf: byId.values.sorted { $0.orderIndex < $1.orderIndex })
+        guard sorted.map(\.localId) != workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }).map(\.localId) else { return }
+        for (idx, ex) in sorted.enumerated() { ex.orderIndex = idx }
+        touch()
+        Theme.Haptics.selection()
     }
 
     /// 启动训练计时（幂等）：仅在尚未启动时落定 timerStartedAt。
@@ -1577,6 +1642,8 @@ private struct ExerciseBlock: View {
             Text(exercise.exerciseName)
                 .font(Theme.Font.l2)
                 .foregroundStyle(isAllDone ? Theme.Color.muted : Theme.Color.fg)
+                .lineLimit(1)
+                .truncationMode(.tail)
             Spacer()
             if isExpanded {
                 if !readOnly { moreButton }
@@ -1584,7 +1651,7 @@ private struct ExerciseBlock: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.Color.muted)
             } else {
-                Text(summaryText).font(Theme.Font.l4).foregroundStyle(Theme.Color.muted)
+                Text(summaryText).font(Theme.Font.l4).foregroundStyle(Theme.Color.muted).lineLimit(1)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.Color.muted)

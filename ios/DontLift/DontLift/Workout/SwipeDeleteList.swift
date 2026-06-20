@@ -86,31 +86,32 @@ struct SwipeToDeleteCard<Content: View>: View {
             .opacity(offset < -8 ? 1 : 0)
             .accessibilityHidden(offset > -8)
 
-            // 点击走 Button 以获得按压微反馈；横向拖动经 highPriorityGesture 接管，互不冲突。
-            Button {
-                if offset < 0 { collapse() }
-                else { onTap() }
-            } label: {
-                content
-            }
-            .buttonStyle(PressableButtonStyle())
-            .offset(x: offset)
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 16)
-                    .onChanged { v in
-                        guard abs(v.translation.width) > abs(v.translation.height) else { return }
-                        if v.translation.width < 0 { offset = max(v.translation.width, revealed) }
-                        else if offset < 0 { offset = min(0, revealed + v.translation.width) }
-                        // 越过显露阈值首次触发选择触感，回到阈值内复位去抖标记。
-                        if offset <= -40, !didReveal { Theme.Haptics.selection(); didReveal = true }
-                        if offset > -40 { didReveal = false }
-                    }
-                    .onEnded { v in
-                        if v.translation.width < -40 { reveal() } else { collapse() }
-                    }
-            )
-            // 左滑手势对 VoiceOver 不可达，提供等价删除自定义动作（走同一二次确认）。
-            .accessibilityAction(named: "删除") { onDelete(globalFrame) }
+            // 主体保持普通 content，避免外层 Button 抢走行内拖拽 handle / 编辑按钮手势。
+            content
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if offset < 0 { collapse() }
+                    else { onTap() }
+                }
+                .offset(x: offset)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 16)
+                        .onChanged { v in
+                            guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                            if v.translation.width < 0 { offset = max(v.translation.width, revealed) }
+                            else if offset < 0 { offset = min(0, revealed + v.translation.width) }
+                            // 越过显露阈值首次触发选择触感，回到阈值内复位去抖标记。
+                            if offset <= -40, !didReveal { Theme.Haptics.selection(); didReveal = true }
+                            if offset > -40 { didReveal = false }
+                        }
+                        .onEnded { v in
+                            guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                            if v.translation.width < -40 { reveal() } else { collapse() }
+                        }
+                )
+                .accessibilityAddTraits(.isButton)
+                // 左滑手势对 VoiceOver 不可达，提供等价删除自定义动作（走同一二次确认）。
+                .accessibilityAction(named: "删除") { onDelete(globalFrame) }
         }
         // 持续记录本行的全局 frame（屏幕坐标系），供删除确认卡片定位于其正下方。
         .background(GeometryReader { g in

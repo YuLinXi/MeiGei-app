@@ -245,6 +245,8 @@ struct PlanDetailView: View {
     @State private var deleteRect: CGRect = .zero
     /// 左滑删除协调器：同一时刻仅一张展开，点击别处自动收回（详见 SwipeDeleteList）。
     @State private var swipe = SwipeRowCoordinator()
+    /// 显式动作排序面板。
+    @State private var showingOrderEditor = false
     /// 单一活跃会话守卫：冲突态 + 待新建闭包 + 导航打开的会话。
     @State private var conflict: Workout?
     @State private var pendingBuild: (() -> Workout)?
@@ -262,6 +264,12 @@ struct PlanDetailView: View {
 
     // 总组数下沉为 `WorkoutPlan` 扩展，与计划列表 featured 卡共用同一算法。
     private var totalSets: Int { plan.totalSuggestedSets }
+
+    private var planOrderItems: [ExerciseOrderItem] {
+        orderedItems.map {
+            ExerciseOrderItem(id: $0.itemId, title: $0.exerciseName, subtitle: subtitle($0))
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -289,7 +297,9 @@ struct PlanDetailView: View {
                                 deleteRect = rect
                                 pendingDeleteItem = item
                             }
-                        ) { item in planItemRow(item) }
+                        ) { item in
+                            planItemRow(item)
+                        }
                     }
 
                     addExerciseCTA
@@ -363,6 +373,11 @@ struct PlanDetailView: View {
         }
         .sheet(isPresented: $showingMode) {
             PlanModeSheet(plan: plan)
+        }
+        .sheet(isPresented: $showingOrderEditor) {
+            ExerciseOrderEditorSheet(title: "调整动作顺序",
+                                     items: planOrderItems,
+                                     onCommit: applyPlanItemOrder)
         }
         .navigationDestination(item: $startedSession) { WorkoutLoggingView(workout: $0) }
         // 训练冲突二次确认：统一为纸感弹窗。无独立取消按钮，点蒙层即取消；
@@ -452,22 +467,37 @@ struct PlanDetailView: View {
 
     // 对齐原型 .seclbl：mono 10/.1em/uppercase/muted。
     private var sectionLabel: some View {
-        Text("动作处方")
-            .font(Theme.Font.mono(size: 10))
-            .tracking(1.0)
-            .textCase(.uppercase)
-            .foregroundStyle(Theme.Color.muted)
-            .padding(.horizontal, 2)
+        HStack {
+            Text("训练动作")
+                .font(Theme.Font.mono(size: 10))
+                .tracking(1.0)
+                .textCase(.uppercase)
+                .foregroundStyle(Theme.Color.muted)
+            Spacer(minLength: 8)
+            if orderedItems.count > 1 {
+                Button {
+                    swipe.collapseAll()
+                    showingOrderEditor = true
+                } label: {
+                    Label("排序", systemImage: "arrow.up.arrow.down")
+                        .font(Theme.Font.body(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.Color.accent)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("调整动作顺序")
+            }
+        }
+        .padding(.horizontal, 2)
     }
 
-    // 动作行（独立卡片，与训练首页「最近训练」统一观感与左滑交互）：
-    // 序号 mono 12/700/muted/宽 18 居中；名称 sans 15/600；参数 mono 12/muted；⋯ muted 17。
-    // 行外层卡片与左滑交互由 `SwipeDeleteList` 统一装配，此处只产出卡片内容。点击行进建议参数编辑。
+    // 动作行（独立卡片，与训练首页「最近训练」统一观感与左滑交互）。
+    // 行外层卡片与左滑交互由 `SwipeDeleteList` 统一装配，此处只产出卡片内容。点击行或编辑图标进入建议参数编辑。
     private func planItemRow(_ item: PlanItem) -> some View {
         // 序号按当前顺序推出（动作数极少，firstIndex 开销可忽略）。
         let index = (orderedItems.firstIndex { $0.itemId == item.itemId } ?? 0) + 1
         let preview = PlanPrescriptionPreview.make(for: item, mode: plan.mode,
                                                    history: finishedWorkouts, planId: plan.localId)
+        let showsSource = plan.mode != .strict
         return HStack(spacing: 11) {
             Text(String(format: "%02d", index))
                 .font(Theme.Font.mono(size: 12, weight: .bold))
@@ -482,17 +512,34 @@ struct PlanDetailView: View {
                 Text(preview.summaryText)
                     .font(Theme.Font.mono(size: 12))
                     .foregroundStyle(Theme.Color.muted)
-                Text(preview.detailText)
-                    .font(Theme.Font.body(size: 12))
-                    .foregroundStyle(Theme.Color.fg2)
+                if showsSource {
+                    Text(preview.detailText)
+                        .font(Theme.Font.body(size: 12))
+                        .foregroundStyle(Theme.Color.fg2)
+                }
             }
             Spacer(minLength: 0)
-            sourceBadge(preview.badgeText)
-            Image(systemName: "ellipsis")
-                .font(.system(size: 17))
-                .foregroundStyle(Theme.Color.muted)
+            if showsSource {
+                sourceBadge(preview.badgeText)
+            }
+            editItemButton(item)
         }
         .cardStyle()
+    }
+
+    private func editItemButton(_ item: PlanItem) -> some View {
+        Button {
+            swipe.collapseAll()
+            editingItem = item
+        } label: {
+            Image(systemName: "square.and.pencil")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+                .frame(width: 34, height: 34)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("编辑\(item.exerciseName)")
     }
 
     private var modeInfoCard: some View {
@@ -732,6 +779,18 @@ struct PlanDetailView: View {
         plan.markDirty()
         try? modelContext.save()
     }
+
+    private func applyPlanItemOrder(_ orderedIds: [UUID]) {
+        var byId = Dictionary(uniqueKeysWithValues: plan.items.map { ($0.itemId, $0) })
+        var items = orderedIds.compactMap { byId.removeValue(forKey: $0) }
+        items.append(contentsOf: byId.values.sorted { $0.orderIndex < $1.orderIndex })
+        guard items.map(\.itemId) != orderedItems.map(\.itemId) else { return }
+        for i in items.indices { items[i].orderIndex = i }
+        plan.items = items
+        plan.markDirty()
+        try? modelContext.save()
+        Theme.Haptics.selection()
+    }
 }
 
 // MARK: - 计划编辑器（仅用于新建空模板入口；详情页内联编辑动作项）
@@ -827,36 +886,41 @@ struct PlanRenameSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Theme.Color.bg.ignoresSafeArea()
-                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    Text("RENAME").eyebrowStyle()
-                    TextField("", text: $name)
-                        .font(Theme.Font.display(size: 22, weight: .bold))
-                        .foregroundStyle(Theme.Color.fg)
-                        .padding(Theme.Spacing.md)
-                        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
-                    Spacer()
-                }
-                .padding(Theme.Spacing.lg)
+        VStack(spacing: 0) {
+            PaperSheetHeader(
+                title: "重命名",
+                cancelTitle: "取消",
+                confirmTitle: "完成",
+                confirmEnabled: !name.trimmingCharacters(in: .whitespaces).isEmpty,
+                background: Theme.Color.bg,
+                onCancel: { dismiss() },
+                onConfirm: save
+            )
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                Text("RENAME").eyebrowStyle()
+                TextField("", text: $name)
+                    .font(Theme.Font.display(size: 22, weight: .bold))
+                    .foregroundStyle(Theme.Color.fg)
+                    .padding(Theme.Spacing.md)
+                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
+                Spacer()
             }
-            .navigationTitle("重命名")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") {
-                        plan.name = name.trimmingCharacters(in: .whitespaces)
-                        plan.markDirty()
-                        dismiss()
-                    }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                    .tint(Theme.Color.accent)
-                }
-            }
+            .padding(Theme.Spacing.lg)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Theme.Color.bg)
         }
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .presentationBackground(Theme.Color.bg)
+    }
+
+    private func save() {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        plan.name = trimmed
+        plan.markDirty()
+        dismiss()
     }
 }
 
@@ -879,48 +943,53 @@ struct PlanItemEditorView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Theme.Color.bg.ignoresSafeArea()
-                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    Text(original.exerciseName)
-                        .font(Theme.Font.l1)
-                        .foregroundStyle(Theme.Color.fg)
-                    // 建议组数
-                    stepperRow(title: "建议组数") {
-                        PaperStepper(value: sets, range: 1...20) { sets = $0 }
-                    }
-                    // 建议次数
-                    stepperRow(title: "建议次数") {
-                        PaperStepper(value: reps, range: 1...100) { reps = $0 }
-                    }
-                    // 建议重量（可空）
-                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                        Text("建议重量 (kg)").eyebrowStyle()
-                        TextField("可空", text: $weight)
-                            .keyboardType(.decimalPad)
-                            .paperField()
-                    }
-                    Spacer()
+        VStack(spacing: 0) {
+            PaperSheetHeader(
+                title: "编辑动作",
+                cancelTitle: "取消",
+                confirmTitle: "完成",
+                background: Theme.Color.bg,
+                onCancel: { dismiss() },
+                onConfirm: save
+            )
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                Text(original.exerciseName)
+                    .font(Theme.Font.l1)
+                    .foregroundStyle(Theme.Color.fg)
+                // 建议组数
+                stepperRow(title: "建议组数") {
+                    PaperStepper(value: sets, range: 1...20) { sets = $0 }
                 }
-                .padding(Theme.Spacing.lg)
-            }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") {
-                        var updated = original
-                        updated.suggestedSets = sets
-                        updated.suggestedReps = reps
-                        updated.suggestedWeightKg = Double(weight.replacingOccurrences(of: ",", with: "."))
-                        onSave(updated)
-                        dismiss()
-                    }
-                    .tint(Theme.Color.accent)
+                // 建议次数
+                stepperRow(title: "建议次数") {
+                    PaperStepper(value: reps, range: 1...100) { reps = $0 }
                 }
+                // 建议重量（可空）
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    Text("建议重量 (kg)").eyebrowStyle()
+                    TextField("可空", text: $weight)
+                        .keyboardType(.decimalPad)
+                        .paperField()
+                }
+                Spacer()
             }
+            .padding(Theme.Spacing.lg)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Theme.Color.bg)
         }
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .presentationBackground(Theme.Color.bg)
         .presentationDetents([.medium])
+    }
+
+    private func save() {
+        var updated = original
+        updated.suggestedSets = sets
+        updated.suggestedReps = reps
+        updated.suggestedWeightKg = Double(weight.replacingOccurrences(of: ",", with: "."))
+        onSave(updated)
+        dismiss()
     }
 
     /// 标签 + 右侧控件一行（卡片容器）。
@@ -952,28 +1021,31 @@ struct PlanModeSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Theme.Color.bg.ignoresSafeArea()
-                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                    option(.adaptive)
-                    option(.strict)
-                    if let error {
-                        Text(error).font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.danger)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer()
+        VStack(spacing: 0) {
+            PaperSheetHeader(
+                title: "计划模式",
+                cancelTitle: "取消",
+                confirmTitle: "确定",
+                background: Theme.Color.bg,
+                onCancel: { dismiss() },
+                onConfirm: requestConfirm
+            )
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                option(.adaptive)
+                option(.strict)
+                if let error {
+                    Text(error).font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.danger)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(Theme.Spacing.lg)
+                Spacer()
             }
-            .navigationTitle("计划模式")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("确定") { requestConfirm() }.tint(Theme.Color.accent)
-                }
-            }
+            .padding(Theme.Spacing.lg)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Theme.Color.bg)
         }
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .presentationBackground(Theme.Color.bg)
         .presentationDetents([.medium, .large])
         .paperConfirmDialog(
             isPresented: $confirmingChange,

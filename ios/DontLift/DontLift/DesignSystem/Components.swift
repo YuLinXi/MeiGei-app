@@ -202,6 +202,116 @@ struct CircleAddButton: View {
     }
 }
 
+// MARK: - Sheet 顶部栏
+
+/// 底部 sheet 顶部栏：左取消 / 中标题 / 右确认，动作按钮统一为 44pt 胶囊触控区。
+/// 用于替代系统 toolbar 文本按钮，避免不同 sheet 间字号、背景和点击反馈漂移。
+struct PaperSheetHeader: View {
+    let title: String
+    var cancelTitle: String? = "取消"
+    var confirmTitle: String? = nil
+    var confirmEnabled: Bool = true
+    var topPadding: CGFloat = 16
+    var bottomPadding: CGFloat = 12
+    var background: Color = Theme.Color.surface
+    var onCancel: (() -> Void)?
+    var onConfirm: (() -> Void)?
+
+    var body: some View {
+        ZStack {
+            Text(title)
+                .font(Theme.Font.body(size: 17, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+                .lineLimit(1)
+                .padding(.horizontal, 96)
+
+            HStack {
+                if let cancelTitle, let onCancel {
+                    PaperSheetHeaderActionButton(title: cancelTitle, role: .cancel, action: onCancel)
+                } else {
+                    PaperSheetHeaderActionButton.placeholder
+                }
+
+                Spacer(minLength: 0)
+
+                if let confirmTitle, let onConfirm {
+                    PaperSheetHeaderActionButton(
+                        title: confirmTitle,
+                        role: .confirm,
+                        enabled: confirmEnabled,
+                        action: onConfirm
+                    )
+                } else {
+                    PaperSheetHeaderActionButton.placeholder
+                }
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, topPadding)
+        .padding(.bottom, bottomPadding)
+        .background(background)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.border).frame(height: 1)
+        }
+    }
+}
+
+struct PaperSheetHeaderActionButton: View {
+    enum Role {
+        case cancel
+        case confirm
+    }
+
+    static let width: CGFloat = 74
+    static let height: CGFloat = 44
+
+    let title: String
+    var role: Role
+    var enabled: Bool = true
+    let action: () -> Void
+
+    static var placeholder: some View {
+        Color.clear.frame(width: width, height: height)
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(Theme.Font.body(size: 15, weight: .bold))
+                .foregroundStyle(foreground)
+                .frame(width: Self.width, height: Self.height)
+                .background(backgroundFill, in: Capsule())
+                .overlay(Capsule().strokeBorder(border, lineWidth: 1))
+        }
+        .buttonStyle(PressableButtonStyle())
+        .disabled(!enabled)
+    }
+
+    private var foreground: Color {
+        guard enabled else { return Theme.Color.muted }
+        switch role {
+        case .cancel: return Theme.Color.fg2
+        case .confirm: return Theme.Color.accent
+        }
+    }
+
+    private var backgroundFill: Color {
+        guard enabled else { return Theme.Color.surface2.opacity(0.72) }
+        switch role {
+        case .cancel: return Theme.Color.surface2
+        case .confirm: return Theme.Color.accentSoft
+        }
+    }
+
+    private var border: Color {
+        guard enabled else { return Theme.Color.border.opacity(0.7) }
+        switch role {
+        case .cancel: return Theme.Color.border
+        case .confirm: return Theme.Color.accentSofter
+        }
+    }
+}
+
 // MARK: - 输入框纸感样式
 
 extension View {
@@ -386,4 +496,3 @@ struct PaperConfirmDialog: View {
         }.buttonStyle(PressableButtonStyle())
     }
 }
-

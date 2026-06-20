@@ -671,24 +671,14 @@ struct CustomExerciseEditorView: View {
                 .padding(.top, Theme.Spacing.sm)
                 .padding(.bottom, Theme.Spacing.xs)
 
-            // 头部：左「取消」+ 居中标题
-            ZStack {
-                Text("新建动作")
-                    .font(Theme.Font.l1)
-                    .foregroundStyle(Theme.Color.fg)
-                HStack {
-                    Button("取消") { dismiss() }
-                        .font(Theme.Font.l3)
-                        .foregroundStyle(Theme.Color.muted)
-                    Spacer()
-                }
-            }
-            .padding(.top, Theme.Spacing.lg)
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.bottom, Theme.Spacing.md)
-            .overlay(alignment: .bottom) {
-                Theme.Color.border.frame(height: 1)
-            }
+            PaperSheetHeader(
+                title: "新建动作",
+                cancelTitle: "取消",
+                topPadding: Theme.Spacing.lg,
+                bottomPadding: Theme.Spacing.md,
+                background: Theme.Color.surface,
+                onCancel: { dismiss() }
+            )
 
             // 字段区
             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
@@ -770,21 +760,15 @@ struct CustomExerciseEditorView: View {
     private func wheelSheet(_ kind: WheelKind) -> some View {
         VStack(spacing: 0) {
             // 顶栏：标题 | 完成（取消路径 = 点 scrim）
-            ZStack {
-                Text(kind.title)
-                    .font(Theme.Font.l1)
-                    .foregroundStyle(Theme.Color.fg)
-                HStack {
-                    Spacer()
-                    Button("完成") { closeWheel(commit: true) }
-                        .font(Theme.Font.l2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(Theme.Color.accent)
-                }
-            }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.vertical, 14)
-            .overlay(alignment: .bottom) { Theme.Color.border.frame(height: 1) }
+            PaperSheetHeader(
+                title: kind.title,
+                cancelTitle: nil,
+                confirmTitle: "完成",
+                topPadding: 14,
+                bottomPadding: 14,
+                background: Theme.Color.surface,
+                onConfirm: { closeWheel(commit: true) }
+            )
 
             // 滚轮：选中带 + 自绘滚动列表
             ZStack {
@@ -980,23 +964,14 @@ struct ExercisePickerView: View {
     // MARK: 顶栏（取消 / 标题 / 占位对称）
 
     private var header: some View {
-        ZStack {
-            Text("选择动作")
-                .font(Theme.Font.display(size: 15, weight: .bold))
-                .foregroundStyle(Theme.Color.fg)
-            HStack {
-                Button("取消") { dismiss() }
-                    .font(Theme.Font.body(size: 14))
-                    .foregroundStyle(Theme.Color.muted)
-                Spacer()
-            }
-        }
-        .padding(.horizontal, 18)
-        .padding(.top, 24)   // 让出系统 grabber，避免标题被挤压
-        .padding(.bottom, 12)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Theme.Color.border).frame(height: 1)
-        }
+        PaperSheetHeader(
+            title: "选择动作",
+            cancelTitle: "取消",
+            topPadding: 24,
+            bottomPadding: 12,
+            background: Theme.Color.surface,
+            onCancel: { dismiss() }
+        )
     }
 
     // MARK: 搜索框（实时跨组过滤）
