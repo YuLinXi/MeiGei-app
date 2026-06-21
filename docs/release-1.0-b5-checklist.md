@@ -58,27 +58,21 @@
   curl -fsS https://dontlift.peipadada.com/actuator/health
   # {"status":"UP","groups":["liveness","readiness"]}
   ```
-- [ ] 后端生产发布未完成：脚本已通过 host key 校验，但当前环境无法通过 `root@124.222.79.121` SSH 认证，报错 `Permission denied (publickey,password)`。
+- [x] 后端生产发布已完成（2026-06-21）：把 `id_ed25519` 加入 ssh-agent 后即可免密登录 `root@124.222.79.121`（此前失败仅因 agent 未加载 key）。`release-update.sh` 全流程通过：迁移前备份 `dontlift_2026-06-21_214150.sql.gz`、远程重建 `dontlift-app`、health `UP`、Flyway V5 `success=true`。
 
 ## 4. 后端发布步骤
 
-> 需先解决 SSH 认证：把可登录 `root@124.222.79.121` 的私钥加入本机 ssh-agent，或用可用账号作为脚本第一个参数。
+> SSH 认证：把可登录 `root@124.222.79.121` 的私钥加入本机 ssh-agent（本次用 `ssh-add ~/.ssh/id_ed25519`），或用可用账号作为脚本第一个参数。
 
-- [ ] 确认可 SSH 登录：
-  ```bash
-  ssh root@124.222.79.121 'hostname && docker ps --format "{{.Names}} {{.Status}}"'
-  ```
-- [ ] 执行例行后端发布：
-  ```bash
-  ./backend/deploy/release-update.sh
-  ```
-- [ ] 发布脚本预期依次完成：
-  - 远端执行 `./scripts/db-backup.sh` 备份生产库 `dontlift`；
-  - `rsync` 同步 `backend/` 源码，排除 `.env.prod`、`secrets/`、`backups/`、`build/`、`.gradle/`；
-  - 远端 `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build`；
+- [x] 确认可 SSH 登录（`VM-0-2-ubuntu`，三容器 `dontlift-app`/`edge-caddy`/`shared-postgres` 均 Up）。
+- [x] 执行例行后端发布 `./backend/deploy/release-update.sh`（2026-06-21 成功）。
+- [x] 发布脚本依次完成：
+  - 远端备份生产库 `dontlift` → `dontlift_2026-06-21_214150.sql.gz`；
+  - `rsync` 同步 `backend/` 源码（排除机密/备份/构建产物）；
+  - 远端 `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build`，Gradle `BUILD SUCCESSFUL`；
   - 公网 health `https://dontlift.peipadada.com/actuator/health` 返回 `UP`；
-  - Flyway 最新本地迁移 `V5` 在 `flyway_schema_history` 中 `success=true`。
-- [ ] 发布后手动抽查：
+  - Flyway 最新迁移 `V5` 在 `flyway_schema_history` 中 `success=true`。
+- [x] 发布后抽查（见下方命令，V5 已确认 success=true）：
   ```bash
   ssh root@124.222.79.121 "docker exec shared-postgres psql -U dontlift -d dontlift -tAc \
     \"SELECT version || ' ' || description || ' success=' || success FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 5;\""
@@ -125,4 +119,4 @@
 
 - iOS 构建仍有既有 Swift 6 并发 warning；当前工程以 Swift 5 构建，未阻塞 Release build，但后续升级 Swift 6 前需要集中治理。
 - TestFlight 真机签名、Apple 登录生产链路、APNs 真实投递仍需你用账号和真机完成最终验收。
-- 后端生产发布当前只因 SSH 认证未完成而阻塞；认证恢复后直接重跑 `./backend/deploy/release-update.sh` 即可。
+- 后端生产发布已于 2026-06-21 完成（Flyway V5 上线）；后续若需复发，先 `ssh-add ~/.ssh/id_ed25519` 再重跑 `./backend/deploy/release-update.sh`。
