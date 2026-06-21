@@ -105,6 +105,29 @@ struct AdaptivePlanTests {
         #expect(sets[1].weightKg == 50)   // 第 2 组无历史 completed → 回退计划值
     }
 
+    @Test func adaptivePrefillUsesPlanItemIdBeforeHistoryKeyForDuplicateExercises() {
+        let key = "BB_BENCH"
+        let firstId = UUID()
+        let secondId = UUID()
+        let first = WorkoutExercise(builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 0,
+                                    planItemId: firstId)
+        first.sets = [WorkoutSet(setIndex: 0, weightKg: 80, reps: 3, completed: true)]
+        let second = WorkoutExercise(builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 1,
+                                     planItemId: secondId)
+        second.sets = [WorkoutSet(setIndex: 0, weightKg: 55, reps: 12, completed: true)]
+        let history = [Workout(startedAt: Date(timeIntervalSince1970: 1000),
+                               endedAt: Date(timeIntervalSince1970: 4600),
+                               exercises: [first, second])]
+        let secondItem = PlanItem(itemId: secondId, builtinExerciseCode: key, exerciseName: "卧推",
+                                  orderIndex: 1, suggestedSets: 1, suggestedReps: 8, suggestedWeightKg: 60)
+
+        let sets = PlanPrefill.sets(for: secondItem, mode: .adaptive, history: history)
+
+        #expect(sets.count == 1)
+        #expect(sets[0].weightKg == 55)
+        #expect(sets[0].reps == 12)
+    }
+
     // MARK: - PlanPrescriptionPreview 下次有效处方
 
     @Test func prescriptionPreviewUsesHistoryAndMatchesPrefillSets() {
@@ -254,5 +277,30 @@ struct AdaptivePlanTests {
         let result = PlanWriteback.merge(planItems: plan, workout: w)
         #expect(result.newItems.count == 1)                 // 不新增重复项
         #expect(result.newItems[0].suggestedWeightKg == 65) // 更新已有项
+    }
+
+    @Test func mergeUsesPlanItemIdBeforeHistoryKeyForDuplicateExercises() {
+        let key = "BB_BENCH"
+        let firstId = UUID()
+        let secondId = UUID()
+        let plan = [
+            PlanItem(itemId: firstId, builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 0,
+                     suggestedSets: 3, suggestedReps: 8, suggestedWeightKg: 60),
+            PlanItem(itemId: secondId, builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 1,
+                     suggestedSets: 2, suggestedReps: 12, suggestedWeightKg: 40)
+        ]
+        let w = makeWorkout(historyKey: key, startedAt: Date(timeIntervalSince1970: 2000),
+                            sets: [(55, 10, true, .working), (57.5, 8, true, .working)],
+                            planItemId: secondId)
+
+        let result = PlanWriteback.merge(planItems: plan, workout: w)
+        let first = result.newItems.first { $0.itemId == firstId }!
+        let second = result.newItems.first { $0.itemId == secondId }!
+
+        #expect(first.suggestedWeightKg == 60)
+        #expect(first.suggestedReps == 8)
+        #expect(second.suggestedWeightKg == 57.5)
+        #expect(second.suggestedReps == 8)
+        #expect(second.suggestedSets == 2)
     }
 }

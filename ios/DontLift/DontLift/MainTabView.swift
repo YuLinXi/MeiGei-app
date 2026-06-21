@@ -17,6 +17,15 @@ struct MainTabView: View {
     private var activeSession: Workout? { activeWorkouts.first }
     /// 全局胶囊点击 → push 进行中记录页（活跃会话必为 isActive，无需 finished 分流）。
     @State private var openedSession: Workout?
+    @State private var activeRootSheet: RootSheet?
+    @State private var presentedRootSheet: RootSheet?
+
+    private enum RootSheet: String, Identifiable {
+        case planWriteback
+        case prCelebration
+
+        var id: String { rawValue }
+    }
 
     /// 休息全屏弹窗开/关动画：纯渐隐（无位移）。
     private var restAnim: Animation { .easeInOut(duration: reduceMotion ? 0.2 : 0.3) }
@@ -117,25 +126,49 @@ struct MainTabView: View {
             // 倒计时归零（或外部结束）时自动渐隐收回弹窗。
             if !running { withAnimation(restAnim) { restTimer.isExpanded = false } }
         }
-        // PR 庆祝弹窗：挂在稳定不被销毁的全局 NavigationStack 根层（详见 PRCelebrationCenter 说明），
-        // 避免结束训练导航切换时承载页被替换导致弹窗一闪即逝。
-        .sheet(isPresented: Binding(
-            get: { prCelebration.records != nil },
-            set: { if !$0 { prCelebration.records = nil } }
-        )) {
-            if let records = prCelebration.records {
-                PRCelebrationSheet(records: records, summary: prCelebration.summary)
+        // 根层弹窗队列：回写回执有撤销入口，优先展示；关闭后再展示 PR 庆祝。
+        .sheet(item: $activeRootSheet, onDismiss: clearPresentedRootSheetAndContinue) { sheet in
+            switch sheet {
+            case .planWriteback:
+                if let receipt = planWriteback.receipt {
+                    PlanWritebackSheet(receipt: receipt)
+                }
+            case .prCelebration:
+                if let records = prCelebration.records {
+                    PRCelebrationSheet(records: records, summary: prCelebration.summary)
+                }
             }
         }
-        // 自适应回写回执：同样挂在稳定根层，避免结束训练导航切换致一闪即逝。
-        .sheet(isPresented: Binding(
-            get: { planWriteback.receipt != nil },
-            set: { if !$0 { planWriteback.receipt = nil } }
-        )) {
-            if let receipt = planWriteback.receipt {
-                PlanWritebackSheet(receipt: receipt)
+        .onAppear { presentNextRootSheetIfNeeded() }
+        .onChange(of: planWriteback.receipt != nil) { _, _ in presentNextRootSheetIfNeeded() }
+        .onChange(of: prCelebration.records != nil) { _, _ in presentNextRootSheetIfNeeded() }
+    }
+
+    private func presentNextRootSheetIfNeeded() {
+        guard activeRootSheet == nil else { return }
+        let next: RootSheet?
+        if planWriteback.receipt != nil {
+            next = .planWriteback
+        } else if prCelebration.records != nil {
+            next = .prCelebration
+        } else {
+            next = nil
+        }
+        guard let next else { return }
+        activeRootSheet = next
+        presentedRootSheet = next
+    }
+
+    private func clearPresentedRootSheetAndContinue() {
+        if let presentedRootSheet {
+            switch presentedRootSheet {
+            case .planWriteback:
+                planWriteback.receipt = nil
+            case .prCelebration:
+                prCelebration.records = nil
             }
         }
+        presentedRootSheet = nil
+        presentNextRootSheetIfNeeded()
     }
 }
-

@@ -24,12 +24,24 @@ enum PlanPrefill {
         "严格模式开始训练前，请先补齐这些动作的组数与次数：" + missing.map(\.exerciseName).joined(separator: "、")
     }
 
+    /// 历史里某计划项「上次」已完成正式组的逐组 `(重量, 次数)`，按 setIndex 升序；无则空。
+    /// 新数据优先用 `planItemId` 精确匹配，旧数据才退回无 `planItemId` 的 `historyKey` 匹配。
+    static func lastCompletedSets(for item: PlanItem, in history: [Workout]) -> [(weightKg: Double?, reps: Int?)] {
+        let exact = lastCompletedSets(in: history) { $0.planItemId == item.itemId }
+        if !exact.isEmpty { return exact }
+        return lastCompletedSets(forHistoryKey: item.historyKey, in: history)
+    }
+
     /// 历史里某动作「上次」已完成正式组的逐组 `(重量, 次数)`，按 setIndex 升序；无则空。
-    /// 取最近一个含该 key 且有完成正式组的 finished workout。
+    /// 仅匹配无 `planItemId` 的旧记录，避免重复同动作计划项互相串味。
     static func lastCompletedSets(forHistoryKey key: String, in history: [Workout]) -> [(weightKg: Double?, reps: Int?)] {
+        lastCompletedSets(in: history) { $0.planItemId == nil && $0.historyKey == key }
+    }
+
+    private static func lastCompletedSets(in history: [Workout], matching matches: (WorkoutExercise) -> Bool) -> [(weightKg: Double?, reps: Int?)] {
         let finished = history.filter { $0.isFinished }.sorted { $0.startedAt > $1.startedAt }
         for w in finished {
-            for ex in w.exercises where ex.historyKey == key {
+            for ex in w.exercises where matches(ex) {
                 let done = ex.sets.filter { $0.countsForStats }.sorted { $0.setIndex < $1.setIndex }
                 if !done.isEmpty { return done.map { ($0.weightKg, $0.reps) } }
             }
@@ -38,10 +50,22 @@ enum PlanPrefill {
     }
 
     /// 历史里某动作最近一次 completed 正式组所在训练日期；供计划详情展示来源说明。
+    static func lastCompletedWorkoutDate(for item: PlanItem, in history: [Workout]) -> Date? {
+        if let exact = lastCompletedWorkoutDate(in: history, matching: { $0.planItemId == item.itemId }) {
+            return exact
+        }
+        return lastCompletedWorkoutDate(forHistoryKey: item.historyKey, in: history)
+    }
+
+    /// 历史里某动作最近一次 completed 正式组所在训练日期；仅匹配无 `planItemId` 的旧记录。
     static func lastCompletedWorkoutDate(forHistoryKey key: String, in history: [Workout]) -> Date? {
+        lastCompletedWorkoutDate(in: history) { $0.planItemId == nil && $0.historyKey == key }
+    }
+
+    private static func lastCompletedWorkoutDate(in history: [Workout], matching matches: (WorkoutExercise) -> Bool) -> Date? {
         let finished = history.filter { $0.isFinished }.sorted { $0.startedAt > $1.startedAt }
         for w in finished {
-            for ex in w.exercises where ex.historyKey == key {
+            for ex in w.exercises where matches(ex) {
                 if ex.sets.contains(where: { $0.countsForStats }) { return w.startedAt }
             }
         }
@@ -58,7 +82,7 @@ enum PlanPrefill {
         }
 
         let last = (mode == .adaptive)
-            ? lastCompletedSets(forHistoryKey: item.historyKey, in: history)
+            ? lastCompletedSets(for: item, in: history)
             : []
         // 自适应组数：计划 suggestedSets 优先；无 suggestedSets 时退回历史组数；再无则默认 4。
         let count = max(1, item.suggestedSets ?? (last.isEmpty ? PlanDefaults.suggestedSets : last.count))
@@ -152,7 +176,7 @@ struct PlanPrescriptionPreview {
         let source: Source
         if let keptDate = lastPlanWorkoutSkippedDate(for: item, in: history, planId: planId) {
             source = .kept(keptDate)
-        } else if let historyDate = PlanPrefill.lastCompletedWorkoutDate(forHistoryKey: item.historyKey, in: history) {
+        } else if let historyDate = PlanPrefill.lastCompletedWorkoutDate(for: item, in: history) {
             source = .history(historyDate)
         } else if item.suggestedSets != nil {
             source = .planPreset
@@ -170,7 +194,13 @@ struct PlanPrescriptionPreview {
             .max(by: { $0.startedAt < $1.startedAt }) else { return nil }
 
         let didComplete = lastPlanWorkout.exercises.contains { ex in
-            ex.historyKey == item.historyKey && ex.sets.contains(where: { $0.countsForStats })
+            let matchesItem: Bool
+            if let planItemId = ex.planItemId {
+                matchesItem = planItemId == item.itemId
+            } else {
+                matchesItem = ex.historyKey == item.historyKey
+            }
+            return matchesItem && ex.sets.contains(where: { $0.countsForStats })
         }
         return didComplete ? nil : lastPlanWorkout.startedAt
     }
@@ -223,11 +253,8 @@ enum PlanWriteback {
             guard let top = working.max(by: { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }) else { continue }
             let setCount = working.count
 
-            // 匹配：planItemId 优先，否则按 historyKey 去重（覆盖「先删再手动加回」）。
-            let matchIdx = items.firstIndex { item in
-                if let pid = ex.planItemId, item.itemId == pid { return true }
-                return item.historyKey == ex.historyKey
-            }
+            // 匹配：planItemId 精确优先；缺失/找不到时，仅在 historyKey 命中唯一项时 fallback。
+            let matchIdx = matchIndex(for: ex, in: items)
 
             if let idx = matchIdx {
                 let before = summary(items[idx])
@@ -264,6 +291,14 @@ enum PlanWriteback {
 
         return Result(newItems: items, diffs: diffs)
     }
+
+    private static func matchIndex(for ex: WorkoutExercise, in items: [PlanItem]) -> Int? {
+        if let pid = ex.planItemId, let exact = items.firstIndex(where: { $0.itemId == pid }) {
+            return exact
+        }
+        let fallbackMatches = items.indices.filter { items[$0].historyKey == ex.historyKey }
+        return fallbackMatches.count == 1 ? fallbackMatches[0] : nil
+    }
 }
 
 // MARK: - 回写回执承载器（task 6.4，复刻 PRCelebrationCenter 模式）
@@ -297,6 +332,7 @@ struct PlanWritebackSheet: View {
 
     private var changed: [PlanWriteback.ItemDiff] { receipt.diffs.filter { $0.kind != .kept } }
     private var kept: [PlanWriteback.ItemDiff] { receipt.diffs.filter { $0.kind == .kept } }
+    private var changedListMaxHeight: CGFloat { min(CGFloat(max(changed.count, 1)) * 72, 320) }
 
     var body: some View {
         content
@@ -332,12 +368,16 @@ struct PlanWritebackSheet: View {
                 .foregroundStyle(Theme.Color.fg)
                 .padding(.top, 6)
 
-            VStack(spacing: 0) {
-                ForEach(Array(changed.enumerated()), id: \.element.id) { idx, d in
-                    if idx > 0 { Rectangle().fill(Theme.Color.border).frame(height: 1) }
-                    row(d)
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(Array(changed.enumerated()), id: \.element.id) { idx, d in
+                        if idx > 0 { Rectangle().fill(Theme.Color.border).frame(height: 1) }
+                        row(d)
+                    }
                 }
             }
+            .scrollIndicators(.visible)
+            .frame(maxHeight: changedListMaxHeight)
             .padding(.top, 18)
 
             if !kept.isEmpty {

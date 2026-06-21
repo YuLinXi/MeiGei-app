@@ -13,18 +13,26 @@ import SwiftData
 @MainActor
 struct ExerciseHistoryMergeTests {
 
-    private func makeContext() -> ModelContext {
-        AppModelContainer.make(inMemory: true).mainContext
+    private func makeContainer() -> ModelContainer {
+        AppModelContainer.make(inMemory: true)
+    }
+
+    @discardableResult
+    private func insertWorkout(with ex: WorkoutExercise, in ctx: ModelContext) throws -> Workout {
+        let workout = Workout(exercises: [ex])
+        ctx.insert(workout)
+        try ctx.save()
+        return workout
     }
 
     /// 旧手填记录（名==某内置动作名）迁移后 historyKey 指向该内置 code。
     @Test func mergesManualEntryByName() throws {
-        let ctx = makeContext()
+        let container = makeContainer()
+        let ctx = container.mainContext
         // "杠铃卧推" 为精选内置动作，code = BB_BENCH_PRESS
         let ex = WorkoutExercise(builtinExerciseCode: nil, customExerciseId: nil,
                                  exerciseName: "杠铃卧推", orderIndex: 0)
-        ctx.insert(ex)
-        try ctx.save()
+        try insertWorkout(with: ex, in: ctx)
 
         let migrated = ExerciseHistoryMerge.run(in: ctx)
         #expect(migrated == 1)
@@ -34,11 +42,11 @@ struct ExerciseHistoryMergeTests {
 
     /// 无同名内置动作的手填记录保持不变。
     @Test func leavesUnmatchedManualEntryUntouched() throws {
-        let ctx = makeContext()
+        let container = makeContainer()
+        let ctx = container.mainContext
         let ex = WorkoutExercise(builtinExerciseCode: nil, customExerciseId: nil,
                                  exerciseName: "我的自创怪招ZZZ", orderIndex: 0)
-        ctx.insert(ex)
-        try ctx.save()
+        try insertWorkout(with: ex, in: ctx)
 
         _ = ExerciseHistoryMerge.run(in: ctx)
         #expect(ex.builtinExerciseCode == nil)
@@ -47,11 +55,11 @@ struct ExerciseHistoryMergeTests {
 
     /// 幂等：重复执行不再迁移、数据不变。
     @Test func idempotentOnRerun() throws {
-        let ctx = makeContext()
+        let container = makeContainer()
+        let ctx = container.mainContext
         let ex = WorkoutExercise(builtinExerciseCode: nil, customExerciseId: nil,
                                  exerciseName: "杠铃卧推", orderIndex: 0)
-        ctx.insert(ex)
-        try ctx.save()
+        try insertWorkout(with: ex, in: ctx)
 
         let first = ExerciseHistoryMerge.run(in: ctx)
         let second = ExerciseHistoryMerge.run(in: ctx)

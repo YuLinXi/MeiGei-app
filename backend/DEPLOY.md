@@ -81,7 +81,7 @@ crontab -e
 ```
 恢复：`gunzip -c backups/dontlift_xxx.sql.gz | docker exec -i shared-postgres psql -U dontlift -d dontlift`
 
-**更新 DontLift**（例行发版，Flyway 自动跑新增 `V4__*.sql` 等迁移）：
+**更新 DontLift**（例行发版，Flyway 自动跑新增 `V*__*.sql` 迁移）：
 
 > ⚠️ **服务器代码不是 git 仓库**（首次由本机同步上来，`/opt/DontLift-app` 下只有 `backend/`，无 `.git`）。**不要用 `git pull`**。
 
@@ -93,7 +93,7 @@ crontab -e
 ./backend/deploy/release-update.sh root@<ip> https://<域名>/actuator/health
 ```
 
-该脚本只重建 app，**不碰共享 PG / Caddy**，按序：① 迁移前备份 DB → ② rsync 源码（不带 `--delete`，排除机密/备份/构建产物）→ ③ 远程 `up -d --build`（Flyway 启动自动迁移）→ ④ 公网 HTTPS 校验 `health=UP` → ⑤ 打印 `flyway_schema_history` 最新版本确认迁移已应用。
+该脚本只重建 app，**不碰共享 PG / Caddy**，按序：① 迁移前备份 DB → ② rsync 源码（不带 `--delete`，排除机密/备份/构建产物）→ ③ 远程 `up -d --build`（Flyway 启动自动迁移）→ ④ 公网 HTTPS 校验 `health=UP` → ⑤ 断言本地最新 `V*__*.sql` 已在 `flyway_schema_history` 中 `success=true`。
 
 > 何时用 `local-deploy.sh` 而非本脚本：`local-deploy.sh` 会跑整个 `server-bootstrap.sh`（重装 Docker 检查、覆盖 `/opt/stacks` 的 Caddyfile、重启共享 PG），适合**首次部署 / 重建基础设施**；**例行 app 更新一律用 `release-update.sh`**（更小步、不动共享基础设施，避免把线上 Caddyfile 覆盖回仓库旧版）。两者的 rsync 均已排除 `backups/`、`secrets/`、`.env.prod`。
 

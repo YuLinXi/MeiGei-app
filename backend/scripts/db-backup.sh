@@ -15,7 +15,7 @@ STAMP="$(date +%F_%H%M%S)"
 
 mkdir -p "$BACKUP_DIR"
 
-docker exec -t "$PG_CONTAINER" \
+docker exec "$PG_CONTAINER" \
   pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_DIR/dontlift_${STAMP}.sql.gz"
 
 echo "[$(date +%F\ %T)] 备份完成：$BACKUP_DIR/dontlift_${STAMP}.sql.gz"
