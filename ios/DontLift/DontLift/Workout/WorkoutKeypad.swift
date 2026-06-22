@@ -164,6 +164,75 @@ struct WorkoutKeypad: View {
     }
 }
 
+/// 纯数字键盘：用于组间休息自定义秒数，只保留 0-9 和删除。
+struct CompactNumberKeypad: View {
+    var onDigit: (Int) -> Void
+    var onBackspace: () -> Void
+
+    private let keyH: CGFloat = 52
+    private let gap: CGFloat = 8
+    private var keyShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+    }
+
+    var body: some View {
+        VStack(spacing: gap) {
+            ForEach(0..<3, id: \.self) { row in
+                HStack(spacing: gap) {
+                    ForEach(1...3, id: \.self) { col in
+                        let d = row * 3 + col
+                        digitKey(d)
+                    }
+                }
+            }
+            HStack(spacing: gap) {
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .frame(height: keyH)
+                digitKey(0)
+                backspaceKey
+            }
+        }
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+        .background(alignment: .top) {
+            Theme.Color.bg
+                .overlay(Rectangle().fill(Theme.Color.border).frame(height: 1), alignment: .top)
+                .ignoresSafeArea(edges: .bottom)
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
+    private func digitKey(_ d: Int) -> some View {
+        Button { onDigit(d) } label: {
+            Text("\(d)")
+                .font(Theme.Font.number(size: 24, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+                .frame(maxWidth: .infinity)
+                .frame(height: keyH)
+                .background(Theme.Color.surface, in: keyShape)
+                .overlay(keyShape.stroke(Theme.Color.border, lineWidth: 1))
+        }
+        .buttonStyle(KeyPressStyle())
+        .accessibilityLabel("数字 \(d)")
+    }
+
+    private var backspaceKey: some View {
+        Button(action: onBackspace) {
+            Image(systemName: "delete.left")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg)
+                .frame(maxWidth: .infinity)
+                .frame(height: keyH)
+                .background(Theme.Color.surface, in: keyShape)
+                .overlay(keyShape.stroke(Theme.Color.border, lineWidth: 1))
+        }
+        .buttonStyle(KeyPressStyle())
+        .accessibilityLabel("删除")
+    }
+}
+
 /// 键按压反馈：按下时轻微缩放 + 降透明。
 private struct KeyPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {

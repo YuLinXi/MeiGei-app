@@ -93,9 +93,13 @@ final class RestTimerController {
     /// 调整剩余时间（±秒，不低于 0），重排通知并重建 Live Activity。
     func adjust(by delta: TimeInterval) {
         guard let current = endDate else { return }
+        let elapsed = max(0, totalDuration - remaining)
         let newEnd = max(Date.now, current.addingTimeInterval(delta))
+        let newRemaining = max(0, newEnd.timeIntervalSinceNow)
         endDate = newEnd
-        scheduleNotification(after: newEnd.timeIntervalSinceNow)
+        // “本次总时长”跟随用户调时后的计划时长，而不是固定停在启动值。
+        totalDuration = elapsed + newRemaining
+        scheduleNotification(after: newRemaining)
         // 已预约 .after 的 Live Activity 不可再 update，整体重建以反映新结束时刻并重排自动消失。
         startActivity(totalDuration: totalDuration, endDate: newEnd, label: contextLabel)
     }
