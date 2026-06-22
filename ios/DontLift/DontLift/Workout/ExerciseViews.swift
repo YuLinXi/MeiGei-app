@@ -54,8 +54,51 @@ private struct RowCardSlice: ViewModifier {
     private var vline: some View { Rectangle().fill(Theme.Color.border).frame(width: 1) }
 }
 
-/// 动作库 · Tab 根页：训记式左栏（解剖三级树逐级手风琴）× 右侧器械 chip + 按树层级分段 + 中文模糊搜索。
+/// 动作库内容的使用场景：Tab 浏览打开详情；添加动作抽屉回传选择结果。
+private enum ExerciseLibraryContentMode {
+    case browse(onBuiltin: (BuiltinExercise) -> Void)
+    case pick(onPick: (ExercisePick) -> Void)
+}
+
+/// 动作库 · Tab 根页：保留顶部标题与右上自定义动作创建入口。
 struct ExerciseLibraryView: View {
+    @State private var showingCreate = false
+    @State private var selectedExercise: BuiltinExercise?
+
+    var body: some View {
+        ZStack {
+            Theme.Color.bg.ignoresSafeArea()
+            VStack(spacing: 0) {
+                header
+                ExerciseLibraryContentView(
+                    mode: .browse { selectedExercise = $0 },
+                    emptyHint: "试试其他关键词，或点右上 + 添加自定义动作。",
+                    emptyPlainHint: "切换部位，或点右上 + 添加自定义动作。"
+                )
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showingCreate) { CustomExerciseEditorView() }
+        .navigationDestination(item: $selectedExercise) { ExerciseDetailView(exercise: $0) }
+    }
+
+    private var header: some View {
+        HStack {
+            Text("动作")
+                .font(Theme.Font.display(size: 36, weight: .heavy))
+                .tracking(-1.08)
+                .foregroundStyle(Theme.Color.fg)
+            Spacer(minLength: 0)
+            CircleAddButton(action: { showingCreate = true }, accessibilityLabel: "添加自定义动作")
+        }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
+    }
+}
+
+/// 可复用动作库主体：不包含顶部标题、右上创建入口或导航外壳，可嵌入 Tab 或底部抽屉。
+private struct ExerciseLibraryContentView: View {
     @Query(sort: \CustomExercise.updatedAt, order: .reverse) private var custom: [CustomExercise]
     @Query(filter: #Predicate<Workout> { $0.deletedAt == nil },
            sort: \Workout.startedAt, order: .reverse)
@@ -68,8 +111,9 @@ struct ExerciseLibraryView: View {
     @State private var expandedNode: String? = nil
     /// 器械轴：「all」或 `EquipmentType.rawValue`。
     @State private var equip: String = "all"
-    @State private var showingCreate = false
-    @State private var selectedExercise: BuiltinExercise?
+    let mode: ExerciseLibraryContentMode
+    let emptyHint: String
+    let emptyPlainHint: String
 
     /// 器械 chip（全部 + EquipmentType）。
     private let equipChips: [LibraryChip] =
@@ -151,37 +195,14 @@ struct ExerciseLibraryView: View {
     }
 
     var body: some View {
-        ZStack {
-            Theme.Color.bg.ignoresSafeArea()
-            VStack(spacing: 0) {
-                header
-                searchBar.padding(.horizontal, Theme.Spacing.lg).padding(.bottom, 8)
-                HStack(spacing: 0) {
-                    leftRail
-                    Rectangle().fill(Theme.Color.border).frame(width: 1)
-                    rightArea
-                }
+        VStack(spacing: 0) {
+            searchBar.padding(.horizontal, Theme.Spacing.lg).padding(.bottom, 8)
+            HStack(spacing: 0) {
+                leftRail
+                Rectangle().fill(Theme.Color.border).frame(width: 1)
+                rightArea
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showingCreate) { CustomExerciseEditorView() }
-        .navigationDestination(item: $selectedExercise) { ExerciseDetailView(exercise: $0) }
-    }
-
-    // MARK: Header
-
-    private var header: some View {
-        HStack {
-            Text("动作")
-                .font(Theme.Font.display(size: 36, weight: .heavy))
-                .tracking(-1.08)
-                .foregroundStyle(Theme.Color.fg)
-            Spacer(minLength: 0)
-            CircleAddButton(action: { showingCreate = true }, accessibilityLabel: "添加自定义动作")
-        }
-        .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.top, 6)
-        .padding(.bottom, 4)
     }
 
     private var searchBar: some View {
@@ -424,13 +445,44 @@ struct ExerciseLibraryView: View {
         case .header(let title):
             sectionHeader(title, topGap: isFirst ? 2 : 14)
         case .builtin(let ex, let first, let last):
-            Button { selectedExercise = ex } label: { builtinRow(ex, prWeights: prWeights) }
+            Button { selectBuiltin(ex) } label: { builtinRow(ex, prWeights: prWeights) }
                 .buttonStyle(.plain)
                 .modifier(RowCardSlice(first: first, last: last))
         case .custom(let ex, let first, let last):
-            customRow(ex, prWeights: prWeights)
-                .modifier(RowCardSlice(first: first, last: last))
+            if isPicking {
+                Button { selectCustom(ex) } label: { customRow(ex, prWeights: prWeights) }
+                    .buttonStyle(.plain)
+                    .modifier(RowCardSlice(first: first, last: last))
+            } else {
+                customRow(ex, prWeights: prWeights)
+                    .modifier(RowCardSlice(first: first, last: last))
+            }
         }
+    }
+
+    private var isPicking: Bool {
+        if case .pick = mode { return true }
+        return false
+    }
+
+    private func selectBuiltin(_ ex: BuiltinExercise) {
+        switch mode {
+        case .browse(let onBuiltin):
+            onBuiltin(ex)
+        case .pick(let onPick):
+            onPick(ExercisePick(builtinCode: ex.code,
+                                customId: nil,
+                                name: ex.name,
+                                primaryMuscle: ex.category))
+        }
+    }
+
+    private func selectCustom(_ ex: CustomExercise) {
+        guard case .pick(let onPick) = mode else { return }
+        onPick(ExercisePick(builtinCode: nil,
+                            customId: ex.localId,
+                            name: ex.name,
+                            primaryMuscle: ex.primaryMuscle))
     }
 
     private struct Segment { let title: String; let items: [BuiltinExercise] }
@@ -519,7 +571,7 @@ struct ExerciseLibraryView: View {
             Text(searching ? "没有匹配「\(trimmedQuery)」的动作" : "该部位暂无动作")
                 .font(Theme.Font.display(size: 17, weight: .semibold))
                 .foregroundStyle(Theme.Color.fg)
-            Text(searching ? "试试其他关键词，或点右上 + 添加自定义动作。" : "切换部位，或点右上 + 添加自定义动作。")
+            Text(searching ? emptyHint : emptyPlainHint)
                 .font(Theme.Font.body(size: 13))
                 .foregroundStyle(Theme.Color.fg2)
         }
@@ -880,6 +932,27 @@ private struct WheelPicker: View {
     }
 }
 
+/// 添加动作抽屉：复用动作库主体，不提供标题栏或创建自定义动作入口。
+struct ExercisePickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    let onPick: (ExercisePick) -> Void
+
+    var body: some View {
+        ExerciseLibraryContentView(
+            mode: .pick { pick in
+                onPick(pick)
+                dismiss()
+            },
+            emptyHint: "试试其他关键词，或切换分类。",
+            emptyPlainHint: "切换分类查看其它动作。"
+        )
+        .padding(.top, 14)
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
 // MARK: - 动作选择器 Sheet（C 设计稿 Screen 9 · 计划/训练复用）
 
 /// 选择器分组：个人置顶，其后按大肌群（顺序对齐设计稿）。
@@ -934,7 +1007,7 @@ private struct IndexBarHeightKey: PreferenceKey {
 
 /// 动作选择器 Sheet：去掉下拉筛选，列表直接按大肌群分组；右侧 iOS 风格快捷索引一触定位；
 /// 实时搜索跨组过滤，空结果转「创建自定义」引导；点击行回传选中动作。
-struct ExercisePickerView: View {
+private struct LegacyExercisePickerView: View {
     @Query(sort: \CustomExercise.updatedAt, order: .reverse) private var custom: [CustomExercise]
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""

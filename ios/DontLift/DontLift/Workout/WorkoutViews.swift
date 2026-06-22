@@ -578,6 +578,16 @@ struct WorkoutLoggingView: View {
     @State private var accordion: AccordionState = .auto
     /// 动作级组间休息时长（秒，0=关）；会话期内存，按 exercise.localId 键。
     @State private var restByExercise: [UUID: Int] = [:]
+    /// 当前正在编辑自定义休息秒数的动作 localId。
+    @State private var restEditingExerciseId: UUID?
+    /// 自定义休息秒数输入缓冲（仅整数秒）。
+    @State private var restEditBuffer: String = ""
+    /// 当前进行中的休息由哪一组触发。
+    @State private var activeRestSetId: UUID?
+    /// 当前进行中休息的真实开始时间。
+    @State private var activeRestStartedAt: Date?
+    /// 每个已完成组的真实休息秒数（仅会话内展示）。
+    @State private var actualRestBySet: [UUID: Int] = [:]
     /// 当前打开 ⋯ 菜单的动作 localId（nil = 无）。顶层浮层据 anchor 定位、外部点击关闭。
     @State private var menuExerciseId: UUID?
     /// 自研数字键盘的焦点单元（nil = 键盘收起）。
@@ -596,6 +606,8 @@ struct WorkoutLoggingView: View {
     @State private var scrollViewport: CGRect = .zero
     /// 自研键盘顶边的 .global Y（0 = 键盘未显示/未测得）；作为可视区下界。
     @State private var keypadTopY: CGFloat = 0
+    /// 动作级组间休息菜单的实际尺寸，用于自定义键盘弹出时向上避让。
+    @State private var restMenuSize: CGSize = .zero
     /// 休息悬浮按钮（FAB）拖动后的锚点（FAB 容器本地坐标，nil = 默认右下角）。
     @State private var fabAnchor: CGPoint?
     /// FAB 拖动中的实时位移（手势驱动，松手自动归零）；用 @GestureState 保证跟手不延迟。
@@ -686,7 +698,7 @@ struct WorkoutLoggingView: View {
                                        timerStartedAt: workout.timerStartedAt,
                                        endedAt: workout.endedAt,
                                        onStart: { startTimerIfNeeded() },
-                                       onFinish: { confirmingFinish = true })
+                                       onFinish: presentFinishConfirmation)
                         triadStats
                         exerciseSectionHeader
                         exerciseList
@@ -698,6 +710,7 @@ struct WorkoutLoggingView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if focused != nil { dismissKeypad() }
+                        if restEditingExerciseId != nil { dismissRestDurationEditor() }
                         if menuSetId != nil { menuSetId = nil }
                     }
                 }
@@ -717,7 +730,8 @@ struct WorkoutLoggingView: View {
                         proxy.scrollTo(id, anchor: .center)
                     }
                 }
-                // 自研数字键盘：仅当存在聚焦单元时从底部升起，并为内容预留底部安全区。
+                // 重量/次数自研数字键盘：从底部升起，并为内容预留底部安全区。
+                // 组间休息自定义键盘放在根级 overlay，避免被菜单浮层的透明关闭层遮挡。
                 .safeAreaInset(edge: .bottom) {
                     if focused != nil {
                         WorkoutKeypad(decimalEnabled: focused?.isWeight ?? false,
@@ -737,9 +751,8 @@ struct WorkoutLoggingView: View {
                             // 升降 transition 拆到 WorkoutKeypad 内部：收起按钮快速渐隐、面板下滑。
                     }
                 }
-                // preference 读取置于 safeAreaInset 之后：否则读不到键盘(外层 inset 内容)发出的 KeypadTopKey。
+                // preference 读取置于 safeAreaInset 之后：否则读不到键盘(外层 inset 内容)发出的行位置。
                 .onPreferenceChange(SetRowFramesKey.self) { setRowFrames = $0 }
-                .onPreferenceChange(KeypadTopKey.self) { keypadTopY = $0 }
             }
             // 浮动 FAB（rest 进行中且未展开即显示）：可在页面内自由拖动；键盘升起时被顶到键盘上方，
             // 不侵占键盘激活区。本屏无 Tab Bar，默认贴右下角。全屏休息弹窗已上提到全局 overlay。
@@ -756,6 +769,7 @@ struct WorkoutLoggingView: View {
                                 .onEnded { value in
                                     let dist = hypot(value.translation.width, value.translation.height)
                                     if dist < 10 {
+                                        prepareForPresentation()
                                         withAnimation(sheetAnim) { restTimer.isExpanded = true }
                                     } else {
                                         let base = fabAnchor ?? fabDefault(in: geo)
@@ -774,7 +788,10 @@ struct WorkoutLoggingView: View {
         // 键盘升降统一用近临界阻尼弹簧：面板下滑 + inset 收起 + 上方内容回流 + FAB 共用一条曲线，贴近 iOS 原生键盘的平滑。
         .animation(.spring(response: 0.45, dampingFraction: 0.92), value: focused == nil)
         // 子页统一导航栏：仅圆形返回键（双环处理收口在 paperToolbar）。
-        .paperToolbar(title: workout.isActive ? "训练进行中" : (workout.title ?? "训练"), onBack: { dismiss() })
+        .paperToolbar(title: workout.isActive ? "训练进行中" : (workout.title ?? "训练"), onBack: {
+            prepareForPresentation()
+            dismiss()
+        })
         // 动作 ⋯ 组间休息菜单：顶层浮层，按 anchor 定位于 ⋯ 下方；外部点击关闭。
         .overlayPreferenceValue(ExerciseMenuAnchorKey.self) { anchor in
             if let id = menuExerciseId,
@@ -786,11 +803,14 @@ struct WorkoutLoggingView: View {
                     ZStack(alignment: .topLeading) {
                         Color.black.opacity(0.001)
                             .ignoresSafeArea()
-                            .onTapGesture { menuExerciseId = nil }
+                            .onTapGesture {
+                                menuExerciseId = nil
+                                dismissRestDurationEditor()
+                            }
                         restMenuCard(for: ex)
                             .frame(width: menuWidth)
                             .offset(x: min(max(16, pt.x - menuWidth), proxy.size.width - menuWidth - 16),
-                                    y: pt.y + 8)
+                                    y: restMenuOffsetY(anchorY: pt.y, in: proxy))
                     }
                 }
                 .transition(.opacity)
@@ -815,6 +835,11 @@ struct WorkoutLoggingView: View {
                 .transition(.opacity)
             }
         }
+        .overlay(alignment: .bottom) {
+            restDurationKeypadOverlay
+        }
+        .onPreferenceChange(KeypadTopKey.self) { keypadTopY = $0 }
+        .onPreferenceChange(RestMenuSizeKey.self) { restMenuSize = $0 }
         // 组间休息已移入每个动作卡右上 ⋯ 菜单（动作级设置）；已完成训练只读，导航栏不再挂编辑入口。
         // 始终弹出二次确认；有未完成组时文案升级为强警示（finishConfirmTitle/Message）。
         .paperConfirmDialog(
@@ -840,6 +865,9 @@ struct WorkoutLoggingView: View {
             ExerciseOrderEditorSheet(title: "调整动作顺序",
                                      items: workoutOrderItems,
                                      onCommit: applyWorkoutExerciseOrder)
+        }
+        .onChange(of: restTimer.isRunning) { oldValue, newValue in
+            if oldValue && !newValue { recordActiveRestIfNeeded() }
         }
     }
 
@@ -941,13 +969,12 @@ struct WorkoutLoggingView: View {
             if canEdit && workout.exercises.count > 1 {
                 HStack {
                     Text("训练动作")
-                        .font(Theme.Font.mono(size: 10))
-                        .tracking(1.0)
+                        .font(Theme.Font.body(size: 12, weight: .bold))
                         .textCase(.uppercase)
                         .foregroundStyle(Theme.Color.muted)
                     Spacer(minLength: 8)
                     Button {
-                        prepareForOrderEditing()
+                        prepareForPresentation()
                         showingOrderEditor = true
                     } label: {
                         Label("排序", systemImage: "arrow.up.arrow.down")
@@ -991,33 +1018,40 @@ struct WorkoutLoggingView: View {
                 ExerciseBlock(exercise: ex,
                               readOnly: !canEdit,
                               menuSetId: menuSetId,
+                              actualRestBySet: actualRestBySet,
                               isExpanded: activeId == ex.localId,
                               isMenuOpen: menuExerciseId == ex.localId,
                               focused: focused,
                               editingText: buffer,
                               onFocus: focus,
                               onToggleExpand: {
+                                  prepareForPresentation()
                                   withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                                       // 点已展开的项 → 全部折叠；点其它项 → 互斥展开它。
                                       accordion = (activeId == ex.localId) ? .collapsedAll : .expanded(ex.localId)
                                   }
                               },
                               onMoreTap: {
-                                  menuExerciseId = (menuExerciseId == ex.localId) ? nil : ex.localId
+                                  let opening = menuExerciseId != ex.localId
+                                  prepareForPresentation()
+                                  menuExerciseId = opening ? ex.localId : nil
                               },
                               onMoreSet: { set in
                                   // 打开该组「更多操作」菜单：先收键盘（避免菜单被遮、且防删除聚焦组后 focused 悬空），
                                   // 与动作级 ⋯ 菜单互斥。
-                                  if focused != nil { dismissKeypad() }
-                                  menuExerciseId = nil
+                                  prepareForPresentation()
                                   withAnimation(.easeOut(duration: 0.18)) { menuSetId = set.localId }
                               },
                               onChange: touch,
-                              onCompleteSet: {
+                              onCompleteSet: { set in
+                                  if accordion == .auto { accordion = .expanded(ex.localId) }
                                   // 完成第一组即自动启动训练计时（幂等：已启动则不动）。
                                   startTimerIfNeeded()
                                   let secs = restByExercise[ex.localId] ?? Int(restTimer.defaultDuration)
                                   if secs > 0 {
+                                      recordActiveRestIfNeeded()
+                                      activeRestSetId = set.localId
+                                      activeRestStartedAt = .now
                                       restTimer.start(duration: TimeInterval(secs), label: ex.exerciseName)
                                       restTimer.nextHint = nextHint
                                   }
@@ -1025,7 +1059,10 @@ struct WorkoutLoggingView: View {
             }
             // 只读（已完成且未进入编辑态）时隐藏「添加动作」入口。
             if canEdit {
-                Button { pickingExercise = true } label: {
+                Button {
+                    prepareForPresentation()
+                    pickingExercise = true
+                } label: {
                     Label("添加动作", systemImage: "plus")
                         .font(Theme.Font.body(size: 14, weight: .medium))
                         .foregroundStyle(Theme.Color.fg2)
@@ -1042,12 +1079,53 @@ struct WorkoutLoggingView: View {
 
     // MARK: 动作 ⋯ 组间休息菜单（顶层浮层，放大版）
 
-    /// 组间休息分段可选值（关 / 60 / 90 / 120 / 180）。
-    private static let restOptions: [Int] = [0, 60, 90, 120, 180]
+    /// 组间休息分段可选值（关 / 60 / 90 / 120），更长时间走自定义输入。
+    private static let restOptions: [Int] = [0, 60, 90, 120]
+
+    @ViewBuilder
+    private var restDurationKeypadOverlay: some View {
+        ZStack(alignment: .bottom) {
+            if focused == nil, restEditingExerciseId != nil {
+                CompactNumberKeypad(onDigit: restDurationDigit,
+                                    onBackspace: restDurationBackspace)
+                    .background(
+                        GeometryReader { g in
+                            Color.clear.preference(key: KeypadTopKey.self,
+                                                   value: g.frame(in: .global).minY)
+                        }
+                    )
+                    .contentShape(Rectangle())
+                    // 吃掉键盘面板空隙点击，避免事件穿透到组间休息菜单的外部关闭层。
+                    .onTapGesture { }
+            }
+        }
+        .animation(.spring(response: 0.45, dampingFraction: 0.92),
+                   value: focused == nil && restEditingExerciseId != nil)
+    }
+
+    private func restMenuOffsetY(anchorY: CGFloat, in proxy: GeometryProxy) -> CGFloat {
+        let margin: CGFloat = 12
+        let gap: CGFloat = 8
+        let keyboardGap: CGFloat = 10
+        let menuHeight = restMenuSize.height > 0 ? restMenuSize.height : 248
+        let preferredY = anchorY + gap
+        var maxY = proxy.size.height - margin - menuHeight
+
+        if restEditingExerciseId != nil, keypadTopY > 0 {
+            let keypadTopLocalY = keypadTopY - proxy.frame(in: .global).minY
+            maxY = min(maxY, keypadTopLocalY - keyboardGap - menuHeight)
+        }
+
+        let clampedMaxY = max(margin, maxY)
+        return min(max(preferredY, margin), clampedMaxY)
+    }
 
     @ViewBuilder
     private func restMenuCard(for ex: WorkoutExercise) -> some View {
         let current = restByExercise[ex.localId] ?? Int(restTimer.defaultDuration)
+        let editingCustom = restEditingExerciseId == ex.localId
+        let isCustom = current > 0 && !Self.restOptions.contains(current)
+        let customText = editingCustom ? restEditBuffer : (isCustom ? "\(current)" : "")
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
@@ -1057,14 +1135,16 @@ struct WorkoutLoggingView: View {
                         .font(Theme.Font.mono(size: 15, weight: .bold))
                         .foregroundStyle(Theme.Color.accent)
                 }
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     ForEach(Self.restOptions, id: \.self) { opt in
                         let on = current == opt
-                        Button { restByExercise[ex.localId] = opt } label: {
+                        Button {
+                            selectPresetRestDuration(opt, for: ex.localId)
+                        } label: {
                             Text(opt == 0 ? "关" : "\(opt)")
                                 .font(Theme.Font.mono(size: 14, weight: .bold))
                                 .foregroundStyle(on ? .white : Theme.Color.fg2)
-                                .frame(maxWidth: .infinity)
+                                .frame(width: 42)
                                 .frame(height: 40)
                                 .background(on ? Theme.Color.accent : Theme.Color.bg,
                                             in: RoundedRectangle(cornerRadius: 9, style: .continuous))
@@ -1074,13 +1154,40 @@ struct WorkoutLoggingView: View {
                                 )
                         }.buttonStyle(.plain)
                     }
+                    Button { beginRestDurationEditing(for: ex, current: current, isCustom: isCustom) } label: {
+                        HStack(spacing: 2) {
+                            if customText.isEmpty {
+                                Text("自定义")
+                                    .font(Theme.Font.body(size: 12, weight: .bold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                            } else {
+                                Text(customText)
+                                    .font(Theme.Font.mono(size: 13, weight: .bold))
+                                Text("秒")
+                                    .font(Theme.Font.body(size: 10, weight: .semibold))
+                            }
+                        }
+                        .foregroundStyle(customText.isEmpty ? Theme.Color.muted : Theme.Color.fg)
+                        .frame(width: 60)
+                        .frame(height: 40)
+                        .background(editingCustom ? Theme.Color.accentSoft : Theme.Color.bg,
+                                    in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .stroke(editingCustom ? Theme.Color.accent : Theme.Color.border,
+                                        lineWidth: editingCustom ? 1.5 : 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("自定义组间休息秒数")
                 }
                 Text(current == 0 ? "该动作完成后不自动开始休息" : "该动作每组完成后统一休息 \(current) 秒")
                     .font(Theme.Font.l4).foregroundStyle(Theme.Color.muted)
             }
             .padding(16)
             Rectangle().fill(Theme.Color.border).frame(height: 1)
-            Button { menuExerciseId = nil; delete(ex) } label: {
+            Button { menuExerciseId = nil; dismissRestDurationEditor(); delete(ex) } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "trash").font(.system(size: 15, weight: .semibold))
                     Text("删除动作").font(Theme.Font.l2)
@@ -1096,6 +1203,11 @@ struct WorkoutLoggingView: View {
                 .stroke(Theme.Color.border, lineWidth: 1)
         )
         .shadow(color: Theme.Color.fg.opacity(0.14), radius: 24, x: 0, y: 10)
+        .background(
+            GeometryReader { g in
+                Color.clear.preference(key: RestMenuSizeKey.self, value: g.size)
+            }
+        )
     }
 
     // MARK: FAB
@@ -1159,7 +1271,10 @@ struct WorkoutLoggingView: View {
         .contentShape(Circle())
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel("休息计时，点按展开")
-        .accessibilityAction { withAnimation(sheetAnim) { restTimer.isExpanded = true } }
+        .accessibilityAction {
+            prepareForPresentation()
+            withAnimation(sheetAnim) { restTimer.isExpanded = true }
+        }
     }
 
     // MARK: actions
@@ -1179,10 +1294,43 @@ struct WorkoutLoggingView: View {
         touch()
     }
 
-    private func prepareForOrderEditing() {
+    /// 进入弹窗、sheet、菜单、返回等非编辑层级前，统一退出自研键盘编辑态并关闭浮层菜单。
+    private func prepareForPresentation() {
         if focused != nil { dismissKeypad() }
+        dismissRestDurationEditor()
         menuExerciseId = nil
         menuSetId = nil
+    }
+
+    /// 结束训练确认弹窗需要和键盘收起解耦：否则 `focused == nil` 的键盘弹簧动画会把
+    /// `fullScreenCover` 呈现卷进同一个布局事务，视觉上变成从底部上滑。
+    private func presentFinishConfirmation() {
+        let hadKeyboard = focused != nil
+        if hadKeyboard {
+            var cleanupTransaction = Transaction(animation: nil)
+            cleanupTransaction.disablesAnimations = true
+            withTransaction(cleanupTransaction) {
+                dismissKeypad()
+                dismissRestDurationEditor()
+                menuExerciseId = nil
+                menuSetId = nil
+            }
+            Task { @MainActor in
+                await Task.yield()
+                presentFinishConfirmationImmediately()
+            }
+        } else {
+            prepareForPresentation()
+            presentFinishConfirmationImmediately()
+        }
+    }
+
+    private func presentFinishConfirmationImmediately() {
+        var presentationTransaction = Transaction(animation: nil)
+        presentationTransaction.disablesAnimations = true
+        withTransaction(presentationTransaction) {
+            confirmingFinish = true
+        }
     }
 
     private func applyWorkoutExerciseOrder(_ orderedIds: [UUID]) {
@@ -1193,6 +1341,60 @@ struct WorkoutLoggingView: View {
         for (idx, ex) in sorted.enumerated() { ex.orderIndex = idx }
         touch()
         Theme.Haptics.selection()
+    }
+
+    private func beginRestDurationEditing(for ex: WorkoutExercise, current: Int, isCustom: Bool) {
+        if focused != nil { dismissKeypad() }
+        menuSetId = nil
+        menuExerciseId = ex.localId
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.92)) {
+            restEditingExerciseId = ex.localId
+            restEditBuffer = isCustom ? "\(current)" : ""
+        }
+    }
+
+    private func selectPresetRestDuration(_ seconds: Int, for exerciseId: UUID) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            restByExercise[exerciseId] = seconds
+            restEditingExerciseId = nil
+            restEditBuffer = ""
+        }
+    }
+
+    private func dismissRestDurationEditor() {
+        restEditingExerciseId = nil
+        restEditBuffer = ""
+    }
+
+    private func restDurationDigit(_ digit: Int) {
+        guard let id = restEditingExerciseId else { return }
+        guard restEditBuffer.count < 3 else { return }
+        if restEditBuffer.isEmpty && digit == 0 { return }
+        restEditBuffer += String(digit)
+        if let seconds = Int(restEditBuffer), seconds > 0 {
+            restByExercise[id] = seconds
+        }
+    }
+
+    private func restDurationBackspace() {
+        guard let id = restEditingExerciseId, !restEditBuffer.isEmpty else { return }
+        restEditBuffer.removeLast()
+        if let seconds = Int(restEditBuffer), seconds > 0 {
+            restByExercise[id] = seconds
+        }
+    }
+
+    private func recordActiveRestIfNeeded(now: Date = .now) {
+        guard let setId = activeRestSetId, let startedAt = activeRestStartedAt else { return }
+        actualRestBySet[setId] = max(0, Int(now.timeIntervalSince(startedAt).rounded()))
+        clearActiveRest()
+    }
+
+    private func clearActiveRest() {
+        activeRestSetId = nil
+        activeRestStartedAt = nil
     }
 
     /// 启动训练计时（幂等）：仅在尚未启动时落定 timerStartedAt。
@@ -1207,6 +1409,7 @@ struct WorkoutLoggingView: View {
     /// 再置 endedAt + HealthKit 写入，最后统一重算派生数据。
     private func finish() {
         Theme.Haptics.notification(.success)
+        clearActiveRest()
         restTimer.stop()   // 结束训练即停止进行中的休息计时全套，避免倒计时/灵动岛残留。
         let endedAt = Date.now
         workout.endedAt = endedAt
@@ -1273,6 +1476,9 @@ struct WorkoutLoggingView: View {
 
     /// 聚焦某单元：载入现值入缓冲并进入「打字即覆盖」。
     private func focus(_ cell: FocusedCell) {
+        dismissRestDurationEditor()
+        menuExerciseId = nil
+        menuSetId = nil
         focused = cell
         buffer = currentText(for: cell)
         pendingReplace = true
@@ -1500,6 +1706,12 @@ private func formatHMS(_ seconds: TimeInterval) -> String {
     return String(format: "%d:%02d", total / 60, total % 60)
 }
 
+private func formatShortRest(_ seconds: Int) -> String {
+    let total = max(0, seconds)
+    if total < 60 { return "\(total)s" }
+    return String(format: "%d:%02d", total / 60, total % 60)
+}
+
 // MARK: - 动作分组卡
 
 /// 动作 ⋯ 按钮的位置锚点，供父视图顶层菜单浮层定位。
@@ -1535,6 +1747,15 @@ private struct KeypadTopKey: PreferenceKey {
     }
 }
 
+/// 动作级组间休息菜单尺寸，用于自定义键盘弹出时计算避让位置。
+private struct RestMenuSizeKey: PreferenceKey {
+    static let defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        let next = nextValue()
+        if next != .zero { value = next }
+    }
+}
+
 private struct ExerciseBlock: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var exercise: WorkoutExercise
@@ -1542,6 +1763,8 @@ private struct ExerciseBlock: View {
     var readOnly: Bool = false
     /// 当前打开「更多操作」菜单的组 localId（父视图持有，跨动作卡共享），用于派生每行 ⋯ 高亮。
     var menuSetId: UUID? = nil
+    /// 每个 set 的真实休息秒数（仅会话内展示）。
+    var actualRestBySet: [UUID: Int]
     /// 手风琴：是否展开 set 列表（false 时折叠为单行摘要）。
     var isExpanded: Bool = true
     /// ⋯ 组间休息菜单是否打开（菜单本体由父视图顶层浮层渲染）。
@@ -1557,7 +1780,7 @@ private struct ExerciseBlock: View {
     /// 点击某组的「更多操作」⋯：由父视图打开该组的菜单浮层。
     var onMoreSet: (WorkoutSet) -> Void = { _ in }
     let onChange: () -> Void
-    let onCompleteSet: () -> Void
+    let onCompleteSet: (WorkoutSet) -> Void
 
     /// 展示序：热身组吸顶（warmup 段在前），段内按 setIndex 稳定升序。
     private var sortedSets: [WorkoutSet] {
@@ -1606,9 +1829,10 @@ private struct ExerciseBlock: View {
                                readOnly: readOnly,
                                focusedField: focusedField(for: set),
                                editingText: editingText,
+                               actualRestText: actualRestText(for: set),
                                isMenuOpen: menuSetId == set.localId,
                                onChange: onChange,
-                               onComplete: onCompleteSet,
+                               onComplete: { onCompleteSet(set) },
                                onToggleType: { toggleType(set) },
                                onMore: { onMoreSet(set) },
                                onFocus: { field in
@@ -1667,9 +1891,8 @@ private struct ExerciseBlock: View {
         Button { onMoreTap() } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(isMenuOpen ? .white : Theme.Color.muted)
+                .foregroundStyle(isMenuOpen ? Theme.Color.accent : Theme.Color.muted)
                 .frame(width: 28, height: 28)
-                .background(isMenuOpen ? Theme.Color.accent : .clear, in: Circle())
         }
         .buttonStyle(.plain)
         // 发布 ⋯ 底部锚点，供父视图顶层菜单定位。
@@ -1708,6 +1931,12 @@ private struct ExerciseBlock: View {
         Theme.Haptics.impact(.light)
         onChange()
     }
+
+    private func actualRestText(for set: WorkoutSet) -> String? {
+        guard set.completed else { return nil }
+        guard let seconds = actualRestBySet[set.localId] else { return nil }
+        return formatShortRest(seconds)
+    }
 }
 
 private struct SetRow: View {
@@ -1722,6 +1951,8 @@ private struct SetRow: View {
     let focusedField: SetField?
     /// 聚焦字段的编辑缓冲串（含 "0." / "72." 中间态）。
     let editingText: String
+    /// 该组真实休息用时文案；nil 表示尚未产生真实休息记录。
+    let actualRestText: String?
     /// 本组「更多操作」菜单是否打开（⋯ 高亮 + 发布定位锚点，菜单本体由父视图顶层浮层渲染）。
     var isMenuOpen: Bool = false
     let onChange: () -> Void
@@ -1746,16 +1977,18 @@ private struct SetRow: View {
         // 完成勾紧跟次数框左对齐；⋯ 被弹性留白推到行尾。
         HStack(spacing: 8) {
             badge
-            valueCell(text: weightDisplay, placeholder: "kg", focused: focusedField == .weight,
+            valueCell(text: weightDisplay, placeholder: "kg", unit: "kg",
+                      focused: focusedField == .weight,
                       label: "重量", value: set.weightKg.map { "\(formatKg($0)) 公斤" })
                 .onTapGesture { if !readOnly { onFocus(.weight) } }
             Text("×").font(Theme.Font.mono(size: 11)).foregroundStyle(Theme.Color.muted).frame(width: 12)
-            valueCell(text: repsDisplay, placeholder: "次", focused: focusedField == .reps,
+            valueCell(text: repsDisplay, placeholder: "次", unit: "次",
+                      focused: focusedField == .reps,
                       label: "次数", value: set.reps.map { "\($0) 次" })
                 .onTapGesture { if !readOnly { onFocus(.reps) } }
             checkButton
             Spacer(minLength: 8)
-            if !readOnly { moreButton }
+            trailingControls
         }
         .opacity(set.completed ? 0.52 : 1)
         .padding(.horizontal, 15)
@@ -1788,13 +2021,23 @@ private struct SetRow: View {
     }
 
     /// 重量/次数输入框：定宽收窄（让右侧腾出完成勾 + 更多操作），居中数字。
-    private func valueCell(text: String, placeholder: String, focused: Bool,
+    private func valueCell(text: String, placeholder: String, unit: String, focused: Bool,
                            label: String, value: String?) -> some View {
-        Text(text.isEmpty ? placeholder : text)
-            .font(Theme.Font.number(size: 15, weight: .bold))
-            .foregroundStyle(text.isEmpty ? Theme.Color.muted : Theme.Color.fg)
-            .multilineTextAlignment(.center)
-            .frame(width: 64, height: 36)
+        ZStack(alignment: .bottomTrailing) {
+            Text(text.isEmpty ? placeholder : text)
+                .font(Theme.Font.number(size: 15, weight: .bold))
+                .foregroundStyle(text.isEmpty ? Theme.Color.muted : Theme.Color.fg)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if !text.isEmpty {
+                Text(unit)
+                    .font(Theme.Font.mono(size: 8, weight: .bold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .padding(.trailing, 5)
+                    .padding(.bottom, 3)
+            }
+        }
+        .frame(width: 64, height: 36)
             .background(focused ? Theme.Color.accentSoft : (isEditing ? Theme.Color.surface : Theme.Color.bg),
                         in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .overlay(
@@ -1846,10 +2089,9 @@ private struct SetRow: View {
         Button { onMore() } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(isMenuOpen ? .white : Theme.Color.muted)
+                .foregroundStyle(isMenuOpen ? Theme.Color.accent : Theme.Color.muted)
                 .frame(width: 30, height: 30)
-                .background(isMenuOpen ? Theme.Color.accent : .clear, in: Circle())
-                // 视觉圆底 30，命中热区横向放大到 44×36 矩形（仅加宽不增高，避免只能精确点到 icon）。
+                // icon 视觉保持无底色，命中热区横向放大到 44×36 矩形。
                 .frame(width: 44, height: 36)
                 .contentShape(Rectangle())
         }
@@ -1859,6 +2101,23 @@ private struct SetRow: View {
             isMenuOpen ? $0 : nil
         }
         .accessibilityLabel("\(rowName)更多操作")
+    }
+
+    private var trailingControls: some View {
+        ZStack(alignment: .top) {
+            if readOnly {
+                Color.clear.frame(width: 44, height: 36)
+            } else {
+                moreButton
+            }
+            Text(actualRestText ?? "")
+                .font(Theme.Font.mono(size: 9, weight: .bold))
+                .foregroundStyle(Theme.Color.muted)
+                .lineLimit(1)
+                .offset(y: -2)
+                .opacity(actualRestText == nil ? 0 : 1)
+        }
+        .frame(width: 44, height: 36)
     }
 
     private var snColor: SwiftUI.Color { emphasized ? Theme.Color.accent : Theme.Color.muted }
