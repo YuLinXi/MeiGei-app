@@ -22,9 +22,9 @@ extension WorkoutPlanMode {
     var detailText: String {
         switch self {
         case .adaptive:
-            "完成训练后，实绩会自动更新此计划：组数只增不减、重量/次数按实绩更新、训练中新增的动作并入计划、跳过的动作保留（需手动删）。"
+            "自适应模式：完成训练后，实绩会自动更新此计划；组数只增不减，重量/次数按实绩更新，训练中新增的动作并入计划。"
         case .strict:
-            "照剧本执行：开始训练时整组复制预设（组数/次数/重量），完成后不回写。需为每个动作填写组数与次数。"
+            "严格模式：开始训练时整组复制预设（组数/次数/重量），完成后不回写。需为每个动作填写组数与次数。"
         }
     }
 }
@@ -88,6 +88,10 @@ final class WorkoutPlan: Syncable {
     var forkedFrom: UUID?
     /// 发布到的 Team；nil 表示私有。
     var sharedToTeamId: UUID?
+    /// 所属计划分组；nil 表示未分组。
+    var groupId: UUID?
+    /// 组内排序值，升序排列；同值时列表按 updatedAt 兜底。
+    var sortOrder: Int = 0
 
     init(
         localId: UUID = UUID(),
@@ -96,6 +100,8 @@ final class WorkoutPlan: Syncable {
         mode: WorkoutPlanMode = .adaptive,
         forkedFrom: UUID? = nil,
         sharedToTeamId: UUID? = nil,
+        groupId: UUID? = nil,
+        sortOrder: Int = 0,
         now: Date = .now
     ) {
         self.localId = localId
@@ -109,6 +115,8 @@ final class WorkoutPlan: Syncable {
         self.modeRaw = mode.rawValue
         self.forkedFrom = forkedFrom
         self.sharedToTeamId = sharedToTeamId
+        self.groupId = groupId
+        self.sortOrder = sortOrder
     }
 }
 

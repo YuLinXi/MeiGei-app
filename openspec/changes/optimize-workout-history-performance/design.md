@@ -156,7 +156,7 @@ PlanHistoryLookup
 
 ### Profile
 
-- 总训练数、最长连续天数来自 `ProfileWorkoutSnapshot`。
+- 总训练数来自 `ProfileWorkoutSnapshot`。
 - 不订阅全部已完成 `Workout`。
 
 ### WorkoutDetail

@@ -2,17 +2,70 @@ import SwiftUI
 import SwiftData
 import OSLog
 
-// MARK: - 计划列表（Screen 05，Neon 改版）
+// MARK: - 计划列表
 
-/// 计划列表：单一「我的计划」列表——最近在用的计划置顶为富信息卡，其余普通行；
-/// 「推荐模板」段在内置动作库数据采集完成前不渲染（开关 `showRecommendedTemplates`）。
+private struct PlanGroupSection: Identifiable {
+    let id: String
+    let group: WorkoutPlanGroup?
+    let title: String
+    let plans: [WorkoutPlan]
+
+    var groupId: UUID? { group?.localId }
+}
+
+private enum PlanGroupEditorTarget: Identifiable {
+    case create(sortOrder: Int)
+    case rename(WorkoutPlanGroup)
+
+    var id: String {
+        switch self {
+        case .create: "create"
+        case .rename(let group): "rename-\(group.localId)"
+        }
+    }
+}
+
+private struct PlanOrderTarget: Identifiable {
+    let id: String
+    let title: String
+    let groupId: UUID?
+}
+
+private struct PlanEditorRoute: Identifiable, Hashable {
+    let id = UUID()
+    let groupId: UUID?
+}
+
+private func sortedPlanGroups(_ groups: [WorkoutPlanGroup]) -> [WorkoutPlanGroup] {
+    groups.sorted {
+        if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
+        return $0.updatedAt > $1.updatedAt
+    }
+}
+
+private func sortedPlans(_ plans: [WorkoutPlan]) -> [WorkoutPlan] {
+    plans.sorted {
+        if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
+        return $0.updatedAt > $1.updatedAt
+    }
+}
+
+/// 计划列表：按分组管理训练模板；所有计划使用同一标准卡片。
 struct PlanListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(WorkoutHistoryStore.self) private var historyStore
+    @Query(filter: #Predicate<WorkoutPlanGroup> { $0.deletedAt == nil },
+           sort: \WorkoutPlanGroup.sortOrder)
+    private var groups: [WorkoutPlanGroup]
     @Query(filter: #Predicate<WorkoutPlan> { $0.deletedAt == nil },
-           sort: \WorkoutPlan.updatedAt, order: .reverse)
+           sort: \WorkoutPlan.sortOrder)
     private var plans: [WorkoutPlan]
-    @State private var creatingNew = false
+    @State private var creatingPlanRoute: PlanEditorRoute?
+    @State private var groupEditor: PlanGroupEditorTarget?
+    @State private var deletingGroup: WorkoutPlanGroup?
+    @State private var showingGroupOrderEditor = false
+    @State private var planOrderTarget: PlanOrderTarget?
+    @State private var collapsedSectionIds: Set<String> = []
     /// 计划详情导航：用绑定式 navigationDestination(item:) 而非 NavigationLink(value:)。
     /// 本工程是「全局唯一 NavigationStack 包 TabView」，类型注册式 navigationDestination(for:)
     /// 从 TabView 子页注册不进外层 stack，value 链接点了不跳；绑定式不依赖类型注册，可靠跳转。
@@ -22,22 +75,29 @@ struct PlanListView: View {
     /// 数据就绪后置 `true` 即恢复整段（段标题 + `recommendedCard`），无需改动其它代码。
     private static let showRecommendedTemplates = false
 
-    /// 最近在用的计划（列表置顶富卡）= 近 14 天内有 workout 关联 planId 的计划；
-    /// 否则取最近更新的一个；若无任何计划则为 nil。判定逻辑复用 `WorkoutPlan.active`，与首页一致。
-    private var activePlan: WorkoutPlan? {
-        if let id = historyStore.home.activePlanId,
-           let plan = plans.first(where: { $0.localId == id }) {
-            return plan
+    private var orderedGroups: [WorkoutPlanGroup] { sortedPlanGroups(groups) }
+    private var validGroupIds: Set<UUID> { Set(groups.map(\.localId)) }
+    private var orderedPlans: [WorkoutPlan] { sortedPlans(plans) }
+    private var isCompletelyEmpty: Bool { groups.isEmpty && plans.isEmpty }
+
+    private var sections: [PlanGroupSection] {
+        let grouped = Dictionary(grouping: orderedPlans) { plan in resolvedGroupId(for: plan) }
+        var result = orderedGroups.map { group in
+            PlanGroupSection(id: group.localId.uuidString,
+                             group: group,
+                             title: group.name,
+                             plans: grouped[group.localId] ?? [])
         }
-        if let recent = plans.first(where: { historyStore.home.recentPlanIds.contains($0.localId) }) {
-            return recent
+        if let ungrouped = grouped[nil], !ungrouped.isEmpty {
+            result.append(PlanGroupSection(id: "ungrouped", group: nil, title: "未分组", plans: ungrouped))
         }
-        return plans.first
+        return result
     }
 
-    private var otherPlans: [WorkoutPlan] {
-        guard let active = activePlan else { return plans }
-        return plans.filter { $0.localId != active.localId }
+    private var groupOrderItems: [ExerciseOrderItem] {
+        orderedGroups.map {
+            ExerciseOrderItem(id: $0.localId, title: $0.name, subtitle: "\(plans(in: $0.localId).count) 个计划")
+        }
     }
 
     private func usage(for plan: WorkoutPlan) -> PlanUsageSummary {
@@ -47,10 +107,16 @@ struct PlanListView: View {
     private func behaviorSummary(for plan: WorkoutPlan, usage: PlanUsageSummary) -> String {
         switch plan.mode {
         case .strict:
-            "严格执行 · 不回写"
+            "严格模式 · 完成后不回写"
         case .adaptive:
-            usage.completedCount == 0 ? "默认 4×10 起步 · 完成后自动更新" : "下次依据：上次完成实绩"
+            usage.completedCount == 0 ? "自适应模式 · 完成后自动更新" : "自适应模式 · 依据上次实绩"
         }
+    }
+
+    private func usageSummary(for plan: WorkoutPlan) -> String {
+        let usage = usage(for: plan)
+        let last = usage.lastTrainedAt.map { "上次 \($0.formatted(.relative(presentation: .named)))" } ?? "未开始"
+        return "\(last) · 累计 \(usage.completedCount) 次"
     }
 
     var body: some View {
@@ -60,21 +126,11 @@ struct PlanListView: View {
                 header
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                        // 单一「我的计划」列表：最近在用的计划置顶为富信息卡（featuredCard），
-                        // 其余按更新时间普通行展示。计划数为 1 时也只此一张富卡，不再出现
-                        // 「进行中」与「还没有计划」并存的矛盾。空态仅当确实没有任何计划。
-                        Text("我的计划").eyebrowStyle()
-                        if plans.isEmpty {
+                        if isCompletelyEmpty {
                             emptyMineCard
                         } else {
-                            VStack(spacing: Theme.Spacing.md) {
-                                if let active = activePlan {
-                                    featuredCard(active)
-                                }
-                                ForEach(otherPlans) { plan in
-                                    Button { selectedPlan = plan } label: { planCard(plan) }
-                                        .buttonStyle(.plain)
-                                }
+                            ForEach(sections) { section in
+                                sectionView(section)
                             }
                         }
 
@@ -91,25 +147,78 @@ struct PlanListView: View {
                 }
             }
         }
-        // 自绘大标题头（与训练/动作 Tab 一致），隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
         .onAppear { WorkoutPerformanceMonitor.event("plan.list.appear") }
         .navigationDestination(item: $selectedPlan) { PlanDetailView(plan: $0) }
-        .navigationDestination(isPresented: $creatingNew) {
-            PlanEditorView(plan: nil)
+        .navigationDestination(item: $creatingPlanRoute) { route in
+            PlanEditorView(plan: nil, initialGroupId: route.groupId)
         }
+        .sheet(item: $groupEditor) { target in
+            switch target {
+            case .create(let sortOrder):
+                PlanGroupEditorSheet(title: "新建分组", initialName: "") { name in
+                    createGroup(name: name, sortOrder: sortOrder)
+                }
+            case .rename(let group):
+                PlanGroupEditorSheet(title: "重命名分组", initialName: group.name) { name in
+                    renameGroup(group, name: name)
+                }
+            }
+        }
+        .sheet(isPresented: $showingGroupOrderEditor) {
+            ExerciseOrderEditorSheet(title: "调整分组顺序",
+                                     items: groupOrderItems,
+                                     onCommit: applyGroupOrder)
+        }
+        .sheet(item: $planOrderTarget) { target in
+            ExerciseOrderEditorSheet(title: "调整\(target.title)顺序",
+                                     items: planOrderItems(for: target.groupId),
+                                     onCommit: { applyPlanOrder($0, groupId: target.groupId) })
+        }
+        .paperConfirmDialog(
+            isPresented: Binding(
+                get: { deletingGroup != nil },
+                set: { if !$0 { deletingGroup = nil } }
+            ),
+            title: "删除分组?",
+            message: deletingGroup.map { "「\($0.name)」下的计划会保留，并移动到未分组。" } ?? "",
+            confirmTitle: "删除分组",
+            onConfirm: {
+                if let group = deletingGroup { deleteGroup(group) }
+                deletingGroup = nil
+            }
+        )
     }
-
-    // MARK: Header（大标题「计划」+ 右侧圆形朱砂红加号，与动作 Tab 一致）
 
     private var header: some View {
         HStack {
-            Text("计划")
+            Text("我的计划")
                 .font(Theme.Font.display(size: 36, weight: .heavy))
                 .tracking(-1.08)
                 .foregroundStyle(Theme.Color.fg)
             Spacer(minLength: 0)
-            CircleAddButton(action: { creatingNew = true }, accessibilityLabel: "新建计划")
+            Menu {
+                Button {
+                    creatingPlanRoute = PlanEditorRoute(groupId: nil)
+                } label: {
+                    Label("新建计划", systemImage: "doc.badge.plus")
+                }
+                Button {
+                    groupEditor = .create(sortOrder: nextGroupSortOrder())
+                } label: {
+                    Label("新建分组", systemImage: "folder.badge.plus")
+                }
+                if orderedGroups.count > 1 {
+                    Button {
+                        showingGroupOrderEditor = true
+                    } label: {
+                        Label("调整分组顺序", systemImage: "arrow.up.arrow.down")
+                    }
+                }
+            } label: {
+                CircleAddLabel()
+            }
+            .accessibilityLabel("添加计划或分组")
         }
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.top, 6)
@@ -117,59 +226,101 @@ struct PlanListView: View {
     }
 
     @ViewBuilder
-    private func featuredCard(_ plan: WorkoutPlan) -> some View {
-        // 关联此计划的已完成训练（用于「累计次数」与 eyebrow 的「上次训练」）。
-        // 全部可由本地记录重算，不展示 MVP 不支持的周计划/周期化语义。
-        let usage = usage(for: plan)
-        let lastTrained = usage.lastTrainedAt
-        Button { selectedPlan = plan } label: {
-            HStack(spacing: 0) {
-                // 左侧朱砂红竖条
-                Rectangle().fill(Theme.Color.accent).frame(width: 4)
-                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                    HStack {
-                        Text(lastTrained.map { "上次训练 · \($0.formatted(.relative(presentation: .named)))" } ?? "未开始")
-                            .font(Theme.Font.mono(size: 11, weight: .semibold))
-                            .padding(.horizontal, 10).padding(.vertical, 4)
-                            .background(Theme.Color.accentSoft, in: Capsule())
-                            .foregroundStyle(Theme.Color.accent)
-                        Spacer()
-                        Image(systemName: "chevron.right").foregroundStyle(Theme.Color.muted)
-                    }
-                    Text(plan.name)
-                        .font(Theme.Font.l1)
-                        .foregroundStyle(Theme.Color.fg)
-                    Text("\(plan.items.count) 个动作")
-                        .font(Theme.Font.l4)
-                        .foregroundStyle(Theme.Color.fg2)
-                    Text(behaviorSummary(for: plan, usage: usage))
-                        .font(Theme.Font.mono(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.Color.muted)
-                    HStack(spacing: Theme.Spacing.xl) {
-                        metaCol(title: "累计", value: "\(usage.completedCount) 次")
-                        metaCol(title: "总组数", value: "\(plan.totalSuggestedSets)")
-                        metaCol(title: "模式", value: plan.mode.displayName)
+    private func sectionView(_ section: PlanGroupSection) -> some View {
+        let collapsed = isSectionCollapsed(section)
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            sectionHeader(section, collapsed: collapsed)
+            if !collapsed {
+                if section.plans.isEmpty {
+                    emptyGroupCard
+                } else {
+                    VStack(spacing: Theme.Spacing.md) {
+                        ForEach(section.plans) { plan in
+                            Button { selectedPlan = plan } label: { planCard(plan) }
+                                .buttonStyle(.plain)
+                        }
                     }
                 }
-                .padding(Theme.Spacing.lg)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                    .stroke(Theme.Color.border, lineWidth: 1)
-            )
-            .paperShadow(.sm, cornerRadius: Theme.Radius.lg)
         }
-        .buttonStyle(.plain)
     }
 
-    private func metaCol(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title).eyebrowStyle()
-            Text(value).numStyle(size: 18).foregroundStyle(Theme.Color.fg)
+    private func sectionHeader(_ section: PlanGroupSection, collapsed: Bool) -> some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Button {
+                toggleSection(section)
+            } label: {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Text(section.title)
+                        .font(Theme.Font.body(size: 17, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg)
+                    Text("\(section.plans.count)")
+                        .font(Theme.Font.mono(size: 10, weight: .bold))
+                        .foregroundStyle(Theme.Color.accent)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Theme.Color.accentSoft, in: Capsule())
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.Color.muted)
+                        .rotationEffect(.degrees(collapsed ? -90 : 0))
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(collapsed ? "展开\(section.title)" : "折叠\(section.title)")
+            Menu {
+                Button {
+                    creatingPlanRoute = PlanEditorRoute(groupId: section.groupId)
+                } label: {
+                    Label("在此分组新建计划", systemImage: "doc.badge.plus")
+                }
+                if section.plans.count > 1 {
+                    Button {
+                        planOrderTarget = PlanOrderTarget(id: section.id, title: section.title, groupId: section.groupId)
+                    } label: {
+                        Label("调整计划顺序", systemImage: "arrow.up.arrow.down")
+                    }
+                }
+                if let group = section.group {
+                    Button {
+                        groupEditor = .rename(group)
+                    } label: {
+                        Label("重命名分组", systemImage: "pencil")
+                    }
+                    Button(role: .destructive) {
+                        deletingGroup = group
+                    } label: {
+                        Label("删除分组", systemImage: "trash")
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .frame(width: 34, height: 34)
+                    .background(Theme.Color.surface, in: Circle())
+                    .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
+            }
+            .accessibilityLabel("\(section.title)更多操作")
         }
+        .padding(.horizontal, 2)
+    }
+
+    private func isSectionCollapsed(_ section: PlanGroupSection) -> Bool {
+        collapsedSectionIds.contains(section.id)
+    }
+
+    private func toggleSection(_ section: PlanGroupSection) {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            if collapsedSectionIds.contains(section.id) {
+                collapsedSectionIds.remove(section.id)
+            } else {
+                collapsedSectionIds.insert(section.id)
+            }
+        }
+        Theme.Haptics.selection()
     }
 
     private func planCard(_ plan: WorkoutPlan) -> some View {
@@ -188,6 +339,9 @@ struct PlanListView: View {
                 Text(behaviorSummary(for: plan, usage: usage))
                     .font(Theme.Font.mono(size: 11))
                     .foregroundStyle(Theme.Color.muted)
+                Text(usageSummary(for: plan))
+                    .font(Theme.Font.mono(size: 11))
+                    .foregroundStyle(Theme.Color.muted)
             }
             Spacer()
             Image(systemName: "chevron.right").foregroundStyle(Theme.Color.muted)
@@ -196,8 +350,21 @@ struct PlanListView: View {
         .cardStyle()
     }
 
+    private var emptyGroupCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("这个分组还没有计划")
+                .font(Theme.Font.body(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg)
+            Text("可以从分组菜单直接新建计划")
+                .font(Theme.Font.body(size: 13))
+                .foregroundStyle(Theme.Color.fg2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+
     private func modePill(_ mode: WorkoutPlanMode) -> some View {
-        Text(mode.displayName)
+        Text(mode.title)
             .font(Theme.Font.mono(size: 10, weight: .bold))
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
@@ -210,7 +377,7 @@ struct PlanListView: View {
             Text("还没有计划")
                 .font(Theme.Font.body(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.Color.fg)
-            Text("点右上 + 新建一个训练模板")
+            Text("点右上 + 新建训练模板或分组")
                 .font(Theme.Font.body(size: 13))
                 .foregroundStyle(Theme.Color.fg2)
         }
@@ -227,6 +394,72 @@ struct PlanListView: View {
         .cardStyle()
         .opacity(0.6)
     }
+
+    private func resolvedGroupId(for plan: WorkoutPlan) -> UUID? {
+        guard let groupId = plan.groupId, validGroupIds.contains(groupId) else { return nil }
+        return groupId
+    }
+
+    private func plans(in groupId: UUID?) -> [WorkoutPlan] {
+        orderedPlans.filter { resolvedGroupId(for: $0) == groupId }
+    }
+
+    private func planOrderItems(for groupId: UUID?) -> [ExerciseOrderItem] {
+        plans(in: groupId).map {
+            ExerciseOrderItem(id: $0.localId,
+                              title: $0.name,
+                              subtitle: "\($0.items.count) 动作 · \($0.totalSuggestedSets) 组")
+        }
+    }
+
+    private func nextGroupSortOrder() -> Int {
+        (groups.map(\.sortOrder).max() ?? -1) + 1
+    }
+
+    private func createGroup(name: String, sortOrder: Int) {
+        let group = WorkoutPlanGroup(name: name, sortOrder: sortOrder)
+        modelContext.insert(group)
+        try? modelContext.save()
+    }
+
+    private func renameGroup(_ group: WorkoutPlanGroup, name: String) {
+        group.name = name
+        group.markDirty()
+        try? modelContext.save()
+    }
+
+    private func deleteGroup(_ group: WorkoutPlanGroup) {
+        for plan in plans where plan.groupId == group.localId {
+            plan.groupId = nil
+            plan.markDirty()
+        }
+        group.markDeleted()
+        try? modelContext.save()
+    }
+
+    private func applyGroupOrder(_ orderedIds: [UUID]) {
+        var byId = Dictionary(uniqueKeysWithValues: groups.map { ($0.localId, $0) })
+        let ordered = orderedIds.compactMap { byId.removeValue(forKey: $0) }
+        guard ordered.map(\.localId) != orderedGroups.map(\.localId) else { return }
+        for (index, group) in ordered.enumerated() {
+            group.sortOrder = index
+            group.markDirty()
+        }
+        try? modelContext.save()
+        Theme.Haptics.selection()
+    }
+
+    private func applyPlanOrder(_ orderedIds: [UUID], groupId: UUID?) {
+        var byId = Dictionary(uniqueKeysWithValues: plans(in: groupId).map { ($0.localId, $0) })
+        let ordered = orderedIds.compactMap { byId.removeValue(forKey: $0) }
+        guard ordered.map(\.localId) != plans(in: groupId).map(\.localId) else { return }
+        for (index, plan) in ordered.enumerated() {
+            plan.sortOrder = index
+            plan.markDirty()
+        }
+        try? modelContext.save()
+        Theme.Haptics.selection()
+    }
 }
 
 // MARK: - 计划详情（Screen 06，Neon 改版）
@@ -237,10 +470,14 @@ struct PlanDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(RestTimerController.self) private var restTimer
     @Environment(WorkoutHistoryStore.self) private var historyStore
+    @Query(filter: #Predicate<WorkoutPlanGroup> { $0.deletedAt == nil },
+           sort: \WorkoutPlanGroup.sortOrder)
+    private var planGroups: [WorkoutPlanGroup]
 
     @State private var pickingExercise = false
     @State private var editingItem: PlanItem?
     @State private var editing = false
+    @State private var movingGroup = false
     @State private var showingMode = false
     @State private var confirmingDelete = false
     @State private var decodeError: String?
@@ -257,7 +494,7 @@ struct PlanDetailView: View {
     /// 仅驱动冲突弹窗显隐，与数据分离——避免弹窗淡出关闭时清空 `conflict` 致动作回调读到 nil。
     @State private var showConflict = false
     @State private var startedSession: Workout?
-    /// 严格计划缺失必填预设时，阻止开始训练并展示原因。
+    /// 严格模式缺失必填预设时，阻止开始训练并展示原因。
     @State private var strictStartError: String?
 
     private static let log = Logger(subsystem: "com.yulinxi.app.DontLift", category: "PlanDetail")
@@ -322,6 +559,7 @@ struct PlanDetailView: View {
         .paperToolbar(onBack: { dismiss() }) {
             CircleIconMenu(systemName: "ellipsis") {
                 Button { editing = true } label: { Label("重命名计划", systemImage: "pencil") }
+                Button { movingGroup = true } label: { Label("移动到分组", systemImage: "folder") }
                 Button(role: .destructive) { confirmingDelete = true } label: { Label("删除计划", systemImage: "trash") }
             }
         }
@@ -376,6 +614,9 @@ struct PlanDetailView: View {
         .sheet(isPresented: $editing) {
             PlanRenameSheet(plan: plan)
         }
+        .sheet(isPresented: $movingGroup) {
+            PlanMoveGroupSheet(plan: plan, groups: sortedPlanGroups(planGroups))
+        }
         .sheet(isPresented: $showingMode) {
             PlanModeSheet(plan: plan)
         }
@@ -422,13 +663,7 @@ struct PlanDetailView: View {
     }
 
     private var header: some View {
-        // 对齐原型：eyebrow mono 10/.16em/muted；ptitle 30 weight 800/-.03em；间距 3。
-        VStack(alignment: .leading, spacing: 3) {
-            Text("PLAN · 训练模板")
-                .font(Theme.Font.mono(size: 10))
-                .tracking(1.6)
-                .textCase(.uppercase)
-                .foregroundStyle(Theme.Color.muted)
+        VStack(alignment: .leading, spacing: 0) {
             Text(plan.name)
                 .font(Theme.Font.display(size: 30, weight: .heavy))
                 .tracking(-0.9)
@@ -437,14 +672,12 @@ struct PlanDetailView: View {
         }
     }
 
-    // 对齐原型 .stat3：3 列居中 + 中缝 1px 分隔线；n=sans 22/800/-.025em，k=mono 9/.06em/muted。
+    // 仅保留动作数与总组数；计划模式在下方规则卡展示，避免重复。
     private var statRow: some View {
         HStack(spacing: 0) {
             statCell(n: "\(plan.items.count)", k: "动作")
             statDivider
             statCell(n: "\(totalSets)", k: "总组数")
-            statDivider
-            statCell(n: plan.mode.displayName, k: "模式")
         }
         .cardStyle(padding: 0)
     }
@@ -555,12 +788,12 @@ struct PlanDetailView: View {
                     .foregroundStyle(Theme.Color.accent)
                     .frame(width: 22, height: 22)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(plan.mode == .adaptive ? "自适应计划" : "严格计划")
+                    Text(plan.mode.title)
                         .font(Theme.Font.body(size: 15, weight: .bold))
                         .foregroundStyle(Theme.Color.fg)
                     Text(plan.mode == .adaptive
-                         ? "开始训练会按下方处方预填；完成后继续跟随实绩更新，跳过动作会保留。"
-                         : "开始训练会复制计划预设；完成后不回写，每个动作需有组数与次数。")
+                         ? "自适应模式会按下方处方预填；完成后继续跟随实绩更新，跳过动作会保留。"
+                         : "严格模式会复制计划预设；完成后不回写，每个动作需有组数与次数。")
                         .font(Theme.Font.body(size: 12))
                         .foregroundStyle(Theme.Color.fg2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -622,7 +855,7 @@ struct PlanDetailView: View {
     /// 实际 SwiftData 走 Codable，解码失败会在底层抛错；这里保留 UI 钩子方便未来 catch。
     private func decodeErrorCard(_ err: String) -> some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text("PLAN · ERROR").eyebrowStyle().foregroundStyle(Theme.Color.danger)
+            Text("计划错误").eyebrowStyle().foregroundStyle(Theme.Color.danger)
             Text("计划数据损坏，请重建")
                 .font(Theme.Font.body(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.Color.danger)
@@ -710,7 +943,9 @@ struct PlanDetailView: View {
                                             suggestedWeightKg: nil)
                                },
                                mode: .adaptive,
-                               forkedFrom: plan.localId)
+                               forkedFrom: plan.localId,
+                               groupId: plan.groupId,
+                               sortOrder: plan.sortOrder + 1)
         modelContext.insert(copy)
         try? modelContext.save()
     }
@@ -799,22 +1034,28 @@ struct PlanDetailView: View {
 struct PlanEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Query(filter: #Predicate<WorkoutPlanGroup> { $0.deletedAt == nil },
+           sort: \WorkoutPlanGroup.sortOrder)
+    private var groups: [WorkoutPlanGroup]
 
     private let existing: WorkoutPlan?
     @State private var name: String
     @State private var mode: WorkoutPlanMode
+    @State private var groupId: UUID?
+    @State private var choosingGroup = false
 
-    init(plan: WorkoutPlan?) {
+    init(plan: WorkoutPlan?, initialGroupId: UUID? = nil) {
         self.existing = plan
         _name = State(initialValue: plan?.name ?? "")
         _mode = State(initialValue: plan?.mode ?? .adaptive)
+        _groupId = State(initialValue: plan?.groupId ?? initialGroupId)
     }
 
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                Text("CREATE · 新建计划").eyebrowStyle()
+                Text("新建计划").eyebrowStyle()
                 TextField("", text: $name, prompt: Text("计划名称").foregroundColor(Theme.Color.muted))
                     .font(Theme.Font.display(size: 24, weight: .bold))
                     .foregroundStyle(Theme.Color.fg)
@@ -825,6 +1066,10 @@ struct PlanEditorView: View {
                     Text("计划模式").eyebrowStyle()
                     modeOption(.adaptive)
                     modeOption(.strict)
+                }
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    Text("分组").eyebrowStyle()
+                    groupPicker
                 }
                 Spacer()
             }
@@ -838,6 +1083,11 @@ struct PlanEditorView: View {
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 .tint(Theme.Color.accent)
         }
+        .sheet(isPresented: $choosingGroup) {
+            PlanGroupPickerSheet(selectedGroupId: groupId, groups: orderedGroups) { selected in
+                groupId = selected
+            }
+        }
     }
 
     private func save() {
@@ -845,13 +1095,54 @@ struct PlanEditorView: View {
         if let existing {
             existing.name = trimmed
             existing.mode = mode
+            existing.groupId = groupId
             existing.markDirty()
         } else {
-            let plan = WorkoutPlan(name: trimmed, mode: mode)
+            let plan = WorkoutPlan(name: trimmed,
+                                   mode: mode,
+                                   groupId: groupId,
+                                   sortOrder: nextSortOrder(in: groupId))
             modelContext.insert(plan)
         }
         try? modelContext.save()
         dismiss()
+    }
+
+    private var orderedGroups: [WorkoutPlanGroup] { sortedPlanGroups(groups) }
+
+    private var selectedGroupName: String {
+        guard let groupId, let group = groups.first(where: { $0.localId == groupId }) else { return "未分组" }
+        return group.name
+    }
+
+    private var groupPicker: some View {
+        Button {
+            choosingGroup = true
+        } label: {
+            HStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "folder")
+                    .foregroundStyle(Theme.Color.fg2)
+                    .frame(width: 22)
+                Text(selectedGroupName)
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.muted)
+            }
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("选择分组")
+    }
+
+    private func nextSortOrder(in groupId: UUID?) -> Int {
+        let descriptor = FetchDescriptor<WorkoutPlan>(
+            predicate: #Predicate { $0.deletedAt == nil }
+        )
+        let sameGroup = (try? modelContext.fetch(descriptor))?.filter { $0.groupId == groupId } ?? []
+        return (sameGroup.map(\.sortOrder).max() ?? -1) + 1
     }
 
     @ViewBuilder private func modeOption(_ candidate: WorkoutPlanMode) -> some View {
@@ -899,7 +1190,7 @@ struct PlanRenameSheet: View {
             )
 
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                Text("RENAME").eyebrowStyle()
+                Text("重命名").eyebrowStyle()
                 TextField("", text: $name)
                     .font(Theme.Font.display(size: 22, weight: .bold))
                     .foregroundStyle(Theme.Color.fg)
@@ -922,6 +1213,174 @@ struct PlanRenameSheet: View {
         plan.name = trimmed
         plan.markDirty()
         dismiss()
+    }
+}
+
+/// 新建 / 重命名计划分组。
+struct PlanGroupEditorSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    let onSave: (String) -> Void
+    @State private var name: String
+
+    init(title: String, initialName: String, onSave: @escaping (String) -> Void) {
+        self.title = title
+        self.onSave = onSave
+        _name = State(initialValue: initialName)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PaperSheetHeader(
+                title: title,
+                cancelTitle: "取消",
+                confirmTitle: "完成",
+                confirmEnabled: !name.trimmingCharacters(in: .whitespaces).isEmpty,
+                background: Theme.Color.bg,
+                onCancel: { dismiss() },
+                onConfirm: save
+            )
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                Text("分组").eyebrowStyle()
+                TextField("", text: $name, prompt: Text("分组名称").foregroundColor(Theme.Color.muted))
+                    .font(Theme.Font.display(size: 22, weight: .bold))
+                    .foregroundStyle(Theme.Color.fg)
+                    .padding(Theme.Spacing.md)
+                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
+                Spacer()
+            }
+            .padding(Theme.Spacing.lg)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Theme.Color.bg)
+        }
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .presentationBackground(Theme.Color.bg)
+        .presentationDetents([.medium])
+    }
+
+    private func save() {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        onSave(trimmed)
+        dismiss()
+    }
+}
+
+/// 新建计划时选择分组：不用系统 Menu/Picker，保持纸感 sheet 与卡片行规范。
+struct PlanGroupPickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let selectedGroupId: UUID?
+    let groups: [WorkoutPlanGroup]
+    let onSelect: (UUID?) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PaperSheetHeader(
+                title: "选择分组",
+                cancelTitle: "取消",
+                background: Theme.Color.bg,
+                onCancel: { dismiss() }
+            )
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                groupOption(title: "未分组", groupId: nil)
+                ForEach(groups) { group in
+                    groupOption(title: group.name, groupId: group.localId)
+                }
+                Spacer()
+            }
+            .padding(Theme.Spacing.lg)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Theme.Color.bg)
+        }
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .presentationBackground(Theme.Color.bg)
+        .presentationDetents([.medium, .large])
+    }
+
+    private func groupOption(title: String, groupId: UUID?) -> some View {
+        let selected = selectedGroupId == groupId
+        return Button {
+            onSelect(groupId)
+            Theme.Haptics.selection()
+            dismiss()
+        } label: {
+            HStack(spacing: Theme.Spacing.md) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.muted)
+                    .frame(width: 24)
+                Image(systemName: groupId == nil ? "tray" : "folder")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .frame(width: 22)
+                Text(title)
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// 计划移动分组。
+struct PlanMoveGroupSheet: View {
+    @Bindable var plan: WorkoutPlan
+    let groups: [WorkoutPlanGroup]
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PaperSheetHeader(
+                title: "移动到分组",
+                cancelTitle: "取消",
+                background: Theme.Color.bg,
+                onCancel: { dismiss() }
+            )
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                groupOption(title: "未分组", groupId: nil)
+                ForEach(groups) { group in
+                    groupOption(title: group.name, groupId: group.localId)
+                }
+                Spacer()
+            }
+            .padding(Theme.Spacing.lg)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Theme.Color.bg)
+        }
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .presentationBackground(Theme.Color.bg)
+        .presentationDetents([.medium, .large])
+    }
+
+    private func groupOption(title: String, groupId: UUID?) -> some View {
+        let selected = plan.groupId == groupId
+        return Button {
+            plan.groupId = groupId
+            plan.markDirty()
+            try? modelContext.save()
+            dismiss()
+        } label: {
+            HStack(spacing: Theme.Spacing.md) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.muted)
+                    .frame(width: 24)
+                Text(title)
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg)
+                Spacer(minLength: 0)
+            }
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -1078,7 +1537,7 @@ struct PlanModeSheet: View {
     }
 
     private var confirmMessage: String {
-        "将「\(plan.name)」从\(plan.mode.displayName)模式切换为\(draftMode.displayName)模式。切换后开始训练与完成回写规则会按新模式执行。"
+        "将「\(plan.name)」从\(plan.mode.title)切换为\(draftMode.title)。切换后开始训练与完成回写规则会按新模式执行。"
     }
 
     /// 点选只改 sheet 内草稿，不写计划实体。

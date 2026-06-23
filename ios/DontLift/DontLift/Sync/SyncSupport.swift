@@ -4,6 +4,7 @@ import CryptoKit
 /// 每个同步域的标识 + 端点路径段 + 本地下拉水位线（since）存取。
 enum SyncDomain: String, CaseIterable {
     case customExercises = "custom-exercises"
+    case workoutPlanGroups = "workout-plan-groups"
     case workoutPlans = "workout-plans"
     case workouts = "workouts"
 

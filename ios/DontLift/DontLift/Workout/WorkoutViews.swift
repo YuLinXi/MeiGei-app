@@ -4,7 +4,7 @@ import Charts
 
 // MARK: - 训练首页（设计稿 01）
 
-/// 训练首页：本周 hero + 三宫格 + 最近训练列表 + 悬浮 CTA。
+/// 训练首页：本周 hero + 两宫格 + 最近训练列表 + 悬浮 CTA。
 struct WorkoutListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(RestTimerController.self) private var restTimer
@@ -23,10 +23,12 @@ struct WorkoutListView: View {
     @State private var pendingDelete: Workout?
     /// 待删训练行的全局坐标，供删除确认卡片定位于其正下方。
     @State private var deleteRect: CGRect = .zero
-    /// 严格计划缺失必填预设时，阻止开始训练并展示原因。
+    /// 严格模式缺失必填预设时，阻止开始训练并展示原因。
     @State private var strictStartError: String?
     /// 左滑删除协调器：同一时刻仅一张展开，点击别处自动收回（详见 SwipeDeleteList）。
     @State private var swipe = SwipeRowCoordinator()
+    /// 历史日历入口：轻量月历 + 当日训练抽屉。
+    @State private var showHistoryCalendar = false
 
     private var stats: WeeklyStats {
         historyStore.home.currentWeekStats
@@ -70,6 +72,9 @@ struct WorkoutListView: View {
         }
         // 已完成训练 / 进行中会话 → 经 openedSession 绑定式导航到对应页面。
         .navigationDestination(item: $openedSession) { workoutDestination($0) }
+        .navigationDestination(isPresented: $showHistoryCalendar) {
+            WorkoutCalendarView()
+        }
         // 训练冲突二次确认：统一为纸感弹窗。无独立取消按钮，点蒙层即取消；
         // 「丢弃并开始新训练」为主（红填充）、「继续训练」为次（描边）。
         .paperConfirmDialog(
@@ -147,6 +152,8 @@ struct WorkoutListView: View {
                 .tracking(-1.08)
                 .foregroundStyle(Theme.Color.fg)
             Spacer(minLength: 0)
+            CircleIconButton(systemName: "calendar", action: { showHistoryCalendar = true })
+                .accessibilityLabel("历史日历")
         }
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.top, 6)
@@ -158,7 +165,7 @@ struct WorkoutListView: View {
     @ViewBuilder private var heroSection: some View {
         if weeklyDoneCount == 0 {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("THIS WEEK · 本周").eyebrowStyle()
+                Text("本周").eyebrowStyle()
                 Text("准备好了吗？")
                     .font(Theme.Font.display(size: 32, weight: .bold))
                     .foregroundStyle(Theme.Color.fg)
@@ -175,7 +182,7 @@ struct WorkoutListView: View {
         } else {
             HStack(alignment: .top, spacing: Theme.Spacing.md) {
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("THIS WEEK · 本周训练量").eyebrowStyle()
+                    Text("本周训练量").eyebrowStyle()
                     HStack(alignment: .lastTextBaseline, spacing: 6) {
                         Text(formatTons(stats.volumeKg)).numStyle(size: 56)
                             .foregroundStyle(Theme.Color.accent)
@@ -217,16 +224,13 @@ struct WorkoutListView: View {
         }
     }
 
-    // MARK: 三宫格
+    // MARK: 两宫格
 
     private var statsGrid: some View {
         HStack(spacing: 0) {
             statCell(label: "总组数", value: stats.setCount > 0 ? "\(stats.setCount)" : "—")
             divider
             statCell(label: "总次数", value: stats.repCount > 0 ? "\(stats.repCount)" : "—")
-            divider
-            statCell(label: "平均时长",
-                     value: stats.avgDurationSec > 0 ? formatMinutes(stats.avgDurationSec) : "—")
         }
         .cardStyle(padding: 0)
         .frame(height: 88)
@@ -256,7 +260,7 @@ struct WorkoutListView: View {
         let recent = historyStore.home.recent
         return VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             HStack {
-                Text("RECENT · 最近训练").eyebrowStyle()
+                Text("最近训练").eyebrowStyle()
                 Spacer()
             }
             if recent.isEmpty {
@@ -524,7 +528,7 @@ func formatTons(_ kg: Double) -> String {
     return String(format: "%.1f", t)
 }
 
-/// 平均时长：>= 60s 取分钟，否则 0′。
+/// 训练时长：>= 60s 取分钟，否则 0′。
 func formatMinutes(_ seconds: Double) -> String {
     let m = Int(seconds / 60)
     return "\(m)′"

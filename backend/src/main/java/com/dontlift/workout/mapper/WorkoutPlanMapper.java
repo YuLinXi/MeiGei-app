@@ -38,6 +38,15 @@ public interface WorkoutPlanMapper extends BaseMapper<WorkoutPlan> {
     @Select("SELECT * FROM workout_plan WHERE id = #{id}")
     WorkoutPlan findByIdIncludingDeleted(@Param("id") UUID id);
 
+    @Select("""
+            SELECT COALESCE(MAX(sort_order), -1) + 1
+            FROM workout_plan
+            WHERE user_id = #{userId}
+              AND group_id IS NULL
+              AND deleted_at IS NULL
+            """)
+    int nextUngroupedSortOrder(@Param("userId") UUID userId);
+
     // Team 内浏览：某 Team 已发布且未删除的模板
     @Select("""
             SELECT * FROM workout_plan

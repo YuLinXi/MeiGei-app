@@ -39,15 +39,6 @@ struct ProfileView: View {
 
     private var totalWorkouts: Int { historyStore.profile.totalWorkouts }
 
-    /// 最长连续训练天数（不要求每日，按日去重连贯计）。
-    private var longestStreak: Int { historyStore.profile.longestStreak }
-
-    private static let joinMonthFormatter: DateFormatter = {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy.MM"
-        return fmt
-    }()
-
     private var appVersion: String {
         let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         let b = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
@@ -62,7 +53,6 @@ struct ProfileView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                         header
-                        statsGrid
                         personalInfoGroup
                         syncGroup
                         trainingPrefsGroup
@@ -167,40 +157,9 @@ struct ProfileView: View {
         }
     }
 
-    /// 副标：加入月份 + 已记录次数（不再展示训练龄）。
+    /// 副标：只展示总训练次数。
     private var headerSubtitle: String {
-        let joined = profile?.createdAt
-        let monthText: String
-        if let joined {
-            monthText = "加入于 \(Self.joinMonthFormatter.string(from: joined)) · "
-        } else {
-            monthText = ""
-        }
-        return "\(monthText)已记录 \(totalWorkouts) 次"
-    }
-
-    // MARK: - Stats Grid
-
-    private var statsGrid: some View {
-        HStack(spacing: 0) {
-            statCell(title: "总训练", value: "\(totalWorkouts)", tint: Theme.Color.fg)
-            statDivider
-            statCell(title: "最长连续", value: "\(longestStreak)", tint: Theme.Color.fg)
-        }
-        .cardStyle(padding: 0)
-    }
-
-    private func statCell(title: String, value: String, tint: Color) -> some View {
-        VStack(spacing: 6) {
-            Text(value).numStyle(size: 22, weight: .bold).foregroundStyle(tint)
-            Text(title).eyebrowStyle()
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.Spacing.md)
-    }
-
-    private var statDivider: some View {
-        Rectangle().fill(Theme.Color.border).frame(width: 1)
+        "总训练次数 \(totalWorkouts) 次"
     }
 
     // MARK: - 个人资料分组（称呼可编辑 + 性别，均为资料、改即 PATCH 后端）

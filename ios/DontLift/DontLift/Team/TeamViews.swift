@@ -103,7 +103,7 @@ struct TeamListView: View {
                 .tracking(-1.08)
                 .foregroundStyle(Theme.Color.fg)
             Spacer(minLength: 0)
-            // 空态已有大号双 CTA，此时不再出右上 +，避免重复入口；有团队后才显示。
+            // 空态已有大号双 CTA，此时不再出右上 +，避免重复入口；有 Team 后才显示。
             if !teamService.teams.isEmpty {
                 Menu {
                     Button("创建 Team") { creating = true }
@@ -253,7 +253,7 @@ struct TeamListView: View {
                      desc: "给队友的打卡点 🔥 💪 表情反应，看见彼此坚持。")
             valueRow(icon: "arrow.triangle.branch",
                      title: "共享计划",
-                     desc: "一键 Fork 队友发布的训练计划，直接开练。")
+                     desc: "一键复制队友发布的训练计划，直接开练。")
         }
     }
 
@@ -703,7 +703,7 @@ struct TeamDetailView: View {
         let trainedToday = Set(checkins.map(\.userId)).count
         return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             HStack(alignment: .top) {
-                Text(isOwner ? "TEAM · 你是队长" : "TEAM").eyebrowStyle()
+                Text(isOwner ? "Team · 你是队长" : "Team").eyebrowStyle()
                 Spacer(minLength: 8)
                 Text("\(trainedToday) / \(totalMembers) 今日已练")
                     .font(Theme.Font.mono(size: 11, weight: .semibold))
@@ -1340,7 +1340,7 @@ struct TeamPlansView: View {
                 } else {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.triangle.branch").font(.system(size: 11, weight: .bold))
-                        Text("Fork")
+                        Text("复制")
                     }
                     .font(Theme.Font.body(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.Color.accent)
@@ -1369,7 +1369,7 @@ struct TeamPlansView: View {
         do {
             try await teamService.fork(planId: p.id)
             await syncEngine.syncAll()
-            await showToast("已 Fork 到「计划」")
+            await showToast("已复制到「计划」")
         } catch {
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }

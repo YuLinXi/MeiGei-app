@@ -65,7 +65,7 @@ func detectPersonalRecords(in workout: Workout, priorBestByKey: [String: Double]
 /// 庆祝弹窗（设计稿 04 · C 纸感，严格对齐 `dontlift-c-pr-celebrate.md`）。
 ///
 /// 结束/编辑训练检测到新 PR 时，从底部升起半屏白 sheet（墨色 scrim 由系统 sheet 提供）：
-/// grabber → 64px 朱砂红奖杯徽记（白色线性图标 + 三点微光）→「PERSONAL RECORD」eyebrow
+/// grabber → 64px 朱砂红奖杯徽记（白色线性图标 + 三点微光）→「个人纪录」eyebrow
 /// →「N 项新纪录！」标题 → 训练摘要副行 → 单容器 PR 列表（旧/首次 + 30px 红重量大数）→「太棒了」CTA。
 /// 高度按内容自适应（半屏内），可点 CTA 关闭或下滑关闭。
 struct PRCelebrationSheet: View {
@@ -101,7 +101,7 @@ struct PRCelebrationSheet: View {
                 .padding(.bottom, 16)
 
             badge
-            Text("PERSONAL RECORD")
+            Text("个人纪录")
                 .font(Theme.Font.mono(size: 10, weight: .bold))
                 .tracking(0.2 * 10)
                 .textCase(.uppercase)

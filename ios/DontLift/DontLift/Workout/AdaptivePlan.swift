@@ -133,7 +133,7 @@ struct PlanPrescriptionPreview {
 
         var badgeText: String {
             switch self {
-            case .strict: "严格"
+            case .strict: "严格模式"
             case .history: "历史"
             case .planPreset: "预设"
             case .defaultValue: "默认"
@@ -144,7 +144,7 @@ struct PlanPrescriptionPreview {
         var detailText: String {
             switch self {
             case .strict:
-                "严格执行 · 完成后不更新"
+                "严格模式 · 完成后不更新"
             case .history(let date):
                 "来自上次完成 · \(date.formatted(.relative(presentation: .named)))"
             case .planPreset:

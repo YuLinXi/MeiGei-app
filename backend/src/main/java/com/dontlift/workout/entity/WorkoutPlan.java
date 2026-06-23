@@ -30,4 +30,10 @@ public class WorkoutPlan extends BaseEntity implements UserOwned {
     private UUID forkedFrom;
 
     private UUID sharedToTeamId;
+
+    /** 计划分组；null 表示未分组。为离线同步容错，不在数据库层加外键。 */
+    private UUID groupId;
+
+    /** 组内排序值，升序排列；同值时客户端按 updatedAt 兜底。 */
+    private Integer sortOrder;
 }

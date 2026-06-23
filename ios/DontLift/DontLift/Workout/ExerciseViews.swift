@@ -575,7 +575,7 @@ private struct ExerciseLibraryContentView: View {
     @ViewBuilder
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text(searching ? "NO MATCH · 无匹配" : "EMPTY · 动作库").eyebrowStyle()
+            Text(searching ? "无匹配" : "动作库").eyebrowStyle()
             Text(searching ? "没有匹配「\(trimmedQuery)」的动作" : "该部位暂无动作")
                 .font(Theme.Font.display(size: 17, weight: .semibold))
                 .foregroundStyle(Theme.Color.fg)

@@ -83,6 +83,18 @@ struct CustomExerciseDTO: Codable {
     var version: Int?
 }
 
+struct WorkoutPlanGroupDTO: Codable {
+    var id: UUID
+    var userId: UUID?
+    var name: String
+    /// 解码缺失时客户端兜底 0，兼容早期开发数据。
+    var sortOrder: Int?
+    var createdAt: Date?
+    var updatedAt: Date
+    var deletedAt: Date?
+    var version: Int?
+}
+
 struct WorkoutPlanDTO: Codable {
     var id: UUID
     var userId: UUID?
@@ -93,6 +105,9 @@ struct WorkoutPlanDTO: Codable {
     var mode: String?
     var forkedFrom: UUID?
     var sharedToTeamId: UUID?
+    var groupId: UUID?
+    /// 解码缺失时客户端兜底 0，兼容旧后端/旧数据。
+    var sortOrder: Int?
     var createdAt: Date?
     var updatedAt: Date
     var deletedAt: Date?

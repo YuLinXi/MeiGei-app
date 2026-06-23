@@ -11,6 +11,7 @@ enum AppModelContainer {
     static let schema = Schema([
         UserProfile.self,
         CustomExercise.self,
+        WorkoutPlanGroup.self,
         WorkoutPlan.self,
         Workout.self,
         WorkoutExercise.self,

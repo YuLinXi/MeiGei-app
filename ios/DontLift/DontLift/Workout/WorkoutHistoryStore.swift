@@ -72,11 +72,66 @@ struct HomeWorkoutSnapshot: Equatable {
     )
 }
 
+struct WorkoutCalendarDaySummary: Identifiable, Equatable, Hashable {
+    var date: Date
+    var workouts: [WorkoutRowSummary]
+    var setCount: Int
+    var volumeKg: Double
+    var hasPR: Bool
+
+    var id: Date { date }
+    var workoutCount: Int { workouts.count }
+}
+
+struct WorkoutCalendarDayCell: Identifiable, Equatable, Hashable {
+    var date: Date
+    var isInDisplayedMonth: Bool
+    var isToday: Bool
+    var summary: WorkoutCalendarDaySummary?
+
+    var id: Date { date }
+}
+
+struct WorkoutCalendarMonthSnapshot: Equatable {
+    var monthStart: Date
+    var days: [WorkoutCalendarDayCell]
+    var workoutCount: Int
+    var setCount: Int
+    var volumeKg: Double
+
+    static func empty(monthStart: Date) -> WorkoutCalendarMonthSnapshot {
+        WorkoutCalendarMonthSnapshot(
+            monthStart: monthStart,
+            days: [],
+            workoutCount: 0,
+            setCount: 0,
+            volumeKg: 0
+        )
+    }
+}
+
+struct WorkoutCalendarMonthArchiveItem: Identifiable, Equatable, Hashable {
+    var monthStart: Date
+    var trainingDayCount: Int
+    var workoutCount: Int
+    var setCount: Int
+    var volumeKg: Double
+    var activeDayNumbers: Set<Int>
+
+    var id: Date { monthStart }
+}
+
+struct WorkoutCalendarYearArchiveGroup: Identifiable, Equatable, Hashable {
+    var year: Int
+    var months: [WorkoutCalendarMonthArchiveItem]
+
+    var id: Int { year }
+}
+
 struct ProfileWorkoutSnapshot: Equatable {
     var totalWorkouts: Int
-    var longestStreak: Int
 
-    static let empty = ProfileWorkoutSnapshot(totalWorkouts: 0, longestStreak: 0)
+    static let empty = ProfileWorkoutSnapshot(totalWorkouts: 0)
 }
 
 struct PlanUsageSummary: Equatable, Hashable {
@@ -127,6 +182,7 @@ struct PlanHistoryLookup: Equatable {
 
 struct WorkoutHistorySnapshot: Equatable {
     var home: HomeWorkoutSnapshot
+    var calendarDays: [Date: WorkoutCalendarDaySummary]
     var exercisePRs: [String: PRSummary]
     var exerciseHistories: [String: ExerciseHistorySnapshot]
     var workoutRecords: [UUID: [PersonalRecord]]
@@ -137,6 +193,7 @@ struct WorkoutHistorySnapshot: Equatable {
 
     static let empty = WorkoutHistorySnapshot(
         home: .empty,
+        calendarDays: [:],
         exercisePRs: [:],
         exerciseHistories: [:],
         workoutRecords: [:],
@@ -154,6 +211,7 @@ final class WorkoutHistoryStore {
 
     private var snapshot: WorkoutHistorySnapshot = .empty
     var home: HomeWorkoutSnapshot { snapshot.home }
+    var calendarDays: [Date: WorkoutCalendarDaySummary] { snapshot.calendarDays }
     var exercisePRs: [String: PRSummary] { snapshot.exercisePRs }
     var exerciseHistories: [String: ExerciseHistorySnapshot] { snapshot.exerciseHistories }
     var workoutRecords: [UUID: [PersonalRecord]] { snapshot.workoutRecords }
@@ -242,6 +300,7 @@ final class WorkoutHistoryStore {
             }
             snapshot = WorkoutHistorySnapshot(
                 home: projection.home,
+                calendarDays: projection.calendarDays,
                 exercisePRs: projection.exercisePRs,
                 exerciseHistories: projection.exerciseHistories,
                 workoutRecords: projection.workoutRecords,
@@ -276,8 +335,82 @@ final class WorkoutHistoryStore {
         exerciseHistories[key] ?? .empty(key)
     }
 
+    func calendarDay(for date: Date, calendar: Calendar = .currentMondayFirst) -> WorkoutCalendarDaySummary? {
+        snapshot.calendarDays[calendar.startOfDay(for: date)]
+    }
+
+    func calendarMonth(containing date: Date, calendar: Calendar = .currentMondayFirst) -> WorkoutCalendarMonthSnapshot {
+        guard let monthStart = Self.monthStart(for: date, calendar: calendar) else {
+            return .empty(monthStart: calendar.startOfDay(for: date))
+        }
+        let weekday = calendar.component(.weekday, from: monthStart)
+        let leadingDays = (weekday - calendar.firstWeekday + 7) % 7
+        let gridStart = calendar.date(byAdding: .day, value: -leadingDays, to: monthStart) ?? monthStart
+        let today = calendar.startOfDay(for: .now)
+        let days = (0..<42).compactMap { offset -> WorkoutCalendarDayCell? in
+            guard let rawDay = calendar.date(byAdding: .day, value: offset, to: gridStart) else { return nil }
+            let day = calendar.startOfDay(for: rawDay)
+            return WorkoutCalendarDayCell(
+                date: day,
+                isInDisplayedMonth: calendar.isDate(day, equalTo: monthStart, toGranularity: .month),
+                isToday: calendar.isDate(day, inSameDayAs: today),
+                summary: snapshot.calendarDays[day]
+            )
+        }
+        let inMonthSummaries = days
+            .filter(\.isInDisplayedMonth)
+            .compactMap(\.summary)
+        return WorkoutCalendarMonthSnapshot(
+            monthStart: monthStart,
+            days: days,
+            workoutCount: inMonthSummaries.reduce(0) { $0 + $1.workoutCount },
+            setCount: inMonthSummaries.reduce(0) { $0 + $1.setCount },
+            volumeKg: inMonthSummaries.reduce(0) { $0 + $1.volumeKg }
+        )
+    }
+
+    func calendarArchiveMonths(calendar: Calendar = .currentMondayFirst) -> [WorkoutCalendarMonthArchiveItem] {
+        let monthSummaries = Dictionary(grouping: snapshot.calendarDays.values) { summary in
+            Self.monthStart(for: summary.date, calendar: calendar) ?? calendar.startOfDay(for: summary.date)
+        }
+        let currentMonth = Self.monthStart(for: .now, calendar: calendar) ?? calendar.startOfDay(for: .now)
+        let earliestMonth = monthSummaries.keys.min() ?? currentMonth
+
+        var result: [WorkoutCalendarMonthArchiveItem] = []
+        var cursor = currentMonth
+        while cursor >= earliestMonth {
+            let summaries = monthSummaries[cursor] ?? []
+            let activeDays = Set(summaries.map { calendar.component(.day, from: $0.date) })
+            result.append(WorkoutCalendarMonthArchiveItem(
+                monthStart: cursor,
+                trainingDayCount: summaries.count,
+                workoutCount: summaries.reduce(0) { $0 + $1.workoutCount },
+                setCount: summaries.reduce(0) { $0 + $1.setCount },
+                volumeKg: summaries.reduce(0) { $0 + $1.volumeKg },
+                activeDayNumbers: activeDays
+            ))
+            guard let previous = calendar.date(byAdding: .month, value: -1, to: cursor) else { break }
+            cursor = previous
+        }
+        return result
+    }
+
+    func calendarArchiveYearGroups(calendar: Calendar = .currentMondayFirst) -> [WorkoutCalendarYearArchiveGroup] {
+        let months = calendarArchiveMonths(calendar: calendar)
+        let grouped = Dictionary(grouping: months) { item in
+            calendar.component(.year, from: item.monthStart)
+        }
+        return grouped.keys.sorted(by: >).map { year in
+            WorkoutCalendarYearArchiveGroup(
+                year: year,
+                months: grouped[year]?.sorted { $0.monthStart > $1.monthStart } ?? []
+            )
+        }
+    }
+
     private struct Projection {
         var home: HomeWorkoutSnapshot
+        var calendarDays: [Date: WorkoutCalendarDaySummary]
         var exercisePRs: [String: PRSummary]
         var exerciseHistories: [String: ExerciseHistorySnapshot]
         var workoutRecords: [UUID: [PersonalRecord]]
@@ -420,25 +553,31 @@ final class WorkoutHistoryStore {
         let startOfToday = Calendar.current.startOfDay(for: now)
         let recentCutoff = Calendar.current.date(byAdding: .day, value: -2, to: startOfToday)
             ?? now.addingTimeInterval(-3 * 86_400)
+        func rowSummary(for w: Workout) -> WorkoutRowSummary {
+            let duration = w.endedAt.map { $0.timeIntervalSince(w.timerStartedAt ?? w.startedAt) }
+            let volume = w.exercises.flatMap(\.sets).reduce(0.0) { acc, set in
+                guard set.countsForStats else { return acc }
+                return acc + (set.weightKg ?? 0) * Double(set.reps ?? 0)
+            }
+            return WorkoutRowSummary(
+                id: w.localId,
+                title: w.title ?? "训练",
+                startedAt: w.startedAt,
+                durationSec: duration,
+                exerciseCount: w.exercises.count,
+                setCount: w.exercises.reduce(0) { $0 + $1.sets.count },
+                volumeKg: volume,
+                pr: prByWorkoutId[w.localId]
+            )
+        }
         let recent = finishedDesc
             .filter { $0.startedAt >= recentCutoff && $0.startedAt <= now }
-            .map { w in
-                let duration = w.endedAt.map { $0.timeIntervalSince(w.timerStartedAt ?? w.startedAt) }
-                let volume = w.exercises.flatMap(\.sets).reduce(0.0) { acc, set in
-                    guard set.countsForStats else { return acc }
-                    return acc + (set.weightKg ?? 0) * Double(set.reps ?? 0)
-                }
-                return WorkoutRowSummary(
-                    id: w.localId,
-                    title: w.title ?? "训练",
-                    startedAt: w.startedAt,
-                    durationSec: duration,
-                    exerciseCount: w.exercises.count,
-                    setCount: w.exercises.reduce(0) { $0 + $1.sets.count },
-                    volumeKg: volume,
-                    pr: prByWorkoutId[w.localId]
-                )
-            }
+            .map(rowSummary)
+        let calendarDays = buildCalendarDays(
+            from: finishedDesc,
+            prByWorkoutId: prByWorkoutId,
+            rowSummary: rowSummary
+        )
 
         let cutoff = Date.now.addingTimeInterval(-14 * 86_400)
         let recentPlanIdsInOrder = finishedDesc
@@ -455,10 +594,7 @@ final class WorkoutHistoryStore {
             prByWorkoutId: prByWorkoutId
         )
 
-        let profile = ProfileWorkoutSnapshot(
-            totalWorkouts: finishedDesc.count,
-            longestStreak: longestStreak(in: finishedDesc)
-        )
+        let profile = ProfileWorkoutSnapshot(totalWorkouts: finishedDesc.count)
 
         var planUsage: [UUID: PlanUsageSummary] = [:]
         for w in finishedDesc {
@@ -483,6 +619,7 @@ final class WorkoutHistoryStore {
 
         return Projection(
             home: home,
+            calendarDays: calendarDays,
             exercisePRs: exercisePRs,
             exerciseHistories: exerciseHistories,
             workoutRecords: recordsByWorkoutId,
@@ -494,23 +631,38 @@ final class WorkoutHistoryStore {
         )
     }
 
-    private static func longestStreak(in workouts: [Workout]) -> Int {
-        let cal = Calendar.current
-        let days = Set(workouts.map { cal.startOfDay(for: $0.startedAt) })
-        let sorted = days.sorted()
-        var best = 0
-        var current = 0
-        var previous: Date?
-        for day in sorted {
-            if let previous, cal.date(byAdding: .day, value: 1, to: previous) == day {
-                current += 1
-            } else {
-                current = 1
+    private static func monthStart(for date: Date, calendar: Calendar) -> Date? {
+        let comps = calendar.dateComponents([.year, .month], from: date)
+        return calendar.date(from: comps).map { calendar.startOfDay(for: $0) }
+    }
+
+    private static func buildCalendarDays(
+        from workouts: [Workout],
+        prByWorkoutId: [UUID: PRBadge],
+        rowSummary: (Workout) -> WorkoutRowSummary,
+        calendar: Calendar = .currentMondayFirst
+    ) -> [Date: WorkoutCalendarDaySummary] {
+        var days: [Date: WorkoutCalendarDaySummary] = [:]
+        for workout in workouts {
+            let day = calendar.startOfDay(for: workout.startedAt)
+            var summary = days[day] ?? WorkoutCalendarDaySummary(
+                date: day,
+                workouts: [],
+                setCount: 0,
+                volumeKg: 0,
+                hasPR: false
+            )
+            summary.workouts.append(rowSummary(workout))
+            summary.hasPR = summary.hasPR || prByWorkoutId[workout.localId] != nil
+            for exercise in workout.exercises {
+                for set in exercise.sets where set.countsForStats {
+                    summary.setCount += 1
+                    summary.volumeKg += (set.weightKg ?? 0) * Double(set.reps ?? 0)
+                }
             }
-            best = max(best, current)
-            previous = day
+            days[day] = summary
         }
-        return best
+        return days
     }
 
     private func logDataScaleIfNeeded(_ scale: DataScale) {

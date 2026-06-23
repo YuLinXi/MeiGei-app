@@ -38,7 +38,7 @@
 
 ## 6. Profile 与详情页
 
-- [x] 6.1 `ProfileView` 的总训练数、最长连续天数改读 `ProfileWorkoutSnapshot`
+- [x] 6.1 `ProfileView` 的总训练数改读 `ProfileWorkoutSnapshot`
 - [x] 6.2 `WorkoutDetailView` 的 PR strip 优先读 projection 中的 workout PR 结果
 - [x] 6.3 训练详情若 projection 缺失，做一次按 `startedAt < workout.startedAt` 的窄重算，不订阅全部 finished workouts
 

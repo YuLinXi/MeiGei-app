@@ -34,6 +34,7 @@ final class SyncEngine {
         isSyncing = true
         defer { isSyncing = false }
         await runSafely { try await self.syncCustomExercises() }
+        await runSafely { try await self.syncWorkoutPlanGroups() }
         await runSafely { try await self.syncWorkoutPlans() }
         await runSafely { try await self.syncWorkouts() }
         try? modelContext.save()
@@ -132,6 +133,74 @@ final class SyncEngine {
         return try? modelContext.fetch(descriptor).first
     }
 
+    // MARK: - WorkoutPlanGroup
+
+    private func syncWorkoutPlanGroups() async throws {
+        let pending = try fetchPendingWorkoutPlanGroups()
+        if !pending.isEmpty {
+            let dtos = pending.map(dto(from:))
+            let pendingById = Dictionary(uniqueKeysWithValues: pending.map { ($0.localId, $0) })
+            let res: SyncPushResult<WorkoutPlanGroupDTO> = try await push(
+                .workoutPlanGroups, dtos, idParts: pending.map { "\($0.localId):\($0.updatedAt.timeIntervalSince1970)" })
+            applyPushResult(res, domain: .workoutPlanGroups, lookup: { id in pendingById[id] }, apply: applyServer(_:to:))
+        }
+        let pulled: SyncPullResult<WorkoutPlanGroupDTO> = try await pull(.workoutPlanGroups)
+        for dto in pulled.changes { upsert(dto) }
+        SyncDomain.workoutPlanGroups.since = pulled.serverTime
+    }
+
+    private func fetchPendingWorkoutPlanGroups() throws -> [WorkoutPlanGroup] {
+        let pendingCreate = SyncStatus.pendingCreate.rawValue
+        let pendingUpdate = SyncStatus.pendingUpdate.rawValue
+        let pendingDelete = SyncStatus.pendingDelete.rawValue
+        let descriptor = FetchDescriptor<WorkoutPlanGroup>(
+            predicate: #Predicate {
+                $0.syncStatusRaw == pendingCreate
+                || $0.syncStatusRaw == pendingUpdate
+                || $0.syncStatusRaw == pendingDelete
+            },
+            sortBy: [SortDescriptor(\.updatedAt)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
+    private func dto(from m: WorkoutPlanGroup) -> WorkoutPlanGroupDTO {
+        WorkoutPlanGroupDTO(id: m.localId, userId: nil, name: m.name,
+                            sortOrder: m.sortOrder,
+                            createdAt: nil, updatedAt: m.updatedAt, deletedAt: m.deletedAt, version: m.version)
+    }
+
+    private func applyServer(_ dto: WorkoutPlanGroupDTO, to m: WorkoutPlanGroup) {
+        m.name = dto.name
+        m.sortOrder = dto.sortOrder ?? 0
+        m.updatedAt = dto.updatedAt
+        m.deletedAt = dto.deletedAt
+        m.version = dto.version ?? m.version
+        m.serverId = dto.id
+        m.syncStatus = .synced
+    }
+
+    private func upsert(_ dto: WorkoutPlanGroupDTO) {
+        if let local = findWorkoutPlanGroup(localId: dto.id) {
+            if dto.deletedAt != nil { modelContext.delete(local); return }
+            if dto.updatedAt > local.updatedAt { applyServer(dto, to: local) }
+        } else if dto.deletedAt == nil {
+            let m = WorkoutPlanGroup(localId: dto.id, name: dto.name,
+                                     sortOrder: dto.sortOrder ?? 0,
+                                     now: dto.updatedAt)
+            applyServer(dto, to: m)
+            modelContext.insert(m)
+        }
+    }
+
+    private func findWorkoutPlanGroup(localId: UUID) -> WorkoutPlanGroup? {
+        var descriptor = FetchDescriptor<WorkoutPlanGroup>(
+            predicate: #Predicate { $0.localId == localId }
+        )
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
+    }
+
     // MARK: - WorkoutPlan
 
     private func syncWorkoutPlans() async throws {
@@ -168,6 +237,7 @@ final class SyncEngine {
         return WorkoutPlanDTO(id: m.localId, userId: nil, name: m.name, items: itemsJSON,
                               mode: m.modeRaw,
                               forkedFrom: m.forkedFrom, sharedToTeamId: m.sharedToTeamId,
+                              groupId: m.groupId, sortOrder: m.sortOrder,
                               createdAt: nil, updatedAt: m.updatedAt, deletedAt: m.deletedAt, version: m.version)
     }
 
@@ -178,6 +248,8 @@ final class SyncEngine {
         m.modeRaw = dto.mode.flatMap(WorkoutPlanMode.init(rawValue:))?.rawValue ?? WorkoutPlanMode.adaptive.rawValue
         m.forkedFrom = dto.forkedFrom
         m.sharedToTeamId = dto.sharedToTeamId
+        m.groupId = dto.groupId
+        m.sortOrder = dto.sortOrder ?? 0
         m.updatedAt = dto.updatedAt
         m.deletedAt = dto.deletedAt
         m.version = dto.version ?? m.version
@@ -361,6 +433,9 @@ protocol HasEnvelopeId {
     var envelopeName: String { get }
 }
 extension CustomExerciseDTO: HasEnvelopeId {
+    var envelopeId: UUID { id }; var envelopeName: String { name }
+}
+extension WorkoutPlanGroupDTO: HasEnvelopeId {
     var envelopeId: UUID { id }; var envelopeName: String { name }
 }
 extension WorkoutPlanDTO: HasEnvelopeId {

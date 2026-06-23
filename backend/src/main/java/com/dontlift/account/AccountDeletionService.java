@@ -16,6 +16,7 @@ import com.dontlift.team.mapper.TeamMapper;
 import com.dontlift.team.mapper.TeamMemberMapper;
 import com.dontlift.workout.mapper.CustomExerciseMapper;
 import com.dontlift.workout.mapper.WorkoutMapper;
+import com.dontlift.workout.mapper.WorkoutPlanGroupMapper;
 import com.dontlift.workout.mapper.WorkoutPlanMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,7 @@ public class AccountDeletionService {
     private final DeviceTokenMapper deviceTokenMapper;
     private final CustomExerciseMapper customExerciseMapper;
     private final WorkoutPlanMapper workoutPlanMapper;
+    private final WorkoutPlanGroupMapper workoutPlanGroupMapper;
     private final WorkoutMapper workoutMapper;
     private final TeamMapper teamMapper;
     private final TeamMemberMapper teamMemberMapper;
@@ -86,6 +88,7 @@ public class AccountDeletionService {
         // 3) 自身训练数据（workout 子树随 ON DELETE CASCADE 连带删）
         workoutMapper.deleteAllByUser(userId);
         workoutPlanMapper.deleteAllByUser(userId);
+        workoutPlanGroupMapper.deleteAllByUser(userId);
         customExerciseMapper.deleteAllByUser(userId);
 
         // 4) 账户附属
