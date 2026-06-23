@@ -197,32 +197,28 @@ struct PlanListView: View {
                 .tracking(-1.08)
                 .foregroundStyle(Theme.Color.fg)
             Spacer(minLength: 0)
-            Menu {
-                Button {
-                    creatingPlanRoute = PlanEditorRoute(groupId: nil)
-                } label: {
-                    Label("新建计划", systemImage: "doc.badge.plus")
-                }
-                Button {
-                    groupEditor = .create(sortOrder: nextGroupSortOrder())
-                } label: {
-                    Label("新建分组", systemImage: "folder.badge.plus")
-                }
-                if orderedGroups.count > 1 {
-                    Button {
-                        showingGroupOrderEditor = true
-                    } label: {
-                        Label("调整分组顺序", systemImage: "arrow.up.arrow.down")
-                    }
-                }
-            } label: {
-                CircleAddLabel()
-            }
-            .accessibilityLabel("添加计划或分组")
+            CircleAddMenu(items: headerMenuItems, accessibilityLabel: "添加计划或分组")
         }
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.top, 6)
         .padding(.bottom, 4)
+    }
+
+    private var headerMenuItems: [PaperMenuItem] {
+        var items = [
+            PaperMenuItem(title: "新建计划", systemImage: "doc.badge.plus") {
+                creatingPlanRoute = PlanEditorRoute(groupId: nil)
+            },
+            PaperMenuItem(title: "新建分组", systemImage: "folder.badge.plus") {
+                groupEditor = .create(sortOrder: nextGroupSortOrder())
+            }
+        ]
+        if orderedGroups.count > 1 {
+            items.append(PaperMenuItem(title: "调整分组顺序", systemImage: "arrow.up.arrow.down") {
+                showingGroupOrderEditor = true
+            })
+        }
+        return items
     }
 
     @ViewBuilder
@@ -270,42 +266,34 @@ struct PlanListView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(collapsed ? "展开\(section.title)" : "折叠\(section.title)")
-            Menu {
-                Button {
-                    creatingPlanRoute = PlanEditorRoute(groupId: section.groupId)
-                } label: {
-                    Label("在此分组新建计划", systemImage: "doc.badge.plus")
-                }
-                if section.plans.count > 1 {
-                    Button {
-                        planOrderTarget = PlanOrderTarget(id: section.id, title: section.title, groupId: section.groupId)
-                    } label: {
-                        Label("调整计划顺序", systemImage: "arrow.up.arrow.down")
-                    }
-                }
-                if let group = section.group {
-                    Button {
-                        groupEditor = .rename(group)
-                    } label: {
-                        Label("重命名分组", systemImage: "pencil")
-                    }
-                    Button(role: .destructive) {
-                        deletingGroup = group
-                    } label: {
-                        Label("删除分组", systemImage: "trash")
-                    }
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg2)
-                    .frame(width: 34, height: 34)
-                    .background(Theme.Color.surface, in: Circle())
-                    .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
-            }
-            .accessibilityLabel("\(section.title)更多操作")
+            CircleIconMenu(systemName: "ellipsis",
+                           size: 34,
+                           items: sectionMenuItems(for: section),
+                           accessibilityLabel: "\(section.title)更多操作")
         }
         .padding(.horizontal, 2)
+    }
+
+    private func sectionMenuItems(for section: PlanGroupSection) -> [PaperMenuItem] {
+        var items = [
+            PaperMenuItem(title: "在此分组新建计划", systemImage: "doc.badge.plus") {
+                creatingPlanRoute = PlanEditorRoute(groupId: section.groupId)
+            }
+        ]
+        if section.plans.count > 1 {
+            items.append(PaperMenuItem(title: "调整计划顺序", systemImage: "arrow.up.arrow.down") {
+                planOrderTarget = PlanOrderTarget(id: section.id, title: section.title, groupId: section.groupId)
+            })
+        }
+        if let group = section.group {
+            items.append(PaperMenuItem(title: "重命名分组", systemImage: "pencil") {
+                groupEditor = .rename(group)
+            })
+            items.append(PaperMenuItem(title: "删除分组", systemImage: "trash", role: .destructive) {
+                deletingGroup = group
+            })
+        }
+        return items
     }
 
     private func isSectionCollapsed(_ section: PlanGroupSection) -> Bool {
@@ -557,11 +545,9 @@ struct PlanDetailView: View {
         .onAppear { WorkoutPerformanceMonitor.event("plan.detail.appear") }
         // 子页统一导航栏：圆形返回 + ⋯ 菜单（标题留空，计划名在内容区大字呈现）。
         .paperToolbar(onBack: { dismiss() }) {
-            CircleIconMenu(systemName: "ellipsis") {
-                Button { editing = true } label: { Label("重命名计划", systemImage: "pencil") }
-                Button { movingGroup = true } label: { Label("移动到分组", systemImage: "folder") }
-                Button(role: .destructive) { confirmingDelete = true } label: { Label("删除计划", systemImage: "trash") }
-            }
+            CircleIconMenu(systemName: "ellipsis",
+                           items: detailMenuItems,
+                           accessibilityLabel: "计划更多操作")
         }
         .paperConfirmDialog(
             isPresented: $confirmingDelete,
@@ -670,6 +656,14 @@ struct PlanDetailView: View {
                 .foregroundStyle(Theme.Color.fg)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private var detailMenuItems: [PaperMenuItem] {
+        [
+            PaperMenuItem(title: "重命名计划", systemImage: "pencil") { editing = true },
+            PaperMenuItem(title: "移动到分组", systemImage: "folder") { movingGroup = true },
+            PaperMenuItem(title: "删除计划", systemImage: "trash", role: .destructive) { confirmingDelete = true }
+        ]
     }
 
     // 仅保留动作数与总组数；计划模式在下方规则卡展示，避免重复。

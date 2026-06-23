@@ -105,19 +105,19 @@ struct TeamListView: View {
             Spacer(minLength: 0)
             // 空态已有大号双 CTA，此时不再出右上 +，避免重复入口；有 Team 后才显示。
             if !teamService.teams.isEmpty {
-                Menu {
-                    Button("创建 Team") { creating = true }
-                    Button("用邀请码加入") { joining = true }
-                } label: {
-                    CircleAddLabel()
-                }
-                .buttonStyle(PressableButtonStyle())
-                .accessibilityLabel("创建或加入 Team")
+                CircleAddMenu(items: teamHeaderMenuItems, accessibilityLabel: "创建或加入 Team")
             }
         }
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.top, 6)
         .padding(.bottom, 4)
+    }
+
+    private var teamHeaderMenuItems: [PaperMenuItem] {
+        [
+            PaperMenuItem(title: "创建 Team", systemImage: "person.2.badge.plus") { creating = true },
+            PaperMenuItem(title: "用邀请码加入", systemImage: "number.square") { joining = true }
+        ]
     }
 
     // 原型团队卡：首字方块（朱砂红 8% 底 + 18% 描边 + accent 首字，社交温度）+ 名称 + 邀请码 mono。
