@@ -3,6 +3,7 @@ package com.dontlift.team;
 import com.dontlift.common.id.Uuid7;
 import com.dontlift.common.web.AppException;
 import com.dontlift.push.PushService;
+import com.dontlift.team.dto.TeamCheckinFeed;
 import com.dontlift.team.entity.CheckinReaction;
 import com.dontlift.team.entity.Team;
 import com.dontlift.team.entity.TeamCheckin;
@@ -81,6 +82,15 @@ public class CheckinService {
     public List<TeamCheckin> listCheckins(UUID userId, UUID teamId, LocalDate date) {
         teamService.requireMember(teamId, userId);
         return checkinMapper.findByTeamAndDate(teamId, date);
+    }
+
+    public TeamCheckinFeed listCheckinFeed(UUID userId, UUID teamId, LocalDate date) {
+        List<TeamCheckin> checkins = listCheckins(userId, teamId, date);
+        if (checkins.isEmpty()) {
+            return new TeamCheckinFeed(checkins, List.of());
+        }
+        List<UUID> ids = checkins.stream().map(TeamCheckin::getId).toList();
+        return new TeamCheckinFeed(checkins, reactionMapper.findByCheckins(ids));
     }
 
     /**

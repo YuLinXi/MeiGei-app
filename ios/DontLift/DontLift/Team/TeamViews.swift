@@ -17,6 +17,7 @@ struct TeamListView: View {
     @State private var selectedTeam: TeamDTO?
     @State private var error: String?
     @State private var actionToast: String?   // 退出/解散返回后的黑底结果 toast
+    @State private var isReloading = false
 
     var body: some View {
         ZStack {
@@ -102,21 +103,21 @@ struct TeamListView: View {
                 .tracking(-1.08)
                 .foregroundStyle(Theme.Color.fg)
             Spacer(minLength: 0)
-            // 空态已有大号双 CTA，此时不再出右上 +，避免重复入口；有团队后才显示。
+            // 空态已有大号双 CTA，此时不再出右上 +，避免重复入口；有 Team 后才显示。
             if !teamService.teams.isEmpty {
-                Menu {
-                    Button("创建 Team") { creating = true }
-                    Button("用邀请码加入") { joining = true }
-                } label: {
-                    CircleAddLabel()
-                }
-                .buttonStyle(PressableButtonStyle())
-                .accessibilityLabel("创建或加入 Team")
+                CircleAddMenu(items: teamHeaderMenuItems, accessibilityLabel: "创建或加入 Team")
             }
         }
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.top, 6)
         .padding(.bottom, 4)
+    }
+
+    private var teamHeaderMenuItems: [PaperMenuItem] {
+        [
+            PaperMenuItem(title: "创建 Team", systemImage: "person.2.badge.plus") { creating = true },
+            PaperMenuItem(title: "用邀请码加入", systemImage: "number.square") { joining = true }
+        ]
     }
 
     // 原型团队卡：首字方块（朱砂红 8% 底 + 18% 描边 + accent 首字，社交温度）+ 名称 + 邀请码 mono。
@@ -252,7 +253,7 @@ struct TeamListView: View {
                      desc: "给队友的打卡点 🔥 💪 表情反应，看见彼此坚持。")
             valueRow(icon: "arrow.triangle.branch",
                      title: "共享计划",
-                     desc: "一键 Fork 队友发布的训练计划，直接开练。")
+                     desc: "一键复制队友发布的训练计划，直接开练。")
         }
     }
 
@@ -320,6 +321,9 @@ struct TeamListView: View {
     }
 
     private func reload() async {
+        guard !isReloading else { return }
+        isReloading = true
+        defer { isReloading = false }
         do { try await teamService.loadMyTeams() }
         catch { self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
     }
@@ -607,6 +611,7 @@ struct TeamDetailView: View {
     @State private var checkins: [TeamCheckinDTO] = []
     @State private var reactions: [UUID: [CheckinReactionDTO]] = [:]
     @State private var error: String?
+    @State private var isReloading = false
 
     // ⋯ 操作菜单 → 二次确认 → 结果反馈 状态机
     @State private var showActionSheet = false
@@ -698,7 +703,7 @@ struct TeamDetailView: View {
         let trainedToday = Set(checkins.map(\.userId)).count
         return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             HStack(alignment: .top) {
-                Text(isOwner ? "TEAM · 你是队长" : "TEAM").eyebrowStyle()
+                Text(isOwner ? "Team · 你是队长" : "Team").eyebrowStyle()
                 Spacer(minLength: 8)
                 Text("\(trainedToday) / \(totalMembers) 今日已练")
                     .font(Theme.Font.mono(size: 11, weight: .semibold))
@@ -1051,23 +1056,19 @@ struct TeamDetailView: View {
     // MARK: 数据加载与动作
 
     private func reload() async {
+        guard !isReloading else { return }
+        isReloading = true
+        defer { isReloading = false }
         do {
             async let m = teamService.members(of: team.id)
-            async let c = teamService.checkins(teamId: team.id)
+            async let feed = teamService.checkinFeed(teamId: team.id)
             members = try await m
-            checkins = try await c
-            await loadReactions()
+            let loadedFeed = try await feed
+            checkins = loadedFeed.checkins
+            reactions = Dictionary(grouping: loadedFeed.reactions, by: \.checkinId)
         } catch {
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
-    }
-
-    private func loadReactions() async {
-        var map: [UUID: [CheckinReactionDTO]] = [:]
-        for c in checkins {
-            map[c.id] = (try? await teamService.reactions(checkinId: c.id)) ?? []
-        }
-        reactions = map
     }
 
     /// 6.5 乐观更新（单选·可取消）：一人一打卡只点一个表情。
@@ -1280,6 +1281,7 @@ struct TeamPlansView: View {
     @State private var error: String?
     @State private var toast: String?
     @State private var forking: UUID?
+    @State private var isReloading = false
 
     var body: some View {
         ZStack {
@@ -1338,7 +1340,7 @@ struct TeamPlansView: View {
                 } else {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.triangle.branch").font(.system(size: 11, weight: .bold))
-                        Text("Fork")
+                        Text("复制")
                     }
                     .font(Theme.Font.body(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.Color.accent)
@@ -1355,6 +1357,9 @@ struct TeamPlansView: View {
     }
 
     private func reload() async {
+        guard !isReloading else { return }
+        isReloading = true
+        defer { isReloading = false }
         do { plans = try await teamService.plans(of: team.id) }
         catch { self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
     }
@@ -1364,7 +1369,7 @@ struct TeamPlansView: View {
         do {
             try await teamService.fork(planId: p.id)
             await syncEngine.syncAll()
-            await showToast("已 Fork 到「计划」")
+            await showToast("已复制到「计划」")
         } catch {
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }

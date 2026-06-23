@@ -4,7 +4,7 @@ import UIKit
 // MARK: - 圆形图标按钮（导航/菜单单一来源，36×36 白底 + border）
 
 /// 圆形图标外观：白底 + border 描边 + 圆形；支持 `active` 高亮态与 `rotated` 旋转态。
-/// 供点击版 `CircleIconButton` 与 Menu 版 `CircleIconMenu` 复用，确保两类入口像素一致。
+/// 供点击版 `CircleIconButton` 与动作菜单版 `CircleIconMenu` 复用，确保两类入口像素一致。
 /// 图标字号按直径 ×0.42 推导（36→≈15），调用点不再硬编码图标字号。
 struct CircleIconLabel: View {
     let systemName: String
@@ -39,21 +39,254 @@ struct CircleIconButton: View {
     }
 }
 
-/// Menu 版圆形图标按钮（⋯ 更多操作）：与点击版同一外观，吸收原各页本地 `menuButton`。
-struct CircleIconMenu<Content: View>: View {
+// MARK: - 纸感动作菜单（替代系统 Menu）
+
+/// 纸感动作菜单项：仅描述动作语义，具体视觉由 `PaperActionMenu` 统一渲染。
+struct PaperMenuItem: Identifiable {
+    enum Role: Equatable {
+        case normal
+        case destructive
+    }
+
+    let id: String
+    let title: String
+    let systemImage: String
+    var role: Role = .normal
+    var isEnabled: Bool = true
+    let action: () -> Void
+
+    init(
+        id: String? = nil,
+        title: String,
+        systemImage: String,
+        role: Role = .normal,
+        isEnabled: Bool = true,
+        action: @escaping () -> Void
+    ) {
+        self.id = id ?? "\(title)-\(systemImage)"
+        self.title = title
+        self.systemImage = systemImage
+        self.role = role
+        self.isEnabled = isEnabled
+        self.action = action
+    }
+}
+
+private struct PaperActionMenuAnchorKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero { value = next }
+    }
+}
+
+private struct PaperActionMenuAnchorReader: View {
+    var body: some View {
+        GeometryReader { proxy in
+            Color.clear.preference(key: PaperActionMenuAnchorKey.self,
+                                   value: proxy.frame(in: .global))
+        }
+    }
+}
+
+/// 触发按钮 + 自绘纸感动作菜单。菜单用透明 `fullScreenCover` 承载，避免被 toolbar / TabBar 层级裁切。
+struct PaperActionMenuButton<Label: View>: View {
+    let items: [PaperMenuItem]
+    var accessibilityLabel: String = "菜单"
+    private let label: (Bool) -> Label
+
+    @State private var isPresented = false
+    @State private var anchorFrame: CGRect = .zero
+
+    init(
+        items: [PaperMenuItem],
+        accessibilityLabel: String = "菜单",
+        @ViewBuilder label: @escaping (Bool) -> Label
+    ) {
+        self.items = items
+        self.accessibilityLabel = accessibilityLabel
+        self.label = label
+    }
+
+    var body: some View {
+        Button {
+            Theme.Haptics.selection()
+            isPresented = true
+        } label: {
+            label(isPresented)
+                .background(PaperActionMenuAnchorReader())
+        }
+        .buttonStyle(PressableButtonStyle())
+        .accessibilityLabel(accessibilityLabel)
+        .onPreferenceChange(PaperActionMenuAnchorKey.self) { anchorFrame = $0 }
+        .fullScreenCover(isPresented: $isPresented) {
+            PaperActionMenuOverlay(isPresented: $isPresented,
+                                   anchorFrame: anchorFrame,
+                                   items: items)
+                .ignoresSafeArea()
+                .presentationBackground(.clear)
+                .interactiveDismissDisabled()
+        }
+        .transaction(value: isPresented) { $0.disablesAnimations = true }
+        .disabled(items.filter(\.isEnabled).isEmpty)
+    }
+}
+
+private struct PaperActionMenuOverlay: View {
+    @Binding var isPresented: Bool
+    let anchorFrame: CGRect
+    let items: [PaperMenuItem]
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shown = false
+
+    private let menuWidth: CGFloat = 232
+    private let rowHeight: CGFloat = 52
+    private let edgePadding: CGFloat = 12
+    /// 统一浮层锚定规范：菜单卡片与触发圆钮保持 8pt 垂直间距。
+    private let anchorGap: CGFloat = 8
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let safe = proxy.safeAreaInsets
+            let width = min(menuWidth, max(0, size.width - safe.leading - safe.trailing - edgePadding * 2))
+            let height = rowHeight * CGFloat(items.count) + CGFloat(max(0, items.count - 1))
+            let origin = menuOrigin(container: size, safeArea: safe, menuSize: CGSize(width: width, height: height))
+
+            ZStack(alignment: .topLeading) {
+                Theme.Color.fg.opacity(0.001)
+                    .ignoresSafeArea()
+                    .onTapGesture { close() }
+
+                PaperActionMenuCard(items: items) { item in
+                    close(after: item.action)
+                }
+                .frame(width: width)
+                .offset(x: origin.x, y: origin.y)
+                .opacity(shown ? 1 : 0)
+                .scaleEffect(reduceMotion ? 1 : (shown ? 1 : 0.98), anchor: .topTrailing)
+                .offset(y: reduceMotion ? 0 : (shown ? 0 : -4))
+            }
+            .onAppear {
+                withAnimation(animation) { shown = true }
+            }
+        }
+        .background(Color.clear.ignoresSafeArea())
+    }
+
+    private var animation: Animation {
+        reduceMotion ? .easeOut(duration: 0.12) : .easeOut(duration: 0.16)
+    }
+
+    private func close(after action: (() -> Void)? = nil) {
+        withAnimation(animation) { shown = false } completion: {
+            isPresented = false
+            guard let action else { return }
+            DispatchQueue.main.async { action() }
+        }
+    }
+
+    private func menuOrigin(container: CGSize, safeArea: EdgeInsets, menuSize: CGSize) -> CGPoint {
+        let minX = safeArea.leading + edgePadding
+        let maxX = container.width - safeArea.trailing - edgePadding - menuSize.width
+        let proposedX = anchorFrame.maxX - menuSize.width
+        let x = min(max(proposedX, minX), max(minX, maxX))
+
+        let minY = safeArea.top + edgePadding
+        let maxY = container.height - safeArea.bottom - edgePadding - menuSize.height
+        let belowY = anchorFrame.maxY + anchorGap
+        let aboveY = anchorFrame.minY - anchorGap - menuSize.height
+        let proposedY = belowY <= maxY ? belowY : aboveY
+        let y = min(max(proposedY, minY), max(minY, maxY))
+
+        return CGPoint(x: x, y: y)
+    }
+}
+
+private struct PaperActionMenuCard: View {
+    let items: [PaperMenuItem]
+    let onSelect: (PaperMenuItem) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                PaperActionMenuRow(item: item) {
+                    guard item.isEnabled else { return }
+                    onSelect(item)
+                }
+                if index < items.count - 1 {
+                    Rectangle()
+                        .fill(Theme.Color.border)
+                        .frame(height: 1)
+                        .padding(.leading, 48)
+                }
+            }
+        }
+        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .stroke(Theme.Color.border, lineWidth: 1)
+        )
+        .paperShadow(.md, cornerRadius: Theme.Radius.lg)
+    }
+}
+
+private struct PaperActionMenuRow: View {
+    let item: PaperMenuItem
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: item.systemImage)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(iconColor)
+                    .frame(width: 22)
+                Text(item.title)
+                    .font(Theme.Font.l2)
+                    .foregroundStyle(textColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                Spacer(minLength: 0)
+            }
+            .frame(height: 52)
+            .padding(.horizontal, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableButtonStyle())
+        .disabled(!item.isEnabled)
+        .accessibilityLabel(item.title)
+    }
+
+    private var textColor: Color {
+        guard item.isEnabled else { return Theme.Color.muted }
+        return item.role == .destructive ? Theme.Color.danger : Theme.Color.fg
+    }
+
+    private var iconColor: Color {
+        guard item.isEnabled else { return Theme.Color.muted }
+        return item.role == .destructive ? Theme.Color.danger : Theme.Color.accent
+    }
+}
+
+/// 动作菜单版圆形图标按钮（⋯ 更多操作）：与点击版同一外观，不再包装系统 `Menu`。
+struct CircleIconMenu: View {
     let systemName: String
     var size: CGFloat = 36
     var active: Bool = false
     var rotated: Bool = false
-    @ViewBuilder var menu: () -> Content
+    let items: [PaperMenuItem]
+    var accessibilityLabel: String = "更多操作"
 
     var body: some View {
-        Menu {
-            menu()
-        } label: {
-            CircleIconLabel(systemName: systemName, size: size, active: active, rotated: rotated)
+        PaperActionMenuButton(items: items, accessibilityLabel: accessibilityLabel) { isPresented in
+            CircleIconLabel(systemName: systemName,
+                            size: size,
+                            active: active || isPresented,
+                            rotated: rotated || isPresented)
         }
-        .buttonStyle(PressableButtonStyle())
     }
 }
 
@@ -177,15 +410,17 @@ final class SwipeBackProbeController: UIViewController {
 
 // MARK: - 圆形「添加」按钮（主操作，accent 朱砂红 + 白底 + border + sm 阴影，36×36）
 
-/// 仅外观：朱砂红 plus 图标。供 Button 与 Menu 作为 label 复用，确保两类入口视觉一致。
+/// 仅外观：朱砂红 plus 图标。供 Button 与纸感动作菜单作为 label 复用，确保两类入口视觉一致。
 struct CircleAddLabel: View {
+    var active: Bool = false
+
     var body: some View {
         Image(systemName: "plus")
             .font(.system(size: 18, weight: .semibold))
             .foregroundStyle(Theme.Color.accent)
             .frame(width: 36, height: 36)
-            .background(Theme.Color.surface, in: Circle())
-            .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
+            .background(active ? Theme.Color.accentSoft : Theme.Color.surface, in: Circle())
+            .overlay(Circle().stroke(active ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
             .shadow(color: Theme.Color.fg.opacity(Theme.ShadowLevel.sm.opacity),
                     radius: Theme.ShadowLevel.sm.radius, x: 0, y: Theme.ShadowLevel.sm.y)
     }
@@ -199,6 +434,18 @@ struct CircleAddButton: View {
         Button(action: action) { CircleAddLabel() }
             .buttonStyle(PressableButtonStyle())
             .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+/// 动作菜单版圆形添加按钮：用于顶部 `+` 展开多个创建入口。
+struct CircleAddMenu: View {
+    let items: [PaperMenuItem]
+    var accessibilityLabel: String = "添加"
+
+    var body: some View {
+        PaperActionMenuButton(items: items, accessibilityLabel: accessibilityLabel) { isPresented in
+            CircleAddLabel(active: isPresented)
+        }
     }
 }
 

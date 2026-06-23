@@ -7,6 +7,7 @@
 //
 
 import Testing
+import Foundation
 import SwiftData
 @testable import DontLift
 
@@ -66,5 +67,27 @@ struct ExerciseHistoryMergeTests {
         #expect(first == 1)
         #expect(second == 0)
         #expect(ex.builtinExerciseCode == "BB_BENCH_PRESS")
+    }
+
+    /// 启动入口只执行一次；完成标记存在时不再全量 fetch `WorkoutExercise`。
+    @Test func runIfNeededSkipsAfterCompletionFlag() throws {
+        let suiteName = "ExerciseHistoryMergeTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let container = makeContainer()
+        let ctx = container.mainContext
+        let ex = WorkoutExercise(builtinExerciseCode: nil, customExerciseId: nil,
+                                 exerciseName: "杠铃卧推", orderIndex: 0)
+        try insertWorkout(with: ex, in: ctx)
+
+        let first = ExerciseHistoryMerge.runIfNeeded(in: ctx, defaults: defaults)
+        ex.builtinExerciseCode = nil
+        let second = ExerciseHistoryMerge.runIfNeeded(in: ctx, defaults: defaults)
+
+        #expect(first == 1)
+        #expect(second == 0)
+        #expect(defaults.bool(forKey: ExerciseHistoryMerge.completionKey))
+        #expect(ex.builtinExerciseCode == nil)
     }
 }

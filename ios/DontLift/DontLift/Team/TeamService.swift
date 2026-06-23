@@ -72,6 +72,11 @@ final class TeamService {
                            query: [URLQueryItem(name: "date", value: Self.dateOnly(date))])
     }
 
+    func checkinFeed(teamId: UUID, date: Date = .now) async throws -> TeamCheckinFeedDTO {
+        try await api.send("GET", "/teams/\(teamId)/checkins/feed",
+                           query: [URLQueryItem(name: "date", value: Self.dateOnly(date))])
+    }
+
     func reactions(checkinId: UUID) async throws -> [CheckinReactionDTO] {
         try await api.send("GET", "/checkins/\(checkinId)/reactions")
     }

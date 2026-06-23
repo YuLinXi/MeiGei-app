@@ -64,6 +64,8 @@ public class TeamPlanService {
         copy.setMode("adaptive");
         copy.setForkedFrom(src.getId());
         copy.setSharedToTeamId(null); // 副本默认私有
+        copy.setGroupId(null); // 不复制发布者的个人分组结构
+        copy.setSortOrder(planMapper.nextUngroupedSortOrder(userId));
         planMapper.insert(copy);
         return copy;
     }

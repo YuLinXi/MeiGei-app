@@ -5,6 +5,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(SessionStore.self) private var session
     @Environment(SyncEngine.self) private var syncEngine
+    @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -29,10 +30,15 @@ struct RootView: View {
         MainTabView()
             .task {
                 PushManager.shared.requestAuthorizationAndRegister()
+                historyStore.ensureLoaded(reason: .login)
                 await syncEngine.syncAll()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .dontliftSyncCompleted)) { _ in
+                historyStore.scheduleRefresh(reason: .syncCompleted)
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
+                    historyStore.ensureLoaded(reason: .appLaunch)
                     Task { await syncEngine.syncAll() }
                 }
             }

@@ -15,6 +15,7 @@ import com.dontlift.team.mapper.TeamMapper;
 import com.dontlift.team.mapper.TeamMemberMapper;
 import com.dontlift.workout.mapper.CustomExerciseMapper;
 import com.dontlift.workout.mapper.WorkoutMapper;
+import com.dontlift.workout.mapper.WorkoutPlanGroupMapper;
 import com.dontlift.workout.mapper.WorkoutPlanMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,6 +47,7 @@ class AccountDeletionServiceTest {
     @Mock DeviceTokenMapper deviceTokenMapper;
     @Mock CustomExerciseMapper customExerciseMapper;
     @Mock WorkoutPlanMapper workoutPlanMapper;
+    @Mock WorkoutPlanGroupMapper workoutPlanGroupMapper;
     @Mock WorkoutMapper workoutMapper;
     @Mock TeamMapper teamMapper;
     @Mock TeamMemberMapper teamMemberMapper;
@@ -66,7 +68,7 @@ class AccountDeletionServiceTest {
         service.deleteSelf(userId);
 
         InOrder order = inOrder(checkinReactionMapper, teamCheckinMapper, teamMemberMapper, teamMapper,
-                workoutMapper, workoutPlanMapper, customExerciseMapper,
+                workoutMapper, workoutPlanMapper, workoutPlanGroupMapper, customExerciseMapper,
                 deviceTokenMapper, idempotencyKeyMapper, userIdentityMapper, appUserMapper);
         // Team 维度：reaction → checkin → member → team（先子后父，避免 FK 违例）
         order.verify(checkinReactionMapper).deleteByUserOrOwnedTeams(userId);
@@ -76,6 +78,7 @@ class AccountDeletionServiceTest {
         // 自身训练数据
         order.verify(workoutMapper).deleteAllByUser(userId);
         order.verify(workoutPlanMapper).deleteAllByUser(userId);
+        order.verify(workoutPlanGroupMapper).deleteAllByUser(userId);
         order.verify(customExerciseMapper).deleteAllByUser(userId);
         // 账户附属
         order.verify(deviceTokenMapper).deleteAllByUser(userId);
@@ -94,7 +97,7 @@ class AccountDeletionServiceTest {
 
         verify(appUserMapper, never()).hardDeleteById(userId);
         verifyNoInteractions(checkinReactionMapper, teamCheckinMapper, teamMemberMapper, teamMapper,
-                workoutMapper, workoutPlanMapper, customExerciseMapper,
+                workoutMapper, workoutPlanMapper, workoutPlanGroupMapper, customExerciseMapper,
                 deviceTokenMapper, idempotencyKeyMapper);
     }
 

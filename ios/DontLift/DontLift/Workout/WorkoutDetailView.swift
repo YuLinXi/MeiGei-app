@@ -12,14 +12,25 @@ import SwiftData
 struct WorkoutDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(WorkoutHistoryStore.self) private var historyStore
     @Bindable var workout: Workout
 
-    /// 用于 PR 识别的历史训练（本视图自查，避免依赖父视图传参）。
-    @Query(filter: #Predicate<Workout> { $0.deletedAt == nil && $0.endedAt != nil },
-           sort: \Workout.startedAt, order: .forward)
-    private var finished: [Workout]
-
     @State private var confirmingDelete = false
+    @State private var fallbackRecords: [PersonalRecord]?
+
+    private static let weekdayFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "zh_CN")
+        fmt.dateFormat = "EEE"
+        return fmt
+    }()
+
+    private static let timeFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "zh_CN")
+        fmt.dateFormat = "HH:mm"
+        return fmt
+    }()
 
     private var sortedExercises: [WorkoutExercise] {
         workout.exercises.sorted { $0.orderIndex < $1.orderIndex }
@@ -27,10 +38,7 @@ struct WorkoutDetailView: View {
 
     /// 本次训练相对「此前」历史识别出的新纪录（与首页 PR 口径一致：按 historyKey 比最大重量）。
     private var personalRecords: [PersonalRecord] {
-        let history = finished.filter {
-            $0.localId != workout.localId && $0.startedAt < workout.startedAt
-        }
-        return detectPersonalRecords(in: workout, history: history)
+        historyStore.workoutRecords[workout.localId] ?? fallbackRecords ?? []
     }
 
     /// 命中 PR 的动作 → 该次最大重量。用于在对应顶组行打 ▲ PR 徽标。
@@ -84,6 +92,14 @@ struct WorkoutDetailView: View {
             confirmTitle: "删除",
             onConfirm: { deleteWorkout() }
         )
+        .task(id: workout.localId) {
+            WorkoutPerformanceMonitor.event("workout.detail.appear")
+            if historyStore.workoutRecords[workout.localId] == nil {
+                fallbackRecords = historyStore.lastRefreshFinishedAt == nil
+                    ? computeFallbackRecords()
+                    : []
+            }
+        }
     }
 
     // MARK: 完成头卡（替换记录中 REC 计时条）
@@ -114,10 +130,7 @@ struct WorkoutDetailView: View {
         let cal = Calendar.current
         let day = cal.component(.day, from: date)
         let month = cal.component(.month, from: date)
-        let fmt = DateFormatter()
-        fmt.locale = Locale(identifier: "zh_CN")
-        fmt.dateFormat = "EEE"
-        let weekday = fmt.string(from: date)
+        let weekday = Self.weekdayFormatter.string(from: date)
         return VStack(spacing: 2) {
             Text(String(format: "%02d", day)).numStyle(size: 21).foregroundStyle(Theme.Color.fg)
             Text("\(month)月 · \(weekday)")
@@ -147,12 +160,9 @@ struct WorkoutDetailView: View {
 
     /// 时段文案：`HH:mm – HH:mm`（无 endedAt 理论不会进入本页，兜底只显示开始）。
     private var rangeText: String {
-        let fmt = DateFormatter()
-        fmt.locale = Locale(identifier: "zh_CN")
-        fmt.dateFormat = "HH:mm"
-        let start = fmt.string(from: workout.startedAt)
+        let start = Self.timeFormatter.string(from: workout.startedAt)
         guard let end = workout.endedAt else { return start }
-        return "\(start) – \(fmt.string(from: end))"
+        return "\(start) – \(Self.timeFormatter.string(from: end))"
     }
 
     // MARK: 三联数（时长 / 总组数 / 训练量，已完成口径，无「剩余动作」）
@@ -258,7 +268,25 @@ struct WorkoutDetailView: View {
         Theme.Haptics.impact(.rigid)
         workout.markDeleted()
         try? modelContext.save()
+        historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
         dismiss()
+    }
+
+    private func computeFallbackRecords() -> [PersonalRecord] {
+        let startedAt = workout.startedAt
+        let localId = workout.localId
+        var descriptor = FetchDescriptor<Workout>(
+            predicate: #Predicate {
+                $0.deletedAt == nil
+                && $0.endedAt != nil
+                && $0.startedAt < startedAt
+                && $0.localId != localId
+            },
+            sortBy: [SortDescriptor(\.startedAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 1_000
+        let history = (try? modelContext.fetch(descriptor)) ?? []
+        return detectPersonalRecords(in: workout, history: history)
     }
 }
 

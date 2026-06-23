@@ -10,6 +10,16 @@ import SwiftData
 /// - 仅本地：不新增同步实体、不动 LWW/幂等约定。
 /// - 幂等：已挂 `code` 的条目不再处理，可安全重跑。
 enum ExerciseHistoryMerge {
+    static let completionKey = "exerciseHistoryMerge.v1.completed"
+
+    /// 启动路径使用的一次性迁移入口。已完成后直接跳过，避免每次启动全量 fetch `WorkoutExercise`。
+    @discardableResult
+    static func runIfNeeded(in context: ModelContext, defaults: UserDefaults = .standard) -> Int {
+        guard !defaults.bool(forKey: completionKey) else { return 0 }
+        let migrated = run(in: context)
+        defaults.set(true, forKey: completionKey)
+        return migrated
+    }
 
     /// 执行迁移，返回被合并（改挂 code）的条目数。
     @discardableResult

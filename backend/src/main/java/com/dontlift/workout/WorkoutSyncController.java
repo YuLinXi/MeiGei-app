@@ -7,6 +7,7 @@ import com.dontlift.sync.dto.SyncPushResult;
 import com.dontlift.workout.dto.WorkoutTree;
 import com.dontlift.workout.entity.CustomExercise;
 import com.dontlift.workout.entity.WorkoutPlan;
+import com.dontlift.workout.entity.WorkoutPlanGroup;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,6 +31,7 @@ import java.util.UUID;
 public class WorkoutSyncController {
 
     private final CustomExerciseSyncService customExerciseSync;
+    private final WorkoutPlanGroupSyncService workoutPlanGroupSync;
     private final WorkoutPlanSyncService workoutPlanSync;
     private final WorkoutSyncService workoutSync;
 
@@ -46,6 +48,21 @@ public class WorkoutSyncController {
             @RequestBody SyncPushRequest<CustomExercise> req) {
         UUID userId = SecurityUtils.currentUserId();
         return customExerciseSync.push(userId, req.items());
+    }
+
+    @GetMapping("/workout-plan-groups/pull")
+    public SyncPullResult<WorkoutPlanGroup> pullWorkoutPlanGroups(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime since) {
+        UUID userId = SecurityUtils.currentUserId();
+        return workoutPlanGroupSync.pull(userId, since);
+    }
+
+    @PostMapping("/workout-plan-groups/push")
+    public SyncPushResult<WorkoutPlanGroup> pushWorkoutPlanGroups(
+            @RequestBody SyncPushRequest<WorkoutPlanGroup> req) {
+        UUID userId = SecurityUtils.currentUserId();
+        return workoutPlanGroupSync.push(userId, req.items());
     }
 
     @GetMapping("/workout-plans/pull")

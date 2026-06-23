@@ -9,11 +9,10 @@ struct ProfileView: View {
     @Environment(SyncEngine.self) private var syncEngine
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(RestTimerController.self) private var restTimer
+    @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(\.modelContext) private var modelContext
 
     @Query private var profiles: [UserProfile]
-    @Query(filter: #Predicate<Workout> { $0.deletedAt == nil && $0.endedAt != nil })
-    private var workouts: [Workout]
 
     @State private var confirmLogout = false
     @State private var confirmDelete = false
@@ -38,27 +37,7 @@ struct ProfileView: View {
 
     private var profile: UserProfile? { profiles.first(where: { $0.serverUserId == session.currentUserId }) }
 
-    private var totalWorkouts: Int { workouts.count }
-
-    /// 最长连续训练天数（不要求每日，按日去重连贯计）。
-    private var longestStreak: Int {
-        let cal = Calendar.current
-        let days = Set(workouts.map { cal.startOfDay(for: $0.startedAt) })
-        let sorted = days.sorted()
-        var best = 0
-        var cur = 0
-        var prev: Date?
-        for d in sorted {
-            if let p = prev, cal.date(byAdding: .day, value: 1, to: p) == d {
-                cur += 1
-            } else {
-                cur = 1
-            }
-            best = max(best, cur)
-            prev = d
-        }
-        return best
-    }
+    private var totalWorkouts: Int { historyStore.profile.totalWorkouts }
 
     private var appVersion: String {
         let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
@@ -74,7 +53,6 @@ struct ProfileView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                         header
-                        statsGrid
                         personalInfoGroup
                         syncGroup
                         trainingPrefsGroup
@@ -91,6 +69,7 @@ struct ProfileView: View {
         // 自绘大标题头（对齐其它 Tab 根页范式 A），隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
         .task {
+            WorkoutPerformanceMonitor.event("profile.appear")
             healthAuthorized = healthKit.isAuthorized
             await refreshNotificationStatus()
         }
@@ -178,42 +157,9 @@ struct ProfileView: View {
         }
     }
 
-    /// 副标：加入月份 + 已记录次数（不再展示训练龄）。
+    /// 副标：只展示总训练次数。
     private var headerSubtitle: String {
-        let joined = profile?.createdAt
-        let monthText: String
-        if let joined {
-            let fmt = DateFormatter()
-            fmt.dateFormat = "yyyy.MM"
-            monthText = "加入于 \(fmt.string(from: joined)) · "
-        } else {
-            monthText = ""
-        }
-        return "\(monthText)已记录 \(totalWorkouts) 次"
-    }
-
-    // MARK: - Stats Grid
-
-    private var statsGrid: some View {
-        HStack(spacing: 0) {
-            statCell(title: "总训练", value: "\(totalWorkouts)", tint: Theme.Color.fg)
-            statDivider
-            statCell(title: "最长连续", value: "\(longestStreak)", tint: Theme.Color.fg)
-        }
-        .cardStyle(padding: 0)
-    }
-
-    private func statCell(title: String, value: String, tint: Color) -> some View {
-        VStack(spacing: 6) {
-            Text(value).numStyle(size: 22, weight: .bold).foregroundStyle(tint)
-            Text(title).eyebrowStyle()
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.Spacing.md)
-    }
-
-    private var statDivider: some View {
-        Rectangle().fill(Theme.Color.border).frame(width: 1)
+        "总训练次数 \(totalWorkouts) 次"
     }
 
     // MARK: - 个人资料分组（称呼可编辑 + 性别，均为资料、改即 PATCH 后端）

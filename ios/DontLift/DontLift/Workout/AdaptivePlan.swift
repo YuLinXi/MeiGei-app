@@ -32,6 +32,10 @@ enum PlanPrefill {
         return lastCompletedSets(forHistoryKey: item.historyKey, in: history)
     }
 
+    static func lastCompletedSets(for item: PlanItem, in lookup: PlanHistoryLookup) -> [(weightKg: Double?, reps: Int?)] {
+        lookup.latestSets(for: item).map { ($0.weightKg, $0.reps) }
+    }
+
     /// 历史里某动作「上次」已完成正式组的逐组 `(重量, 次数)`，按 setIndex 升序；无则空。
     /// 仅匹配无 `planItemId` 的旧记录，避免重复同动作计划项互相串味。
     static func lastCompletedSets(forHistoryKey key: String, in history: [Workout]) -> [(weightKg: Double?, reps: Int?)] {
@@ -95,6 +99,24 @@ enum PlanPrefill {
             return WorkoutSet(setIndex: idx, weightKg: item.suggestedWeightKg, reps: item.suggestedReps)
         }
     }
+
+    static func sets(for item: PlanItem, mode: WorkoutPlanMode, lookup: PlanHistoryLookup) -> [WorkoutSet] {
+        if mode == .strict {
+            guard let count = item.suggestedSets, count > 0, item.suggestedReps != nil else { return [] }
+            return (0..<count).map {
+                WorkoutSet(setIndex: $0, weightKg: item.suggestedWeightKg, reps: item.suggestedReps)
+            }
+        }
+
+        let last = mode == .adaptive ? lastCompletedSets(for: item, in: lookup) : []
+        let count = max(1, item.suggestedSets ?? (last.isEmpty ? PlanDefaults.suggestedSets : last.count))
+        return (0..<count).map { idx in
+            if mode == .adaptive, idx < last.count {
+                return WorkoutSet(setIndex: idx, weightKg: last[idx].weightKg, reps: last[idx].reps)
+            }
+            return WorkoutSet(setIndex: idx, weightKg: item.suggestedWeightKg, reps: item.suggestedReps)
+        }
+    }
 }
 
 // MARK: - 下次训练处方预览（task 6.9）
@@ -111,7 +133,7 @@ struct PlanPrescriptionPreview {
 
         var badgeText: String {
             switch self {
-            case .strict: "严格"
+            case .strict: "严格模式"
             case .history: "历史"
             case .planPreset: "预设"
             case .defaultValue: "默认"
@@ -122,7 +144,7 @@ struct PlanPrescriptionPreview {
         var detailText: String {
             switch self {
             case .strict:
-                "严格执行 · 完成后不更新"
+                "严格模式 · 完成后不更新"
             case .history(let date):
                 "来自上次完成 · \(date.formatted(.relative(presentation: .named)))"
             case .planPreset:
@@ -177,6 +199,25 @@ struct PlanPrescriptionPreview {
         if let keptDate = lastPlanWorkoutSkippedDate(for: item, in: history, planId: planId) {
             source = .kept(keptDate)
         } else if let historyDate = PlanPrefill.lastCompletedWorkoutDate(for: item, in: history) {
+            source = .history(historyDate)
+        } else if item.suggestedSets != nil {
+            source = .planPreset
+        } else {
+            source = .defaultValue
+        }
+        return PlanPrescriptionPreview(sets: sets, source: source)
+    }
+
+    static func make(for item: PlanItem, mode: WorkoutPlanMode, lookup: PlanHistoryLookup, planId: UUID? = nil) -> PlanPrescriptionPreview {
+        let sets = PlanPrefill.sets(for: item, mode: mode, lookup: lookup)
+        if mode == .strict {
+            return PlanPrescriptionPreview(sets: sets, source: .strict)
+        }
+
+        let source: Source
+        if let keptDate = lookup.keptDate(for: item, planId: planId) {
+            source = .kept(keptDate)
+        } else if let historyDate = lookup.latestDate(for: item) {
             source = .history(historyDate)
         } else if item.suggestedSets != nil {
             source = .planPreset
@@ -436,8 +477,14 @@ struct PlanWritebackSheet: View {
 
     /// 撤销：把计划项还原至回写前快照并标脏（重新同步该还原）。
     private func undo() {
-        let plans = (try? modelContext.fetch(FetchDescriptor<WorkoutPlan>())) ?? []
-        if let p = plans.first(where: { $0.localId == receipt.planLocalId }) {
+        let planId = receipt.planLocalId
+        var descriptor = FetchDescriptor<WorkoutPlan>(
+            predicate: #Predicate {
+                $0.localId == planId
+            }
+        )
+        descriptor.fetchLimit = 1
+        if let p = (try? modelContext.fetch(descriptor))?.first {
             p.items = receipt.snapshot
             p.markDirty()
             try? modelContext.save()

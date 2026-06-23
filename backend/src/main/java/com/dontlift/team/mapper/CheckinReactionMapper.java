@@ -17,6 +17,18 @@ public interface CheckinReactionMapper extends BaseMapper<CheckinReaction> {
     @Select("SELECT * FROM checkin_reaction WHERE checkin_id = #{checkinId} ORDER BY created_at")
     List<CheckinReaction> findByCheckin(@Param("checkinId") UUID checkinId);
 
+    @Select("""
+            <script>
+            SELECT * FROM checkin_reaction
+            WHERE checkin_id IN
+            <foreach collection="checkinIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+            ORDER BY created_at
+            </script>
+            """)
+    List<CheckinReaction> findByCheckins(@Param("checkinIds") List<UUID> checkinIds);
+
     // 账号删除：本人产生的所有表情 + 本人作为 owner 的团队下打卡收到的全部表情
     @Delete("""
             DELETE FROM checkin_reaction

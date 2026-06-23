@@ -60,7 +60,7 @@ struct LiveSessionCapsule: View {
                            : .easeInOut(duration: 0.75).repeatForever(autoreverses: true),
                            value: pulsing)
             VStack(alignment: .leading, spacing: 1) {
-                Text("LIVE")
+                Text("进行中")
                     .font(Theme.Font.mono(size: 8, weight: .bold))
                     .tracking(1.2)
                     .foregroundStyle(Theme.Color.accent)

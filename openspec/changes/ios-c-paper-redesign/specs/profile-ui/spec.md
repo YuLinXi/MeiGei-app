@@ -24,14 +24,15 @@
 - **WHEN** `UserProfile` 已登录且存在至少一条 `Workout`
 - **THEN** 渲染头像 + 用户名 + 「训练龄 {years} 年」副标（纸感配色）。
 
-### Requirement: 三宫格统计
+### Requirement: 训练统计卡
 
-ProfileHeader 下方 SHALL 渲染 1×2 网格：「总训练 / 最长连续」，每格背景 `Theme.Color.surface`（白），外层 1px `Theme.Color.border`、网格内 1px `border` 分隔，两格数字均使用 `Theme.Color.fg`。原「本月 PR」格 MUST 保持移除。
+ProfileHeader 下方 SHALL 渲染单个全宽统计卡：「总训练」。该统计卡背景为 `Theme.Color.surface`（白），外层 1px `Theme.Color.border`，数字使用 `Theme.Color.fg`。原「本月 PR」格 MUST 保持移除，且 MUST NOT 展示「最长连续」。
 
 #### Scenario: 用户从未训练
 - **WHEN** `Workout` 表 0 行
-- **THEN** 两格分别显示 `0` / `0d`，不报错不空白。
+- **THEN** 统计卡显示「总训练 0」，不报错不空白。
 
-#### Scenario: 不再展示本月 PR
+#### Scenario: 不再展示本月 PR 与最长连续
 - **WHEN** 用户进入「我的」页
-- **THEN** 顶部统计仅含「总训练」与「最长连续」两格，不渲染「本月 PR」格，布局不留空位。
+- **THEN** 顶部统计仅含「总训练」
+- **AND** 不渲染「本月 PR」或「最长连续」格，布局不留空位。

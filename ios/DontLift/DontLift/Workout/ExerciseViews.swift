@@ -99,10 +99,8 @@ struct ExerciseLibraryView: View {
 
 /// 可复用动作库主体：不包含顶部标题、右上创建入口或导航外壳，可嵌入 Tab 或底部抽屉。
 private struct ExerciseLibraryContentView: View {
+    @Environment(WorkoutHistoryStore.self) private var historyStore
     @Query(sort: \CustomExercise.updatedAt, order: .reverse) private var custom: [CustomExercise]
-    @Query(filter: #Predicate<Workout> { $0.deletedAt == nil },
-           sort: \Workout.startedAt, order: .reverse)
-    private var workouts: [Workout]
 
     @State private var query = ""
     @State private var selection: LibrarySelection = .all
@@ -368,7 +366,7 @@ private struct ExerciseLibraryContentView: View {
     // MARK: 右侧动作区（器械 chip + 按树层级分段，逐行懒加载 + 返回顶部）
 
     private var rightArea: some View {
-        let prWeights = PRStats.maxWeightByKey(in: workouts)
+        let prWeights = historyStore.exercisePRs.mapValues(\.weightKg)
         return ScrollViewReader { proxy in
             VStack(spacing: 0) {
                 // 置顶器械轴：固定在右侧顶部，不随动作列表滚动；重复点已激活 chip 也回顶
@@ -395,8 +393,18 @@ private struct ExerciseLibraryContentView: View {
                 }
             }
             // 左栏筛选切换 / 器械筛选切换 → 列表自动回顶
-            .onChange(of: selection) { _, _ in proxy.scrollTo("LIB_TOP", anchor: .top) }
-            .onChange(of: equip) { _, _ in proxy.scrollTo("LIB_TOP", anchor: .top) }
+            .onAppear { WorkoutPerformanceMonitor.event("exercise.library.appear") }
+            .onChange(of: selection) { _, _ in
+                WorkoutPerformanceMonitor.event("exercise.library.filter")
+                proxy.scrollTo("LIB_TOP", anchor: .top)
+            }
+            .onChange(of: equip) { _, _ in
+                WorkoutPerformanceMonitor.event("exercise.library.filter")
+                proxy.scrollTo("LIB_TOP", anchor: .top)
+            }
+            .onChange(of: trimmedQuery) { _, _ in
+                WorkoutPerformanceMonitor.event("exercise.library.search")
+            }
         }
     }
 
@@ -567,7 +575,7 @@ private struct ExerciseLibraryContentView: View {
     @ViewBuilder
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text(searching ? "NO MATCH · 无匹配" : "EMPTY · 动作库").eyebrowStyle()
+            Text(searching ? "无匹配" : "动作库").eyebrowStyle()
             Text(searching ? "没有匹配「\(trimmedQuery)」的动作" : "该部位暂无动作")
                 .font(Theme.Font.display(size: 17, weight: .semibold))
                 .foregroundStyle(Theme.Color.fg)
@@ -1300,10 +1308,8 @@ extension String {
 struct ExerciseDetailView: View {
     let exercise: BuiltinExercise
     @Environment(SessionStore.self) private var session
+    @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(\.dismiss) private var dismiss
-    @Query(filter: #Predicate<Workout> { $0.deletedAt == nil },
-           sort: \Workout.startedAt, order: .reverse)
-    private var workouts: [Workout]
     @Query private var profiles: [UserProfile]
 
     /// 用户性别（仅切高亮图底图）。
@@ -1326,6 +1332,7 @@ struct ExerciseDetailView: View {
         .background(Theme.Color.bg.ignoresSafeArea())
         // 子页统一导航栏：纸感圆形返回钮（标题留空，动作名在内容区大字呈现）。
         .paperToolbar(onBack: { dismiss() })
+        .onAppear { WorkoutPerformanceMonitor.event("exercise.detail.appear") }
     }
 
     // MARK: 训练部位（正背肌群图）
@@ -1365,17 +1372,16 @@ struct ExerciseDetailView: View {
             .overlay(Capsule().stroke(Theme.Color.border, lineWidth: 1))
     }
 
-    // MARK: 你的数据（全部按 workouts 重算，不持久化）
+    // MARK: 你的数据（读取可重建 projection，不在视图层扫全量训练）
 
-    /// 含该动作、已结束、未软删的训练（按 startedAt 降序，沿用 workouts 排序）。
-    private var matching: [Workout] {
-        workouts.filter { $0.endedAt != nil && $0.exercises.contains { $0.historyKey == exercise.code } }
+    private var history: ExerciseHistorySnapshot {
+        historyStore.exerciseHistory(for: exercise.code)
     }
 
     private var yourDataSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             Text("你的数据").eyebrowStyle()
-            if matching.isEmpty {
+            if history.isEmpty {
                 Text("还没练过 · 去训练里记录这个动作")
                     .font(Theme.Font.body(size: 13))
                     .foregroundStyle(Theme.Color.muted)
@@ -1388,8 +1394,8 @@ struct ExerciseDetailView: View {
     }
 
     private var dataCard: some View {
-        let pr = PRStats.latestPR(for: exercise.code, in: workouts)
-        let last = matching.first
+        let pr = history.pr
+        let last = history.last
         return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             HStack(spacing: Theme.Spacing.md) {
                 dataCell("上次", lastAgoText(last))
@@ -1413,11 +1419,7 @@ struct ExerciseDetailView: View {
 
     /// 每训练日最大重量序列（按时间升序）。
     private var chartData: [(idx: Int, weight: Double)] {
-        Array(matching.reversed()).enumerated().compactMap { i, w in
-            let mx = w.exercises.filter { $0.historyKey == exercise.code }
-                .flatMap { $0.sets }.filter(\.countsForStats).compactMap { $0.weightKg }.max()
-            return mx.map { (i, $0) }
-        }
+        history.chartPoints
     }
 
     @ViewBuilder private var miniChart: some View {
@@ -1433,19 +1435,16 @@ struct ExerciseDetailView: View {
         }
     }
 
-    private func lastAgoText(_ w: Workout?) -> String {
-        guard let d = w?.startedAt else { return "—" }
+    private func lastAgoText(_ point: ExerciseHistoryPoint?) -> String {
+        guard let d = point?.date else { return "—" }
         let cal = Calendar.current
         let days = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: cal.startOfDay(for: .now)).day ?? 0
         if days <= 0 { return "今天" }
         if days == 1 { return "昨天" }
         return "\(days) 天前"
     }
-    private func lastSetText(_ w: Workout?) -> String {
-        guard let w else { return "—" }
-        let sets = w.exercises.filter { $0.historyKey == exercise.code }.flatMap { $0.sets }
-        guard let s = sets.last(where: { $0.weightKg != nil && $0.reps != nil }),
-              let wt = s.weightKg, let r = s.reps else { return "—" }
+    private func lastSetText(_ point: ExerciseHistoryPoint?) -> String {
+        guard let wt = point?.lastSetWeightKg, let r = point?.lastSetReps else { return "—" }
         return "\(formatKg(wt))×\(r)"
     }
 

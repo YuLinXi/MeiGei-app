@@ -34,10 +34,12 @@ final class SyncEngine {
         isSyncing = true
         defer { isSyncing = false }
         await runSafely { try await self.syncCustomExercises() }
+        await runSafely { try await self.syncWorkoutPlanGroups() }
         await runSafely { try await self.syncWorkoutPlans() }
         await runSafely { try await self.syncWorkouts() }
         try? modelContext.save()
         // 同步周期完成：广播给服务端权威域刷新（失败项仍 pending，下轮再播）。
+        WorkoutPerformanceMonitor.event("syncAll.completed")
         NotificationCenter.default.post(name: .dontliftSyncCompleted, object: nil)
     }
 
@@ -62,24 +64,35 @@ final class SyncEngine {
         return try await api.send("GET", domain.pullPath, query: query)
     }
 
-    private func isPending(_ s: SyncStatus) -> Bool {
-        s == .pendingCreate || s == .pendingUpdate || s == .pendingDelete
-    }
-
     // MARK: - CustomExercise
 
     private func syncCustomExercises() async throws {
-        let all = try modelContext.fetch(FetchDescriptor<CustomExercise>())
-        let pending = all.filter { isPending($0.syncStatus) }
+        let pending = try fetchPendingCustomExercises()
         if !pending.isEmpty {
             let dtos = pending.map(dto(from:))
+            let pendingById = Dictionary(uniqueKeysWithValues: pending.map { ($0.localId, $0) })
             let res: SyncPushResult<CustomExerciseDTO> = try await push(
                 .customExercises, dtos, idParts: pending.map { "\($0.localId):\($0.updatedAt.timeIntervalSince1970)" })
-            applyPushResult(res, domain: .customExercises, lookup: { id in all.first { $0.localId == id } }, apply: applyServer(_:to:))
+            applyPushResult(res, domain: .customExercises, lookup: { id in pendingById[id] }, apply: applyServer(_:to:))
         }
         let pulled: SyncPullResult<CustomExerciseDTO> = try await pull(.customExercises)
         for dto in pulled.changes { upsert(dto) }
         SyncDomain.customExercises.since = pulled.serverTime
+    }
+
+    private func fetchPendingCustomExercises() throws -> [CustomExercise] {
+        let pendingCreate = SyncStatus.pendingCreate.rawValue
+        let pendingUpdate = SyncStatus.pendingUpdate.rawValue
+        let pendingDelete = SyncStatus.pendingDelete.rawValue
+        let descriptor = FetchDescriptor<CustomExercise>(
+            predicate: #Predicate {
+                $0.syncStatusRaw == pendingCreate
+                || $0.syncStatusRaw == pendingUpdate
+                || $0.syncStatusRaw == pendingDelete
+            },
+            sortBy: [SortDescriptor(\.updatedAt)]
+        )
+        return try modelContext.fetch(descriptor)
     }
 
     private func dto(from m: CustomExercise) -> CustomExerciseDTO {
@@ -100,8 +113,7 @@ final class SyncEngine {
     }
 
     private func upsert(_ dto: CustomExerciseDTO) {
-        let all = (try? modelContext.fetch(FetchDescriptor<CustomExercise>())) ?? []
-        if let local = all.first(where: { $0.localId == dto.id }) {
+        if let local = findCustomExercise(localId: dto.id) {
             if dto.deletedAt != nil { modelContext.delete(local); return }
             if dto.updatedAt > local.updatedAt { applyServer(dto, to: local) }
         } else if dto.deletedAt == nil {
@@ -113,20 +125,111 @@ final class SyncEngine {
         }
     }
 
+    private func findCustomExercise(localId: UUID) -> CustomExercise? {
+        var descriptor = FetchDescriptor<CustomExercise>(
+            predicate: #Predicate { $0.localId == localId }
+        )
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    // MARK: - WorkoutPlanGroup
+
+    private func syncWorkoutPlanGroups() async throws {
+        let pending = try fetchPendingWorkoutPlanGroups()
+        if !pending.isEmpty {
+            let dtos = pending.map(dto(from:))
+            let pendingById = Dictionary(uniqueKeysWithValues: pending.map { ($0.localId, $0) })
+            let res: SyncPushResult<WorkoutPlanGroupDTO> = try await push(
+                .workoutPlanGroups, dtos, idParts: pending.map { "\($0.localId):\($0.updatedAt.timeIntervalSince1970)" })
+            applyPushResult(res, domain: .workoutPlanGroups, lookup: { id in pendingById[id] }, apply: applyServer(_:to:))
+        }
+        let pulled: SyncPullResult<WorkoutPlanGroupDTO> = try await pull(.workoutPlanGroups)
+        for dto in pulled.changes { upsert(dto) }
+        SyncDomain.workoutPlanGroups.since = pulled.serverTime
+    }
+
+    private func fetchPendingWorkoutPlanGroups() throws -> [WorkoutPlanGroup] {
+        let pendingCreate = SyncStatus.pendingCreate.rawValue
+        let pendingUpdate = SyncStatus.pendingUpdate.rawValue
+        let pendingDelete = SyncStatus.pendingDelete.rawValue
+        let descriptor = FetchDescriptor<WorkoutPlanGroup>(
+            predicate: #Predicate {
+                $0.syncStatusRaw == pendingCreate
+                || $0.syncStatusRaw == pendingUpdate
+                || $0.syncStatusRaw == pendingDelete
+            },
+            sortBy: [SortDescriptor(\.updatedAt)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
+    private func dto(from m: WorkoutPlanGroup) -> WorkoutPlanGroupDTO {
+        WorkoutPlanGroupDTO(id: m.localId, userId: nil, name: m.name,
+                            sortOrder: m.sortOrder,
+                            createdAt: nil, updatedAt: m.updatedAt, deletedAt: m.deletedAt, version: m.version)
+    }
+
+    private func applyServer(_ dto: WorkoutPlanGroupDTO, to m: WorkoutPlanGroup) {
+        m.name = dto.name
+        m.sortOrder = dto.sortOrder ?? 0
+        m.updatedAt = dto.updatedAt
+        m.deletedAt = dto.deletedAt
+        m.version = dto.version ?? m.version
+        m.serverId = dto.id
+        m.syncStatus = .synced
+    }
+
+    private func upsert(_ dto: WorkoutPlanGroupDTO) {
+        if let local = findWorkoutPlanGroup(localId: dto.id) {
+            if dto.deletedAt != nil { modelContext.delete(local); return }
+            if dto.updatedAt > local.updatedAt { applyServer(dto, to: local) }
+        } else if dto.deletedAt == nil {
+            let m = WorkoutPlanGroup(localId: dto.id, name: dto.name,
+                                     sortOrder: dto.sortOrder ?? 0,
+                                     now: dto.updatedAt)
+            applyServer(dto, to: m)
+            modelContext.insert(m)
+        }
+    }
+
+    private func findWorkoutPlanGroup(localId: UUID) -> WorkoutPlanGroup? {
+        var descriptor = FetchDescriptor<WorkoutPlanGroup>(
+            predicate: #Predicate { $0.localId == localId }
+        )
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
+    }
+
     // MARK: - WorkoutPlan
 
     private func syncWorkoutPlans() async throws {
-        let all = try modelContext.fetch(FetchDescriptor<WorkoutPlan>())
-        let pending = all.filter { isPending($0.syncStatus) }
+        let pending = try fetchPendingWorkoutPlans()
         if !pending.isEmpty {
             let dtos = pending.map(dto(from:))
+            let pendingById = Dictionary(uniqueKeysWithValues: pending.map { ($0.localId, $0) })
             let res: SyncPushResult<WorkoutPlanDTO> = try await push(
                 .workoutPlans, dtos, idParts: pending.map { "\($0.localId):\($0.updatedAt.timeIntervalSince1970)" })
-            applyPushResult(res, domain: .workoutPlans, lookup: { id in all.first { $0.localId == id } }, apply: applyServer(_:to:))
+            applyPushResult(res, domain: .workoutPlans, lookup: { id in pendingById[id] }, apply: applyServer(_:to:))
         }
         let pulled: SyncPullResult<WorkoutPlanDTO> = try await pull(.workoutPlans)
         for dto in pulled.changes { upsert(dto) }
         SyncDomain.workoutPlans.since = pulled.serverTime
+    }
+
+    private func fetchPendingWorkoutPlans() throws -> [WorkoutPlan] {
+        let pendingCreate = SyncStatus.pendingCreate.rawValue
+        let pendingUpdate = SyncStatus.pendingUpdate.rawValue
+        let pendingDelete = SyncStatus.pendingDelete.rawValue
+        let descriptor = FetchDescriptor<WorkoutPlan>(
+            predicate: #Predicate {
+                $0.syncStatusRaw == pendingCreate
+                || $0.syncStatusRaw == pendingUpdate
+                || $0.syncStatusRaw == pendingDelete
+            },
+            sortBy: [SortDescriptor(\.updatedAt)]
+        )
+        return try modelContext.fetch(descriptor)
     }
 
     private func dto(from m: WorkoutPlan) -> WorkoutPlanDTO {
@@ -134,6 +237,7 @@ final class SyncEngine {
         return WorkoutPlanDTO(id: m.localId, userId: nil, name: m.name, items: itemsJSON,
                               mode: m.modeRaw,
                               forkedFrom: m.forkedFrom, sharedToTeamId: m.sharedToTeamId,
+                              groupId: m.groupId, sortOrder: m.sortOrder,
                               createdAt: nil, updatedAt: m.updatedAt, deletedAt: m.deletedAt, version: m.version)
     }
 
@@ -144,6 +248,8 @@ final class SyncEngine {
         m.modeRaw = dto.mode.flatMap(WorkoutPlanMode.init(rawValue:))?.rawValue ?? WorkoutPlanMode.adaptive.rawValue
         m.forkedFrom = dto.forkedFrom
         m.sharedToTeamId = dto.sharedToTeamId
+        m.groupId = dto.groupId
+        m.sortOrder = dto.sortOrder ?? 0
         m.updatedAt = dto.updatedAt
         m.deletedAt = dto.deletedAt
         m.version = dto.version ?? m.version
@@ -157,8 +263,7 @@ final class SyncEngine {
     }
 
     private func upsert(_ dto: WorkoutPlanDTO) {
-        let all = (try? modelContext.fetch(FetchDescriptor<WorkoutPlan>())) ?? []
-        if let local = all.first(where: { $0.localId == dto.id }) {
+        if let local = findWorkoutPlan(localId: dto.id) {
             if dto.deletedAt != nil { modelContext.delete(local); return }
             if dto.updatedAt > local.updatedAt { applyServer(dto, to: local) }
         } else if dto.deletedAt == nil {
@@ -168,25 +273,48 @@ final class SyncEngine {
         }
     }
 
+    private func findWorkoutPlan(localId: UUID) -> WorkoutPlan? {
+        var descriptor = FetchDescriptor<WorkoutPlan>(
+            predicate: #Predicate { $0.localId == localId }
+        )
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
+    }
+
     // MARK: - Workout（聚合树）
 
     private func syncWorkouts() async throws {
-        let all = try modelContext.fetch(FetchDescriptor<Workout>())
-        let pending = all.filter { isPending($0.syncStatus) }
+        let pending = try fetchPendingWorkouts()
         if !pending.isEmpty {
             let dtos = pending.map(tree(from:))
+            let pendingById = Dictionary(uniqueKeysWithValues: pending.map { ($0.localId, $0) })
             let res: SyncPushResult<WorkoutTreeDTO> = try await push(
                 .workouts, dtos, idParts: pending.map { "\($0.localId):\($0.updatedAt.timeIntervalSince1970)" })
             applyPushResult(res,
                             domain: .workouts,
                             idOf: { $0.workout.id },
                             nameOf: { $0.workout.title ?? "训练" },
-                            lookup: { id in all.first { $0.localId == id } },
+                            lookup: { id in pendingById[id] },
                             apply: applyServer(tree:to:))
         }
         let pulled: SyncPullResult<WorkoutTreeDTO> = try await pull(.workouts)
         for tree in pulled.changes { upsert(tree) }
         SyncDomain.workouts.since = pulled.serverTime
+    }
+
+    private func fetchPendingWorkouts() throws -> [Workout] {
+        let pendingCreate = SyncStatus.pendingCreate.rawValue
+        let pendingUpdate = SyncStatus.pendingUpdate.rawValue
+        let pendingDelete = SyncStatus.pendingDelete.rawValue
+        let descriptor = FetchDescriptor<Workout>(
+            predicate: #Predicate {
+                $0.syncStatusRaw == pendingCreate
+                || $0.syncStatusRaw == pendingUpdate
+                || $0.syncStatusRaw == pendingDelete
+            },
+            sortBy: [SortDescriptor(\.updatedAt)]
+        )
+        return try modelContext.fetch(descriptor)
     }
 
     private func tree(from m: Workout) -> WorkoutTreeDTO {
@@ -242,8 +370,7 @@ final class SyncEngine {
     }
 
     private func upsert(_ dto: WorkoutTreeDTO) {
-        let all = (try? modelContext.fetch(FetchDescriptor<Workout>())) ?? []
-        if let local = all.first(where: { $0.localId == dto.workout.id }) {
+        if let local = findWorkout(localId: dto.workout.id) {
             if dto.workout.deletedAt != nil { modelContext.delete(local); return }
             if dto.workout.updatedAt > local.updatedAt { applyServer(tree: dto, to: local) }
         } else if dto.workout.deletedAt == nil {
@@ -251,6 +378,14 @@ final class SyncEngine {
             applyServer(tree: dto, to: m)
             modelContext.insert(m)
         }
+    }
+
+    private func findWorkout(localId: UUID) -> Workout? {
+        var descriptor = FetchDescriptor<Workout>(
+            predicate: #Predicate { $0.localId == localId }
+        )
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
     }
 
     // MARK: - push 结果落地（applied / conflicts）
@@ -298,6 +433,9 @@ protocol HasEnvelopeId {
     var envelopeName: String { get }
 }
 extension CustomExerciseDTO: HasEnvelopeId {
+    var envelopeId: UUID { id }; var envelopeName: String { name }
+}
+extension WorkoutPlanGroupDTO: HasEnvelopeId {
     var envelopeId: UUID { id }; var envelopeName: String { name }
 }
 extension WorkoutPlanDTO: HasEnvelopeId {

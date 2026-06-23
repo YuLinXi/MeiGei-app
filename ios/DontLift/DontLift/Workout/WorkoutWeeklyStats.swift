@@ -6,16 +6,13 @@ import Foundation
 /// 训练量：每组 `weightKg * reps` 求和（缺值视为 0）。
 /// 总组数：所有训练里全部 set 计数（不要求 completed，与现有 logging 视图一致）。
 /// 总次数：本周训练 session 数（按 startedAt 落入本周）。
-/// 平均时长：已结束训练的时长加权平均；未结束训练不计入。
 struct WeeklyStats: Equatable {
     var volumeKg: Double
     var sessionCount: Int
     var setCount: Int
     var repCount: Int
-    /// 平均时长（秒）。无已结束训练时为 0。
-    var avgDurationSec: Double
 
-    static let empty = WeeklyStats(volumeKg: 0, sessionCount: 0, setCount: 0, repCount: 0, avgDurationSec: 0)
+    static let empty = WeeklyStats(volumeKg: 0, sessionCount: 0, setCount: 0, repCount: 0)
 }
 
 enum WorkoutWeeklyStats {
@@ -23,7 +20,6 @@ enum WorkoutWeeklyStats {
     static func compute(workouts: [Workout], reference: Date = .now, calendar: Calendar = .currentMondayFirst) -> WeeklyStats {
         let (start, end) = weekBounds(for: reference, calendar: calendar)
         var stats = WeeklyStats.empty
-        var totalSec: Double = 0
         for w in workouts {
             guard w.deletedAt == nil else { continue }
             guard w.startedAt >= start, w.startedAt < end else { continue }
@@ -38,15 +34,7 @@ enum WorkoutWeeklyStats {
                     stats.repCount += reps
                 }
             }
-            if let ended = w.endedAt {
-                totalSec += ended.timeIntervalSince(w.timerStartedAt ?? w.startedAt)
-            }
         }
-        // 平均时长按「有结束时间的 session」加权平均。
-        let endedCount = workouts.filter {
-            $0.deletedAt == nil && $0.startedAt >= start && $0.startedAt < end && $0.endedAt != nil
-        }.count
-        stats.avgDurationSec = endedCount > 0 ? totalSec / Double(endedCount) : 0
         return stats
     }
 
@@ -61,7 +49,7 @@ enum WorkoutWeeklyStats {
 
 extension Calendar {
     /// 本应用统一用「周一起算」的日历视图（与设计稿一致）。
-    static var currentMondayFirst: Calendar {
+    nonisolated static var currentMondayFirst: Calendar {
         var c = Calendar.current
         c.firstWeekday = 2 // 1=Sun, 2=Mon
         c.minimumDaysInFirstWeek = 4

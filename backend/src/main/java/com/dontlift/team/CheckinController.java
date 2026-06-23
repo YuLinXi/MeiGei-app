@@ -3,6 +3,7 @@ package com.dontlift.team;
 import com.dontlift.security.SecurityUtils;
 import com.dontlift.team.dto.TeamRequests.CheckIn;
 import com.dontlift.team.dto.TeamRequests.React;
+import com.dontlift.team.dto.TeamCheckinFeed;
 import com.dontlift.team.entity.CheckinReaction;
 import com.dontlift.team.entity.TeamCheckin;
 import jakarta.validation.Valid;
@@ -38,6 +39,13 @@ public class CheckinController {
             @PathVariable UUID teamId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return checkinService.listCheckins(SecurityUtils.currentUserId(), teamId, date);
+    }
+
+    @GetMapping("/teams/{teamId}/checkins/feed")
+    public TeamCheckinFeed listCheckinFeed(
+            @PathVariable UUID teamId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return checkinService.listCheckinFeed(SecurityUtils.currentUserId(), teamId, date);
     }
 
     @PostMapping("/checkins/{checkinId}/reactions")

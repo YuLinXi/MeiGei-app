@@ -82,6 +82,7 @@ final class SessionStore {
         // 覆盖 AppModelContainer.schema 的全部 @Model 类型（新增模型时须同步补充）
         try? modelContext.delete(model: UserProfile.self)
         try? modelContext.delete(model: CustomExercise.self)
+        try? modelContext.delete(model: WorkoutPlanGroup.self)
         try? modelContext.delete(model: WorkoutPlan.self)
         try? modelContext.delete(model: Workout.self)
         try? modelContext.delete(model: WorkoutExercise.self)
