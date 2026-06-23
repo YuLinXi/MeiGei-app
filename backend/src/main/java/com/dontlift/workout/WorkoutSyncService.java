@@ -17,7 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 训练记录聚合根同步：LWW 作用于聚合根 workout 的 updatedAt；
@@ -45,11 +47,14 @@ public class WorkoutSyncService {
     /** 增量下拉：含软删墓碑（墓碑项 exercises 为空，让其他设备删除本地）。 */
     public SyncPullResult<WorkoutTree> pull(UUID userId, OffsetDateTime since) {
         List<Workout> changes = workoutMapper.findChangesSince(userId, since);
+        Map<UUID, WorkoutTree> loaded = loadTrees(changes.stream()
+                .filter(w -> w.getDeletedAt() == null)
+                .toList());
         List<WorkoutTree> trees = new ArrayList<>(changes.size());
         for (Workout w : changes) {
             trees.add(w.getDeletedAt() != null
                     ? new WorkoutTree(w, List.of())
-                    : loadTree(w));
+                    : loaded.getOrDefault(w.getId(), new WorkoutTree(w, List.of())));
         }
         return new SyncPullResult<>(trees, OffsetDateTime.now());
     }
@@ -103,6 +108,33 @@ public class WorkoutSyncService {
             nodes.add(new WorkoutTree.ExerciseNode(e, setMapper.findByExercise(e.getId())));
         }
         return new WorkoutTree(w, nodes);
+    }
+
+    private Map<UUID, WorkoutTree> loadTrees(List<Workout> workouts) {
+        if (workouts.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> workoutIds = workouts.stream().map(Workout::getId).toList();
+        List<WorkoutExercise> exercises = exerciseMapper.findByWorkouts(workoutIds);
+        Map<UUID, List<WorkoutExercise>> exercisesByWorkout = exercises.stream()
+                .collect(Collectors.groupingBy(WorkoutExercise::getWorkoutId));
+        List<UUID> exerciseIds = exercises.stream().map(WorkoutExercise::getId).toList();
+        Map<UUID, List<WorkoutSet>> setsByExercise = exerciseIds.isEmpty()
+                ? Map.of()
+                : setMapper.findByExercises(exerciseIds).stream()
+                .collect(Collectors.groupingBy(WorkoutSet::getWorkoutExerciseId));
+        return workouts.stream().collect(Collectors.toMap(
+                Workout::getId,
+                workout -> {
+                    List<WorkoutExercise> workoutExercises = exercisesByWorkout.getOrDefault(workout.getId(), List.of());
+                    List<WorkoutTree.ExerciseNode> nodes = new ArrayList<>(workoutExercises.size());
+                    for (WorkoutExercise exercise : workoutExercises) {
+                        nodes.add(new WorkoutTree.ExerciseNode(
+                                exercise,
+                                setsByExercise.getOrDefault(exercise.getId(), List.of())));
+                    }
+                    return new WorkoutTree(workout, nodes);
+                }));
     }
 
     /** 删旧子树（动作删除级联删组）后按上传内容重建。 */

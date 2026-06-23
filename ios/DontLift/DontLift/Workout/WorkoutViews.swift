@@ -8,9 +8,7 @@ import Charts
 struct WorkoutListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(RestTimerController.self) private var restTimer
-    @Query(filter: #Predicate<Workout> { $0.deletedAt == nil },
-           sort: \Workout.startedAt, order: .reverse)
-    private var workouts: [Workout]
+    @Environment(WorkoutHistoryStore.self) private var historyStore
     @Query(filter: #Predicate<WorkoutPlan> { $0.deletedAt == nil },
            sort: \WorkoutPlan.updatedAt, order: .reverse)
     private var plans: [WorkoutPlan]
@@ -30,35 +28,17 @@ struct WorkoutListView: View {
     /// 左滑删除协调器：同一时刻仅一张展开，点击别处自动收回（详见 SwipeDeleteList）。
     @State private var swipe = SwipeRowCoordinator()
 
-    /// 已完成训练（最近列表 / 统计仅看这些，进行中会话不混入）。
-    private var finishedWorkouts: [Workout] { workouts.filter { $0.isFinished } }
-
     private var stats: WeeklyStats {
-        WorkoutWeeklyStats.compute(workouts: finishedWorkouts)
+        historyStore.home.currentWeekStats
     }
     /// 本周已完成训练（按 startedAt 落入本周）的次数。
     private var weeklyDoneCount: Int { stats.sessionCount }
-    /// 本周训练命中 PR 的映射：workout.localId -> (动作名, 重量)。一周内只标第一项 PR。
-    private var prByWorkout: [UUID: (name: String, weight: Double)] {
-        // 历史训练按时间升序，逐次维护「每动作历史最大重量」，每当本次比历史大且为本周训练，则记一条。
-        let asc = workouts.filter { $0.deletedAt == nil && $0.endedAt != nil }
-            .sorted { $0.startedAt < $1.startedAt }
-        var best: [String: Double] = [:]
-        var out: [UUID: (String, Double)] = [:]
-        for w in asc {
-            var hit: (String, Double)?
-            for ex in w.exercises {
-                guard let m = ex.sets.filter(\.countsForStats).compactMap(\.weightKg).max() else { continue }
-                let prior = best[ex.historyKey]
-                if prior == nil || m > prior! {
-                    if hit == nil { hit = (ex.exerciseName, m) }
-                    best[ex.historyKey] = m
-                }
-            }
-            if let hit { out[w.localId] = hit }
-        }
-        return out
-    }
+    private static let weekdayFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "zh_CN")
+        fmt.dateFormat = "EEE"
+        return fmt
+    }()
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -84,6 +64,10 @@ struct WorkoutListView: View {
         // 工具栏左右上角入口均已移除：右上角原「搜索占位 + 加号菜单」、左上角「日历 / 训练历史」
         // （历史模块已删，留待后续单独立项）。开始训练唯一收敛到底部悬浮 CTA。
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            WorkoutPerformanceMonitor.event("home.appear")
+            historyStore.ensureLoaded(reason: .manual)
+        }
         // 已完成训练 / 进行中会话 → 经 openedSession 绑定式导航到对应页面。
         .navigationDestination(item: $openedSession) { workoutDestination($0) }
         // 训练冲突二次确认：统一为纸感弹窗。无独立取消按钮，点蒙层即取消；
@@ -132,6 +116,7 @@ struct WorkoutListView: View {
                         Theme.Haptics.notification(.warning)
                         w.markDeleted()
                         try? modelContext.save()
+                        historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
                     },
                     onClose: { pendingDelete = nil }
                 )
@@ -214,13 +199,8 @@ struct WorkoutListView: View {
 
     /// 近期每次训练训练量的迷你折线（Swift Charts），对齐设计稿 hero 右侧趋势图。
     @ViewBuilder private var volumeSparkline: some View {
-        let series: [(idx: Int, vol: Double)] = Array(finishedWorkouts.prefix(8))
-            .reversed().enumerated().map { item in
-                let vol = item.element.exercises
-                    .flatMap(\.sets).filter(\.countsForStats)
-                    .reduce(0.0) { $0 + (($1.weightKg ?? 0) * Double($1.reps ?? 0)) }
-                return (item.offset, vol)
-            }
+        let series: [(idx: Int, vol: Double)] = Array(historyStore.home.recent.prefix(8))
+            .reversed().enumerated().map { ($0.offset, $0.element.volumeKg) }
         if series.count >= 2 {
             Chart(series, id: \.idx) { point in
                 LineMark(x: .value("序", point.idx), y: .value("量", point.vol))
@@ -273,14 +253,14 @@ struct WorkoutListView: View {
 
     private var recentSection: some View {
         // 仅展示已完成训练，进行中会话由顶部横幅承载，不混入常规行。
-        let recent = Array(finishedWorkouts.prefix(8))
+        let recent = historyStore.home.recent
         return VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             HStack {
                 Text("RECENT · 最近训练").eyebrowStyle()
                 Spacer()
             }
             if recent.isEmpty {
-                Text("还没有训练记录")
+                Text("近 3 天还没有训练记录")
                     .font(Theme.Font.body(size: 13))
                     .foregroundStyle(Theme.Color.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -288,40 +268,39 @@ struct WorkoutListView: View {
             } else {
                 SwipeDeleteList(
                     data: recent,
-                    id: \.localId,
+                    id: \.id,
                     coordinator: swipe,
-                    onTap: { openedSession = $0 },
-                    onDelete: { w, rect in
+                    onTap: { openWorkout($0.id) },
+                    onDelete: { row, rect in
                         deleteRect = rect
-                        pendingDelete = w
+                        pendingDelete = fetchWorkout(row.id)
                     }
                 ) { recentRow($0) }
             }
         }
     }
 
-    private func recentRow(_ w: Workout) -> some View {
-        let totalSets = w.exercises.reduce(0) { $0 + $1.sets.count }
-        let durationMin: Int? = w.endedAt.map { Int($0.timeIntervalSince(w.timerStartedAt ?? w.startedAt) / 60) }
-        let pr = prByWorkout[w.localId]
+    private func recentRow(_ w: WorkoutRowSummary) -> some View {
+        let durationMin: Int? = w.durationSec.map { Int($0 / 60) }
+        let pr = w.pr
         let durText = durationMin.map { "，\($0) 分钟" } ?? ""
-        let prText = pr.map { "，\($0.name) PR \(formatKg($0.weight)) 公斤" } ?? ""
-        let a11yLabel = "\(w.title ?? "训练")，\(w.exercises.count) 个动作，\(totalSets) 组\(durText)\(prText)"
+        let prText = pr.map { "，\($0.name) PR \(formatKg($0.weightKg)) 公斤" } ?? ""
+        let a11yLabel = "\(w.title)，\(w.exerciseCount) 个动作，\(w.setCount) 组\(durText)\(prText)"
         return HStack(spacing: Theme.Spacing.md) {
             dateBlock(w.startedAt)
             VStack(alignment: .leading, spacing: 4) {
-                Text(w.title ?? "训练")
+                Text(w.title)
                     .font(Theme.Font.body(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
-                Text("\(w.exercises.count) 动作 · \(totalSets) 组" + (durationMin.map { " · \($0)′" } ?? ""))
+                Text("\(w.exerciseCount) 动作 · \(w.setCount) 组" + (durationMin.map { " · \($0)′" } ?? ""))
                     .font(Theme.Font.body(size: 12))
                     .foregroundStyle(Theme.Color.fg2)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 if let pr {
-                    Text("▲ \(pr.name) PR \(formatKg(pr.weight))kg")
+                    Text("▲ \(pr.name) PR \(formatKg(pr.weightKg))kg")
                         .font(Theme.Font.body(size: 11, weight: .medium))
                         .foregroundStyle(Theme.Color.accent)
                         .lineLimit(1)
@@ -342,10 +321,7 @@ struct WorkoutListView: View {
         let cal = Calendar.current
         let day = cal.component(.day, from: date)
         let month = cal.component(.month, from: date)
-        let fmt = DateFormatter()
-        fmt.locale = Locale(identifier: "zh_CN")
-        fmt.dateFormat = "EEE"
-        let weekday = fmt.string(from: date)
+        let weekday = Self.weekdayFormatter.string(from: date)
         return VStack(spacing: 2) {
             Text(String(format: "%02d", day)).numStyle(size: 22).foregroundStyle(Theme.Color.fg)
             Text("\(month)月 · \(weekday)")
@@ -361,7 +337,14 @@ struct WorkoutListView: View {
 
     /// 首页「进行中」计划：与「计划」页共用 `WorkoutPlan.active` 判定，供 CTA 智能单键上浮。
     private var activePlan: WorkoutPlan? {
-        WorkoutPlan.active(in: plans, workouts: workouts)
+        if let id = historyStore.home.activePlanId,
+           let plan = plans.first(where: { $0.localId == id }) {
+            return plan
+        }
+        if let recent = plans.first(where: { historyStore.home.recentPlanIds.contains($0.localId) }) {
+            return recent
+        }
+        return plans.first
     }
 
     /// CTA 文案：存在进行中计划 → 「从「X」开始」；否则按本周是否已训练给空白训练文案。
@@ -417,6 +400,7 @@ struct WorkoutListView: View {
         let w = build()
         modelContext.insert(w)
         try? modelContext.save()
+        historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
         openedSession = w
     }
 
@@ -437,7 +421,6 @@ struct WorkoutListView: View {
         beginSession {
             let w = Workout(planId: plan.localId, title: plan.name)
             let mode = plan.mode
-            let history = mode == .adaptive ? finishedWorkouts : []
             let orderedItems = plan.items.sorted(by: { $0.orderIndex < $1.orderIndex })
             for (i, item) in orderedItems.enumerated() {
                 let ex = WorkoutExercise(builtinExerciseCode: item.builtinExerciseCode,
@@ -446,10 +429,24 @@ struct WorkoutListView: View {
                                          primaryMuscle: nil,
                                          orderIndex: i,
                                          planItemId: item.itemId)
-                ex.sets = PlanPrefill.sets(for: item, mode: mode, history: history)
+                ex.sets = PlanPrefill.sets(for: item, mode: mode, lookup: historyStore.planLookup)
                 w.exercises.append(ex)
             }
             return w
+        }
+    }
+
+    private func fetchWorkout(_ id: UUID) -> Workout? {
+        var descriptor = FetchDescriptor<Workout>(
+            predicate: #Predicate { $0.localId == id && $0.deletedAt == nil }
+        )
+        descriptor.fetchLimit = 1
+        return (try? modelContext.fetch(descriptor))?.first
+    }
+
+    private func openWorkout(_ id: UUID) {
+        if let workout = fetchWorkout(id) {
+            openedSession = workout
         }
     }
 }
@@ -560,6 +557,7 @@ struct WorkoutLoggingView: View {
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(PRCelebrationCenter.self) private var prCelebration
     @Environment(PlanWritebackCenter.self) private var planWriteback
+    @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var workout: Workout
@@ -714,14 +712,16 @@ struct WorkoutLoggingView: View {
                         if menuSetId != nil { menuSetId = nil }
                     }
                 }
-                // 量取 ScrollView 视口（.global）：顶边作为可视区上界。
-                .background(
-                    GeometryReader { g in
-                        Color.clear
-                            .onChange(of: g.frame(in: .global)) { _, f in scrollViewport = f }
-                            .onAppear { scrollViewport = g.frame(in: .global) }
+                // 量取 ScrollView 视口（.global）：仅键盘聚焦时用于判断聚焦组是否已在可视区内。
+                .background {
+                    if focused != nil {
+                        GeometryReader { g in
+                            Color.clear
+                                .onChange(of: g.frame(in: .global)) { _, f in scrollViewport = f }
+                                .onAppear { scrollViewport = g.frame(in: .global) }
+                        }
                     }
-                )
+                }
                 // 聚焦单元变化时把所在组滚入键盘上方可视区；若已完整可见则不滚动。
                 .onChange(of: focused) { _, new in
                     guard let id = new?.setId else { return }
@@ -1439,8 +1439,13 @@ struct WorkoutLoggingView: View {
     /// 经计划本地编辑 markDirty 走同步域 LWW；回执 + 撤销由 PlanWritebackCenter 呈现。
     private func applyAdaptiveWriteback() {
         guard let planId = workout.planId else { return }
-        let plans = (try? modelContext.fetch(FetchDescriptor<WorkoutPlan>())) ?? []
-        guard let plan = plans.first(where: { $0.localId == planId && $0.deletedAt == nil }),
+        var descriptor = FetchDescriptor<WorkoutPlan>(
+            predicate: #Predicate {
+                $0.localId == planId && $0.deletedAt == nil
+            }
+        )
+        descriptor.fetchLimit = 1
+        guard let plan = (try? modelContext.fetch(descriptor))?.first,
               plan.mode == .adaptive else { return }
         let snapshot = plan.items
         let result = PlanWriteback.merge(planItems: plan.items, workout: workout)
@@ -1454,17 +1459,38 @@ struct WorkoutLoggingView: View {
 
     /// 重算派生数据：PR 检测（命中弹庆祝）+ Team 打卡（按 localId 幂等：训练结束时首次创建摘要）。
     private func recomputeDerived() {
-        let descriptor = FetchDescriptor<Workout>(
-            predicate: #Predicate { $0.deletedAt == nil && $0.endedAt != nil })
-        if let all = try? modelContext.fetch(descriptor) {
-            let history = all.filter { $0.localId != workout.localId }
-            let prs = detectPersonalRecords(in: workout, history: history)
+        let prs = WorkoutPerformanceMonitor.measure("finish.pr.detect") {
+            if historyStore.lastRefreshFinishedAt != nil {
+                detectPersonalRecords(in: workout, priorBestByKey: historyStore.bestWeightByExerciseKey)
+            } else {
+                detectPersonalRecordsFromFallbackHistory()
+            }
+        }
+        if !prs.isEmpty {
             // 庆祝弹窗经 App 级 center 由 MainTabView 呈现：结束训练会触发导航把本页换成
             // 只读详情页，若挂本页 sheet 会随本页销毁而一闪即逝（详见 PRCelebrationCenter）。
-            if !prs.isEmpty { prCelebration.present(prs, summary: prSummary) }
+            prCelebration.present(prs, summary: prSummary)
         }
+        historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
         let snapshot = workout
         Task { try? await teamService.checkIn(workout: snapshot) }
+    }
+
+    private func detectPersonalRecordsFromFallbackHistory() -> [PersonalRecord] {
+        let startedAt = workout.startedAt
+        let localId = workout.localId
+        var descriptor = FetchDescriptor<Workout>(
+            predicate: #Predicate {
+                $0.deletedAt == nil
+                && $0.endedAt != nil
+                && $0.startedAt < startedAt
+                && $0.localId != localId
+            },
+            sortBy: [SortDescriptor(\.startedAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 1_000
+        let history = (try? modelContext.fetch(descriptor)) ?? []
+        return detectPersonalRecords(in: workout, history: history)
     }
 
     private func touch() {
@@ -1839,13 +1865,15 @@ private struct ExerciseBlock: View {
                                    onFocus(field == .weight ? .weight(set.localId) : .reps(set.localId))
                                })
                         .id(set.localId)
-                        // 上报本行 .global frame，供父视图判断聚焦组是否已在可视区内。
-                        .background(
-                            GeometryReader { g in
-                                Color.clear.preference(key: SetRowFramesKey.self,
-                                                       value: [set.localId: g.frame(in: .global)])
+                        // 仅聚焦组上报 .global frame，供父视图判断是否已在键盘上方可视区内。
+                        .background {
+                            if focused?.setId == set.localId {
+                                GeometryReader { g in
+                                    Color.clear.preference(key: SetRowFramesKey.self,
+                                                           value: [set.localId: g.frame(in: .global)])
+                                }
                             }
-                        )
+                        }
                     }
                 }
                 .padding(.top, 4).padding(.bottom, 8)

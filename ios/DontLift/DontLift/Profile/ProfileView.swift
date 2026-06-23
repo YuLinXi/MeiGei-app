@@ -9,11 +9,10 @@ struct ProfileView: View {
     @Environment(SyncEngine.self) private var syncEngine
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(RestTimerController.self) private var restTimer
+    @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(\.modelContext) private var modelContext
 
     @Query private var profiles: [UserProfile]
-    @Query(filter: #Predicate<Workout> { $0.deletedAt == nil && $0.endedAt != nil })
-    private var workouts: [Workout]
 
     @State private var confirmLogout = false
     @State private var confirmDelete = false
@@ -38,27 +37,16 @@ struct ProfileView: View {
 
     private var profile: UserProfile? { profiles.first(where: { $0.serverUserId == session.currentUserId }) }
 
-    private var totalWorkouts: Int { workouts.count }
+    private var totalWorkouts: Int { historyStore.profile.totalWorkouts }
 
     /// 最长连续训练天数（不要求每日，按日去重连贯计）。
-    private var longestStreak: Int {
-        let cal = Calendar.current
-        let days = Set(workouts.map { cal.startOfDay(for: $0.startedAt) })
-        let sorted = days.sorted()
-        var best = 0
-        var cur = 0
-        var prev: Date?
-        for d in sorted {
-            if let p = prev, cal.date(byAdding: .day, value: 1, to: p) == d {
-                cur += 1
-            } else {
-                cur = 1
-            }
-            best = max(best, cur)
-            prev = d
-        }
-        return best
-    }
+    private var longestStreak: Int { historyStore.profile.longestStreak }
+
+    private static let joinMonthFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy.MM"
+        return fmt
+    }()
 
     private var appVersion: String {
         let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
@@ -91,6 +79,7 @@ struct ProfileView: View {
         // 自绘大标题头（对齐其它 Tab 根页范式 A），隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
         .task {
+            WorkoutPerformanceMonitor.event("profile.appear")
             healthAuthorized = healthKit.isAuthorized
             await refreshNotificationStatus()
         }
@@ -183,9 +172,7 @@ struct ProfileView: View {
         let joined = profile?.createdAt
         let monthText: String
         if let joined {
-            let fmt = DateFormatter()
-            fmt.dateFormat = "yyyy.MM"
-            monthText = "加入于 \(fmt.string(from: joined)) · "
+            monthText = "加入于 \(Self.joinMonthFormatter.string(from: joined)) · "
         } else {
             monthText = ""
         }

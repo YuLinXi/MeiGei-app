@@ -64,7 +64,8 @@ struct SwipeToDeleteCard<Content: View>: View {
     @State private var offset: CGFloat = 0
     /// 越阈触感去抖：仅在首次越过删除显露阈值时触发一次 selection。
     @State private var didReveal = false
-    /// 本行在屏幕中的全局 frame（随布局更新），删除时随回调一并回传。
+    /// 本行在屏幕中的全局 frame，删除时随回调一并回传。
+    /// 只在初次出现和左滑展开期间更新，避免纵向滚动时所有行逐帧写 @State。
     @State private var globalFrame: CGRect = .zero
     private let revealed: CGFloat = -76
     /// 显露 / 收回统一回弹，保证手感对称。
@@ -97,7 +98,7 @@ struct SwipeToDeleteCard<Content: View>: View {
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 16)
                         .onChanged { v in
-                            guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                            guard isHorizontalSwipe(v.translation) else { return }
                             if v.translation.width < 0 { offset = max(v.translation.width, revealed) }
                             else if offset < 0 { offset = min(0, revealed + v.translation.width) }
                             // 越过显露阈值首次触发选择触感，回到阈值内复位去抖标记。
@@ -105,7 +106,7 @@ struct SwipeToDeleteCard<Content: View>: View {
                             if offset > -40 { didReveal = false }
                         }
                         .onEnded { v in
-                            guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                            guard isHorizontalSwipe(v.translation) else { return }
                             if v.translation.width < -40 { reveal() } else { collapse() }
                         }
                 )
@@ -113,11 +114,17 @@ struct SwipeToDeleteCard<Content: View>: View {
                 // 左滑手势对 VoiceOver 不可达，提供等价删除自定义动作（走同一二次确认）。
                 .accessibilityAction(named: "删除") { onDelete(globalFrame) }
         }
-        // 持续记录本行的全局 frame（屏幕坐标系），供删除确认卡片定位于其正下方。
+        // 仅在必要时记录本行的全局 frame（屏幕坐标系），供删除确认卡片定位于其正下方。
         .background(GeometryReader { g in
+            let frame = g.frame(in: .global)
             Color.clear
-                .onAppear { globalFrame = g.frame(in: .global) }
-                .onChange(of: g.frame(in: .global)) { _, new in globalFrame = new }
+                .onAppear { updateGlobalFrame(frame, force: true) }
+                .onChange(of: offset < 0) { _, active in
+                    if active { updateGlobalFrame(frame, force: true) }
+                }
+                .onChange(of: frame) { _, new in
+                    updateGlobalFrame(new, force: false)
+                }
         })
         // 别的卡片展开（openID 变成别人）或父视图点击别处置 nil 时，本卡片自动收回。
         .onChange(of: openID.wrappedValue) { _, newValue in
@@ -138,5 +145,21 @@ struct SwipeToDeleteCard<Content: View>: View {
         withAnimation(snap) { offset = 0 }
         didReveal = false
         if openID.wrappedValue == rowID { openID.wrappedValue = nil }
+    }
+
+    /// 明确横向意图后才接管拖动，避免轻微横向抖动干扰 ScrollView 纵向滚动。
+    private func isHorizontalSwipe(_ translation: CGSize) -> Bool {
+        let width = abs(translation.width)
+        let height = abs(translation.height)
+        if offset < 0 {
+            return width > 8 && width > height
+        }
+        return width > 18 && width > height * 1.25
+    }
+
+    private func updateGlobalFrame(_ frame: CGRect, force: Bool) {
+        guard force || offset < 0 else { return }
+        guard globalFrame != frame else { return }
+        globalFrame = frame
     }
 }

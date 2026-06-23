@@ -21,7 +21,7 @@ final class PRCelebrationCenter {
 }
 
 /// 一条个人记录：由原始训练记录重算得出，不持久化（design.md Non-Goals）。
-struct PersonalRecord: Identifiable {
+struct PersonalRecord: Identifiable, Equatable {
     let exerciseName: String
     let weightKg: Double
     /// 此前历史最大重量；nil 表示该动作首次有重量记录。
@@ -42,13 +42,18 @@ func detectPersonalRecords(in workout: Workout, history: [Workout]) -> [Personal
             bestByKey[ex.historyKey] = max(bestByKey[ex.historyKey] ?? m, m)
         }
     }
+    return detectPersonalRecords(in: workout, priorBestByKey: bestByKey)
+}
+
+/// 使用预先构建的历史最大重量索引识别新 PR，避免结束训练时重新扫描全历史。
+func detectPersonalRecords(in workout: Workout, priorBestByKey: [String: Double]) -> [PersonalRecord] {
     var seen = Set<String>()
     var prs: [PersonalRecord] = []
     for ex in workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }) {
         guard let sessionMax = ex.sets.filter(\.countsForStats).compactMap(\.weightKg).max() else { continue }
         let key = ex.historyKey
         guard !seen.contains(key) else { continue }
-        let prior = bestByKey[key]
+        let prior = priorBestByKey[key]
         if prior == nil || sessionMax > prior! {
             prs.append(PersonalRecord(exerciseName: ex.exerciseName, weightKg: sessionMax, previousBestKg: prior))
             seen.insert(key)

@@ -8,12 +8,10 @@ import OSLog
 /// 「推荐模板」段在内置动作库数据采集完成前不渲染（开关 `showRecommendedTemplates`）。
 struct PlanListView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(WorkoutHistoryStore.self) private var historyStore
     @Query(filter: #Predicate<WorkoutPlan> { $0.deletedAt == nil },
            sort: \WorkoutPlan.updatedAt, order: .reverse)
     private var plans: [WorkoutPlan]
-    @Query(filter: #Predicate<Workout> { $0.deletedAt == nil },
-           sort: \Workout.startedAt, order: .reverse)
-    private var workouts: [Workout]
     @State private var creatingNew = false
     /// 计划详情导航：用绑定式 navigationDestination(item:) 而非 NavigationLink(value:)。
     /// 本工程是「全局唯一 NavigationStack 包 TabView」，类型注册式 navigationDestination(for:)
@@ -27,7 +25,14 @@ struct PlanListView: View {
     /// 最近在用的计划（列表置顶富卡）= 近 14 天内有 workout 关联 planId 的计划；
     /// 否则取最近更新的一个；若无任何计划则为 nil。判定逻辑复用 `WorkoutPlan.active`，与首页一致。
     private var activePlan: WorkoutPlan? {
-        WorkoutPlan.active(in: plans, workouts: workouts)
+        if let id = historyStore.home.activePlanId,
+           let plan = plans.first(where: { $0.localId == id }) {
+            return plan
+        }
+        if let recent = plans.first(where: { historyStore.home.recentPlanIds.contains($0.localId) }) {
+            return recent
+        }
+        return plans.first
     }
 
     private var otherPlans: [WorkoutPlan] {
@@ -35,16 +40,16 @@ struct PlanListView: View {
         return plans.filter { $0.localId != active.localId }
     }
 
-    private func completedWorkouts(for plan: WorkoutPlan) -> [Workout] {
-        workouts.filter { $0.planId == plan.localId && $0.endedAt != nil }
+    private func usage(for plan: WorkoutPlan) -> PlanUsageSummary {
+        historyStore.planUsage[plan.localId] ?? .empty
     }
 
-    private func behaviorSummary(for plan: WorkoutPlan, completed: [Workout]) -> String {
+    private func behaviorSummary(for plan: WorkoutPlan, usage: PlanUsageSummary) -> String {
         switch plan.mode {
         case .strict:
             "严格执行 · 不回写"
         case .adaptive:
-            completed.isEmpty ? "默认 4×10 起步 · 完成后自动更新" : "下次依据：上次完成实绩"
+            usage.completedCount == 0 ? "默认 4×10 起步 · 完成后自动更新" : "下次依据：上次完成实绩"
         }
     }
 
@@ -88,6 +93,7 @@ struct PlanListView: View {
         }
         // 自绘大标题头（与训练/动作 Tab 一致），隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear { WorkoutPerformanceMonitor.event("plan.list.appear") }
         .navigationDestination(item: $selectedPlan) { PlanDetailView(plan: $0) }
         .navigationDestination(isPresented: $creatingNew) {
             PlanEditorView(plan: nil)
@@ -114,8 +120,8 @@ struct PlanListView: View {
     private func featuredCard(_ plan: WorkoutPlan) -> some View {
         // 关联此计划的已完成训练（用于「累计次数」与 eyebrow 的「上次训练」）。
         // 全部可由本地记录重算，不展示 MVP 不支持的周计划/周期化语义。
-        let done = completedWorkouts(for: plan)
-        let lastTrained = done.map(\.startedAt).max()
+        let usage = usage(for: plan)
+        let lastTrained = usage.lastTrainedAt
         Button { selectedPlan = plan } label: {
             HStack(spacing: 0) {
                 // 左侧朱砂红竖条
@@ -136,11 +142,11 @@ struct PlanListView: View {
                     Text("\(plan.items.count) 个动作")
                         .font(Theme.Font.l4)
                         .foregroundStyle(Theme.Color.fg2)
-                    Text(behaviorSummary(for: plan, completed: done))
+                    Text(behaviorSummary(for: plan, usage: usage))
                         .font(Theme.Font.mono(size: 11, weight: .semibold))
                         .foregroundStyle(Theme.Color.muted)
                     HStack(spacing: Theme.Spacing.xl) {
-                        metaCol(title: "累计", value: "\(done.count) 次")
+                        metaCol(title: "累计", value: "\(usage.completedCount) 次")
                         metaCol(title: "总组数", value: "\(plan.totalSuggestedSets)")
                         metaCol(title: "模式", value: plan.mode.displayName)
                     }
@@ -167,7 +173,7 @@ struct PlanListView: View {
     }
 
     private func planCard(_ plan: WorkoutPlan) -> some View {
-        let done = completedWorkouts(for: plan)
+        let usage = usage(for: plan)
         return HStack {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
@@ -179,7 +185,7 @@ struct PlanListView: View {
                 Text("\(plan.items.count) 个动作 · \(plan.totalSuggestedSets) 组")
                     .font(Theme.Font.mono(size: 11))
                     .foregroundStyle(Theme.Color.muted)
-                Text(behaviorSummary(for: plan, completed: done))
+                Text(behaviorSummary(for: plan, usage: usage))
                     .font(Theme.Font.mono(size: 11))
                     .foregroundStyle(Theme.Color.muted)
             }
@@ -230,9 +236,7 @@ struct PlanDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(RestTimerController.self) private var restTimer
-    @Query(filter: #Predicate<Workout> { $0.deletedAt == nil && $0.endedAt != nil },
-           sort: \Workout.startedAt, order: .reverse)
-    private var finishedWorkouts: [Workout]
+    @Environment(WorkoutHistoryStore.self) private var historyStore
 
     @State private var pickingExercise = false
     @State private var editingItem: PlanItem?
@@ -313,6 +317,7 @@ struct PlanDetailView: View {
         }
         // 对齐原型 .footer：scroll 与 footer 为兄弟（内容不穿底栏），底栏实底 + 顶部分隔线。
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+        .onAppear { WorkoutPerformanceMonitor.event("plan.detail.appear") }
         // 子页统一导航栏：圆形返回 + ⋯ 菜单（标题留空，计划名在内容区大字呈现）。
         .paperToolbar(onBack: { dismiss() }) {
             CircleIconMenu(systemName: "ellipsis") {
@@ -496,7 +501,7 @@ struct PlanDetailView: View {
         // 序号按当前顺序推出（动作数极少，firstIndex 开销可忽略）。
         let index = (orderedItems.firstIndex { $0.itemId == item.itemId } ?? 0) + 1
         let preview = PlanPrescriptionPreview.make(for: item, mode: plan.mode,
-                                                   history: finishedWorkouts, planId: plan.localId)
+                                                   lookup: historyStore.planLookup, planId: plan.localId)
         let showsSource = plan.mode != .strict
         return HStack(spacing: 11) {
             Text(String(format: "%02d", index))
@@ -737,11 +742,6 @@ struct PlanDetailView: View {
     private func buildFromPlan() -> Workout {
         let w = Workout(planId: plan.localId, title: plan.name)
         let mode = plan.mode
-        // 自适应历史回填：取已完成训练（本会话尚未建，无需排除自身）。严格模式不需历史。
-        let history: [Workout] = (mode == .adaptive)
-            ? (try? modelContext.fetch(FetchDescriptor<Workout>(
-                predicate: #Predicate { $0.deletedAt == nil && $0.endedAt != nil }))) ?? []
-            : []
         for (i, item) in orderedItems.enumerated() {
             let ex = WorkoutExercise(
                 builtinExerciseCode: item.builtinExerciseCode,
@@ -751,7 +751,7 @@ struct PlanDetailView: View {
                 planItemId: item.itemId   // 自适应回写合并主键（design.md D3）
             )
             // 按模式落值（design.md D1/D4）：严格整组复制预设；自适应历史优先→回退预设。
-            ex.sets = PlanPrefill.sets(for: item, mode: mode, history: history)
+            ex.sets = PlanPrefill.sets(for: item, mode: mode, lookup: historyStore.planLookup)
             w.exercises.append(ex)
         }
         return w
@@ -761,6 +761,7 @@ struct PlanDetailView: View {
         let w = build()
         modelContext.insert(w)
         try? modelContext.save()
+        historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
         startedSession = w
     }
 

@@ -198,6 +198,11 @@ struct CheckinReactionDTO: Decodable, Identifiable, Hashable {
     var emoji: String        // muscle | fire | clap | heart
 }
 
+struct TeamCheckinFeedDTO: Decodable {
+    var checkins: [TeamCheckinDTO]
+    var reactions: [CheckinReactionDTO]
+}
+
 /// 服务端计划模板（Team 内浏览/Fork 用，items 同为 jsonb 字符串）。
 struct ServerPlanDTO: Decodable, Identifiable, Hashable {
     var id: UUID

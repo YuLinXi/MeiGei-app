@@ -17,6 +17,7 @@ struct TeamListView: View {
     @State private var selectedTeam: TeamDTO?
     @State private var error: String?
     @State private var actionToast: String?   // 退出/解散返回后的黑底结果 toast
+    @State private var isReloading = false
 
     var body: some View {
         ZStack {
@@ -320,6 +321,9 @@ struct TeamListView: View {
     }
 
     private func reload() async {
+        guard !isReloading else { return }
+        isReloading = true
+        defer { isReloading = false }
         do { try await teamService.loadMyTeams() }
         catch { self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
     }
@@ -607,6 +611,7 @@ struct TeamDetailView: View {
     @State private var checkins: [TeamCheckinDTO] = []
     @State private var reactions: [UUID: [CheckinReactionDTO]] = [:]
     @State private var error: String?
+    @State private var isReloading = false
 
     // ⋯ 操作菜单 → 二次确认 → 结果反馈 状态机
     @State private var showActionSheet = false
@@ -1051,23 +1056,19 @@ struct TeamDetailView: View {
     // MARK: 数据加载与动作
 
     private func reload() async {
+        guard !isReloading else { return }
+        isReloading = true
+        defer { isReloading = false }
         do {
             async let m = teamService.members(of: team.id)
-            async let c = teamService.checkins(teamId: team.id)
+            async let feed = teamService.checkinFeed(teamId: team.id)
             members = try await m
-            checkins = try await c
-            await loadReactions()
+            let loadedFeed = try await feed
+            checkins = loadedFeed.checkins
+            reactions = Dictionary(grouping: loadedFeed.reactions, by: \.checkinId)
         } catch {
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
-    }
-
-    private func loadReactions() async {
-        var map: [UUID: [CheckinReactionDTO]] = [:]
-        for c in checkins {
-            map[c.id] = (try? await teamService.reactions(checkinId: c.id)) ?? []
-        }
-        reactions = map
     }
 
     /// 6.5 乐观更新（单选·可取消）：一人一打卡只点一个表情。
@@ -1280,6 +1281,7 @@ struct TeamPlansView: View {
     @State private var error: String?
     @State private var toast: String?
     @State private var forking: UUID?
+    @State private var isReloading = false
 
     var body: some View {
         ZStack {
@@ -1355,6 +1357,9 @@ struct TeamPlansView: View {
     }
 
     private func reload() async {
+        guard !isReloading else { return }
+        isReloading = true
+        defer { isReloading = false }
         do { plans = try await teamService.plans(of: team.id) }
         catch { self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
     }

@@ -4,21 +4,28 @@ import UIKit
 
 /// 主界面 Tab：训练三件套 + Team + 我的（饮食模块已移出 MVP）。
 struct MainTabView: View {
+    @Environment(\.modelContext) private var modelContext
     @Environment(RestTimerController.self) private var restTimer
     @Environment(PRCelebrationCenter.self) private var prCelebration
     @Environment(PlanWritebackCenter.self) private var planWriteback
+    @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// 全局进行中会话（LIVE 悬浮胶囊来源）：未删除且未结束 = isActive。
-    /// 因 `Workout.isActive` 是计算属性不能进 `#Predicate`，此处直接展开其条件。
-    @Query(filter: #Predicate<Workout> { $0.deletedAt == nil && $0.endedAt == nil },
-           sort: \Workout.startedAt, order: .reverse)
-    private var activeWorkouts: [Workout]
-    private var activeSession: Workout? { activeWorkouts.first }
+    @State private var activeSession: Workout?
     /// 全局胶囊点击 → push 进行中记录页（活跃会话必为 isActive，无需 finished 分流）。
     @State private var openedSession: Workout?
     @State private var activeRootSheet: RootSheet?
     @State private var presentedRootSheet: RootSheet?
+    @State private var selectedTab: MainTab = .workout
+
+    private enum MainTab: Hashable {
+        case workout
+        case plan
+        case exercise
+        case team
+        case profile
+    }
 
     private enum RootSheet: String, Identifiable {
         case planWriteback
@@ -85,17 +92,22 @@ struct MainTabView: View {
         // 全局唯一 NavigationStack 包 TabView：push 页渲染在 TabView（含 Tab Bar）之上，
         // 所有二级/三级页天然全屏、标准右滑入转场，Tab Bar 被盖住而非做消失动画。
         NavigationStack {
-            TabView {
+            TabView(selection: $selectedTab) {
                 WorkoutListView()
                     .tabItem { Label("训练", image: "tabTrain") }
+                    .tag(MainTab.workout)
                 PlanListView()
                     .tabItem { Label("计划", image: "tabPlan") }
+                    .tag(MainTab.plan)
                 ExerciseLibraryView()
                     .tabItem { Label("动作", image: "tabExercise") }
+                    .tag(MainTab.exercise)
                 TeamListView()
                     .tabItem { Label("Team", image: "tabTeam") }
+                    .tag(MainTab.team)
                 ProfileView()
                     .tabItem { Label("我的", image: "tabProfile") }
+                    .tag(MainTab.profile)
             }
             .toolbarBackground(Theme.Color.bg, for: .navigationBar)
             .toolbarColorScheme(.light, for: .navigationBar)
@@ -112,6 +124,19 @@ struct MainTabView: View {
             .navigationDestination(item: $openedSession) { WorkoutLoggingView(workout: $0) }
         }
         .tint(Theme.Color.accent)
+        .onAppear { refreshActiveSession() }
+        .onChange(of: selectedTab) { _, tab in
+            if tab == .workout {
+                WorkoutPerformanceMonitor.event("home.tab.selected")
+                refreshActiveSession()
+            }
+        }
+        .onChange(of: historyStore.lastRefreshFinishedAt) { _, _ in
+            refreshActiveSession()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dontliftSyncCompleted)) { _ in
+            refreshActiveSession()
+        }
         // 休息全屏弹窗：挂在全局 NavigationStack 之上的 overlay，层级高于 push 页与 Tab Bar；
         // 纯 .opacity 渐隐、无位移。
         .overlay {
@@ -170,5 +195,9 @@ struct MainTabView: View {
         }
         presentedRootSheet = nil
         presentNextRootSheetIfNeeded()
+    }
+
+    private func refreshActiveSession() {
+        activeSession = WorkoutSession.activeSession(in: modelContext)
     }
 }

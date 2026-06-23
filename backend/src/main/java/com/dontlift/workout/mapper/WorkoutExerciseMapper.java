@@ -14,6 +14,18 @@ public interface WorkoutExerciseMapper extends BaseMapper<WorkoutExercise> {
     @Select("SELECT * FROM workout_exercise WHERE workout_id = #{workoutId} ORDER BY order_index")
     List<WorkoutExercise> findByWorkout(@Param("workoutId") UUID workoutId);
 
+    @Select("""
+            <script>
+            SELECT * FROM workout_exercise
+            WHERE workout_id IN
+            <foreach collection="workoutIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+            ORDER BY workout_id, order_index
+            </script>
+            """)
+    List<WorkoutExercise> findByWorkouts(@Param("workoutIds") List<UUID> workoutIds);
+
     // 整树替换：删动作即级联删其下各组（ON DELETE CASCADE）
     @Delete("DELETE FROM workout_exercise WHERE workout_id = #{workoutId}")
     int deleteByWorkout(@Param("workoutId") UUID workoutId);

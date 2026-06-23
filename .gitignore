@@ -12,6 +12,9 @@
 **/__pycache__/
 *.pyc
 
+# Codex/导入调研临时产物（可重建，不应入库）
+.codex-tmp/
+
 # Xcode 构建产物 / DerivedData（ios-sim-dev.sh 写入 ios/DontLift/build/sim-dd，可重建）
 **/build/
 **/DerivedData/
