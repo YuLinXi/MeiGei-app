@@ -107,13 +107,16 @@ public class AccountDeletionService {
     }
 
     private void transferOrDeleteOwnedTeams(UUID userId) {
-        List<Team> ownedTeams = teamMapper.findActiveOwnedTeams(userId);
+        List<Team> ownedTeams = teamMapper.findOwnedTeamsIncludingDeleted(userId);
         for (Team team : ownedTeams) {
+            if (team.getDeletedAt() != null) {
+                deleteOwnedTeamResidue(team.getId());
+                log.info("删号清理已解散 Team 残留 team={} owner={}", team.getId(), userId);
+                continue;
+            }
             TeamMember replacement = teamMemberMapper.findOldestOtherMember(team.getId(), userId);
             if (replacement == null) {
-                teamCheckinMapper.deleteByTeam(team.getId());
-                teamMemberMapper.deleteByTeam(team.getId());
-                teamMapper.hardDeleteById(team.getId());
+                deleteOwnedTeamResidue(team.getId());
                 log.info("删号删除空 Team team={} owner={}", team.getId(), userId);
                 continue;
             }
@@ -121,6 +124,12 @@ public class AccountDeletionService {
             teamMemberMapper.updateRole(team.getId(), replacement.getUserId(), "owner");
             log.info("删号转移 Team owner team={} from={} to={}", team.getId(), userId, replacement.getUserId());
         }
+    }
+
+    private void deleteOwnedTeamResidue(UUID teamId) {
+        teamCheckinMapper.deleteByTeam(teamId);
+        teamMemberMapper.deleteByTeam(teamId);
+        teamMapper.hardDeleteById(teamId);
     }
 
     private void revokeAppleIfPossible(UUID userId) {

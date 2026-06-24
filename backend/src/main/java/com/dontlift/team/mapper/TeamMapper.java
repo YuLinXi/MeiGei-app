@@ -36,6 +36,9 @@ public interface TeamMapper extends BaseMapper<Team> {
                       @Param("oldOwnerId") UUID oldOwnerId,
                       @Param("newOwnerId") UUID newOwnerId);
 
+    @Select("SELECT * FROM team WHERE owner_user_id = #{userId} ORDER BY created_at")
+    List<Team> findOwnedTeamsIncludingDeleted(@Param("userId") UUID userId);
+
     @Select("SELECT * FROM team WHERE owner_user_id = #{userId} AND deleted_at IS NULL ORDER BY created_at")
     List<Team> findActiveOwnedTeams(@Param("userId") UUID userId);
 

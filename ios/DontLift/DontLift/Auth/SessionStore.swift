@@ -69,6 +69,9 @@ final class SessionStore {
     }
 
     func logout() {
+        if let currentUserId {
+            TeamService.clearStoredShareState(userId: currentUserId)
+        }
         Keychain.delete(Self.tokenKey)
         token = nil
         currentUserId = nil
@@ -79,6 +82,7 @@ final class SessionStore {
     /// 删号成功后：物理清空本地 SwiftData 全部用户数据 + 重置同步水位 + 清 Keychain JWT 并登出。
     /// 与「退出登录」不同——退出仅清登录态、保留本地数据，删号则不留任何残留。
     func wipeLocalDataAndLogout() {
+        let userId = currentUserId
         // 覆盖 AppModelContainer.schema 的全部 @Model 类型（新增模型时须同步补充）
         try? modelContext.delete(model: UserProfile.self)
         try? modelContext.delete(model: CustomExercise.self)
@@ -89,6 +93,9 @@ final class SessionStore {
         try? modelContext.delete(model: WorkoutSet.self)
         try? modelContext.save()
         SyncDomain.resetAllWatermarks()
+        if let userId {
+            TeamService.clearStoredShareState(userId: userId)
+        }
         logout()
     }
 

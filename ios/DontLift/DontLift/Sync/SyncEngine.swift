@@ -5,6 +5,8 @@ extension Notification.Name {
     /// 一轮 `syncAll()` 完成（push/pull 走完一遍）后广播；供服务端权威域（如 Team 今日动态）据此重拉，
     /// 保证「删训练 → 同步后端撤销 checkin → Team feed 反映移除」的有序刷新。
     static let dontliftSyncCompleted = Notification.Name("dontlift.sync.completed")
+    /// workout 域完整 push/pull 且本地落盘成功后广播；用于重放依赖服务端 workout 已存在的队列任务。
+    static let dontliftWorkoutSyncSucceeded = Notification.Name("dontlift.sync.workouts.succeeded")
 }
 
 /// 离线优先同步引擎（design.md D2/D3/D4）。
@@ -36,15 +38,30 @@ final class SyncEngine {
         await runSafely { try await self.syncCustomExercises() }
         await runSafely { try await self.syncWorkoutPlanGroups() }
         await runSafely { try await self.syncWorkoutPlans() }
-        await runSafely { try await self.syncWorkouts() }
-        try? modelContext.save()
+        let workoutsSynced = await runSafely { try await self.syncWorkouts() }
+        let saved: Bool
+        do {
+            try modelContext.save()
+            saved = true
+        } catch {
+            saved = false
+        }
         // 同步周期完成：广播给服务端权威域刷新（失败项仍 pending，下轮再播）。
         WorkoutPerformanceMonitor.event("syncAll.completed")
         NotificationCenter.default.post(name: .dontliftSyncCompleted, object: nil)
+        if workoutsSynced && saved {
+            NotificationCenter.default.post(name: .dontliftWorkoutSyncSucceeded, object: nil)
+        }
     }
 
-    private func runSafely(_ op: () async throws -> Void) async {
-        do { try await op() } catch { /* 失败项保持 pending，下次重试 */ }
+    private func runSafely(_ op: () async throws -> Void) async -> Bool {
+        do {
+            try await op()
+            return true
+        } catch {
+            // 失败项保持 pending，下次重试。
+            return false
+        }
     }
 
     // MARK: - 通用 push / pull

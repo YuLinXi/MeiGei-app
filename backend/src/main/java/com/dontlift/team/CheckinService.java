@@ -10,6 +10,8 @@ import com.dontlift.team.entity.TeamMember;
 import com.dontlift.team.mapper.CheckinReactionMapper;
 import com.dontlift.team.mapper.TeamCheckinMapper;
 import com.dontlift.team.mapper.TeamMemberMapper;
+import com.dontlift.workout.entity.Workout;
+import com.dontlift.workout.mapper.WorkoutMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,14 +35,16 @@ public class CheckinService {
     private final CheckinReactionMapper reactionMapper;
     private final TeamService teamService;
     private final PushService pushService;
+    private final WorkoutMapper workoutMapper;
 
     public CheckinService(TeamMemberMapper memberMapper, TeamCheckinMapper checkinMapper, CheckinReactionMapper reactionMapper,
-                          TeamService teamService, PushService pushService) {
+                          TeamService teamService, PushService pushService, WorkoutMapper workoutMapper) {
         this.memberMapper = memberMapper;
         this.checkinMapper = checkinMapper;
         this.reactionMapper = reactionMapper;
         this.teamService = teamService;
         this.pushService = pushService;
+        this.workoutMapper = workoutMapper;
     }
 
     /**
@@ -52,6 +56,7 @@ public class CheckinService {
         if (teamIds == null || teamIds.isEmpty()) {
             throw AppException.badRequest("请选择要分享的 Team");
         }
+        requireShareableWorkout(userId, workoutId);
         List<TeamCheckin> affected = new ArrayList<>();
         for (UUID teamId : new LinkedHashSet<>(teamIds)) {
             teamService.requireMember(teamId, userId);
@@ -77,6 +82,13 @@ public class CheckinService {
             notifyOtherMembers(teamId, userId, "队友打卡了", "你的训练搭子完成了今天的训练");
         }
         return affected;
+    }
+
+    private void requireShareableWorkout(UUID userId, UUID workoutId) {
+        Workout workout = workoutMapper.findByIdIncludingDeleted(workoutId);
+        if (workout == null || !userId.equals(workout.getUserId()) || workout.getDeletedAt() != null) {
+            throw AppException.notFound("训练尚未同步或已删除，暂不能分享");
+        }
     }
 
     public List<TeamCheckin> listCheckins(UUID userId, UUID teamId, LocalDate date) {

@@ -6,6 +6,8 @@ import com.dontlift.team.entity.TeamCheckin;
 import com.dontlift.team.mapper.CheckinReactionMapper;
 import com.dontlift.team.mapper.TeamCheckinMapper;
 import com.dontlift.team.mapper.TeamMemberMapper;
+import com.dontlift.workout.entity.Workout;
+import com.dontlift.workout.mapper.WorkoutMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -32,6 +34,7 @@ class CheckinServiceTest {
     @Mock CheckinReactionMapper reactionMapper;
     @Mock TeamService teamService;
     @Mock PushService pushService;
+    @Mock WorkoutMapper workoutMapper;
 
     @InjectMocks CheckinService service;
 
@@ -51,6 +54,8 @@ class CheckinServiceTest {
 
     @Test
     void checkIn_createsOnlySelectedTeam() {
+        givenShareableWorkout();
+
         List<TeamCheckin> result = service.checkIn(userId, workoutId, today, "{\"exerciseCount\":1}", List.of(teamId));
 
         assertThat(result).hasSize(1);
@@ -64,6 +69,7 @@ class CheckinServiceTest {
 
     @Test
     void checkIn_updatesExistingCheckinAndReturnsIt() {
+        givenShareableWorkout();
         TeamCheckin existing = new TeamCheckin();
         existing.setId(UUID.randomUUID());
         existing.setTeamId(teamId);
@@ -82,6 +88,7 @@ class CheckinServiceTest {
 
     @Test
     void checkIn_propagatesForbiddenForNonMember() {
+        givenShareableWorkout();
         when(teamService.requireMember(teamId, userId)).thenThrow(AppException.forbidden("非该 Team 成员"));
 
         assertThatThrownBy(() -> service.checkIn(userId, workoutId, today, "{}", List.of(teamId)))
@@ -92,10 +99,29 @@ class CheckinServiceTest {
     }
 
     @Test
+    void checkIn_rejectsUnsyncedWorkout() {
+        when(workoutMapper.findByIdIncludingDeleted(workoutId)).thenReturn(null);
+
+        assertThatThrownBy(() -> service.checkIn(userId, workoutId, today, "{}", List.of(teamId)))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("训练尚未同步");
+
+        verify(teamService, never()).requireMember(teamId, userId);
+        verify(checkinMapper, never()).insert(any(TeamCheckin.class));
+    }
+
+    @Test
     void withdraw_deletesOnlySelectedTeamCheckin() {
         service.withdraw(userId, teamId, workoutId);
 
         verify(teamService).requireMember(teamId, userId);
         verify(checkinMapper).deleteByTeamUserWorkout(teamId, userId, workoutId);
+    }
+
+    private void givenShareableWorkout() {
+        Workout workout = new Workout();
+        workout.setId(workoutId);
+        workout.setUserId(userId);
+        when(workoutMapper.findByIdIncludingDeleted(workoutId)).thenReturn(workout);
     }
 }

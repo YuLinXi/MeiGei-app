@@ -6,9 +6,18 @@ import Foundation
 @Observable
 final class TeamService {
     private let api: APIClient
-    private static let pendingShareKey = "dontlift.team.pendingCheckinShares"
+    private static let legacyPendingShareKey = "dontlift.team.pendingCheckinShares"
+    private static func pendingShareKey(userId: UUID) -> String {
+        "dontlift.team.pendingCheckinShares.\(userId.uuidString)"
+    }
     private static func autoShareCacheKey(userId: UUID) -> String {
         "dontlift.team.autoShareTeamIds.\(userId.uuidString)"
+    }
+    static func clearStoredShareState(userId: UUID) {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: pendingShareKey(userId: userId))
+        defaults.removeObject(forKey: autoShareCacheKey(userId: userId))
+        defaults.removeObject(forKey: legacyPendingShareKey)
     }
     private(set) var teams: [TeamDTO] = []
 
@@ -17,6 +26,8 @@ final class TeamService {
 
     init(api: APIClient = .shared) {
         self.api = api
+        // b8 前的队列未按 userId 隔离；升级后直接丢弃，避免跨账号重放旧摘要。
+        UserDefaults.standard.removeObject(forKey: Self.legacyPendingShareKey)
     }
 
     // MARK: - 空间与成员
@@ -133,15 +144,20 @@ final class TeamService {
     }
 
     /// 显式分享；失败时把用户已确认的分享意图持久化，待后续同步完成后重试。
-    func shareOrQueue(draft: TeamShareDraft, teamIds: [UUID]) async -> TeamShareResult {
+    func shareOrQueue(draft: TeamShareDraft, teamIds: [UUID], userId: UUID?) async -> TeamShareResult {
         guard !teamIds.isEmpty else { return .privateOnly }
+        guard let userId else { return .failed("登录状态已失效") }
         let intent = PendingCheckinShare(draft: draft, teamIds: teamIds)
+        guard draft.isWorkoutSynced else {
+            enqueue(intent, userId: userId)
+            return .queued
+        }
         do {
             let checkins = try await send(intent)
-            removePending(intent)
+            removePending(intent, userId: userId)
             return .shared(count: checkins.count)
-        } catch APIError.transport {
-            enqueue(intent)
+        } catch where shouldQueueShareRetry(error) {
+            enqueue(intent, userId: userId)
             return .queued
         } catch {
             return .failed(error.localizedDescription)
@@ -150,17 +166,17 @@ final class TeamService {
 
     /// 训练完成后的低打扰自动分享：只读取用户已在 Team 内开启的偏好。
     func autoShareOrQueue(draft: TeamShareDraft, userId: UUID?) async -> TeamShareResult {
+        guard let userId else { return .privateOnly }
         do {
             let enabledTeamIds = try await mySharePreferences(cacheFor: userId)
                 .filter(\.autoShareWorkouts)
                 .map(\.teamId)
             guard !enabledTeamIds.isEmpty else { return .privateOnly }
-            return await shareOrQueue(draft: draft, teamIds: enabledTeamIds)
+            return await shareOrQueue(draft: draft, teamIds: enabledTeamIds, userId: userId)
         } catch APIError.transport {
-            guard let userId else { return .privateOnly }
             let cachedTeamIds = cachedAutoShareTeamIds(userId: userId)
             guard !cachedTeamIds.isEmpty else { return .privateOnly }
-            return await shareOrQueue(draft: draft, teamIds: cachedTeamIds)
+            return await shareOrQueue(draft: draft, teamIds: cachedTeamIds, userId: userId)
         } catch {
             return .failed(error.localizedDescription)
         }
@@ -170,18 +186,29 @@ final class TeamService {
         try await api.sendVoid("DELETE", "/teams/\(teamId)/checkins/workouts/\(workoutId)")
     }
 
-    /// 同步完成后由 MainTab 触发：重放此前用户明确选择过、但网络失败的分享意图。
-    func retryPendingShares() async {
-        let intents = pendingShares
+    /// workout 同步成功后由 MainTab 触发：只重放当前用户、且本地 workout 已处于 synced 的分享意图。
+    func retryPendingShares(userId: UUID, syncedDrafts: [UUID: TeamShareDraft]) async {
+        let intents = pendingShares(userId: userId)
         guard !intents.isEmpty else { return }
         for intent in intents {
+            guard let currentDraft = syncedDrafts[intent.workoutId] else { continue }
+            let readyIntent = intent.matches(currentDraft)
+                ? intent
+                : PendingCheckinShare(draft: currentDraft, teamIds: intent.teamIds)
             do {
-                _ = try await send(intent)
-                removePending(intent)
+                _ = try await send(readyIntent)
+                removePending(intent, userId: userId)
+                removePending(readyIntent, userId: userId)
+            } catch where shouldQueueShareRetry(error) {
+                replacePending(intent, with: readyIntent, userId: userId)
             } catch {
                 // 保留待下轮同步后重试。
             }
         }
+    }
+
+    func pendingShareWorkoutIds(userId: UUID) -> Set<UUID> {
+        Set(pendingShares(userId: userId).map(\.workoutId))
     }
 
     // MARK: - 工具
@@ -205,28 +232,43 @@ final class TeamService {
                                   idempotencyKey: intent.idempotencyKey)
     }
 
-    private var pendingShares: [PendingCheckinShare] {
-        get {
-            guard let data = UserDefaults.standard.data(forKey: Self.pendingShareKey),
-                  let decoded = try? JSONCoding.decoder.decode([PendingCheckinShare].self, from: data) else {
-                return []
-            }
-            return decoded
+    private func pendingShares(userId: UUID) -> [PendingCheckinShare] {
+        guard let data = UserDefaults.standard.data(forKey: Self.pendingShareKey(userId: userId)),
+              let decoded = try? JSONCoding.decoder.decode([PendingCheckinShare].self, from: data) else {
+            return []
         }
-        set {
-            let data = try? JSONCoding.encoder.encode(newValue)
-            UserDefaults.standard.set(data, forKey: Self.pendingShareKey)
-        }
+        return decoded
     }
 
-    private func enqueue(_ intent: PendingCheckinShare) {
-        var items = pendingShares.filter { $0.id != intent.id }
+    private func setPendingShares(_ items: [PendingCheckinShare], userId: UUID) {
+        let data = try? JSONCoding.encoder.encode(items)
+        UserDefaults.standard.set(data, forKey: Self.pendingShareKey(userId: userId))
+    }
+
+    private func enqueue(_ intent: PendingCheckinShare, userId: UUID) {
+        var items = pendingShares(userId: userId).filter { $0.id != intent.id }
         items.append(intent)
-        pendingShares = items
+        setPendingShares(items, userId: userId)
     }
 
-    private func removePending(_ intent: PendingCheckinShare) {
-        pendingShares = pendingShares.filter { $0.id != intent.id }
+    private func removePending(_ intent: PendingCheckinShare, userId: UUID) {
+        setPendingShares(pendingShares(userId: userId).filter { $0.id != intent.id }, userId: userId)
+    }
+
+    private func replacePending(_ oldIntent: PendingCheckinShare, with newIntent: PendingCheckinShare, userId: UUID) {
+        var items = pendingShares(userId: userId).filter { $0.id != oldIntent.id && $0.id != newIntent.id }
+        items.append(newIntent)
+        setPendingShares(items, userId: userId)
+    }
+
+    private func shouldQueueShareRetry(_ error: Error) -> Bool {
+        if case APIError.transport = error { return true }
+        if case APIError.http(let status, let body) = error,
+           status == 404,
+           body.contains("训练尚未同步") {
+            return true
+        }
+        return false
     }
 
     private func cachedAutoShareTeamIds(userId: UUID) -> [UUID] {
@@ -281,6 +323,12 @@ private struct PendingCheckinShare: Codable, Identifiable, Equatable {
 
     var idempotencyKey: String {
         "share-checkin-\(id)"
+    }
+
+    func matches(_ draft: TeamShareDraft) -> Bool {
+        workoutId == draft.workoutId
+        && checkinDate == draft.checkinDate
+        && summary == draft.summary
     }
 }
 

@@ -19,14 +19,17 @@ struct TeamShareDraft: Identifiable, Codable, Hashable {
     var checkinDate: String
     var summary: CheckinSummary
     var updatedAt: Date
+    var workoutSyncStatusRaw: String
 
     var id: UUID { workoutId }
+    var isWorkoutSynced: Bool { workoutSyncStatusRaw == SyncStatus.synced.rawValue }
 
     init(workout: Workout) {
         self.workoutId = workout.localId
         self.checkinDate = TeamService.dateOnly(workout.startedAt)
         self.summary = CheckinSummary(workout: workout)
         self.updatedAt = workout.updatedAt
+        self.workoutSyncStatusRaw = workout.syncStatus.rawValue
     }
 }
 
@@ -34,6 +37,7 @@ struct TeamShareSheet: View {
     let draft: TeamShareDraft
 
     @Environment(TeamService.self) private var teamService
+    @Environment(SessionStore.self) private var session
     @Environment(\.dismiss) private var dismiss
 
     @State private var selected = Set<UUID>()
@@ -166,7 +170,7 @@ struct TeamShareSheet: View {
         guard !selected.isEmpty else { return }
         isSubmitting = true
         defer { isSubmitting = false }
-        let result = await teamService.shareOrQueue(draft: draft, teamIds: Array(selected))
+        let result = await teamService.shareOrQueue(draft: draft, teamIds: Array(selected), userId: session.currentUserId)
         switch result {
         case .privateOnly:
             dismiss()

@@ -10,6 +10,7 @@ struct MainTabView: View {
     @Environment(PlanWritebackCenter.self) private var planWriteback
     @Environment(TeamShareCenter.self) private var teamShare
     @Environment(TeamService.self) private var teamService
+    @Environment(SessionStore.self) private var session
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -139,7 +140,9 @@ struct MainTabView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .dontliftSyncCompleted)) { _ in
             refreshActiveSession()
-            Task { await teamService.retryPendingShares() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dontliftWorkoutSyncSucceeded)) { _ in
+            Task { await retryReadyPendingShares() }
         }
         // 休息全屏弹窗：挂在全局 NavigationStack 之上的 overlay，层级高于 push 页与 Tab Bar；
         // 纯 .opacity 渐隐、无位移。
@@ -230,6 +233,23 @@ struct MainTabView: View {
 
     private func refreshActiveSession() {
         activeSession = WorkoutSession.activeSession(in: modelContext)
+    }
+
+    private func retryReadyPendingShares() async {
+        guard let userId = session.currentUserId else { return }
+        let pendingIds = teamService.pendingShareWorkoutIds(userId: userId)
+        guard !pendingIds.isEmpty else { return }
+        let workouts = (try? modelContext.fetch(FetchDescriptor<Workout>())) ?? []
+        let syncedDrafts = Dictionary(uniqueKeysWithValues: workouts.compactMap { workout -> (UUID, TeamShareDraft)? in
+            guard pendingIds.contains(workout.localId),
+                  workout.deletedAt == nil,
+                  workout.syncStatus == .synced else {
+                return nil
+            }
+            return (workout.localId, TeamShareDraft(workout: workout))
+        })
+        guard !syncedDrafts.isEmpty else { return }
+        await teamService.retryPendingShares(userId: userId, syncedDrafts: syncedDrafts)
     }
 }
 
