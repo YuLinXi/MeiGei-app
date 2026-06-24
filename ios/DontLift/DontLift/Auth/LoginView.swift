@@ -43,6 +43,7 @@ struct LoginView: View {
         }
         .preferredColorScheme(.light)
         .onAppear { if authService == nil { authService = AuthService(session: session) } }
+        .task { await preflightNetworkPermission() }
         .safariSheet(url: $legalURL)
     }
 
@@ -152,6 +153,16 @@ struct LoginView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func preflightNetworkPermission() async {
+        // iOS 没有显式网络权限申请 API；登录页先打一笔匿名请求，让系统首次网络弹窗前置到 Apple 登录前。
+        _ = try? await APIClient.shared.sendVoid(
+            "GET",
+            "/actuator/health",
+            authorized: false,
+            retryOnConnectivity: true
+        )
     }
 
     private func handleDev() async {

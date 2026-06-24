@@ -84,6 +84,7 @@
 ## 5. TestFlight 回归重点
 
 - [ ] 新装 build 8 后 Apple 登录成功，Release API 指向 `https://dontlift.peipadada.com`。
+- [ ] 首次安装后进入登录页，网络权限弹窗应尽量在点击 Apple 登录前出现。
 - [ ] 删号影响面展示正确；有 owned Team 时 owner 正确转移或清空 Team；已解散 owned Team 不阻断删号。
 - [ ] 删除账号后本地 SwiftData、Keychain JWT、同步水位、Team 分享队列和自动分享缓存均清理。
 - [ ] 手动选择 Team 分享训练：仅选中 Team 可见，撤回单个 Team 后个人训练记录保留。
