@@ -1,7 +1,7 @@
 # v1.0-b8 发版功能介绍
 
 > 适用版本：`1.0 (build 8)`  
-> 后端状态：已于 2026-06-24 22:59 CST 部署，Flyway V10 已成功应用。  
+> 后端状态：已于 2026-06-24 23:34 CST 部署，Flyway V10 已成功应用，Apple JWKS 已预热成功。
 > iOS 状态：等待上传 TestFlight。
 
 ## 一句话摘要
@@ -16,6 +16,7 @@
 - Team 数据边界更清晰：已解散 Team、owner 转移、checkin 归属和 reaction 状态都做了更严格校验，减少删号失败和跨用户数据串用。
 - 同步时间更安全：当设备时间异常偏移时，后端会裁剪未来时间戳并把校正信息回传给客户端，降低同步水位异常风险。
 - 登录体验更顺：登录页会先发起一次轻量网络预热请求，让 iOS 首次网络权限弹窗尽量出现在点击 Apple 登录前。
+- Apple 登录更稳：后端加长 Apple JWKS 拉取超时、开启 retry 和缓存预热，避免 Apple key 拉取慢时把正常登录误报为“登录已失效”。
 - 休息计时体验增强：Live Activity 和 Dynamic Island 展示更新，提前结束休息的链路继续可用。
 - 法务入口补齐：隐私政策和服务条款使用线上 HTTPS 页面，便于 TestFlight 和后续审核检查。
 
@@ -39,6 +40,7 @@
   - `MARKETING_VERSION = 1.0`。
   - `CURRENT_PROJECT_VERSION = 8`。
   - 登录页前置匿名 health check，用于提前触发系统首次网络权限弹窗。
+  - 未登录接口的 `401` 不再映射为全局“登录已失效”，仅已鉴权请求触发重新登录。
   - Release simulator build 与 `DontLiftTests` 已通过。
 
 ## 兼容性说明
@@ -55,12 +57,14 @@
 - iOS `DontLiftTests` 单元测试通过。
 - 生产 health 返回 `UP`。
 - 生产 Flyway 最新迁移为 `V10 team auto share preference success=true`。
+- 生产启动日志显示 `Apple JWKS 预热成功 keys=3`。
 - 生产 `POST /auth/dev/token` 返回 `404`，确认 dev token 未开启。
 
 ## TestFlight 回归重点
 
 - Apple 登录生产链路可用。
 - 首次安装后进入登录页，系统网络权限弹窗应在点击 Apple 登录前尽量前置出现。
+- Apple 登录失败时不应再统一显示“登录已失效，请重新登录”；只有真实已登录会话过期才显示该提示。
 - 新建训练、完成训练、手动分享 Team、自动分享 Team 均正常。
 - 离线完成训练后恢复网络，Team 分享在 workout 同步成功后补发。
 - 删除账号前影响面展示正确，删除后本地数据和分享队列清理完整。

@@ -21,7 +21,7 @@
 - [x] 后端本地构建/测试通过：`backend ./gradlew build`。
 - [x] iOS Release simulator 构建通过：`DontLift` scheme，`CODE_SIGNING_ALLOWED=NO`。
 - [x] iOS 单元测试通过：`DontLiftTests` scheme。
-- [x] 后端生产发布完成：2026-06-24 22:59 CST，备份 `dontlift_2026-06-24_225803.sql.gz`，Flyway V10 `success=true`。
+- [x] 后端生产发布完成：2026-06-24 23:34 CST，备份 `dontlift_2026-06-24_233403.sql.gz`，Flyway V10 `success=true`，Apple JWKS 预热成功。
 
 ## 2. 后端发布前检查
 
@@ -49,7 +49,7 @@
   ```bash
   ./backend/deploy/release-update.sh
   ```
-- [x] 发布脚本完成迁移前数据库备份：`dontlift_2026-06-24_225803.sql.gz`。
+- [x] 发布脚本完成迁移前数据库备份：`dontlift_2026-06-24_233403.sql.gz`。
 - [x] `rsync` 已同步 `backend/` 源码，排除 `.env.prod`、`secrets/`、`backups/`、构建产物和 `.git/`。
 - [x] 远端 `dontlift-app` 容器重建并启动成功。
 - [x] 公网 HTTPS health 返回 `UP`：
@@ -85,6 +85,7 @@
 
 - [ ] 新装 build 8 后 Apple 登录成功，Release API 指向 `https://dontlift.peipadada.com`。
 - [ ] 首次安装后进入登录页，网络权限弹窗应尽量在点击 Apple 登录前出现。
+- [ ] Apple 登录失败时不应统一显示“登录已失效，请重新登录”；只有真实已登录会话过期才显示该提示。
 - [ ] 删号影响面展示正确；有 owned Team 时 owner 正确转移或清空 Team；已解散 owned Team 不阻断删号。
 - [ ] 删除账号后本地 SwiftData、Keychain JWT、同步水位、Team 分享队列和自动分享缓存均清理。
 - [ ] 手动选择 Team 分享训练：仅选中 Team 可见，撤回单个 Team 后个人训练记录保留。
