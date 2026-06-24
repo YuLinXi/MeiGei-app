@@ -35,9 +35,9 @@ final class SyncEngine {
         guard !isSyncing else { return }
         isSyncing = true
         defer { isSyncing = false }
-        await runSafely { try await self.syncCustomExercises() }
-        await runSafely { try await self.syncWorkoutPlanGroups() }
-        await runSafely { try await self.syncWorkoutPlans() }
+        _ = await runSafely { try await self.syncCustomExercises() }
+        _ = await runSafely { try await self.syncWorkoutPlanGroups() }
+        _ = await runSafely { try await self.syncWorkoutPlans() }
         let workoutsSynced = await runSafely { try await self.syncWorkouts() }
         let saved: Bool
         do {
