@@ -20,7 +20,7 @@
 - [x] 后端本地构建/测试通过：`backend ./gradlew build`。
 - [x] iOS Release simulator 构建通过：`DontLift` scheme，`CODE_SIGNING_ALLOWED=NO`。
 - [x] iOS 单元测试通过：`DontLiftTests` scheme。
-- [ ] 后端生产发布完成，备份与 Flyway V10 状态待回填。
+- [x] 后端生产发布完成：2026-06-24 22:59 CST，备份 `dontlift_2026-06-24_225803.sql.gz`，Flyway V10 `success=true`。
 
 ## 2. 后端发布前检查
 
@@ -44,23 +44,23 @@
 
 > 例行发布必须使用 `backend/deploy/release-update.sh`，不要在服务器上 `git pull`，也不要运行会覆盖共享基础设施的 `local-deploy.sh`。
 
-- [ ] 执行例行后端发布：
+- [x] 执行例行后端发布：
   ```bash
   ./backend/deploy/release-update.sh
   ```
-- [ ] 发布脚本完成迁移前数据库备份：待回填。
-- [ ] `rsync` 已同步 `backend/` 源码，排除 `.env.prod`、`secrets/`、`backups/`、构建产物和 `.git/`。
-- [ ] 远端 `dontlift-app` 容器重建并启动成功。
-- [ ] 公网 HTTPS health 返回 `UP`：
+- [x] 发布脚本完成迁移前数据库备份：`dontlift_2026-06-24_225803.sql.gz`。
+- [x] `rsync` 已同步 `backend/` 源码，排除 `.env.prod`、`secrets/`、`backups/`、构建产物和 `.git/`。
+- [x] 远端 `dontlift-app` 容器重建并启动成功。
+- [x] 公网 HTTPS health 返回 `UP`：
   ```bash
   curl -fsS https://dontlift.peipadada.com/actuator/health
   ```
-- [ ] Flyway 最新迁移 `V10` 在生产库中 `success=true`：
+- [x] Flyway 最新迁移 `V10` 在生产库中 `success=true`：
   ```bash
   ssh root@124.222.79.121 "docker exec shared-postgres psql -U dontlift -d dontlift -tAc \
     \"SELECT version || ' ' || description || ' success=' || success FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 5;\""
   ```
-- [ ] 确认生产禁用 dev token：
+- [x] 确认生产禁用 dev token：`POST /auth/dev/token` 返回 `404`。
   ```bash
   curl -i -X POST https://dontlift.peipadada.com/auth/dev/token
   # 期望 404 或非 2xx
