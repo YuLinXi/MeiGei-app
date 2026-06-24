@@ -17,7 +17,7 @@
 - 同步时间更安全：当设备时间异常偏移时，后端会裁剪未来时间戳并把校正信息回传给客户端，降低同步水位异常风险。
 - 登录体验更顺：登录页会先发起一次轻量网络预热请求，让 iOS 首次网络权限弹窗尽量出现在点击 Apple 登录前。
 - Apple 登录更稳：后端加长 Apple JWKS 拉取超时、开启 retry 和缓存预热，避免 Apple key 拉取慢时把正常登录误报为“登录已失效”。
-- 休息计时体验增强：Live Activity 和 Dynamic Island 展示更新，提前结束休息的链路继续可用。
+- 休息计时体验增强：休息结束提示音改为更清晰的双击 bell，Live Activity 和 Dynamic Island 展示更新，提前结束休息的链路继续可用。
 - 法务入口补齐：隐私政策和服务条款使用线上 HTTPS 页面，便于 TestFlight 和后续审核检查。
 
 ## 内部技术变更
@@ -41,6 +41,7 @@
   - `CURRENT_PROJECT_VERSION = 8`。
   - 登录页前置匿名 health check，用于提前触发系统首次网络权限弹窗。
   - 未登录接口的 `401` 不再映射为全局“登录已失效”，仅已鉴权请求触发重新登录。
+  - `rest_complete.caf` 替换为 `Gym Bell Double Tap` 版本，时长约 `1.18s`。
   - Release simulator build 与 `DontLiftTests` 已通过。
 
 ## 兼容性说明
@@ -69,5 +70,5 @@
 - 离线完成训练后恢复网络，Team 分享在 workout 同步成功后补发。
 - 删除账号前影响面展示正确，删除后本地数据和分享队列清理完整。
 - 已解散 owned Team 不阻断删号。
-- Live Activity、Dynamic Island、本地休息通知和提前结束休息可用。
+- Live Activity、Dynamic Island、本地休息通知、双击 bell 提示音和提前结束休息可用。
 - 隐私政策、服务条款链接均可打开且为 HTTPS。

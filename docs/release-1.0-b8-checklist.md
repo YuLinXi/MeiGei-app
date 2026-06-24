@@ -92,7 +92,7 @@
 - [ ] 自动分享偏好可开关；离线完成训练后恢复网络，等待 workout 同步成功后再重放分享队列。
 - [ ] Team feed 的 checkin 与 reaction 一致，emoji reaction 单选/取消/切换正常。
 - [ ] 修改系统时间异常或设备时间偏移后，同步时间校正提示不会破坏本地队列。
-- [ ] Live Activity / Dynamic Island / 本地通知 / 提前结束仍正常。
+- [ ] Live Activity / Dynamic Island / 本地通知 / 双击 bell 提示音 / 提前结束仍正常。
 - [ ] 法务链接（隐私政策、服务条款）可打开且为 HTTPS。
 - [ ] 计划分组、训练历史、PR 庆祝、计划实绩回写无回归。
 
