@@ -2,6 +2,7 @@
 
 > 生成于 2026-06-24，分支 `main`，提交范围 `v1.0-b7..HEAD`。
 > 本清单记录 build 8 增量；一次性基础设施盘点见 [`testflight-checklist.md`](./testflight-checklist.md)。
+> 本次发版功能介绍见 [`release-1.0-b8-feature-intro.md`](./release-1.0-b8-feature-intro.md)。
 
 ## 0. 本次发版摘要
 

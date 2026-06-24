@@ -58,6 +58,22 @@ xcodebuild -project DontLift.xcodeproj -scheme DontLift \
 - 写完新文件后编辑器 SourceKit 可能瞬时误报「Cannot find type / No such module」（跨文件索引竞态），**以 `xcodebuild` 结果为准**。
 - `GENERATE_INFOPLIST_FILE=YES`，无独立 Info.plist；HealthKit 用途串、`NSSupportsLiveActivities` 等经 `INFOPLIST_KEY_*` build setting 注入。
 
+## 发版输出约定
+
+每次准备或完成 TestFlight/生产发版时，除发版 checklist 外，必须同步输出一份「发版功能介绍」，文件建议命名为 `docs/release-<version>-b<build>-feature-intro.md`。
+
+发版功能介绍必须使用简体中文，面向测试用户和发布负责人都能直接阅读，避免只贴 commit log。内容至少包含：
+
+- 版本与状态：`MARKETING_VERSION`、`CURRENT_PROJECT_VERSION`、后端部署状态、iOS 上传状态。
+- 一句话摘要：说明本次发版解决的核心问题。
+- 面向测试用户的更新说明：用用户能感知的语言说明新增、优化和修复点。
+- 内部技术变更：列出关键后端迁移、API/同步/数据清理/客户端行为变化。
+- 兼容性说明：说明后端先发是否影响未升级 iOS 用户，哪些能力需要新版客户端。
+- 已完成验证：后端构建、iOS 构建/测试、生产 health、Flyway、dev token 等结果。
+- TestFlight 回归重点：列出本次最需要人工真机验证的路径。
+
+发版最终回复用户时，要同时给出 checklist 和功能介绍文档链接；若后端已部署但 TestFlight 未上传，要明确说明 iOS 仍待用户上传。只有 TestFlight 上传并确认可用后，才建议打对应 `vX.Y-bN` tag。
+
 ## 后端架构
 
 按领域分包于 `com.dontlift.*`：`auth`（Apple 登录校验 + 签发 JWT）、`account`、`workout`、`team`、`sync`、`push`、`idempotency`、`security`、`config`、`common`。
