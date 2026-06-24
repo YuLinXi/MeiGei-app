@@ -21,7 +21,7 @@ enum PlanPrefill {
     }
 
     static func strictRequirementMessage(for missing: [PlanItem]) -> String {
-        "严格模式开始训练前，请先补齐这些动作的组数与次数：" + missing.map(\.exerciseName).joined(separator: "、")
+        "严格模式开始训练前，请先补齐这些动作的组数与次数：" + missing.map(\.displayExerciseName).joined(separator: "、")
     }
 
     /// 历史里某计划项「上次」已完成正式组的逐组 `(重量, 次数)`，按 setIndex 升序；无则空。
@@ -313,6 +313,8 @@ enum PlanWriteback {
                                        builtinExerciseCode: ex.builtinExerciseCode,
                                        customExerciseId: ex.customExerciseId,
                                        exerciseName: ex.exerciseName,
+                                       primaryMuscle: ex.primaryMuscle,
+                                       equipmentType: nil,
                                        orderIndex: nextOrder,
                                        suggestedSets: setCount,
                                        suggestedReps: top.reps,
@@ -326,7 +328,7 @@ enum PlanWriteback {
 
         // kept：原计划里有、本次未被 UPDATE 命中的项（保留不动，仅作回执展示）。
         for original in planItems where !touchedItemIds.contains(original.itemId) {
-            diffs.append(ItemDiff(kind: .kept, exerciseName: original.exerciseName,
+            diffs.append(ItemDiff(kind: .kept, exerciseName: original.displayExerciseName,
                                   oldText: nil, newText: nil))
         }
 

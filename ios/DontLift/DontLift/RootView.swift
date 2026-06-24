@@ -30,6 +30,7 @@ struct RootView: View {
         MainTabView()
             .task {
                 PushManager.shared.requestAuthorizationAndRegister()
+                RestTimerController.clearDeliveredRestNotification()
                 historyStore.ensureLoaded(reason: .login)
                 await syncEngine.syncAll()
             }
@@ -38,6 +39,7 @@ struct RootView: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
+                    RestTimerController.clearDeliveredRestNotification()
                     historyStore.ensureLoaded(reason: .appLaunch)
                     Task { await syncEngine.syncAll() }
                 }

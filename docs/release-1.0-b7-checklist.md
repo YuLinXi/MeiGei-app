@@ -87,7 +87,7 @@
 - [ ] 离线创建/编辑/删除计划分组后恢复网络，push/pull 同步一致。
 - [ ] 历史日历可切换月份，训练详情进入和返回流畅。
 - [ ] 训练历史列表和统计在大量数据下无明显卡顿。
-- [ ] Team fork 计划模板、训练完成打卡 feed、emoji reaction 仍正常。
+- [ ] Team fork 计划模板、开启自动分享后的打卡 feed、emoji reaction 仍正常。
 - [ ] 休息计时 Live Activity / 本地通知 / 提前结束仍正常。
 
 ## 6. 打 tag 与后续记录

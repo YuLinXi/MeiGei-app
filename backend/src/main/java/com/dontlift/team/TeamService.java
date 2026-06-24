@@ -76,6 +76,17 @@ public class TeamService {
         return memberMapper.findViewByTeam(teamId);
     }
 
+    public List<TeamMemberView> listMySharePreferences(UUID userId) {
+        return memberMapper.findMyActiveViews(userId);
+    }
+
+    @Transactional
+    public TeamMemberView updateSharePreference(UUID userId, UUID teamId, boolean autoShareWorkouts) {
+        requireMember(teamId, userId);
+        memberMapper.updateAutoShareWorkouts(teamId, userId, autoShareWorkouts);
+        return memberMapper.findViewByTeamAndUser(teamId, userId);
+    }
+
     /** 成员退出；群主不可退出（需解散或后续支持转让）。 */
     @Transactional
     public void leaveTeam(UUID userId, UUID teamId) {

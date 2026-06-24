@@ -11,6 +11,8 @@
 		BB00000000000000000000C1 /* RestTimerLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B1 /* RestTimerLiveActivity.swift */; };
 		BB00000000000000000000C2 /* RestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B2 /* RestActivityAttributes.swift */; };
 		BB00000000000000000000C3 /* EndRestIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B3 /* EndRestIntent.swift */; };
+		BB00000000000000000000C4 /* DontLiftIslandIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B5 /* DontLiftIslandIcon.png */; };
+		BB00000000000000000000C5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B6 /* Assets.xcassets */; };
 		BB00000000000000000000D0 /* RestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B2 /* RestActivityAttributes.swift */; };
 		BB00000000000000000000D1 /* EndRestIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B3 /* EndRestIntent.swift */; };
 		BB00000000000000000000E1 /* DontLiftWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000A2 /* DontLiftWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -65,6 +67,8 @@
 		BB00000000000000000000B2 /* RestActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestActivityAttributes.swift; sourceTree = "<group>"; };
 		BB00000000000000000000B3 /* EndRestIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndRestIntent.swift; sourceTree = "<group>"; };
 		BB00000000000000000000B4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BB00000000000000000000B5 /* DontLiftIslandIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = DontLiftIslandIcon.png; sourceTree = "<group>"; };
+		BB00000000000000000000B6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -148,6 +152,8 @@
 				BB00000000000000000000B2 /* RestActivityAttributes.swift */,
 				BB00000000000000000000B3 /* EndRestIntent.swift */,
 				BB00000000000000000000B4 /* Info.plist */,
+				BB00000000000000000000B6 /* Assets.xcassets */,
+				BB00000000000000000000B5 /* DontLiftIslandIcon.png */,
 			);
 			path = DontLiftWidgets;
 			sourceTree = "<group>";
@@ -322,6 +328,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BB00000000000000000000C5 /* Assets.xcassets in Resources */,
+				BB00000000000000000000C4 /* DontLiftIslandIcon.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -62,6 +62,7 @@ extension PushManager: UNUserNotificationCenterDelegate {
         // 休息结束本地通知：前台声音由 RestTimer 的 AVAudioPlayer 负责（无视静音键），
         // 这里抑制通知自带声音，避免前台双响；横幅仍展示。
         if notification.request.identifier == RestTimerController.notificationId {
+            RestTimerController.clearDeliveredRestNotificationSoon()
             return [.banner]
         }
         return [.banner, .sound]
@@ -70,5 +71,8 @@ extension PushManager: UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse) async {
         handleRemoteNotification(response.notification.request.content.userInfo)
+        if response.notification.request.identifier == RestTimerController.notificationId {
+            RestTimerController.clearDeliveredRestNotification()
+        }
     }
 }

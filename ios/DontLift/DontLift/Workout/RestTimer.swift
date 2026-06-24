@@ -1,6 +1,7 @@
 import ActivityKit
 import AVFoundation
 import Foundation
+import os.log
 import SwiftUI
 import UserNotifications
 
@@ -17,6 +18,8 @@ extension Notification.Name {
 @MainActor
 @Observable
 final class RestTimerController {
+    private static let log = Logger(subsystem: "com.yulinxi.app.DontLift", category: "RestTimer")
+
     /// 默认休息时长（秒），持久化到 UserDefaults。
     var defaultDuration: TimeInterval {
         didSet { UserDefaults.standard.set(defaultDuration, forKey: Self.durationKey) }
@@ -40,6 +43,8 @@ final class RestTimerController {
     private(set) var totalDuration: TimeInterval = 0
     /// 关联的下一个动作名，用于计时条与结束提醒文案（也是 3.8 Live Activity 的数据来源）。
     private(set) var contextLabel: String?
+    /// 下一组结构化信息，用于 Live Activity 展示重量/次数；仅随本次休息生命周期存在。
+    private(set) var contextNextSet: RestActivityAttributes.NextSet?
     /// 前台 ticker 写入，仅用于驱动 SwiftUI 每秒刷新。
     private(set) var tick: Date = .now
 
@@ -50,6 +55,7 @@ final class RestTimerController {
 
     private var ticker: Timer?
     private var activity: Activity<RestActivityAttributes>?
+    private var activityEndTask: Task<Void, Never>?
     /// 提醒音效播放器（懒加载并预备，复用同一实例）。
     private var audioPlayer: AVAudioPlayer?
     private static let durationKey = "dontlift.rest.defaultDuration"
@@ -58,7 +64,9 @@ final class RestTimerController {
     /// 休息结束本地通知标识（PushManager 据此在前台抑制其声音，避免与前台音效双响）。
     static let notificationId = "dontlift.rest.timer"
     /// Live Activity 到点后自动消失的宽限秒数：给「00:00 + 一声提醒」留出可见窗口再收回。
-    private static let dismissGrace: TimeInterval = 2
+    private static let dismissGrace: TimeInterval = 15
+    /// 前台展示休息结束横幅后，延迟清掉通知中心残留；锁屏/后台场景等用户回到 App 再清理。
+    private static let deliveredNotificationCleanupDelay: TimeInterval = 6
 
     init() {
         let saved = UserDefaults.standard.double(forKey: Self.durationKey)
@@ -79,15 +87,18 @@ final class RestTimerController {
     }
 
     /// 开始/重启一次休息倒计时，安排结束本地通知，并启动 Live Activity。
-    func start(duration: TimeInterval? = nil, label: String? = nil) {
+    func start(duration: TimeInterval? = nil,
+               label: String? = nil,
+               nextSet: RestActivityAttributes.NextSet? = nil) {
         let secs = duration ?? defaultDuration
         let end = Date.now.addingTimeInterval(secs)
         endDate = end
         totalDuration = secs
-        contextLabel = label
+        contextLabel = nextSet?.exerciseName ?? label
+        contextNextSet = nextSet
         scheduleNotification(after: secs)
         startTicker()
-        startActivity(totalDuration: secs, endDate: end, label: label)
+        startActivity(totalDuration: secs, endDate: end, label: label, nextSet: nextSet)
     }
 
     /// 调整剩余时间（±秒，不低于 0），重排通知并重建 Live Activity。
@@ -101,25 +112,40 @@ final class RestTimerController {
         totalDuration = elapsed + newRemaining
         scheduleNotification(after: newRemaining)
         // 已预约 .after 的 Live Activity 不可再 update，整体重建以反映新结束时刻并重排自动消失。
-        startActivity(totalDuration: totalDuration, endDate: newEnd, label: contextLabel)
+        startActivity(totalDuration: totalDuration, endDate: newEnd, label: contextLabel, nextSet: contextNextSet)
     }
 
     /// 提前结束 / 取消休息：清状态、撤销待发通知、结束 Live Activity。
     func stop() {
         clear()
-        UNUserNotificationCenter.current()
-            .removePendingNotificationRequests(withIdentifiers: [Self.notificationId])
+        Self.clearRestNotifications(removePending: true, removeDelivered: true)
     }
 
-    private func clear() {
+    /// 清理通知中心里已投递的休息结束通知；用于 App 回前台、用户点通知、开始下一次休息等可执行时机。
+    static func clearDeliveredRestNotification() {
+        clearRestNotifications(removePending: false, removeDelivered: true)
+    }
+
+    /// 前台横幅展示一小段时间后清理通知中心残留，不影响横幅本身的即时提醒。
+    static func clearDeliveredRestNotificationSoon() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(deliveredNotificationCleanupDelay))
+            clearDeliveredRestNotification()
+        }
+    }
+
+    private func clear(endingActivity: Bool = true) {
         ticker?.invalidate()
         ticker = nil
         endDate = nil
         totalDuration = 0
         contextLabel = nil
+        contextNextSet = nil
         nextHint = nil
         // isExpanded 不在此清，交给根层 onChange(isRunning) 动画收起，保证渐隐。
-        endActivity()
+        if endingActivity {
+            endActivity()
+        }
     }
 
     private func startTicker() {
@@ -134,7 +160,8 @@ final class RestTimerController {
         // 前台到点：收起计时条，播一声提醒音（无视静音键）+ 按开关震动。
         // 同刻本地通知由 PushManager 在前台抑制其声音，避免双响。
         if let endDate, endDate.timeIntervalSinceNow <= 0 {
-            clear()
+            // App 内休息态立即结束，但 Live Activity 继续停在 00:00 一小段时间，由 activityEndTask 自动收回。
+            clear(endingActivity: false)
             playEndSound()
             if hapticsEnabled { Theme.Haptics.notification(.success) }
         }
@@ -164,7 +191,7 @@ final class RestTimerController {
 
     private func scheduleNotification(after seconds: TimeInterval) {
         let center = UNUserNotificationCenter.current()
-        center.removePendingNotificationRequests(withIdentifiers: [Self.notificationId])
+        Self.clearRestNotifications(removePending: true, removeDelivered: true)
         guard seconds > 0 else { return }
         let content = UNMutableNotificationContent()
         content.title = "休息结束"
@@ -177,23 +204,59 @@ final class RestTimerController {
         center.add(UNNotificationRequest(identifier: Self.notificationId, content: content, trigger: trigger))
     }
 
+    private static func clearRestNotifications(removePending: Bool, removeDelivered: Bool) {
+        let center = UNUserNotificationCenter.current()
+        if removePending {
+            center.removePendingNotificationRequests(withIdentifiers: [notificationId])
+        }
+        if removeDelivered {
+            center.removeDeliveredNotifications(withIdentifiers: [notificationId])
+        }
+    }
+
     // MARK: - Live Activity（3.8）
 
-    private func startActivity(totalDuration: TimeInterval, endDate: Date, label: String?) {
+    private func startActivity(totalDuration: TimeInterval,
+                               endDate: Date,
+                               label: String?,
+                               nextSet: RestActivityAttributes.NextSet?) {
         endActivity()
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         let attributes = RestActivityAttributes(totalDuration: totalDuration)
-        let state = RestActivityAttributes.ContentState(endDate: endDate, nextExercise: label)
+        let state = RestActivityAttributes.ContentState(endDate: endDate,
+                                                        nextExercise: nextSet?.exerciseName ?? label,
+                                                        nextSet: nextSet)
         let content = ActivityContent(state: state, staleDate: endDate)
-        guard let act = try? Activity.request(attributes: attributes, content: content, pushType: nil) else { return }
-        activity = act
-        // 启动即预约「到点后自动消失」：把 dismiss 时机交给系统，后台/锁屏无需唤醒即可收回灵动岛。
-        // ended 态下 Text(timerInterval:) 仍自走倒计时，灵动岛在 endDate+grace 前持续显示后自动隐去。
-        // 注意：end 后 activity 不可再 update，故 adjust(±10s) 走整体重建（见 adjust）。
-        Task { await act.end(content, dismissalPolicy: .after(endDate.addingTimeInterval(Self.dismissGrace))) }
+        do {
+            let act = try Activity.request(attributes: attributes, content: content, pushType: nil)
+            activity = act
+            Self.log.info("休息 Live Activity 已启动：\(act.id, privacy: .public)")
+
+            // Live Activity 必须在倒计时期间保持 active，灵动岛才会持续展示。
+            // 到点后由一个轻量任务结束活动；若 App 被系统挂起，回到前台的 ticker/stop 仍会兜底清理。
+            let dismissDate = endDate.addingTimeInterval(Self.dismissGrace)
+            activityEndTask = Task { [weak self] in
+                let delay = max(0, dismissDate.timeIntervalSinceNow)
+                try? await Task.sleep(for: .seconds(delay))
+                guard !Task.isCancelled else { return }
+                let shouldEnd = await MainActor.run { self?.activity?.id == act.id }
+                guard shouldEnd else { return }
+                await act.end(content, dismissalPolicy: .immediate)
+                await MainActor.run {
+                    if self?.activity?.id == act.id {
+                        self?.activity = nil
+                        self?.activityEndTask = nil
+                    }
+                }
+            }
+        } catch {
+            Self.log.error("休息 Live Activity 启动失败：\(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private func endActivity() {
+        activityEndTask?.cancel()
+        activityEndTask = nil
         guard let activity else { return }
         self.activity = nil
         Task { await activity.end(nil, dismissalPolicy: .immediate) }

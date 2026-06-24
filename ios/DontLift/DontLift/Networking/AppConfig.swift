@@ -26,9 +26,12 @@ enum AppConfig {
     /// 当前环境的后端基址。
     static var apiBaseURL: URL {
         switch current {
-        case .localhost:  return URL(string: "http://localhost:8001")!
-        case .serverIP:   return URL(string: "http://124.222.79.121:8080")!
-        case .production: return URL(string: "https://dontlift.peipadada.com")!
+        case .localhost:
+            return URL(string: "http://localhost:8001")!
+        case .serverIP:
+            return URL(string: "http://124.222.79.121:8080")!
+        case .production:
+            return URL(string: "https://dontlift.peipadada.com")!
         }
     }
 
@@ -36,8 +39,10 @@ enum AppConfig {
     /// 公网/线上 dev token 已关，必须走真正的 Sign in with Apple。
     static var devLoginEnabled: Bool {
         switch current {
-        case .localhost:            return true
-        case .serverIP, .production: return false
+        case .localhost:
+            return true
+        case .serverIP, .production:
+            return false
         }
     }
 
@@ -55,7 +60,6 @@ enum AppConfig {
     /// 隐私政策页（后端 Caddy 静态托管，已上线，App Store 上架硬要求）。
     static let privacyPolicyURL = URL(string: "https://dontlift.peipadada.com/privacy")!
 
-    /// 服务条款页。注意：独立 `/terms` 页尚未部署，暂指向隐私政策页（当前唯一上线的法律文档）；
-    /// 部署独立条款页后只改此一行即可全局生效。
-    static let termsOfServiceURL = URL(string: "https://dontlift.peipadada.com/privacy")!
+    /// 服务条款页（后端 Caddy 静态托管，必须与隐私政策 URL 分离）。
+    static let termsOfServiceURL = URL(string: "https://dontlift.peipadada.com/terms")!
 }

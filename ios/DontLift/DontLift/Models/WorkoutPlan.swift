@@ -42,6 +42,8 @@ struct PlanItem: Codable, Identifiable, Hashable {
     var builtinExerciseCode: String?
     var customExerciseId: UUID?
     var exerciseName: String
+    var primaryMuscle: String?
+    var equipmentType: String?
     var orderIndex: Int
     var suggestedSets: Int?
     var suggestedReps: Int?
@@ -54,6 +56,8 @@ struct PlanItem: Codable, Identifiable, Hashable {
         builtinExerciseCode: String? = nil,
         customExerciseId: UUID? = nil,
         exerciseName: String,
+        primaryMuscle: String? = nil,
+        equipmentType: String? = nil,
         orderIndex: Int,
         suggestedSets: Int? = nil,
         suggestedReps: Int? = nil,
@@ -63,10 +67,52 @@ struct PlanItem: Codable, Identifiable, Hashable {
         self.builtinExerciseCode = builtinExerciseCode
         self.customExerciseId = customExerciseId
         self.exerciseName = exerciseName
+        self.primaryMuscle = primaryMuscle
+        self.equipmentType = equipmentType
         self.orderIndex = orderIndex
         self.suggestedSets = suggestedSets
         self.suggestedReps = suggestedReps
         self.suggestedWeightKg = suggestedWeightKg
+    }
+}
+
+extension PlanItem {
+    private var trimmedSnapshotName: String? {
+        let value = exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private var resolvedBuiltin: BuiltinExercise? {
+        guard let builtinExerciseCode else { return nil }
+        return BuiltinExercise.starter.first { $0.code == builtinExerciseCode }
+    }
+
+    /// 展示/开始训练优先使用本地动作库名称；本地未知时使用计划项随包保存的名称快照。
+    var resolvedExerciseName: String? {
+        resolvedBuiltin?.name ?? trimmedSnapshotName
+    }
+
+    var displayExerciseName: String {
+        resolvedExerciseName ?? "未知动作"
+    }
+
+    var resolvedPrimaryMuscle: String? {
+        primaryMuscle ?? resolvedBuiltin?.category
+    }
+
+    var resolvedEquipmentType: String? {
+        equipmentType ?? resolvedBuiltin?.equipmentType
+    }
+
+    static func unstartableItems(in items: [PlanItem]) -> [PlanItem] {
+        items.filter { $0.resolvedExerciseName == nil }
+    }
+
+    static func unstartableMessage(for items: [PlanItem]) -> String {
+        let refs = items.map { item in
+            item.builtinExerciseCode ?? item.customExerciseId?.uuidString ?? item.itemId.uuidString
+        }
+        return "计划包含无法识别且缺少名称快照的动作：" + refs.joined(separator: "、") + "。请更新 App 或重新编辑该计划后再开始训练。"
     }
 }
 

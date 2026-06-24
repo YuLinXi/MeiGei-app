@@ -20,14 +20,14 @@ public class AccountController {
 
     private final AccountDeletionService accountDeletionService;
 
-    /** 删除自身账号（物理硬删全部数据 + 解散所拥有团队 + 尽力撤销 Apple 授权）。 */
+    /** 删除自身账号（物理硬删本人数据 + 多人 Team 转移 owner + 尽力撤销 Apple 授权）。 */
     @DeleteMapping
     public ResponseEntity<Void> deleteSelf() {
         accountDeletionService.deleteSelf(SecurityUtils.currentUserId());
         return ResponseEntity.noContent().build();
     }
 
-    /** 删号影响面预览（只读）：返回将解散的团队数与受影响成员数，供二次确认框展示。 */
+    /** 删号影响面预览（只读）：返回 owner 转移、空 Team 删除与受影响成员摘要，供二次确认框展示。 */
     @GetMapping("/deletion-impact")
     public DeletionImpact deletionImpact() {
         return accountDeletionService.impact(SecurityUtils.currentUserId());

@@ -9,6 +9,8 @@ import com.dontlift.auth.AppleClientSecretFactory;
 import com.dontlift.auth.AppleTokenClient;
 import com.dontlift.idempotency.mapper.IdempotencyKeyMapper;
 import com.dontlift.push.mapper.DeviceTokenMapper;
+import com.dontlift.team.entity.Team;
+import com.dontlift.team.entity.TeamMember;
 import com.dontlift.team.mapper.CheckinReactionMapper;
 import com.dontlift.team.mapper.TeamCheckinMapper;
 import com.dontlift.team.mapper.TeamMapper;
@@ -30,7 +32,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -60,21 +61,21 @@ class AccountDeletionServiceTest {
 
     private final UUID userId = UUID.randomUUID();
 
-    /** 3.1/3.2：删号按 FK 拓扑先子后父逐表删，覆盖团主解散维度与自身维度，最后删 app_user。 */
+    /** 账号删除：按 FK 拓扑只删除本人数据，最后删 app_user，不解散多人 Team。 */
     @Test
     void deleteSelf_cascadesAllTablesInTopologicalOrder() {
-        when(appUserMapper.selectById(userId)).thenReturn(new AppUser());
+        givenExistingUserWithoutOwnedTeams();
 
         service.deleteSelf(userId);
 
-        InOrder order = inOrder(checkinReactionMapper, teamCheckinMapper, teamMemberMapper, teamMapper,
+        InOrder order = inOrder(checkinReactionMapper, teamCheckinMapper, teamMapper, teamMemberMapper,
                 workoutMapper, workoutPlanMapper, workoutPlanGroupMapper, customExerciseMapper,
                 deviceTokenMapper, idempotencyKeyMapper, userIdentityMapper, appUserMapper);
-        // Team 维度：reaction → checkin → member → team（先子后父，避免 FK 违例）
-        order.verify(checkinReactionMapper).deleteByUserOrOwnedTeams(userId);
-        order.verify(teamCheckinMapper).deleteByUserOrOwnedTeams(userId);
-        order.verify(teamMemberMapper).deleteByUserOrOwnedTeams(userId);
-        order.verify(teamMapper).deleteOwnedTeams(userId);
+        // Team 个人维度：只删本人 reaction/checkin/member，不删除 owner 名下其他成员历史
+        order.verify(checkinReactionMapper).deleteByUser(userId);
+        order.verify(teamCheckinMapper).deleteByUser(userId);
+        order.verify(teamMapper).findOwnedTeamsIncludingDeleted(userId);
+        order.verify(teamMemberMapper).deleteByUser(userId);
         // 自身训练数据
         order.verify(workoutMapper).deleteAllByUser(userId);
         order.verify(workoutPlanMapper).deleteAllByUser(userId);
@@ -86,6 +87,10 @@ class AccountDeletionServiceTest {
         order.verify(userIdentityMapper).deleteAllByUser(userId);
         // 主体最后删
         order.verify(appUserMapper).hardDeleteById(userId);
+        verify(teamMapper, never()).deleteOwnedTeams(userId);
+        verify(teamMemberMapper, never()).deleteByUserOrOwnedTeams(userId);
+        verify(teamCheckinMapper, never()).deleteByUserOrOwnedTeams(userId);
+        verify(checkinReactionMapper, never()).deleteByUserOrOwnedTeams(userId);
     }
 
     /** 3.2 边界：user 已不存在时为幂等空操作，不触碰任何表。 */
@@ -104,7 +109,7 @@ class AccountDeletionServiceTest {
     /** 3.3：revoke 凭据缺失时降级——不调 Apple，仍完整执行本地删除。 */
     @Test
     void deleteSelf_degradesWhenRevokeCredentialsMissing() {
-        when(appUserMapper.selectById(userId)).thenReturn(new AppUser());
+        givenExistingUserWithoutOwnedTeams();
         when(clientSecretFactory.available()).thenReturn(false);
 
         service.deleteSelf(userId);
@@ -116,7 +121,7 @@ class AccountDeletionServiceTest {
     /** 3.4：凭据齐备且存有 refresh_token 时，删号触发 Apple revoke 调用。 */
     @Test
     void deleteSelf_invokesAppleRevokeWhenTokenPresent() {
-        when(appUserMapper.selectById(userId)).thenReturn(new AppUser());
+        givenExistingUserWithoutOwnedTeams();
         when(clientSecretFactory.available()).thenReturn(true);
         when(clientSecretFactory.clientId()).thenReturn("com.example.app");
         when(clientSecretFactory.create()).thenReturn("signed-client-secret");
@@ -133,12 +138,83 @@ class AccountDeletionServiceTest {
     /** 3.4：影响面计数直接委托 mapper。 */
     @Test
     void impact_returnsCountsFromMapper() {
-        when(teamMapper.countOwnedActiveTeams(userId)).thenReturn(2);
+        when(teamMapper.countOwnedTeamsToTransfer(userId)).thenReturn(2);
+        when(teamMapper.countEmptyOwnedTeamsToDelete(userId)).thenReturn(1);
         when(teamMapper.countAffectedMembers(userId)).thenReturn(5);
 
         DeletionImpact impact = service.impact(userId);
 
-        assertThat(impact.ownedTeams()).isEqualTo(2);
+        assertThat(impact.ownedTeamsToTransfer()).isEqualTo(2);
+        assertThat(impact.emptyOwnedTeamsToDelete()).isEqualTo(1);
         assertThat(impact.affectedMembers()).isEqualTo(5);
+    }
+
+    @Test
+    void deleteSelf_transfersOwnedTeamToOldestRemainingMember() {
+        when(appUserMapper.selectById(userId)).thenReturn(new AppUser());
+        Team team = team(UUID.randomUUID());
+        TeamMember replacement = member(team.getId(), UUID.randomUUID());
+        when(teamMapper.findOwnedTeamsIncludingDeleted(userId)).thenReturn(List.of(team));
+        when(teamMemberMapper.findOldestOtherMember(team.getId(), userId)).thenReturn(replacement);
+
+        service.deleteSelf(userId);
+
+        verify(teamMapper).transferOwner(team.getId(), userId, replacement.getUserId());
+        verify(teamMemberMapper).updateRole(team.getId(), replacement.getUserId(), "owner");
+        verify(teamMemberMapper).deleteByUser(userId);
+        verify(teamCheckinMapper, never()).deleteByTeam(team.getId());
+        verify(teamMapper, never()).hardDeleteById(team.getId());
+    }
+
+    @Test
+    void deleteSelf_deletesOwnedTeamOnlyWhenNoOtherMembersRemain() {
+        when(appUserMapper.selectById(userId)).thenReturn(new AppUser());
+        Team team = team(UUID.randomUUID());
+        when(teamMapper.findOwnedTeamsIncludingDeleted(userId)).thenReturn(List.of(team));
+        when(teamMemberMapper.findOldestOtherMember(team.getId(), userId)).thenReturn(null);
+
+        service.deleteSelf(userId);
+
+        verify(teamCheckinMapper).deleteByTeam(team.getId());
+        verify(teamMemberMapper).deleteByTeam(team.getId());
+        verify(teamMapper).hardDeleteById(team.getId());
+        verify(teamMapper, never()).transferOwner(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void deleteSelf_hardDeletesSoftDeletedOwnedTeamResidue() {
+        when(appUserMapper.selectById(userId)).thenReturn(new AppUser());
+        Team team = team(UUID.randomUUID());
+        team.setDeletedAt(java.time.OffsetDateTime.parse("2026-06-20T10:00:00Z"));
+        when(teamMapper.findOwnedTeamsIncludingDeleted(userId)).thenReturn(List.of(team));
+
+        service.deleteSelf(userId);
+
+        verify(teamCheckinMapper).deleteByTeam(team.getId());
+        verify(teamMemberMapper).deleteByTeam(team.getId());
+        verify(teamMapper).hardDeleteById(team.getId());
+        verify(teamMemberMapper, never()).findOldestOtherMember(team.getId(), userId);
+        verify(teamMapper, never()).transferOwner(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    private void givenExistingUserWithoutOwnedTeams() {
+        when(appUserMapper.selectById(userId)).thenReturn(new AppUser());
+        when(teamMapper.findOwnedTeamsIncludingDeleted(userId)).thenReturn(List.of());
+    }
+
+    private Team team(UUID teamId) {
+        Team team = new Team();
+        team.setId(teamId);
+        team.setOwnerUserId(userId);
+        return team;
+    }
+
+    private TeamMember member(UUID teamId, UUID memberId) {
+        TeamMember member = new TeamMember();
+        member.setId(UUID.randomUUID());
+        member.setTeamId(teamId);
+        member.setUserId(memberId);
+        member.setRole("member");
+        return member;
     }
 }

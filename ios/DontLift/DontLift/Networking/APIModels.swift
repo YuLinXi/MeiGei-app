@@ -34,7 +34,8 @@ struct ProfilePatchRequest: Encodable {
 
 /// 删号影响面（GET /account/deletion-impact）。
 struct DeletionImpactDTO: Decodable {
-    let ownedTeams: Int
+    let ownedTeamsToTransfer: Int
+    let emptyOwnedTeamsToDelete: Int
     let affectedMembers: Int
 }
 
@@ -62,11 +63,39 @@ struct SyncConflict<T: Decodable>: Decodable {
     let serverValue: T
 }
 
-/// 上传结果：已落库 id + 冲突 + 服务端时间。
+/// 服务端校正客户端偏移时间戳的通知。
+struct SyncTimestampAdjustmentDTO: Decodable {
+    let id: UUID
+    let domain: String
+    let originalUpdatedAt: Date?
+    let adjustedAt: Date
+    let reason: String?
+}
+
+/// 上传结果：已落库 id + 冲突 + 服务端时间 + 时间戳校正通知。
 struct SyncPushResult<T: Decodable>: Decodable {
     let applied: [UUID]
     let conflicts: [SyncConflict<T>]
     let serverTime: Date
+    let timestampAdjustments: [SyncTimestampAdjustmentDTO]
+
+    private enum CodingKeys: String, CodingKey {
+        case applied
+        case conflicts
+        case serverTime
+        case timestampAdjustments
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        applied = try container.decode([UUID].self, forKey: .applied)
+        conflicts = try container.decode([SyncConflict<T>].self, forKey: .conflicts)
+        serverTime = try container.decode(Date.self, forKey: .serverTime)
+        timestampAdjustments = try container.decodeIfPresent(
+            [SyncTimestampAdjustmentDTO].self,
+            forKey: .timestampAdjustments
+        ) ?? []
+    }
 }
 
 // MARK: - 各域实体 DTO（字段对齐后端 Jackson camelCase）
@@ -173,6 +202,8 @@ struct TeamDTO: Decodable, Identifiable, Hashable {
     var name: String
     var ownerUserId: UUID
     var inviteCode: String
+    var ownerTransferredAt: Date?
+    var ownerTransferredFromUserId: UUID?
 }
 
 struct TeamMemberDTO: Decodable, Identifiable, Hashable {
@@ -183,6 +214,23 @@ struct TeamMemberDTO: Decodable, Identifiable, Hashable {
     var joinedAt: Date?
     /// 后端 join app_user.display_name 得到；用户未设名时为 nil，前端兜底。
     var displayName: String?
+    /// 当前用户在某个 Team 的训练完成自动分享偏好。旧后端未返回时按 false 处理。
+    var autoShareWorkouts: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id, teamId, userId, role, joinedAt, displayName, autoShareWorkouts
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        teamId = try c.decode(UUID.self, forKey: .teamId)
+        userId = try c.decode(UUID.self, forKey: .userId)
+        role = try c.decode(String.self, forKey: .role)
+        joinedAt = try c.decodeIfPresent(Date.self, forKey: .joinedAt)
+        displayName = try c.decodeIfPresent(String.self, forKey: .displayName)
+        autoShareWorkouts = try c.decodeIfPresent(Bool.self, forKey: .autoShareWorkouts) ?? false
+    }
 }
 
 /// 队友打卡。`summary` 为后端 jsonb，序列化为 JSON **字符串**（同 WorkoutPlanDTO.items），需二次解析。
@@ -227,10 +275,26 @@ struct ServerPlanDTO: Decodable, Identifiable, Hashable {
     var forkedFrom: UUID?
     var sharedToTeamId: UUID?
 
-    var itemCount: Int {
+    var decodedItems: [PlanItem] {
         guard let data = items.data(using: .utf8),
-              let arr = try? JSONCoding.decoder.decode([PlanItem].self, from: data) else { return 0 }
-        return arr.count
+              let arr = try? JSONCoding.decoder.decode([PlanItem].self, from: data) else { return [] }
+        return arr
+    }
+
+    var itemCount: Int {
+        decodedItems.count
+    }
+
+    var exercisePreviewText: String {
+        let names = decodedItems
+            .sorted { $0.orderIndex < $1.orderIndex }
+            .prefix(3)
+            .map(\.displayExerciseName)
+        return names.isEmpty ? "暂无动作" : names.joined(separator: "、")
+    }
+
+    var hasUnstartableItems: Bool {
+        !PlanItem.unstartableItems(in: decodedItems).isEmpty
     }
 }
 
@@ -239,9 +303,11 @@ struct ServerPlanDTO: Decodable, Identifiable, Hashable {
 struct CreateTeamRequest: Encodable { let name: String }
 struct JoinTeamRequest: Encodable { let inviteCode: String }
 struct ReactRequest: Encodable { let emoji: String }
+struct UpdateTeamSharePreferenceRequest: Encodable { let autoShareWorkouts: Bool }
 
 struct CheckInRequest: Encodable {
     let workoutId: UUID
     let checkinDate: String  // "yyyy-MM-dd"
     let summary: CheckinSummary
+    let teamIds: [UUID]
 }

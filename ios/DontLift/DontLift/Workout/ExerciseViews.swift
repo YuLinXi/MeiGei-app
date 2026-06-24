@@ -8,6 +8,7 @@ struct ExercisePick: Identifiable, Hashable {
     var customId: UUID?
     var name: String
     var primaryMuscle: String?
+    var equipmentType: String?
     var id: String { builtinCode ?? customId?.uuidString ?? name }
 }
 
@@ -481,7 +482,8 @@ private struct ExerciseLibraryContentView: View {
             onPick(ExercisePick(builtinCode: ex.code,
                                 customId: nil,
                                 name: ex.name,
-                                primaryMuscle: ex.category))
+                                primaryMuscle: ex.category,
+                                equipmentType: ex.equipmentType))
         }
     }
 
@@ -490,7 +492,8 @@ private struct ExerciseLibraryContentView: View {
         onPick(ExercisePick(builtinCode: nil,
                             customId: ex.localId,
                             name: ex.name,
-                            primaryMuscle: ex.primaryMuscle))
+                            primaryMuscle: ex.primaryMuscle,
+                            equipmentType: ex.equipmentType))
     }
 
     private struct Segment { let title: String; let items: [BuiltinExercise] }
@@ -1248,7 +1251,8 @@ private struct LegacyExercisePickerView: View {
                 PickerRow(id: "c-\(ex.localId.uuidString)", name: ex.name,
                           muscle: ex.primaryMuscle, equipment: ex.equipmentType, isCustom: true,
                           pick: ExercisePick(builtinCode: nil, customId: ex.localId,
-                                             name: ex.name, primaryMuscle: ex.primaryMuscle))
+                                             name: ex.name, primaryMuscle: ex.primaryMuscle,
+                                             equipmentType: ex.equipmentType))
             }
         if !personal.isEmpty { dict[.personal] = personal }
 
@@ -1259,7 +1263,8 @@ private struct LegacyExercisePickerView: View {
                     PickerRow(id: "b-\(ex.code)", name: ex.name,
                               muscle: ex.category, equipment: ex.equipmentType, isCustom: false,
                               pick: ExercisePick(builtinCode: ex.code, customId: nil,
-                                                 name: ex.name, primaryMuscle: ex.category))
+                                                 name: ex.name, primaryMuscle: ex.category,
+                                                 equipmentType: ex.equipmentType))
                 }
             if !rows.isEmpty { dict[.muscle(m)] = rows }
         }

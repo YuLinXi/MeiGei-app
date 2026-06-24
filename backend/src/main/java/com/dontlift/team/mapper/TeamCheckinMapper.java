@@ -21,6 +21,18 @@ public interface TeamCheckinMapper extends BaseMapper<TeamCheckin> {
     @Delete("DELETE FROM team_checkin WHERE user_id = #{userId} AND workout_id = #{workoutId}")
     int deleteByUserWorkout(@Param("userId") UUID userId, @Param("workoutId") UUID workoutId);
 
+    /** 用户主动撤回某次训练在单个 Team 的可见性。 */
+    @Delete("DELETE FROM team_checkin WHERE team_id = #{teamId} AND user_id = #{userId} AND workout_id = #{workoutId}")
+    int deleteByTeamUserWorkout(@Param("teamId") UUID teamId,
+                                @Param("userId") UUID userId,
+                                @Param("workoutId") UUID workoutId);
+
+    @Delete("DELETE FROM team_checkin WHERE user_id = #{userId}")
+    int deleteByUser(@Param("userId") UUID userId);
+
+    @Delete("DELETE FROM team_checkin WHERE team_id = #{teamId}")
+    int deleteByTeam(@Param("teamId") UUID teamId);
+
     @Select("SELECT * FROM team_checkin WHERE team_id = #{teamId} AND checkin_date = #{date} ORDER BY created_at DESC")
     List<TeamCheckin> findByTeamAndDate(@Param("teamId") UUID teamId, @Param("date") LocalDate date);
 

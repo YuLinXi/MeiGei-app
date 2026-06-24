@@ -578,7 +578,10 @@ struct PlanDetailView: View {
             ExercisePickerView { pick in
                 var items = plan.items
                 items.append(PlanItem(builtinExerciseCode: pick.builtinCode, customExerciseId: pick.customId,
-                                      exerciseName: pick.name, orderIndex: items.count,
+                                      exerciseName: pick.name,
+                                      primaryMuscle: pick.primaryMuscle,
+                                      equipmentType: pick.equipmentType,
+                                      orderIndex: items.count,
                                       suggestedSets: PlanDefaults.suggestedSets,
                                       suggestedReps: PlanDefaults.suggestedReps))
                 plan.items = items
@@ -736,7 +739,7 @@ struct PlanDetailView: View {
                 .foregroundStyle(Theme.Color.muted)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.exerciseName)
+                Text(item.displayExerciseName)
                     .font(Theme.Font.body(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
                     .lineLimit(1)
@@ -771,7 +774,7 @@ struct PlanDetailView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("编辑\(item.exerciseName)")
+        .accessibilityLabel("编辑\(item.displayExerciseName)")
     }
 
     private var modeInfoCard: some View {
@@ -931,6 +934,8 @@ struct PlanDetailView: View {
                                             builtinExerciseCode: $0.builtinExerciseCode,
                                             customExerciseId: $0.customExerciseId,
                                             exerciseName: $0.exerciseName,
+                                            primaryMuscle: $0.primaryMuscle,
+                                            equipmentType: $0.equipmentType,
                                             orderIndex: $0.orderIndex,
                                             suggestedSets: $0.suggestedSets,
                                             suggestedReps: $0.suggestedReps,
@@ -946,6 +951,11 @@ struct PlanDetailView: View {
 
     /// 单一活跃会话守卫：存在进行中会话时弹「继续 / 丢弃」，否则新建并进入。
     private func startWorkout() {
+        let brokenItems = PlanItem.unstartableItems(in: plan.items)
+        guard brokenItems.isEmpty else {
+            strictStartError = PlanItem.unstartableMessage(for: brokenItems)
+            return
+        }
         if plan.mode == .strict {
             let missing = PlanPrefill.missingStrictRequiredItems(in: plan.items)
             guard missing.isEmpty else {
@@ -975,7 +985,8 @@ struct PlanDetailView: View {
             let ex = WorkoutExercise(
                 builtinExerciseCode: item.builtinExerciseCode,
                 customExerciseId: item.customExerciseId,
-                exerciseName: item.exerciseName,
+                exerciseName: item.displayExerciseName,
+                primaryMuscle: item.resolvedPrimaryMuscle,
                 orderIndex: i,
                 planItemId: item.itemId   // 自适应回写合并主键（design.md D3）
             )
@@ -1408,7 +1419,7 @@ struct PlanItemEditorView: View {
             )
 
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                Text(original.exerciseName)
+                Text(original.displayExerciseName)
                     .font(Theme.Font.l1)
                     .foregroundStyle(Theme.Color.fg)
                 // 建议组数

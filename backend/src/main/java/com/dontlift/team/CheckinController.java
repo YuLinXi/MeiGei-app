@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,18 +21,24 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/** 训练即打卡与表情回应（5.4）。 */
+/** 训练分享打卡与表情回应（5.4）。 */
 @RestController
 @RequiredArgsConstructor
 public class CheckinController {
 
     private final CheckinService checkinService;
 
-    /** 保存训练后打卡：fan-out 到本人所有 Team。配合 Idempotency-Key 头防重。 */
+    /** 保存训练后打卡：仅分享到用户显式选择的 Team。配合 Idempotency-Key 头防重。 */
     @PostMapping("/checkins")
     public List<TeamCheckin> checkIn(@Valid @RequestBody CheckIn req) {
         return checkinService.checkIn(SecurityUtils.currentUserId(),
-                req.workoutId(), req.checkinDate(), req.summary().toString());
+                req.workoutId(), req.checkinDate(), req.summary().toString(), req.teamIds());
+    }
+
+    /** 撤回某次训练在单个 Team 的可见性；个人训练记录不受影响。 */
+    @DeleteMapping("/teams/{teamId}/checkins/workouts/{workoutId}")
+    public void withdrawCheckin(@PathVariable UUID teamId, @PathVariable UUID workoutId) {
+        checkinService.withdraw(SecurityUtils.currentUserId(), teamId, workoutId);
     }
 
     @GetMapping("/teams/{teamId}/checkins")
