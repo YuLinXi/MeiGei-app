@@ -1,6 +1,7 @@
 package com.dontlift.common.web;
 
 import com.dontlift.auth.AppleTokenVerifier.AppleTokenException;
+import com.dontlift.auth.AppleTokenVerifier.AppleJwksUnavailableException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -18,6 +19,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  *   <li>Spring MVC 标准异常（@Valid 400 / 反序列化失败 / 405 等）由父类 {@link ResponseEntityExceptionHandler}
  *       正确映射为 4xx；{@link #handleExceptionInternal} 是其统一出口，在此补一行日志，不改变状态码契约。</li>
  *   <li>{@link AppleTokenException} → 401（外部 token 不可信，warn）。</li>
+ *   <li>{@link AppleJwksUnavailableException} → 503（Apple JWKS 暂不可用，warn）。</li>
  *   <li>{@link AppException} → 自带状态（404/403/409/400，客户端可预期，debug 留痕不告警）。</li>
  *   <li>其余未预期异常 → 500，error 级别带堆栈（含 MDC traceId/userId），并经 Sentry 上报。</li>
  * </ul>
@@ -31,6 +33,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail handleAppleToken(AppleTokenException e) {
         log.warn("Apple token 校验失败: {}", e.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
+    }
+
+    /** Apple JWKS 拉取失败 → 503，避免把上游网络问题误报为 token 失效。 */
+    @ExceptionHandler(AppleJwksUnavailableException.class)
+    public ProblemDetail handleAppleJwksUnavailable(AppleJwksUnavailableException e) {
+        log.warn("Apple JWKS 暂不可用: {}", e.getMessage());
+        return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
     }
 
     /** 业务规则违规 → 自带状态。 */

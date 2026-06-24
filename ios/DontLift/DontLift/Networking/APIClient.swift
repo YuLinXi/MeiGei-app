@@ -182,10 +182,16 @@ actor APIClient {
             #endif
             return data
         case 401:
-            netLog.error("❌ #\(id, privacy: .public) 401 \(method, privacy: .public) \(endpoint, privacy: .public) · ⏱\(ms, privacy: .public)ms · 登录失效")
             // 仅对带鉴权的请求触发全局登出（登录/造 token 等 authorized=false 的 401 是凭据问题，不应登出）。
-            if authorized { onUnauthorized?() }
-            throw APIError.unauthorized
+            if authorized {
+                netLog.error("❌ #\(id, privacy: .public) 401 \(method, privacy: .public) \(endpoint, privacy: .public) · ⏱\(ms, privacy: .public)ms · 登录失效")
+                onUnauthorized?()
+                throw APIError.unauthorized
+            }
+            netLog.error("❌ #\(id, privacy: .public) 401 \(method, privacy: .public) \(endpoint, privacy: .public) · ⏱\(ms, privacy: .public)ms")
+            let bodyStr = String(data: data, encoding: .utf8) ?? ""
+            netLog.error("   #\(id, privacy: .public) 错误体 \(Self.prettyJSON(data), privacy: .public)")
+            throw APIError.http(status: http.statusCode, body: bodyStr)
         default:
             let bodyStr = String(data: data, encoding: .utf8) ?? ""
             netLog.error("❌ #\(id, privacy: .public) \(http.statusCode, privacy: .public) \(method, privacy: .public) \(endpoint, privacy: .public) · ⏱\(ms, privacy: .public)ms")
