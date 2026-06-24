@@ -2,7 +2,7 @@
 # DontLift 后端 API 端到端联调脚本（纯服务端 curl，不含 iOS UI）
 #
 # 覆盖链路：登录 → 离线同步(push/pull/幂等/LWW 冲突) → Team 建团/加入/成员
-#           → 训练即打卡(fan-out) → 表情回应。双用户(A=owner / B=member)。
+#           → Team 自动分享偏好 / 显式 checkin API（默认不 fan-out）→ 表情回应。双用户(A=owner / B=member)。
 #
 # 前置：后端在线（另开终端 ./backend/scripts/dev-start.sh，已注入 APP_DEV_TOKEN=true）。
 #       需要 jq、uuidgen（macOS 自带）。
@@ -35,7 +35,7 @@ fi
 uuid() { uuidgen | tr 'A-Z' 'a-z'; }
 TS_NOW=$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)
 TS_OLD=$(date -u -v-1d +%Y-%m-%dT%H:%M:%S.000000Z)   # 昨天（BSD date）
-TS_NEW=$(date -u -v+1d +%Y-%m-%dT%H:%M:%S.000000Z)   # 明天
+TS_NEW=$(date -u -v+1S +%Y-%m-%dT%H:%M:%S.000000Z)   # 稍新但仍在服务端时钟容忍窗口内
 TODAY=$(date -u +%Y-%m-%d)
 
 # call METHOD PATH [BODY] [TOKEN] [IDEMPOTENCY_KEY] → 设置 RESP_BODY / RESP_CODE
@@ -166,18 +166,41 @@ MCOUNT=$(jqr 'length')
 [ "$MCOUNT" = "2" ] && pass "成员数=2" || fail "成员数=${MCOUNT}（期望 2）"
 [ "$(jqr "[.[].userId] | index(\"$USER_A\")")" != "null" ] && [ "$(jqr "[.[].userId] | index(\"$USER_B\")")" != "null" ] \
   && pass "A、B 均在成员中" || fail "成员缺 A 或 B"
+[ "$(jqr ".[] | select(.userId==\"$USER_A\") | .autoShareWorkouts")" = "false" ] \
+  && pass "A 自动分享偏好默认关闭" || fail "A 自动分享偏好不是默认关闭 | $RESP_BODY"
+
+call PATCH "/teams/$TEAM_ID/members/me/share-preferences" '{"autoShareWorkouts":true}' "$TOKEN_A" "$(uuid)"
+expect_code 200 "A 开启 Team 自动分享偏好"
+[ "$(jqr '.autoShareWorkouts')" = "true" ] && pass "A 偏好已开启" || fail "A 偏好未开启 | $RESP_BODY"
+
+call GET "/teams/members/me/share-preferences" "" "$TOKEN_A"
+expect_code 200 "A 查询自己的 Team 分享偏好"
+[ "$(jqr ".[] | select(.teamId==\"$TEAM_ID\") | .autoShareWorkouts")" = "true" ] \
+  && pass "偏好列表包含已开启的 Team" || fail "偏好列表未反映开启状态 | $RESP_BODY"
 
 # ============================================================
-section "5. 训练即打卡（A，fan-out 到所属 Team）"
+section "5. Team checkin API：显式 teamIds 写入（默认不 fan-out）"
 CK_IDEM=$(uuid)
+CK_EMPTY_BODY=$(cat <<JSON
+{"workoutId":"$W_ID","checkinDate":"$TODAY","summary":{"exerciseCount":1,"totalSets":2,"totalVolume":1440},"teamIds":[]}
+JSON
+)
+call POST /checkins "$CK_EMPTY_BODY" "$TOKEN_A" "$(uuid)"
+expect_code 400 "teamIds 为空时服务端拒绝创建 checkin"
+
+call GET "/teams/$TEAM_ID/checkins?date=$TODAY" "" "$TOKEN_B"
+expect_code 200 "B 列当日打卡（显式分享前）"
+[ "$(jqr "[.[] | select(.workoutId==\"$W_ID\")] | length")" = "0" ] \
+  && pass "checkin API 写入前 Team feed 不出现该训练" || fail "teamIds 为空却出现 checkin | $RESP_BODY"
+
 CK_BODY=$(cat <<JSON
-{"workoutId":"$W_ID","checkinDate":"$TODAY","summary":{"exerciseCount":1,"totalSets":2,"totalVolume":1440}}
+{"workoutId":"$W_ID","checkinDate":"$TODAY","summary":{"exerciseCount":1,"totalSets":2,"totalVolume":1440},"teamIds":["$TEAM_ID"]}
 JSON
 )
 call POST /checkins "$CK_BODY" "$TOKEN_A" "$CK_IDEM"
-expect_code 200 "A 打卡"
+expect_code 200 "A 显式分享到 Team"
 CK_LEN=$(jqr 'length')
-[ "$CK_LEN" -ge 1 ] 2>/dev/null && pass "fan-out 生成 $CK_LEN 条打卡" || fail "打卡未生成 | $RESP_BODY"
+[ "$CK_LEN" = "1" ] 2>/dev/null && pass "仅生成所选 Team 的 1 条打卡" || fail "打卡数量不符 | $RESP_BODY"
 CHECKIN_ID=$(jqr ".[] | select(.teamId==\"$TEAM_ID\") | .id")
 [ -n "$CHECKIN_ID" ] && [ "$CHECKIN_ID" != "null" ] && pass "命中本 team 的打卡（checkinId=${CHECKIN_ID}）" || fail "未命中本 team 打卡"
 
@@ -211,7 +234,7 @@ RCOUNT=$(jqr 'length')
 # ============================================================
 echo ""
 if [ "$FAILS" -eq 0 ]; then
-  echo -e "${GREEN}全部通过 ✓${NC}  端到端链路：登录→同步(push/pull/幂等/LWW)→建团/加入→打卡(fan-out)→表情 均符合契约。"
+  echo -e "${GREEN}全部通过 ✓${NC}  端到端链路：登录→同步(push/pull/幂等/LWW)→建团/加入→显式 Team 分享→表情 均符合契约。"
   exit 0
 else
   echo -e "${RED}有 $FAILS 项断言失败 ✗${NC}  见上方 ✗ 行。"

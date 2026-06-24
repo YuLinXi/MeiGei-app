@@ -23,4 +23,6 @@ public class TeamMember {
     private String role;
 
     private OffsetDateTime joinedAt;
+
+    private boolean autoShareWorkouts;
 }

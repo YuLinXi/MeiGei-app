@@ -3,6 +3,8 @@ package com.dontlift.workout;
 import com.dontlift.sync.dto.SyncConflict;
 import com.dontlift.sync.dto.SyncPullResult;
 import com.dontlift.sync.dto.SyncPushResult;
+import com.dontlift.sync.SyncTimestampGuard;
+import com.dontlift.sync.dto.SyncTimestampAdjustment;
 import com.dontlift.team.CheckinService;
 import com.dontlift.workout.dto.WorkoutTree;
 import com.dontlift.workout.entity.Workout;
@@ -62,12 +64,21 @@ public class WorkoutSyncService {
     /** 批量上传 + LWW + 子树全量替换。 */
     @Transactional
     public SyncPushResult<WorkoutTree> push(UUID userId, List<WorkoutTree> incoming) {
+        OffsetDateTime serverTime = OffsetDateTime.now();
         List<UUID> applied = new ArrayList<>();
         List<SyncConflict<WorkoutTree>> conflicts = new ArrayList<>();
+        List<SyncTimestampAdjustment> timestampAdjustments = new ArrayList<>();
 
         for (WorkoutTree item : incoming) {
             Workout workout = item.workout();
             workout.setUserId(userId); // 强制归属，忽略客户端伪造
+            SyncTimestampGuard.Decision timestamp = SyncTimestampGuard.normalize(
+                    workout.getId(), "workouts", workout.getUpdatedAt(), serverTime);
+            if (timestamp.adjusted()) {
+                workout.setUpdatedAt(timestamp.effectiveUpdatedAt());
+                workout.setDeletedAt(SyncTimestampGuard.normalizeDeletedAt(workout.getDeletedAt(), timestamp.effectiveUpdatedAt()));
+                timestampAdjustments.add(timestamp.adjustment());
+            }
             Workout server = workoutMapper.findByIdIncludingDeleted(workout.getId());
 
             if (server == null) {
@@ -77,7 +88,7 @@ public class WorkoutSyncService {
                 continue;
             }
 
-            boolean incomingWins = !server.getUpdatedAt().isAfter(workout.getUpdatedAt());
+            boolean incomingWins = !server.getUpdatedAt().isAfter(timestamp.lwwUpdatedAt());
             if (!incomingWins) {
                 conflicts.add(new SyncConflict<>(workout.getId(), loadTree(server)));
                 continue;
@@ -98,7 +109,7 @@ public class WorkoutSyncService {
             applied.add(workout.getId());
         }
 
-        return new SyncPushResult<>(applied, conflicts, OffsetDateTime.now());
+        return new SyncPushResult<>(applied, conflicts, serverTime, timestampAdjustments);
     }
 
     private WorkoutTree loadTree(Workout w) {

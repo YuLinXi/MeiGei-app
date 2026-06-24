@@ -111,7 +111,8 @@ enum WorkoutSetType: String, Codable, CaseIterable {
     // 预留：case dropset / case failure ...
 }
 
-/// 一个动作下的单组记录（聚合子节点，不单独同步）。重量绝不自动预填（spec 约束）。
+/// 一个动作下的单组记录（聚合子节点，不单独同步）。新增组可由调用方按当前训练上下文预填重量/次数；
+/// 未完成组不计入训练量/PR。
 @Model
 final class WorkoutSet {
     @Attribute(.unique) var localId: UUID
@@ -171,6 +172,14 @@ extension WorkoutExercise {
     /// 上一**正式**组重量（按 setIndex 取最后一个正式组），用于「加一组」预填源（热身组不作预填）。
     var lastWorkingWeight: Double? {
         sets.filter { $0.setType != .warmup }.sorted { $0.setIndex < $1.setIndex }.last?.weightKg
+    }
+
+    /// 上一**正式**组的重量与次数，用于新增正式组时继承输入值（热身组不作预填源）。
+    var lastWorkingSetValues: (weightKg: Double?, reps: Int?) {
+        guard let last = sets.filter({ $0.setType != .warmup }).sorted(by: { $0.setIndex < $1.setIndex }).last else {
+            return (nil, nil)
+        }
+        return (last.weightKg, last.reps)
     }
 
     /// 切换某组 working ⇄ warmup，并重排到对应段尾（赋最大 setIndex+1）。仅改模型，保存由调用方负责。

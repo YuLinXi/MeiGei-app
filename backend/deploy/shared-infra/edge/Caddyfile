@@ -14,6 +14,12 @@ dontlift.peipadada.com {
 		file_server
 	}
 
+	# 服务条款静态页，源文件在 ./site/dontlift/terms/
+	handle_path /terms* {
+		root * /srv/site/dontlift/terms
+		file_server
+	}
+
 	handle {
 		reverse_proxy dontlift-app:8080
 	}

@@ -38,22 +38,23 @@
 
 ### 上架硬卡点：账号删除与法律链接（change `profile-account-deletion-and-prefs`，2026-06-14）
 
-- [x] **App 内「删除账号」路径已补齐（Apple 5.1.1(v) 硬要求）**：「我的 → 账号 → 删除账号」二次确认后调 `DELETE /account`，后端单事务**物理硬删**该用户全部数据、团主删号连带解散团队；客户端成功后清本地 SwiftData + Keychain JWT 并回登录页。已用 dev token 端到端实测级联清零、影响面计数、重复删幂等（均 204）。
+- [x] **App 内「删除账号」路径已补齐（Apple 5.1.1(v) 硬要求）**：「我的 → 账号 → 删除账号」二次确认后调 `DELETE /account`，后端单事务**物理硬删**该用户本人数据；团主删号时多人 Team 保留并转移 owner，空 Team 才会删除。客户端成功后清本地 SwiftData + Keychain JWT 并回登录页。已用 dev token 端到端实测级联清零、影响面计数、重复删幂等（均 204）。
 - [x] **隐私政策 / 服务条款 App 内可达**：登录页底部法律链接与「我的 → 关于」组均经 `SFSafariViewController` 打开后端页面（URL 收敛于 `AppConfig`，单一来源）。
-  - ⚠️ **服务条款页尚未单独部署**：`AppConfig.termsOfServiceURL` 暂指向 `/privacy`。上线独立 `/terms` 页后改 `AppConfig` 一处即可。提交前建议补一份服务条款静态页。
+- [ ] **发布硬门禁：独立法律链接已上线且 App 内可达**：外部 TestFlight / App Store 提交前必须确认 `https://dontlift.peipadada.com/privacy` 与 `https://dontlift.peipadada.com/terms` 均为独立 HTTPS 页面，登录页与「我的 → 关于」均可打开，且 `AppConfig.termsOfServiceURL != AppConfig.privacyPolicyURL`。
 - [ ] **（可选，软阻塞）Apple 授权主动撤销凭据**：删号时若配 `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_KEY_PATH`（client_secret 签发用 .p8，可复用 APNs 同一 Key 或单独建），后端会调 Apple `/auth/revoke` 真正撤销授权；**凭据缺失时自动降级**（记 warn、跳过 revoke、仍完整删除本地数据并返回 2xx），不阻塞上架。登录持久化 `refresh_token` 同样依赖该凭据，缺失则老用户删号走 S2S 反向通知兜底。
 - [ ] Xcode：Product → Archive → Distribute App（App Store Connect）上传；TestFlight 页填测试信息。
   - **内部测试员（≤100 人）不需要 Beta 审核**，处理完即可安装；外部测试员才走 Beta App Review。
 
 ## 五、发布前回归（对应 openspec 任务 5.3 / 5.4）
 
-- [ ] 5.3 真机验证：HealthKit 读写、Live Activity（休息计时灵动岛/锁屏）、Watch Smart Stack——建议在发 TestFlight 前或第一轮内部测试中过掉。
+- [ ] 5.3 真机验证（iPhone 必测）：HealthKit 读写、休息 Live Activity（锁屏/灵动岛）、本地通知、前台声音与触觉反馈。
+- [ ] 5.3 条件验证（有设备时）：iOS 18+ iPhone 配对 watchOS 11+ Apple Watch，观察 Watch Smart Stack 是否呈现；无匹配设备或系统未转呈时记录为“条件未测/平台未呈现”，不得判定为休息提醒失败。
 - [ ] 5.4 TestFlight 灰度回归（**2026-06-12 已过半**，服务器日志逐项核验）：
   - [x] 真 Apple 登录（生产首个用户创建成功）
   - [x] 离线记录 → 云同步（workouts push/pull 200，幂等重推正常）
   - [x] APNs 设备令牌注册（`POST /devices/token` 200）
   - [x] 建团（含邀请码）
-  - [ ] Team 打卡 fan-out（注意：须**先在团里**再完成训练才触发；首测时训练早于建团，checkin=0 属预期）
+  - [ ] Team 自动分享偏好：默认关闭时完成训练不进 Team；在 Team 详情首次确认开启后，后续训练才自动进入该 Team；关闭后不再分享，历史可按次撤回。
   - [ ] APNs 真实投递 + 表情回应（需第二个账号入团：另一台手机装 TestFlight 包、用其自身 Apple ID 登录、邀请码入团）
 - 已知观察项：①国行 iOS 首次联网权限未授予时首启报「offline」（设置→别练了→无线数据）；②服务器拉 Apple JWKS 偶发超时致首次登录 401、重试即好，频发再优化。
 - 提醒：测试设备上的旧 MeiGei App 直接删掉（bundle ID 变了，沙盒数据不迁移）。

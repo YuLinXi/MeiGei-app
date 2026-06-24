@@ -79,7 +79,7 @@
 
   curl -fsS https://dontlift.peipadada.com/actuator/health
   ```
-- [ ] 后端回归重点：登录/JWT、workout sync push/pull、计划 strict/adaptive mode 序列化、Team fork 计划模板、训练完成打卡 fan-out。
+- [ ] 后端回归重点：登录/JWT、workout sync push/pull、计划 strict/adaptive mode 序列化、Team fork 计划模板、Team 自动分享偏好与显式 checkin API。
 
 ## 5. iOS TestFlight 上传步骤
 

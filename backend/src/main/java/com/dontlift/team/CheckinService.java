@@ -5,12 +5,10 @@ import com.dontlift.common.web.AppException;
 import com.dontlift.push.PushService;
 import com.dontlift.team.dto.TeamCheckinFeed;
 import com.dontlift.team.entity.CheckinReaction;
-import com.dontlift.team.entity.Team;
 import com.dontlift.team.entity.TeamCheckin;
 import com.dontlift.team.entity.TeamMember;
 import com.dontlift.team.mapper.CheckinReactionMapper;
 import com.dontlift.team.mapper.TeamCheckinMapper;
-import com.dontlift.team.mapper.TeamMapper;
 import com.dontlift.team.mapper.TeamMemberMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,28 +16,26 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** 训练即打卡 + 表情回应 + 事件推送（5.4）。 */
+/** 训练分享打卡 + 表情回应 + 事件推送（5.4）。 */
 @Service
 public class CheckinService {
 
     private static final Set<String> EMOJIS = Set.of("muscle", "fire", "clap", "heart");
 
-    private final TeamMapper teamMapper;
     private final TeamMemberMapper memberMapper;
     private final TeamCheckinMapper checkinMapper;
     private final CheckinReactionMapper reactionMapper;
     private final TeamService teamService;
     private final PushService pushService;
 
-    public CheckinService(TeamMapper teamMapper, TeamMemberMapper memberMapper,
-                          TeamCheckinMapper checkinMapper, CheckinReactionMapper reactionMapper,
+    public CheckinService(TeamMemberMapper memberMapper, TeamCheckinMapper checkinMapper, CheckinReactionMapper reactionMapper,
                           TeamService teamService, PushService pushService) {
-        this.teamMapper = teamMapper;
         this.memberMapper = memberMapper;
         this.checkinMapper = checkinMapper;
         this.reactionMapper = reactionMapper;
@@ -48,35 +44,39 @@ public class CheckinService {
     }
 
     /**
-     * 保存训练即打卡：fan-out 到该用户所有 Team，按 (team,user,workout) 幂等。
+     * 保存训练分享打卡：仅写入用户显式选择的 Team，按 (team,user,workout) 幂等。
      * summary 为成交时刻快照。新打卡推送给同团其他成员。
      */
     @Transactional
-    public List<TeamCheckin> checkIn(UUID userId, UUID workoutId, LocalDate date, String summary) {
-        List<Team> teams = teamMapper.findByMember(userId);
-        List<TeamCheckin> created = new ArrayList<>();
-        for (Team team : teams) {
-            TeamCheckin existing = checkinMapper.findByTeamUserWorkout(team.getId(), userId, workoutId);
+    public List<TeamCheckin> checkIn(UUID userId, UUID workoutId, LocalDate date, String summary, List<UUID> teamIds) {
+        if (teamIds == null || teamIds.isEmpty()) {
+            throw AppException.badRequest("请选择要分享的 Team");
+        }
+        List<TeamCheckin> affected = new ArrayList<>();
+        for (UUID teamId : new LinkedHashSet<>(teamIds)) {
+            teamService.requireMember(teamId, userId);
+            TeamCheckin existing = checkinMapper.findByTeamUserWorkout(teamId, userId, workoutId);
             if (existing != null) {
                 // 已打卡：编辑训练后更新摘要快照（不重复推送），保持本地与 Team 一致。
                 existing.setSummary(summary);
                 existing.setCheckinDate(date);
                 checkinMapper.updateById(existing);
+                affected.add(existing);
                 continue;
             }
             TeamCheckin c = new TeamCheckin();
             c.setId(Uuid7.generate());
-            c.setTeamId(team.getId());
+            c.setTeamId(teamId);
             c.setUserId(userId);
             c.setWorkoutId(workoutId);
             c.setCheckinDate(date);
             c.setSummary(summary);
             c.setCreatedAt(OffsetDateTime.now());
             checkinMapper.insert(c);
-            created.add(c);
-            notifyOtherMembers(team.getId(), userId, "队友打卡了", "你的训练搭子完成了今天的训练");
+            affected.add(c);
+            notifyOtherMembers(teamId, userId, "队友打卡了", "你的训练搭子完成了今天的训练");
         }
-        return created;
+        return affected;
     }
 
     public List<TeamCheckin> listCheckins(UUID userId, UUID teamId, LocalDate date) {
@@ -100,6 +100,13 @@ public class CheckinService {
     @Transactional
     public void removeForWorkout(UUID userId, UUID workoutId) {
         checkinMapper.deleteByUserWorkout(userId, workoutId);
+    }
+
+    /** 撤回某次训练在单个 Team 的可见性。reaction 由 FK ON DELETE CASCADE 清理。 */
+    @Transactional
+    public void withdraw(UUID userId, UUID teamId, UUID workoutId) {
+        teamService.requireMember(teamId, userId);
+        checkinMapper.deleteByTeamUserWorkout(teamId, userId, workoutId);
     }
 
     /**

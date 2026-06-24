@@ -536,9 +536,17 @@ struct ProfileView: View {
 
     /// 二次确认文案：强调不可恢复，并显式列出影响面（若已成功拉取）。
     private var deleteConfirmMessage: String {
-        var lines = "账号与全部训练数据将被永久删除,不可恢复。"
-        if let impact = deletionImpact, impact.ownedTeams > 0 {
-            lines += "\n将解散 \(impact.ownedTeams) 个团队、影响 \(impact.affectedMembers) 名成员。"
+        var lines = "账号与本人训练数据将被永久删除,不可恢复。"
+        if let impact = deletionImpact {
+            if impact.ownedTeamsToTransfer > 0 {
+                lines += "\n\(impact.ownedTeamsToTransfer) 个多人 Team 将保留，并自动转移队长；其他成员历史不会被删除。"
+            }
+            if impact.emptyOwnedTeamsToDelete > 0 {
+                lines += "\n\(impact.emptyOwnedTeamsToDelete) 个只有你的空 Team 将被删除。"
+            }
+            if impact.affectedMembers > 0 {
+                lines += "\n涉及 \(impact.affectedMembers) 名成员的 Team 共享历史将继续保留。"
+            }
         }
         return lines
     }

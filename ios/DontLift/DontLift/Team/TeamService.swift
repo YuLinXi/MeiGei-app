@@ -6,6 +6,10 @@ import Foundation
 @Observable
 final class TeamService {
     private let api: APIClient
+    private static let pendingShareKey = "dontlift.team.pendingCheckinShares"
+    private static func autoShareCacheKey(userId: UUID) -> String {
+        "dontlift.team.autoShareTeamIds.\(userId.uuidString)"
+    }
     private(set) var teams: [TeamDTO] = []
 
     /// 退出/解散成功后由详情页写入，返回 Team 列表时顶部 toast 读取并清空（跨页结果反馈）。
@@ -36,6 +40,28 @@ final class TeamService {
 
     func members(of teamId: UUID) async throws -> [TeamMemberDTO] {
         try await api.send("GET", "/teams/\(teamId)/members")
+    }
+
+    func mySharePreferences(cacheFor userId: UUID? = nil) async throws -> [TeamMemberDTO] {
+        let preferences: [TeamMemberDTO] = try await api.send("GET", "/teams/members/me/share-preferences")
+        if let userId {
+            cacheAutoShareTeamIds(preferences.filter(\.autoShareWorkouts).map(\.teamId), userId: userId)
+        }
+        return preferences
+    }
+
+    @discardableResult
+    func updateAutoShareWorkouts(teamId: UUID, enabled: Bool, userId: UUID? = nil) async throws -> TeamMemberDTO {
+        let member: TeamMemberDTO = try await api.send("PATCH", "/teams/\(teamId)/members/me/share-preferences",
+                                                       body: UpdateTeamSharePreferenceRequest(autoShareWorkouts: enabled))
+        if let userId {
+            updateCachedAutoShareTeamId(teamId, enabled: enabled, userId: userId)
+        }
+        return member
+    }
+
+    func rememberAutoSharePreference(teamId: UUID, enabled: Bool, userId: UUID) {
+        updateCachedAutoShareTeamId(teamId, enabled: enabled, userId: userId)
     }
 
     func leave(_ teamId: UUID) async throws {
@@ -87,17 +113,75 @@ final class TeamService {
         try await api.sendVoid("POST", "/checkins/\(checkinId)/reactions", body: ReactRequest(emoji: emoji))
     }
 
-    /// 训练完成即打卡：fan-out 到本人所有 Team（无 Team 时服务端返回空，无副作用）。
-    /// workoutId 用 localId（== serverId，软指针无 FK）。
+    /// 训练完成后的显式分享：仅写入用户选择的 Team。空数组表示「仅自己可见」，不发请求。
     @discardableResult
-    func checkIn(workout: Workout) async throws -> [TeamCheckinDTO] {
-        let body = CheckInRequest(workoutId: workout.localId,
-                                  checkinDate: Self.dateOnly(workout.startedAt),
-                                  summary: CheckinSummary(workout: workout))
+    func checkIn(workout: Workout, teamIds: [UUID]) async throws -> [TeamCheckinDTO] {
+        try await checkIn(draft: TeamShareDraft(workout: workout), teamIds: teamIds)
+    }
+
+    @discardableResult
+    func checkIn(draft: TeamShareDraft, teamIds: [UUID]) async throws -> [TeamCheckinDTO] {
+        guard !teamIds.isEmpty else { return [] }
+        let body = CheckInRequest(workoutId: draft.workoutId,
+                                  checkinDate: draft.checkinDate,
+                                  summary: draft.summary,
+                                  teamIds: teamIds)
         // 幂等键含 updatedAt：首次打卡去重；编辑训练后 updatedAt 变化 → 新键穿透幂等过滤，
         // 后端按 (team,user,workout) 更新摘要快照。
         return try await api.send("POST", "/checkins", body: body,
-                                  idempotencyKey: "checkin-\(workout.localId.uuidString):\(workout.updatedAt.timeIntervalSince1970)")
+                                  idempotencyKey: "checkin-\(draft.workoutId.uuidString):\(draft.updatedAt.timeIntervalSince1970)")
+    }
+
+    /// 显式分享；失败时把用户已确认的分享意图持久化，待后续同步完成后重试。
+    func shareOrQueue(draft: TeamShareDraft, teamIds: [UUID]) async -> TeamShareResult {
+        guard !teamIds.isEmpty else { return .privateOnly }
+        let intent = PendingCheckinShare(draft: draft, teamIds: teamIds)
+        do {
+            let checkins = try await send(intent)
+            removePending(intent)
+            return .shared(count: checkins.count)
+        } catch APIError.transport {
+            enqueue(intent)
+            return .queued
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    /// 训练完成后的低打扰自动分享：只读取用户已在 Team 内开启的偏好。
+    func autoShareOrQueue(draft: TeamShareDraft, userId: UUID?) async -> TeamShareResult {
+        do {
+            let enabledTeamIds = try await mySharePreferences(cacheFor: userId)
+                .filter(\.autoShareWorkouts)
+                .map(\.teamId)
+            guard !enabledTeamIds.isEmpty else { return .privateOnly }
+            return await shareOrQueue(draft: draft, teamIds: enabledTeamIds)
+        } catch APIError.transport {
+            guard let userId else { return .privateOnly }
+            let cachedTeamIds = cachedAutoShareTeamIds(userId: userId)
+            guard !cachedTeamIds.isEmpty else { return .privateOnly }
+            return await shareOrQueue(draft: draft, teamIds: cachedTeamIds)
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    func withdrawCheckin(teamId: UUID, workoutId: UUID) async throws {
+        try await api.sendVoid("DELETE", "/teams/\(teamId)/checkins/workouts/\(workoutId)")
+    }
+
+    /// 同步完成后由 MainTab 触发：重放此前用户明确选择过、但网络失败的分享意图。
+    func retryPendingShares() async {
+        let intents = pendingShares
+        guard !intents.isEmpty else { return }
+        for intent in intents {
+            do {
+                _ = try await send(intent)
+                removePending(intent)
+            } catch {
+                // 保留待下轮同步后重试。
+            }
+        }
     }
 
     // MARK: - 工具
@@ -111,6 +195,93 @@ final class TeamService {
     }()
 
     static func dateOnly(_ date: Date) -> String { dateOnlyFormatter.string(from: date) }
+
+    private func send(_ intent: PendingCheckinShare) async throws -> [TeamCheckinDTO] {
+        let body = CheckInRequest(workoutId: intent.workoutId,
+                                  checkinDate: intent.checkinDate,
+                                  summary: intent.summary,
+                                  teamIds: intent.teamIds)
+        return try await api.send("POST", "/checkins", body: body,
+                                  idempotencyKey: intent.idempotencyKey)
+    }
+
+    private var pendingShares: [PendingCheckinShare] {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: Self.pendingShareKey),
+                  let decoded = try? JSONCoding.decoder.decode([PendingCheckinShare].self, from: data) else {
+                return []
+            }
+            return decoded
+        }
+        set {
+            let data = try? JSONCoding.encoder.encode(newValue)
+            UserDefaults.standard.set(data, forKey: Self.pendingShareKey)
+        }
+    }
+
+    private func enqueue(_ intent: PendingCheckinShare) {
+        var items = pendingShares.filter { $0.id != intent.id }
+        items.append(intent)
+        pendingShares = items
+    }
+
+    private func removePending(_ intent: PendingCheckinShare) {
+        pendingShares = pendingShares.filter { $0.id != intent.id }
+    }
+
+    private func cachedAutoShareTeamIds(userId: UUID) -> [UUID] {
+        guard let data = UserDefaults.standard.data(forKey: Self.autoShareCacheKey(userId: userId)),
+              let ids = try? JSONCoding.decoder.decode([UUID].self, from: data) else {
+            return []
+        }
+        return ids
+    }
+
+    private func cacheAutoShareTeamIds(_ teamIds: [UUID], userId: UUID) {
+        let sorted = teamIds.sorted { $0.uuidString < $1.uuidString }
+        let data = try? JSONCoding.encoder.encode(sorted)
+        UserDefaults.standard.set(data, forKey: Self.autoShareCacheKey(userId: userId))
+    }
+
+    private func updateCachedAutoShareTeamId(_ teamId: UUID, enabled: Bool, userId: UUID) {
+        var ids = cachedAutoShareTeamIds(userId: userId)
+        if enabled {
+            if !ids.contains(teamId) { ids.append(teamId) }
+        } else {
+            ids.removeAll { $0 == teamId }
+        }
+        cacheAutoShareTeamIds(ids, userId: userId)
+    }
+}
+
+enum TeamShareResult: Equatable {
+    case privateOnly
+    case shared(count: Int)
+    case queued
+    case failed(String)
+}
+
+private struct PendingCheckinShare: Codable, Identifiable, Equatable {
+    var id: String
+    var workoutId: UUID
+    var checkinDate: String
+    var summary: CheckinSummary
+    var teamIds: [UUID]
+    var updatedAt: Date
+
+    init(draft: TeamShareDraft, teamIds: [UUID]) {
+        let sortedTeamIds = teamIds.sorted { $0.uuidString < $1.uuidString }
+        self.id = draft.workoutId.uuidString + ":" + sortedTeamIds.map(\.uuidString).joined(separator: ",") + ":\(draft.updatedAt.timeIntervalSince1970)"
+        self.workoutId = draft.workoutId
+        self.checkinDate = draft.checkinDate
+        self.summary = draft.summary
+        self.teamIds = sortedTeamIds
+        self.updatedAt = draft.updatedAt
+    }
+
+    var idempotencyKey: String {
+        "share-checkin-\(id)"
+    }
 }
 
 /// 4 个预设表情的展示映射（后端存 code，UI 显示 emoji）。

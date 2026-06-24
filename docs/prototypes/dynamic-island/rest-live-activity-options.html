@@ -1,0 +1,1056 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>别练了 · 灵动岛休息计时方案</title>
+  <style>
+    :root {
+      --paper: #f3f0e8;
+      --paper-2: #e8e2d7;
+      --ink: #181716;
+      --muted: #6f6960;
+      --line: #d8d0c3;
+      --island: #050505;
+      --island-2: #101010;
+      --white: #f9fafb;
+      --soft: rgba(255, 255, 255, 0.62);
+      --faint: rgba(255, 255, 255, 0.28);
+      --accent: #ff6a32;
+      --accent-2: #ff9b54;
+      --green: #62d783;
+      --red: #ff563f;
+      --blue: #7cc8ff;
+      --shadow: 0 24px 70px rgba(24, 23, 22, 0.18);
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(135deg, rgba(255, 106, 50, 0.12), transparent 34%),
+        radial-gradient(circle at 88% 10%, rgba(98, 215, 131, 0.18), transparent 26%),
+        var(--paper);
+    }
+
+    main {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 42px 0 72px;
+    }
+
+    .page-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 24px;
+      align-items: end;
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0;
+      color: #b24723;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: "Arial Narrow", "SF Pro Display", Impact, ui-sans-serif, system-ui, sans-serif;
+      font-size: clamp(34px, 4vw, 62px);
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .subcopy {
+      max-width: 760px;
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.65;
+    }
+
+    .legend {
+      display: grid;
+      gap: 8px;
+      min-width: 230px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.42);
+      box-shadow: 0 12px 30px rgba(24, 23, 22, 0.08);
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: #403b35;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 99px;
+      background: var(--accent);
+    }
+
+    .dot.green {
+      background: var(--green);
+    }
+
+    .dot.blue {
+      background: var(--blue);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px;
+    }
+
+    .option {
+      display: grid;
+      gap: 18px;
+      padding: 18px;
+      border: 1px solid rgba(84, 74, 62, 0.2);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.48);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .option.recommended {
+      border-color: rgba(255, 106, 50, 0.55);
+      background: rgba(255, 255, 255, 0.62);
+    }
+
+    .option-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .option-title {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+    }
+
+    .option-id {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      border-radius: 12px;
+      color: #fff7ef;
+      background: #1f1b18;
+      font-weight: 900;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 19px;
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    .note {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      padding: 7px 10px;
+      border-radius: 99px;
+      color: #8a391e;
+      background: rgba(255, 106, 50, 0.14);
+      border: 1px solid rgba(255, 106, 50, 0.28);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .device {
+      position: relative;
+      display: grid;
+      gap: 18px;
+      justify-items: center;
+      padding: 24px 18px 22px;
+      min-height: 360px;
+      border-radius: 38px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(232, 226, 215, 0.72)),
+        var(--paper-2);
+      border: 1px solid rgba(102, 91, 78, 0.26);
+      overflow: hidden;
+    }
+
+    .statusbar {
+      width: min(355px, 100%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #171615;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .status-icons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .cellular {
+      display: flex;
+      gap: 2px;
+      align-items: end;
+    }
+
+    .cellular span {
+      width: 3px;
+      border-radius: 3px;
+      background: #171615;
+    }
+
+    .cellular span:nth-child(1) { height: 5px; opacity: .45; }
+    .cellular span:nth-child(2) { height: 7px; opacity: .6; }
+    .cellular span:nth-child(3) { height: 9px; opacity: .78; }
+    .cellular span:nth-child(4) { height: 11px; }
+
+    .battery {
+      width: 24px;
+      height: 12px;
+      border: 2px solid #171615;
+      border-radius: 4px;
+      position: relative;
+    }
+
+    .battery::before {
+      content: "";
+      position: absolute;
+      right: 2px;
+      top: 2px;
+      bottom: 2px;
+      left: 2px;
+      border-radius: 2px;
+      background: #171615;
+    }
+
+    .battery::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      right: -5px;
+      width: 3px;
+      height: 5px;
+      border-radius: 0 2px 2px 0;
+      background: #171615;
+    }
+
+    .compact-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: #3e3934;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .compact-island {
+      height: 37px;
+      min-width: 134px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 9px;
+      border-radius: 999px;
+      color: var(--white);
+      background: #000;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+    }
+
+    .compact-island.narrow {
+      min-width: 104px;
+      justify-content: center;
+      gap: 7px;
+    }
+
+    .app-icon {
+      width: 20px;
+      height: 20px;
+      flex: 0 0 auto;
+      border-radius: 6px;
+      object-fit: cover;
+      background:
+        linear-gradient(145deg, #ff7a32, #181614 72%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .svg-icon {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+      color: var(--accent);
+    }
+
+    .compact-time {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .mini-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 15px;
+    }
+
+    .mini-bars span {
+      width: 3px;
+      border-radius: 3px;
+      background: var(--accent);
+    }
+
+    .mini-bars span:nth-child(1) { height: 7px; opacity: .7; }
+    .mini-bars span:nth-child(2) { height: 11px; opacity: .86; }
+    .mini-bars span:nth-child(3) { height: 15px; }
+
+    .expanded {
+      width: min(355px, 100%);
+      min-height: 164px;
+      padding: 16px 18px 15px;
+      border-radius: 31px;
+      color: var(--white);
+      background:
+        radial-gradient(circle at 16% 18%, rgba(255, 106, 50, 0.22), transparent 30%),
+        linear-gradient(180deg, var(--island-2), var(--island));
+      box-shadow: 0 26px 42px rgba(0, 0, 0, 0.36);
+      overflow: hidden;
+    }
+
+    .expanded .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 28px;
+      margin-bottom: 12px;
+    }
+
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      gap: 8px;
+    }
+
+    .brand-lockup .app-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+    }
+
+    .kicker {
+      display: block;
+      color: var(--accent-2);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .small-line {
+      display: block;
+      overflow: hidden;
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 150px;
+    }
+
+    .timer {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      color: #fff;
+      font-size: 31px;
+      font-weight: 950;
+      letter-spacing: 0;
+      line-height: 0.95;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .timer.small {
+      font-size: 24px;
+    }
+
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+      margin: 7px 0 12px;
+    }
+
+    .next-label {
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .exercise {
+      margin-top: 2px;
+      color: #fff;
+      font-size: 20px;
+      line-height: 1.12;
+      font-weight: 950;
+      letter-spacing: 0;
+    }
+
+    .set-line {
+      margin-top: 6px;
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .load {
+      font-family: "Arial Narrow", "SF Pro Display", Impact, ui-sans-serif, system-ui, sans-serif;
+      color: #fff;
+      font-size: 31px;
+      line-height: 0.95;
+      font-weight: 950;
+      letter-spacing: 0;
+    }
+
+    .load .unit {
+      font-family: inherit;
+      color: var(--soft);
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    .meta {
+      color: var(--accent-2);
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .end-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 54px;
+      min-height: 38px;
+      padding: 0 14px;
+      border: 0;
+      border-radius: 99px;
+      color: #1b100b;
+      background: var(--accent);
+      font-size: 13px;
+      font-weight: 950;
+      cursor: pointer;
+      box-shadow: 0 10px 22px rgba(255, 106, 50, 0.25);
+    }
+
+    .expanded.option-a .bottom {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      align-items: end;
+    }
+
+    .expanded.option-b {
+      background:
+        radial-gradient(circle at 82% 20%, rgba(124, 200, 255, 0.18), transparent 32%),
+        linear-gradient(180deg, #0d0d0d, #020202);
+    }
+
+    .cue {
+      margin: 10px 0 12px;
+      color: #fff;
+      font-size: 23px;
+      font-weight: 950;
+      line-height: 1.06;
+      letter-spacing: 0;
+    }
+
+    .cue-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .cue-load {
+      color: var(--blue);
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 20px;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .expanded.option-c {
+      padding-top: 14px;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .split-panel {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 3px 0;
+    }
+
+    .vertical-rule {
+      position: absolute;
+      width: 1px;
+      background: rgba(255, 255, 255, 0.16);
+      top: 49px;
+      bottom: 20px;
+      left: 51.5%;
+    }
+
+    .set-index {
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .number-stack {
+      display: grid;
+      gap: 7px;
+    }
+
+    .number-line {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      color: #fff;
+      font-size: 25px;
+      font-weight: 950;
+    }
+
+    .number-line span:last-child {
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .expanded.option-d {
+      background:
+        linear-gradient(135deg, rgba(255, 106, 50, 0.18), transparent 40%),
+        linear-gradient(180deg, #0d0a08, #020202);
+    }
+
+    .progress-track {
+      height: 5px;
+      margin: 9px 0 16px;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.14);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 58%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+    }
+
+    .rail-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .rail-load {
+      display: grid;
+      grid-auto-flow: column;
+      align-items: baseline;
+      justify-content: start;
+      gap: 9px;
+      margin-top: 5px;
+    }
+
+    .rail-number {
+      color: #fff;
+      font-family: "Arial Narrow", "SF Pro Display", Impact, ui-sans-serif, system-ui, sans-serif;
+      font-size: 38px;
+      font-weight: 950;
+      letter-spacing: 0;
+      line-height: 0.95;
+    }
+
+    .rail-reps {
+      color: var(--green);
+      font-size: 16px;
+      font-weight: 950;
+    }
+
+    .expanded.option-e {
+      background: #020202;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .terminal {
+      display: grid;
+      gap: 9px;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .terminal-row {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 10px;
+      align-items: baseline;
+      color: var(--white);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .terminal-row span:first-child {
+      color: var(--accent);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .terminal .timer {
+      font-size: 30px;
+    }
+
+    .terminal-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .open-hint {
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .full {
+      grid-column: 1 / -1;
+    }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    .score {
+      padding: 13px;
+      border-radius: 18px;
+      background: rgba(24, 23, 22, 0.07);
+      border: 1px solid rgba(84, 74, 62, 0.14);
+    }
+
+    .score strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 13px;
+    }
+
+    .score p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 940px) {
+      .page-head {
+        grid-template-columns: 1fr;
+      }
+
+      .grid,
+      .comparison {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 520px) {
+      main {
+        width: min(100vw - 20px, 420px);
+        padding-top: 22px;
+      }
+
+      .option {
+        padding: 14px;
+        border-radius: 24px;
+      }
+
+      .option-head {
+        display: grid;
+      }
+
+      .badge {
+        justify-self: start;
+      }
+
+      .device {
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .progress-fill {
+        animation: breathe 2.8s ease-in-out infinite;
+      }
+
+      @keyframes breathe {
+        0%, 100% { opacity: 0.86; }
+        50% { opacity: 1; }
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="page-head">
+      <div>
+        <p class="eyebrow">DontLift · Live Activity prototype</p>
+        <h1>灵动岛休息计时高保真方案</h1>
+        <p class="subcopy">每个方案都包含非展开 compact 与长按后的 expanded 状态。重点比较 App 图标、倒计时、下一组动作、重量、次数和「结束」操作的优先级。</p>
+      </div>
+      <aside class="legend" aria-label="原型说明">
+        <div class="legend-row"><span class="dot"></span><span>橙色代表休息倒计时状态</span></div>
+        <div class="legend-row"><span class="dot green"></span><span>绿色代表下一组执行提示</span></div>
+        <div class="legend-row"><span class="dot blue"></span><span>蓝色代表教练提示型方案</span></div>
+      </aside>
+    </header>
+
+    <section class="grid" aria-label="灵动岛方案列表">
+      <article class="option recommended">
+        <div class="option-head">
+          <div class="option-title">
+            <span class="option-id">A</span>
+            <div>
+              <h2>竞赛计分板</h2>
+              <p class="note">最接近严肃训练工具：倒计时强、下一组数据直接、结束按钮稳定在右下。</p>
+            </div>
+          </div>
+          <span class="badge">推荐</span>
+        </div>
+
+        <div class="device">
+          <div class="statusbar">
+            <span>15:36</span>
+            <div class="status-icons" aria-hidden="true">
+              <div class="cellular"><span></span><span></span><span></span><span></span></div>
+              <div class="battery"></div>
+            </div>
+          </div>
+
+          <div class="compact-wrap">
+            <span>compact</span>
+            <div class="compact-island">
+              <img class="app-icon" src="../../../ios/DontLift/DontLiftWidgets/DontLiftIslandIcon.png" alt="别练了 App 图标">
+              <span class="compact-time">01:18</span>
+            </div>
+          </div>
+
+          <div class="expanded option-a">
+            <div class="top">
+              <div class="brand-lockup">
+                <img class="app-icon" src="../../../ios/DontLift/DontLiftWidgets/DontLiftIslandIcon.png" alt="别练了 App 图标">
+                <div>
+                  <span class="kicker">REST</span>
+                  <span class="small-line">下一组 · 第 3 组</span>
+                </div>
+              </div>
+              <div class="timer">01:18</div>
+            </div>
+            <div class="divider"></div>
+            <div class="bottom">
+              <div>
+                <div class="next-label">下一组</div>
+                <div class="exercise">杠铃卧推</div>
+                <div class="set-line">
+                  <span class="load">80<span class="unit"> kg</span></span>
+                  <span class="meta">× 10 次</span>
+                </div>
+              </div>
+              <button class="end-button" type="button">结束</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="option">
+        <div class="option-head">
+          <div class="option-title">
+            <span class="option-id">B</span>
+            <div>
+              <h2>教练提示型</h2>
+              <p class="note">把「马上要做什么」放在第一层，适合用户休息时快速扫一眼，不强调复杂指标。</p>
+            </div>
+          </div>
+          <span class="badge">清晰</span>
+        </div>
+
+        <div class="device">
+          <div class="statusbar">
+            <span>15:36</span>
+            <div class="status-icons" aria-hidden="true">
+              <div class="cellular"><span></span><span></span><span></span><span></span></div>
+              <div class="battery"></div>
+            </div>
+          </div>
+
+          <div class="compact-wrap">
+            <span>compact</span>
+            <div class="compact-island">
+              <img class="app-icon" src="../../../ios/DontLift/DontLiftWidgets/DontLiftIslandIcon.png" alt="别练了 App 图标">
+              <span class="compact-time">80×10</span>
+            </div>
+          </div>
+
+          <div class="expanded option-b">
+            <div class="top">
+              <div class="brand-lockup">
+                <img class="app-icon" src="../../../ios/DontLift/DontLiftWidgets/DontLiftIslandIcon.png" alt="别练了 App 图标">
+                <div>
+                  <span class="kicker">NEXT SET</span>
+                  <span class="small-line">休息还剩 01:18</span>
+                </div>
+              </div>
+              <div class="timer small">01:18</div>
+            </div>
+            <p class="cue">准备杠铃卧推</p>
+            <div class="cue-row">
+              <div>
+                <div class="next-label">第 3 组</div>
+                <div class="cue-load">80 kg × 10 次</div>
+              </div>
+              <button class="end-button" type="button">结束</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="option">
+        <div class="option-head">
+          <div class="option-title">
+            <span class="option-id">C</span>
+            <div>
+              <h2>左右分栏型</h2>
+              <p class="note">左侧动作，右侧倒计时和训练量，适合信息密度更高但仍保持有序。</p>
+            </div>
+          </div>
+          <span class="badge">高密度</span>
+        </div>
+
+        <div class="device">
+          <div class="statusbar">
+            <span>15:36</span>
+            <div class="status-icons" aria-hidden="true">
+              <div class="cellular"><span></span><span></span><span></span><span></span></div>
+              <div class="battery"></div>
+            </div>
+          </div>
+
+          <div class="compact-wrap">
+            <span>compact</span>
+            <div class="compact-island narrow">
+              <img class="app-icon" src="../../../ios/DontLift/DontLiftWidgets/DontLiftIslandIcon.png" alt="别练了 App 图标">
+              <span class="compact-time">1:18</span>
+            </div>
+          </div>
+
+          <div class="expanded option-c">
+            <div class="vertical-rule" aria-hidden="true"></div>
+            <div class="split">
+              <div class="split-panel">
+                <div>
+                  <div class="brand-lockup">
+                    <img class="app-icon" src="../../../ios/DontLift/DontLiftWidgets/DontLiftIslandIcon.png" alt="别练了 App 图标">
+                    <div>
+                      <span class="kicker">REST</span>
+                      <span class="small-line">杠铃卧推</span>
+                    </div>
+                  </div>
+                  <div class="exercise">第 3 组</div>
+                  <div class="set-index">继续主项</div>
+                </div>
+                <button class="end-button" type="button">结束</button>
+              </div>
+              <div class="split-panel">
+                <div class="timer">01:18</div>
+                <div class="number-stack">
+                  <div class="number-line"><strong>80 kg</strong><span>重量</span></div>
+                  <div class="number-line"><strong>10 次</strong><span>次数</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="option">
+        <div class="option-head">
+          <div class="option-title">
+            <span class="option-id">D</span>
+            <div>
+              <h2>进度轨道型</h2>
+              <p class="note">用细进度轨道强化时间流逝，不用大色块承载数据，整体更像系统级组件。</p>
+            </div>
+          </div>
+          <span class="badge">动效友好</span>
+        </div>
+
+        <div class="device">
+          <div class="statusbar">
+            <span>15:36</span>
+            <div class="status-icons" aria-hidden="true">
+              <div class="cellular"><span></span><span></span><span></span><span></span></div>
+              <div class="battery"></div>
+            </div>
+          </div>
+
+          <div class="compact-wrap">
+            <span>compact</span>
+            <div class="compact-island">
+              <img class="app-icon" src="../../../ios/DontLift/DontLiftWidgets/DontLiftIslandIcon.png" alt="别练了 App 图标">
+              <div class="mini-bars" aria-hidden="true"><span></span><span></span><span></span></div>
+              <span class="compact-time">1:18</span>
+            </div>
+          </div>
+
+          <div class="expanded option-d">
+            <div class="top">
+              <div class="brand-lockup">
+                <img class="app-icon" src="../../../ios/DontLift/DontLiftWidgets/DontLiftIslandIcon.png" alt="别练了 App 图标">
+                <div>
+                  <span class="kicker">REST TIMER</span>
+                  <span class="small-line">组间休息进行中</span>
+                </div>
+              </div>
+              <div class="timer small">01:18</div>
+            </div>
+            <div class="progress-track" aria-hidden="true"><div class="progress-fill"></div></div>
+            <div class="rail-row">
+              <div>
+                <div class="next-label">下一组 · 杠铃卧推</div>
+                <div class="rail-load">
+                  <span class="rail-number">80</span>
+                  <span class="rail-reps">kg × 10 次</span>
+                </div>
+              </div>
+              <button class="end-button" type="button">结束</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="option full">
+        <div class="option-head">
+          <div class="option-title">
+            <span class="option-id">E</span>
+            <div>
+              <h2>极简命令型</h2>
+              <p class="note">最克制，所有信息按训练日志行展示。适合喜欢工具感的用户，但情绪和品牌记忆较弱。</p>
+            </div>
+          </div>
+          <span class="badge">极简</span>
+        </div>
+
+        <div class="device">
+          <div class="statusbar">
+            <span>15:36</span>
+            <div class="status-icons" aria-hidden="true">
+              <div class="cellular"><span></span><span></span><span></span><span></span></div>
+              <div class="battery"></div>
+            </div>
+          </div>
+
+          <div class="compact-wrap">
+            <span>compact</span>
+            <div class="compact-island narrow">
+              <img class="app-icon" src="../../../ios/DontLift/DontLiftWidgets/DontLiftIslandIcon.png" alt="别练了 App 图标">
+              <span class="compact-time">01:18</span>
+            </div>
+          </div>
+
+          <div class="expanded option-e">
+            <div class="terminal">
+              <div class="terminal-row">
+                <span>rest</span>
+                <strong class="timer">01:18</strong>
+              </div>
+              <div class="terminal-row">
+                <span>next</span>
+                <strong>杠铃卧推 · 第 3 组</strong>
+              </div>
+              <div class="terminal-row">
+                <span>load</span>
+                <strong>80 kg × 10 次</strong>
+              </div>
+            </div>
+            <div class="terminal-actions">
+              <span class="open-hint">点击结束后同步打开 App</span>
+              <button class="end-button" type="button">结束</button>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="option full" style="margin-top: 22px;">
+      <div class="option-head">
+        <div class="option-title">
+          <span class="option-id">✓</span>
+          <div>
+            <h2>快速取舍</h2>
+            <p class="note">用于决定后续 SwiftUI 落地优先级。</p>
+          </div>
+        </div>
+      </div>
+      <div class="comparison">
+        <div class="score"><strong>A 竞赛计分板</strong><p>综合最稳，训练数据可读性最好，建议作为默认方案。</p></div>
+        <div class="score"><strong>B 教练提示型</strong><p>适合降低用户理解成本，compact 用下一组数据而非倒计时。</p></div>
+        <div class="score"><strong>C 左右分栏型</strong><p>信息多，但小屏上更容易挤，需要真机验证圆角遮挡。</p></div>
+        <div class="score"><strong>D 进度轨道型</strong><p>系统感强，动效空间更好，适合作为 A 的轻动效版本。</p></div>
+        <div class="score"><strong>E 极简命令型</strong><p>工程实现简单，品牌感弱，更适合作为低风险备选。</p></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

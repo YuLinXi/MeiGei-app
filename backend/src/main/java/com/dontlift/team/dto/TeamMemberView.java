@@ -18,4 +18,5 @@ public class TeamMemberView {
     private String role;
     private OffsetDateTime joinedAt;
     private String displayName;
+    private boolean autoShareWorkouts;
 }

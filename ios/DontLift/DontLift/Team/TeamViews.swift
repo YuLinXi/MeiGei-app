@@ -621,10 +621,17 @@ struct TeamDetailView: View {
     @State private var actionFailed = false   // 详情页顶部红 toast（操作失败）
     /// Team 计划三级页导航：绑定式，避免闭包式 NavigationLink 在嵌套 TabView 的 stack 里失灵。
     @State private var showingPlans = false
+    @State private var showOwnerTakeoverNotice = false
+    @State private var autoShareWorkouts = false
+    @State private var autoSharePreferenceBusy = false
+    @State private var confirmingAutoShareEnable = false
+    @State private var pendingWithdrawCheckin: TeamCheckinDTO?
+    @State private var confirmingWithdraw = false
 
     private enum ConfirmKind: Identifiable { case leave, dissolve; var id: Int { hashValue } }
 
     private var isOwner: Bool { team.ownerUserId == session.currentUserId }
+    private var ownerTakeoverSeenKey: String { "dontlift.team.ownerTakeoverSeen.\(team.id.uuidString)" }
 
     var body: some View {
         ZStack {
@@ -632,7 +639,11 @@ struct TeamDetailView: View {
             VStack(spacing: 0) {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                        if showOwnerTakeoverNotice {
+                            ownerTakeoverCard
+                        }
                         headerCard
+                        autoSharePreferenceCard
 
                         Text("今日动态").eyebrowStyle()
                         if checkins.isEmpty {
@@ -645,7 +656,9 @@ struct TeamDetailView: View {
                                         memberName: displayName(for: c.userId),
                                         reactions: reactions[c.id] ?? [],
                                         myUserId: session.currentUserId,
-                                        onReact: { emoji in await react(checkinId: c.id, emoji: emoji) }
+                                        canWithdraw: session.currentUserId.map { $0 == c.userId } ?? false,
+                                        onReact: { emoji in await react(checkinId: c.id, emoji: emoji) },
+                                        onWithdraw: { presentWithdrawConfirmation(c) }
                                     )
                                 }
                             }
@@ -680,8 +693,27 @@ struct TeamDetailView: View {
                 withAnimation(.easeOut(duration: 0.18)) { showActionSheet = true }
             }
         }
+        .paperConfirmDialog(
+            isPresented: $confirmingAutoShareEnable,
+            title: "开启自动分享?",
+            message: "之后完成训练会自动分享到「\(team.name)」，Team 成员可看到训练摘要和每组记录。你可以随时关闭，已分享记录可在动态中撤回。",
+            confirmTitle: "开启",
+            destructive: false,
+            onConfirm: { Task { await setAutoShareWorkouts(true) } }
+        )
+        .paperConfirmDialog(
+            isPresented: $confirmingWithdraw,
+            title: "撤回这次分享?",
+            message: "这次训练将从「\(team.name)」动态中移除，相关表情回应也会删除。个人训练记录不受影响。",
+            confirmTitle: "撤回",
+            onConfirm: { [checkin = pendingWithdrawCheckin] in
+                guard let checkin else { return }
+                Task { await withdraw(checkin) }
+            }
+        )
         .navigationDestination(isPresented: $showingPlans) { TeamPlansView(team: team) }
         .overlay(alignment: .top) { failureToast }
+        .onAppear { prepareOwnerTakeoverNotice() }
         .task { await reload() }
         // 同步周期完成后重拉今日动态：删训练经同步使后端撤销 checkin，此处反映移除（无需手动下拉）。
         .onReceive(NotificationCenter.default.publisher(for: .dontliftSyncCompleted)) { _ in
@@ -697,6 +729,35 @@ struct TeamDetailView: View {
     }
 
     // MARK: 队头卡（左竖条 + 进度 pill + 邀请码 + monogram 头像栈）
+
+    private var ownerTakeoverCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "person.crop.circle.badge.checkmark")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Theme.Color.accent)
+                .frame(width: 26, height: 26)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("已接管 Team")
+                    .font(Theme.Font.body(size: 15, weight: .bold))
+                    .foregroundStyle(Theme.Color.fg)
+                Text("原队长删除账号后，Team 与成员历史已保留。你可以继续管理，或在右上角解散 Team。")
+                    .font(Theme.Font.body(size: 12))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Button {
+                UserDefaults.standard.set(true, forKey: ownerTakeoverSeenKey)
+                withAnimation(.easeOut(duration: 0.18)) { showOwnerTakeoverNotice = false }
+            } label: {
+                Text("知道了")
+                    .font(Theme.Font.body(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.accent)
+            }
+            .buttonStyle(.plain)
+        }
+        .cardStyle()
+    }
 
     private var headerCard: some View {
         let totalMembers = members.count
@@ -745,6 +806,39 @@ struct TeamDetailView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .paperShadow(.sm, cornerRadius: Theme.Radius.lg)
+    }
+
+    private var autoSharePreferenceCard: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("训练完成后自动分享")
+                    .font(Theme.Font.body(size: 15, weight: .bold))
+                    .foregroundStyle(Theme.Color.fg)
+                Text(autoShareWorkouts ? "已开启。后续训练会自动进入这个 Team，可按次撤回。" : "默认仅自己可见。开启后不再在训练结束时打扰你。")
+                    .font(Theme.Font.body(size: 12))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            if autoSharePreferenceBusy {
+                ProgressView()
+                    .frame(width: 44, height: 31)
+            } else {
+                Toggle("", isOn: Binding(
+                    get: { autoShareWorkouts },
+                    set: { enabled in
+                        if enabled {
+                            confirmingAutoShareEnable = true
+                        } else {
+                            Task { await setAutoShareWorkouts(false) }
+                        }
+                    }
+                ))
+                .labelsHidden()
+                .tint(Theme.Color.accent)
+            }
+        }
+        .cardStyle()
     }
 
     // monogram 头像栈：me 在前高亮，−7px 重叠，超 5 折叠 +N。
@@ -805,7 +899,7 @@ struct TeamDetailView: View {
             Text("今天还没人打卡")
                 .font(Theme.Font.body(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.Color.fg)
-            Text("第一个完成训练的人，自动出现在这里。")
+            Text("开启自动分享或主动分享后，训练会出现在这里。")
                 .font(Theme.Font.body(size: 13))
                 .foregroundStyle(Theme.Color.fg2)
         }
@@ -902,6 +996,11 @@ struct TeamDetailView: View {
         guard let owner = members.first(where: { $0.userId == team.ownerUserId }),
               let joined = owner.joinedAt else { return nil }
         return max(0, Calendar.current.dateComponents([.day], from: joined, to: .now).day ?? 0)
+    }
+
+    private func prepareOwnerTakeoverNotice() {
+        guard isOwner, team.ownerTransferredAt != nil else { return }
+        showOwnerTakeoverNotice = !UserDefaults.standard.bool(forKey: ownerTakeoverSeenKey)
     }
 
     // MARK: 二次确认弹窗
@@ -1062,7 +1161,9 @@ struct TeamDetailView: View {
         do {
             async let m = teamService.members(of: team.id)
             async let feed = teamService.checkinFeed(teamId: team.id)
-            members = try await m
+            let loadedMembers = try await m
+            members = loadedMembers
+            syncAutoSharePreference(from: loadedMembers)
             let loadedFeed = try await feed
             checkins = loadedFeed.checkins
             reactions = Dictionary(grouping: loadedFeed.reactions, by: \.checkinId)
@@ -1092,6 +1193,47 @@ struct TeamDetailView: View {
         } catch {
             reactions[checkinId] = prior
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    private func withdraw(_ checkin: TeamCheckinDTO) async {
+        do {
+            try await teamService.withdrawCheckin(teamId: team.id, workoutId: checkin.workoutId)
+            checkins.removeAll { $0.id == checkin.id }
+            reactions[checkin.id] = nil
+            pendingWithdrawCheckin = nil
+        } catch {
+            self.error = "撤回失败，请稍后重试"
+        }
+    }
+
+    private func presentWithdrawConfirmation(_ checkin: TeamCheckinDTO) {
+        pendingWithdrawCheckin = checkin
+        confirmingWithdraw = true
+    }
+
+    private func syncAutoSharePreference(from loadedMembers: [TeamMemberDTO]) {
+        guard !autoSharePreferenceBusy,
+              let myId = session.currentUserId,
+              let me = loadedMembers.first(where: { $0.userId == myId }) else { return }
+        autoShareWorkouts = me.autoShareWorkouts
+        teamService.rememberAutoSharePreference(teamId: team.id, enabled: me.autoShareWorkouts, userId: myId)
+    }
+
+    private func setAutoShareWorkouts(_ enabled: Bool) async {
+        guard let myId = session.currentUserId else { return }
+        let previous = autoShareWorkouts
+        autoSharePreferenceBusy = true
+        defer { autoSharePreferenceBusy = false }
+        do {
+            let updated = try await teamService.updateAutoShareWorkouts(teamId: team.id, enabled: enabled, userId: myId)
+            autoShareWorkouts = updated.autoShareWorkouts
+            if let idx = members.firstIndex(where: { $0.userId == myId }) {
+                members[idx] = updated
+            }
+        } catch {
+            autoShareWorkouts = previous
+            self.error = enabled ? "开启自动分享失败，请稍后重试" : "关闭自动分享失败，请稍后重试"
         }
     }
 
@@ -1126,7 +1268,9 @@ struct FeedItemCard: View {
     let memberName: String
     let reactions: [CheckinReactionDTO]
     let myUserId: UUID?
+    let canWithdraw: Bool
     let onReact: (String) async -> Void
+    let onWithdraw: () -> Void
 
     @State private var busy = false
 
@@ -1177,6 +1321,20 @@ struct FeedItemCard: View {
                     .foregroundStyle(Theme.Color.muted)
             }
             Spacer()
+            if canWithdraw {
+                Button {
+                    onWithdraw()
+                } label: {
+                    Text("撤回")
+                        .font(Theme.Font.body(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.Color.danger)
+                        .padding(.horizontal, 9)
+                        .frame(height: 28)
+                        .background(Theme.Color.bg, in: Capsule())
+                        .overlay(Capsule().stroke(Theme.Color.border, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
@@ -1329,9 +1487,16 @@ struct TeamPlansView: View {
                 Text(p.name)
                     .font(Theme.Font.body(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
-                Text("\(p.itemCount) 个动作")
+                Text("\(p.itemCount) 个动作 · \(p.exercisePreviewText)")
                     .font(Theme.Font.mono(size: 11))
                     .foregroundStyle(Theme.Color.muted)
+                    .lineLimit(1)
+                if p.hasUnstartableItems {
+                    Text("包含无法识别的动作，请更新 App 或联系发布者修复")
+                        .font(Theme.Font.body(size: 12))
+                        .foregroundStyle(Theme.Color.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer()
             Button { Task { await fork(p) } } label: {

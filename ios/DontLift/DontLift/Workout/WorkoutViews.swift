@@ -414,6 +414,11 @@ struct WorkoutListView: View {
     }
 
     private func start(from plan: WorkoutPlan) {
+        let brokenItems = PlanItem.unstartableItems(in: plan.items)
+        guard brokenItems.isEmpty else {
+            strictStartError = PlanItem.unstartableMessage(for: brokenItems)
+            return
+        }
         if plan.mode == .strict {
             let missing = PlanPrefill.missingStrictRequiredItems(in: plan.items)
             guard missing.isEmpty else {
@@ -429,8 +434,8 @@ struct WorkoutListView: View {
             for (i, item) in orderedItems.enumerated() {
                 let ex = WorkoutExercise(builtinExerciseCode: item.builtinExerciseCode,
                                          customExerciseId: item.customExerciseId,
-                                         exerciseName: item.exerciseName,
-                                         primaryMuscle: nil,
+                                         exerciseName: item.displayExerciseName,
+                                         primaryMuscle: item.resolvedPrimaryMuscle,
                                          orderIndex: i,
                                          planItemId: item.itemId)
                 ex.sets = PlanPrefill.sets(for: item, mode: mode, lookup: historyStore.planLookup)
@@ -557,10 +562,12 @@ enum SetField { case weight, reps }
 struct WorkoutLoggingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(TeamService.self) private var teamService
+    @Environment(SessionStore.self) private var session
     @Environment(RestTimerController.self) private var restTimer
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(PRCelebrationCenter.self) private var prCelebration
     @Environment(PlanWritebackCenter.self) private var planWriteback
+    @Environment(TeamShareCenter.self) private var teamShare
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -685,6 +692,22 @@ struct WorkoutLoggingView: View {
             if let next = ex.sets.sorted(by: { $0.setIndex < $1.setIndex })
                 .first(where: { !$0.completed }) {
                 return "下一组 · **\(ex.exerciseName)** 第 \(next.setIndex + 1) 组"
+            }
+        }
+        return nil
+    }
+
+    /// 下一组结构化摘要：供 Live Activity / 灵动岛展示动作、第几组、重量和次数。
+    private var nextSetSummary: RestActivityAttributes.NextSet? {
+        for ex in workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }) {
+            if let next = ex.sets.sorted(by: { $0.setIndex < $1.setIndex })
+                .first(where: { !$0.completed }) {
+                return RestActivityAttributes.NextSet(
+                    exerciseName: ex.exerciseName,
+                    setIndex: next.setIndex + 1,
+                    weightText: next.weightKg.map { "\(formatKg($0)) kg" },
+                    repsText: next.reps.map { "\($0) 次" }
+                )
             }
         }
         return nil
@@ -1056,7 +1079,10 @@ struct WorkoutLoggingView: View {
                                       recordActiveRestIfNeeded()
                                       activeRestSetId = set.localId
                                       activeRestStartedAt = .now
-                                      restTimer.start(duration: TimeInterval(secs), label: ex.exerciseName)
+                                      let nextSet = nextSetSummary
+                                      restTimer.start(duration: TimeInterval(secs),
+                                                      label: nextSet?.exerciseName ?? ex.exerciseName,
+                                                      nextSet: nextSet)
                                       restTimer.nextHint = nextHint
                                   }
                               })
@@ -1461,7 +1487,7 @@ struct WorkoutLoggingView: View {
                                     diffs: result.diffs, snapshot: snapshot))
     }
 
-    /// 重算派生数据：PR 检测（命中弹庆祝）+ Team 打卡（按 localId 幂等：训练结束时首次创建摘要）。
+    /// 重算派生数据：PR 检测（命中弹庆祝）+ Team 自动分享偏好（默认仅自己可见）。
     private func recomputeDerived() {
         let prs = WorkoutPerformanceMonitor.measure("finish.pr.detect") {
             if historyStore.lastRefreshFinishedAt != nil {
@@ -1476,8 +1502,25 @@ struct WorkoutLoggingView: View {
             prCelebration.present(prs, summary: prSummary)
         }
         historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
-        let snapshot = workout
-        Task { try? await teamService.checkIn(workout: snapshot) }
+        let draft = TeamShareDraft(workout: workout)
+        Task { @MainActor in
+            await autoShareCompletedWorkout(draft)
+        }
+    }
+
+    private func autoShareCompletedWorkout(_ draft: TeamShareDraft) async {
+        let result = await teamService.autoShareOrQueue(draft: draft, userId: session.currentUserId)
+        switch result {
+        case .privateOnly:
+            break
+        case .shared(let count):
+            guard count > 0 else { return }
+            teamShare.presentNotice(count == 1 ? "已自动分享到 1 个 Team" : "已自动分享到 \(count) 个 Team")
+        case .queued:
+            teamShare.presentNotice("Team 自动分享已排队，同步成功后重试")
+        case .failed:
+            teamShare.presentNotice("Team 自动分享失败，可稍后重试")
+        }
     }
 
     private func detectPersonalRecordsFromFallbackHistory() -> [PersonalRecord] {
@@ -1618,13 +1661,14 @@ struct WorkoutLoggingView: View {
         focus(seq[idx - 1])
     }
 
-    /// 「加一组」：在当前聚焦组所属动作追加一组（预填上一组重量），并聚焦其重量。
+    /// 「加一组」：在当前聚焦组所属动作追加一组（预填上一正式组重量与次数），并聚焦其重量。
     /// 与 ExerciseBlock.addSet 行为一致；高频操作不离键盘。
     private func keypadAddSet() {
         guard let cell = focused, let ex = exercise(containing: cell.setId) else { return }
-        // 默认追加正式组，预填上一**正式**组重量（热身组不作预填源）。
+        // 默认追加正式组，预填上一**正式**组重量与次数（热身组不作预填源）。
         let next = (ex.sets.map(\.setIndex).max() ?? -1) + 1
-        let newSet = WorkoutSet(setIndex: next, weightKg: ex.lastWorkingWeight, setType: .working)
+        let previous = ex.lastWorkingSetValues
+        let newSet = WorkoutSet(setIndex: next, weightKg: previous.weightKg, reps: previous.reps, setType: .working)
         ex.sets.append(newSet)
         touch()
         focus(.weight(newSet.localId))
@@ -1951,9 +1995,10 @@ private struct ExerciseBlock: View {
     }
 
     private func addSet() {
-        // 默认追加正式组，预填上一**正式**组重量（热身组不作预填源）。
+        // 默认追加正式组，预填上一**正式**组重量与次数（热身组不作预填源）。
         let next = (exercise.sets.map(\.setIndex).max() ?? -1) + 1
-        exercise.sets.append(WorkoutSet(setIndex: next, weightKg: exercise.lastWorkingWeight, setType: .working))
+        let previous = exercise.lastWorkingSetValues
+        exercise.sets.append(WorkoutSet(setIndex: next, weightKg: previous.weightKg, reps: previous.reps, setType: .working))
         onChange()
     }
 

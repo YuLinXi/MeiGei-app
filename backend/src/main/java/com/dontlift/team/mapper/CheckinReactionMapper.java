@@ -29,6 +29,9 @@ public interface CheckinReactionMapper extends BaseMapper<CheckinReaction> {
             """)
     List<CheckinReaction> findByCheckins(@Param("checkinIds") List<UUID> checkinIds);
 
+    @Delete("DELETE FROM checkin_reaction WHERE user_id = #{userId}")
+    int deleteByUser(@Param("userId") UUID userId);
+
     // 账号删除：本人产生的所有表情 + 本人作为 owner 的团队下打卡收到的全部表情
     @Delete("""
             DELETE FROM checkin_reaction

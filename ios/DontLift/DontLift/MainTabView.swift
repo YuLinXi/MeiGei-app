@@ -8,6 +8,8 @@ struct MainTabView: View {
     @Environment(RestTimerController.self) private var restTimer
     @Environment(PRCelebrationCenter.self) private var prCelebration
     @Environment(PlanWritebackCenter.self) private var planWriteback
+    @Environment(TeamShareCenter.self) private var teamShare
+    @Environment(TeamService.self) private var teamService
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -30,6 +32,7 @@ struct MainTabView: View {
     private enum RootSheet: String, Identifiable {
         case planWriteback
         case prCelebration
+        case teamShare
 
         var id: String { rawValue }
     }
@@ -136,6 +139,7 @@ struct MainTabView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .dontliftSyncCompleted)) { _ in
             refreshActiveSession()
+            Task { await teamService.retryPendingShares() }
         }
         // 休息全屏弹窗：挂在全局 NavigationStack 之上的 overlay，层级高于 push 页与 Tab Bar；
         // 纯 .opacity 渐隐、无位移。
@@ -147,11 +151,29 @@ struct MainTabView: View {
                 .transition(.opacity)
             }
         }
+        .overlay(alignment: .bottom) {
+            if let notice = teamShare.notice {
+                TeamShareNoticeBanner(message: notice)
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.bottom, 88)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
         .onChange(of: restTimer.isRunning) { _, running in
             // 倒计时归零（或外部结束）时自动渐隐收回弹窗。
             if !running { withAnimation(restAnim) { restTimer.isExpanded = false } }
         }
-        // 根层弹窗队列：回写回执有撤销入口，优先展示；关闭后再展示 PR 庆祝。
+        .onChange(of: teamShare.notice) { _, message in
+            guard let message else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2.8))
+                if teamShare.notice == message {
+                    withAnimation(.easeOut(duration: 0.18)) { teamShare.notice = nil }
+                }
+            }
+        }
+        // 根层弹窗队列：回写回执有撤销入口，优先展示；关闭后再展示 PR 庆祝与手动 Team 分享入口。
         .sheet(item: $activeRootSheet, onDismiss: clearPresentedRootSheetAndContinue) { sheet in
             switch sheet {
             case .planWriteback:
@@ -162,11 +184,16 @@ struct MainTabView: View {
                 if let records = prCelebration.records {
                     PRCelebrationSheet(records: records, summary: prCelebration.summary)
                 }
+            case .teamShare:
+                if let draft = teamShare.draft {
+                    TeamShareSheet(draft: draft)
+                }
             }
         }
         .onAppear { presentNextRootSheetIfNeeded() }
         .onChange(of: planWriteback.receipt != nil) { _, _ in presentNextRootSheetIfNeeded() }
         .onChange(of: prCelebration.records != nil) { _, _ in presentNextRootSheetIfNeeded() }
+        .onChange(of: teamShare.draft != nil) { _, _ in presentNextRootSheetIfNeeded() }
     }
 
     private func presentNextRootSheetIfNeeded() {
@@ -176,6 +203,8 @@ struct MainTabView: View {
             next = .planWriteback
         } else if prCelebration.records != nil {
             next = .prCelebration
+        } else if teamShare.draft != nil {
+            next = .teamShare
         } else {
             next = nil
         }
@@ -191,6 +220,8 @@ struct MainTabView: View {
                 planWriteback.receipt = nil
             case .prCelebration:
                 prCelebration.records = nil
+            case .teamShare:
+                teamShare.draft = nil
             }
         }
         presentedRootSheet = nil
@@ -199,5 +230,26 @@ struct MainTabView: View {
 
     private func refreshActiveSession() {
         activeSession = WorkoutSession.activeSession(in: modelContext)
+    }
+}
+
+private struct TeamShareNoticeBanner: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "person.2.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+            Text(message)
+                .font(Theme.Font.body(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 11)
+        .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .paperShadow(.lg, cornerRadius: Theme.Radius.md)
     }
 }

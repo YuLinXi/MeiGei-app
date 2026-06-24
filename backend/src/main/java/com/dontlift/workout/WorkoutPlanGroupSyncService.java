@@ -15,7 +15,7 @@ public class WorkoutPlanGroupSyncService extends AbstractSyncService<WorkoutPlan
     private final WorkoutPlanGroupMapper groupMapper;
 
     public WorkoutPlanGroupSyncService(WorkoutPlanGroupMapper mapper) {
-        super(mapper);
+        super(mapper, "workout-plan-groups");
         this.groupMapper = mapper;
     }
 

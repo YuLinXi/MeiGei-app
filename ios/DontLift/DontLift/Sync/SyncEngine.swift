@@ -409,6 +409,7 @@ final class SyncEngine {
         lookup: (UUID) -> M?,
         apply: (DTO, M) -> Void
     ) {
+        applyTimestampAdjustments(res.timestampAdjustments, domain: domain, lookup: lookup)
         for id in res.applied {
             guard let m = lookup(id) as? (any Syncable) else { continue }
             if m.syncStatus == .pendingDelete {
@@ -423,6 +424,22 @@ final class SyncEngine {
             apply(conflict.serverValue, m)
             pendingConflictNotices.append(
                 ConflictNotice(id: conflict.id, domain: domain, name: nameOf(conflict.serverValue)))
+        }
+    }
+
+    private func applyTimestampAdjustments<M: AnyObject>(
+        _ adjustments: [SyncTimestampAdjustmentDTO],
+        domain: SyncDomain,
+        lookup: (UUID) -> M?
+    ) {
+        for adjustment in adjustments {
+            guard let m = lookup(adjustment.id) as? (any Syncable) else { continue }
+            m.updatedAt = adjustment.adjustedAt
+            if let deletedAt = m.deletedAt, deletedAt > adjustment.adjustedAt {
+                m.deletedAt = adjustment.adjustedAt
+            }
+            pendingConflictNotices.append(
+                ConflictNotice(id: adjustment.id, domain: domain, name: "设备时间已校正"))
         }
     }
 }

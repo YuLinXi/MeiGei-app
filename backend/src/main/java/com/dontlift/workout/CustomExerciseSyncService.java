@@ -15,7 +15,7 @@ public class CustomExerciseSyncService extends AbstractSyncService<CustomExercis
     private final CustomExerciseMapper customMapper;
 
     public CustomExerciseSyncService(CustomExerciseMapper mapper) {
-        super(mapper);
+        super(mapper, "custom-exercises");
         this.customMapper = mapper;
     }
 

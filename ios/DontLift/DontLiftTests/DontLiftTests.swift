@@ -9,6 +9,7 @@ import Testing
 import Foundation
 @testable import DontLift
 
+@MainActor
 struct WorkoutWeeklyStatsTests {
 
     /// 构造一个简单训练（在 SwiftData container 外，仅用于纯函数测试）。
@@ -39,10 +40,9 @@ struct WorkoutWeeklyStatsTests {
         #expect(s.repCount == 18)
         let expectedVolume: Double = 100 * 5 + 100 * 5 + 90 * 8
         #expect(s.volumeKg == expectedVolume)
-        #expect(s.avgDurationSec == 3600)
     }
 
-    @Test func weightedAverageDuration() {
+    @Test func unfinishedWorkoutCountsAsSession() {
         let now = Date()
         let w1 = makeWorkout(startedAt: now, endedAt: now.addingTimeInterval(1800), sets: [(50, 10)])
         let w2 = makeWorkout(startedAt: now, endedAt: now.addingTimeInterval(3600), sets: [(50, 10)])
@@ -50,7 +50,6 @@ struct WorkoutWeeklyStatsTests {
         let w3 = makeWorkout(startedAt: now, endedAt: nil, sets: [(50, 10)])
         let s = WorkoutWeeklyStats.compute(workouts: [w1, w2, w3], reference: now, calendar: mondayCalendar)
         #expect(s.sessionCount == 3)
-        #expect(s.avgDurationSec == (1800 + 3600) / 2)
     }
 
     @Test func crossWeekBoundary() {
@@ -67,5 +66,40 @@ struct WorkoutWeeklyStatsTests {
         let s = WorkoutWeeklyStats.compute(workouts: [wOut, wIn], reference: monday, calendar: mondayCalendar)
         #expect(s.sessionCount == 1)
         #expect(s.volumeKg == 50 * 4)
+    }
+}
+
+struct TeamMemberDTOTests {
+
+    @Test func missingAutoShareWorkoutsDefaultsToFalse() throws {
+        let json = """
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "teamId": "00000000-0000-0000-0000-000000000002",
+          "userId": "00000000-0000-0000-0000-000000000003",
+          "role": "member",
+          "displayName": "测试用户"
+        }
+        """.data(using: .utf8)!
+
+        let member = try JSONCoding.decoder.decode(TeamMemberDTO.self, from: json)
+
+        #expect(member.autoShareWorkouts == false)
+    }
+
+    @Test func decodesAutoShareWorkouts() throws {
+        let json = """
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "teamId": "00000000-0000-0000-0000-000000000002",
+          "userId": "00000000-0000-0000-0000-000000000003",
+          "role": "member",
+          "autoShareWorkouts": true
+        }
+        """.data(using: .utf8)!
+
+        let member = try JSONCoding.decoder.decode(TeamMemberDTO.self, from: json)
+
+        #expect(member.autoShareWorkouts == true)
     }
 }

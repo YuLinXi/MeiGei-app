@@ -5,6 +5,7 @@ import com.dontlift.common.entity.BaseEntity;
 import com.dontlift.sync.dto.SyncConflict;
 import com.dontlift.sync.dto.SyncPullResult;
 import com.dontlift.sync.dto.SyncPushResult;
+import com.dontlift.sync.dto.SyncTimestampAdjustment;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -23,9 +24,11 @@ import java.util.UUID;
 public abstract class AbstractSyncService<T extends BaseEntity & UserOwned> {
 
     protected final BaseMapper<T> mapper;
+    private final String syncDomain;
 
-    protected AbstractSyncService(BaseMapper<T> mapper) {
+    protected AbstractSyncService(BaseMapper<T> mapper, String syncDomain) {
         this.mapper = mapper;
+        this.syncDomain = syncDomain;
     }
 
     /** 子类实现：本用户自 since 起的全部变更（含软删墓碑）。since 为 null 视为全量。 */
@@ -48,11 +51,20 @@ public abstract class AbstractSyncService<T extends BaseEntity & UserOwned> {
 
     /** 批量上传 + LWW。客户端编辑时间（updatedAt）较新或相等则覆盖服务端，否则记为冲突。 */
     public SyncPushResult<T> push(UUID userId, List<T> incoming) {
+        OffsetDateTime serverTime = OffsetDateTime.now();
         List<UUID> applied = new ArrayList<>();
         List<SyncConflict<T>> conflicts = new ArrayList<>();
+        List<SyncTimestampAdjustment> timestampAdjustments = new ArrayList<>();
 
         for (T item : incoming) {
             item.setUserId(userId); // 强制归属，忽略客户端伪造的 userId
+            SyncTimestampGuard.Decision timestamp = SyncTimestampGuard.normalize(
+                    item.getId(), syncDomain, item.getUpdatedAt(), serverTime);
+            if (timestamp.adjusted()) {
+                item.setUpdatedAt(timestamp.effectiveUpdatedAt());
+                item.setDeletedAt(SyncTimestampGuard.normalizeDeletedAt(item.getDeletedAt(), timestamp.effectiveUpdatedAt()));
+                timestampAdjustments.add(timestamp.adjustment());
+            }
             T server = findByIdIncludingDeleted(item.getId());
 
             if (server == null) {
@@ -61,7 +73,7 @@ public abstract class AbstractSyncService<T extends BaseEntity & UserOwned> {
                 continue;
             }
 
-            boolean incomingWins = !server.getUpdatedAt().isAfter(item.getUpdatedAt());
+            boolean incomingWins = !server.getUpdatedAt().isAfter(timestamp.lwwUpdatedAt());
             if (incomingWins) {
                 if (item.getDeletedAt() != null) {
                     softDelete(item, server.getVersion()); // 墓碑：updateById 写不动 @TableLogic 字段
@@ -75,6 +87,6 @@ public abstract class AbstractSyncService<T extends BaseEntity & UserOwned> {
             }
         }
 
-        return new SyncPushResult<>(applied, conflicts, OffsetDateTime.now());
+        return new SyncPushResult<>(applied, conflicts, serverTime, timestampAdjustments);
     }
 }

@@ -5,6 +5,7 @@ import com.dontlift.common.entity.BaseEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /** 私密小空间。服务端权威共享实体（非离线同步域），软删=解散。 */
@@ -18,4 +19,8 @@ public class Team extends BaseEntity {
     private UUID ownerUserId;
 
     private String inviteCode;
+
+    private OffsetDateTime ownerTransferredAt;
+
+    private UUID ownerTransferredFromUserId;
 }
