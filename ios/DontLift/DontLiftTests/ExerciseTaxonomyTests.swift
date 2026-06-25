@@ -135,13 +135,12 @@ struct ExerciseTaxonomyTests {
         #expect(cat("STANDING_CALF_RAISE") == "腿")  // 小腿 → 腿
     }
 
-    /// curated 153 code 全部保留（去噪/归位均不删改已发布 code）。
-    @Test func curatedCodesPreserved() {
+    /// curated code 集合仍作为旧库回滚/排序参考；V1 预置库只保留已确认动作。
+    @Test func curatedCodesRemainAvailableForFallback() {
         #expect(BuiltinExercise.curatedCodes.count == 153)
         let codes = Set(BuiltinExercise.starter.map(\.code))
-        #expect(BuiltinExercise.curatedCodes.isSubset(of: codes))
         for anchor in ["BB_BENCH_PRESS", "BB_SQUAT", "DEADLIFT", "PULL_UP", "HIP_THRUST", "PLANK"] {
-            #expect(codes.contains(anchor), "缺失精选 code: \(anchor)")
+            #expect(codes.contains(anchor), "缺失 V1 必留 code: \(anchor)")
         }
     }
 
@@ -165,10 +164,58 @@ struct ExerciseTaxonomyTests {
         }
     }
 
-    /// 去噪后库规模合理（curated 153 + 导入约 866）。
+    /// V1 收敛为单一预置库，不再把 1000+ 导入动作全量展示。
     @Test func libraryScale() {
-        #expect(BuiltinExercise.starter.count >= 1000)
-        #expect(BuiltinExercise.starter.count <= 1040)
+        #expect(BuiltinExercise.starter.count >= 170)
+        #expect(BuiltinExercise.starter.count <= 200)
+    }
+
+    @Test func removedExercisesAreNotPresetSelectable() {
+        let names = Set(BuiltinExercise.starter.map(\.name))
+        for gone in ["派克俯卧撑", "扎特曼弯举", "JM 推", "西西深蹲", "弹力带蚌式", "TraditionalStrengthTraining", "沙发伸展"] {
+            #expect(!names.contains(gone), "明确移除动作不应在 V1 预置库: \(gone)")
+            #expect(ExerciseLibrary.isRemovedFromNewSelection(gone))
+        }
+        #expect(ExerciseLibrary.isRemovedFromNewSelection("跑步（有氧）"))
+    }
+
+    @Test func aliasesResolveToStandardExercises() {
+        #expect(ExerciseLibrary.resolve(code: "LAT_PULLDOWN", name: "宽距下拉")?.name == "高位下拉")
+        #expect(ExerciseLibrary.resolve(code: "PEC_DECK_FLY", name: "器械飞鸟")?.name == "蝴蝶机夹胸")
+        #expect(ExerciseLibrary.resolve(code: "CABLE_CROSSOVER", name: "绳索十字夹胸")?.name == "绳索夹胸")
+        #expect(ExerciseLibrary.resolve(code: "DB_ROTATING_CURL", name: "哑铃轮换弯举")?.name == "哑铃交替弯举")
+        #expect(ExerciseLibrary.resolve(code: "FACE_PULL", name: "面拉")?.name == "绳索面拉")
+        #expect(ExerciseLibrary.resolve(code: "MACHINE_ROW", name: "器械单臂划船")?.name == "单臂器械划船")
+    }
+
+    @Test func aliasSearchReturnsOnlyStandardExercise() {
+        let crossoverMatches = BuiltinExercise.starter.filter { ExerciseSearch.matches($0, query: "绳索十字夹胸") }
+        #expect(crossoverMatches.map(\.name) == ["绳索夹胸"])
+
+        let rotatingCurlMatches = BuiltinExercise.starter.filter { ExerciseSearch.matches($0, query: "哑铃轮换弯举") }
+        #expect(rotatingCurlMatches.map(\.name) == ["哑铃交替弯举"])
+    }
+
+    @Test func independentExercisesAreNotMerged() {
+        let names = Set(BuiltinExercise.starter.map(\.name))
+        #expect(names.contains("直杆绳索弯举"))
+        #expect(names.contains("绳索弯举"))
+        #expect(names.contains("悍马机卧推"))
+        #expect(names.contains("悍马机推胸"))
+        #expect(names.contains("器械倒蹬机"))
+        #expect(names.contains("腿举"))
+    }
+
+    @Test func planItemDisplaysStandardNameForLegacyReference() {
+        let pecDeck = PlanItem(builtinExerciseCode: "PEC_DECK_FLY",
+                               exerciseName: "器械飞鸟",
+                               orderIndex: 0)
+        #expect(pecDeck.displayExerciseName == "蝴蝶机夹胸")
+
+        let machineRow = PlanItem(builtinExerciseCode: "MACHINE_ROW",
+                                  exerciseName: "器械单臂划船",
+                                  orderIndex: 1)
+        #expect(machineRow.displayExerciseName == "单臂器械划船")
     }
 
     // MARK: 5.4 中文模糊多词搜索

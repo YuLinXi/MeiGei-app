@@ -39,7 +39,7 @@ extension CheckinSummary {
                 volume += (s.weightKg ?? 0) * Double(s.reps ?? 0)
             }
             return ExerciseSummary(
-                name: ex.exerciseName,
+                name: ex.displayExerciseName,
                 sets: sets.map { SetSummary(weightKg: $0.weightKg, reps: $0.reps) })
         }
         self.init(

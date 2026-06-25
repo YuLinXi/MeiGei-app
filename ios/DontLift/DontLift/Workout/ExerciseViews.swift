@@ -133,6 +133,10 @@ private struct ExerciseLibraryContentView: View {
         searching ? ExerciseSearch.matches(name, query: query) : true
     }
 
+    private func matchesQuery(_ exercise: BuiltinExercise) -> Bool {
+        searching ? ExerciseSearch.matches(exercise, query: query) : true
+    }
+
     // MARK: 解剖归位辅助
 
     /// 动作在某 L1 内命中的 L2 肌肉名（按 primaryRegions 经 regionOwner 派生）。空=该 L1 内无 L2（归「全部」段）。
@@ -156,7 +160,7 @@ private struct ExerciseLibraryContentView: View {
 
     private var filteredBuiltin: [BuiltinExercise] {
         allBuiltin.filter { ex in
-            guard passesEquipAndQuery(ex.equipmentType, ex.name) else { return false }
+            guard (equip == "all" || ex.equipmentType == equip) && matchesQuery(ex) else { return false }
             if searching { return true }
             switch selection {
             case .all:                 return true
@@ -1259,6 +1263,7 @@ private struct LegacyExercisePickerView: View {
     private func buildGroups() -> [PickerGroup: [PickerRow]] {
         let q = query.trimmingCharacters(in: .whitespaces)
         func match(_ name: String) -> Bool { q.isEmpty || name.localizedCaseInsensitiveContains(q) }
+        func match(_ ex: BuiltinExercise) -> Bool { q.isEmpty || ExerciseSearch.matches(ex, query: q) }
 
         var dict: [PickerGroup: [PickerRow]] = [:]
 
@@ -1275,7 +1280,7 @@ private struct LegacyExercisePickerView: View {
 
         for case let .muscle(m) in PickerGroup.order {
             let rows = BuiltinExercise.starter
-                .filter { $0.category == m.rawValue && match($0.name) }
+                .filter { $0.category == m.rawValue && match($0) }
                 .map { ex in
                     PickerRow(id: "b-\(ex.code)", name: ex.name,
                               muscle: ex.category, equipment: ex.equipmentType, isCustom: false,

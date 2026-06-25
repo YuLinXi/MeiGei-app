@@ -469,7 +469,8 @@ final class WorkoutHistoryStore {
                     let prior = bestByKey[key]
                     if prior == nil || maxWeight > prior! {
                         records.append(PersonalRecord(
-                            exerciseName: ex.exerciseName,
+                            exerciseKey: key,
+                            exerciseName: ex.displayExerciseName,
                             weightKg: maxWeight,
                             previousBestKg: prior
                         ))

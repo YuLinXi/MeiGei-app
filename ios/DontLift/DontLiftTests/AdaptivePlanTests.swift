@@ -250,7 +250,7 @@ struct AdaptivePlanTests {
         #expect(result.newItems.contains { $0.exerciseName == "深蹲" })        // 跳过的保留
         #expect(result.newItems.contains { $0.exerciseName == "弯举" })        // 新增 append
         #expect(result.diffs.contains { $0.kind == .added && $0.exerciseName == "弯举" })
-        #expect(result.diffs.contains { $0.kind == .kept && $0.exerciseName == "深蹲" })
+        #expect(result.diffs.contains { $0.kind == .kept && $0.exerciseName == "杠铃深蹲" })
     }
 
     /// 仅热身/未完成组的动作不回写。

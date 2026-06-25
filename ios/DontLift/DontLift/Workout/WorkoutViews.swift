@@ -1940,7 +1940,7 @@ private struct ExerciseBlock: View {
     // 卡头：展开态 = 名称 + ⋯ + 收起 ^；折叠态 = 名称 + 摘要 + 展开 ⌄。
     private var head: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            Text(exercise.exerciseName)
+            Text(exercise.displayExerciseName)
                 .font(Theme.Font.l2)
                 .foregroundStyle(isAllDone ? Theme.Color.muted : Theme.Color.fg)
                 .lineLimit(1)

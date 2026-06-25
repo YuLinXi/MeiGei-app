@@ -45,7 +45,7 @@ extension BuiltinExercise {
     /// ② `primaryRegions`/要点：curated 走 `regionData`（含中束/臀中肌精修），导入条按旧 L1/subcategory 派生；
     /// ③ `subcategory` 重锚为合法 L3 肌头 / 非解剖浏览子类（功能性按动作名关键词归桶），其余置 nil。
     /// 浏览 L2 由 `primaryRegions` 经 `ExerciseCategory.regionOwner` 派生，与高亮同源。
-    static let starter: [BuiltinExercise] = starterBase.map(normalized)
+    static let starter: [BuiltinExercise] = (ExerciseLibraryManifest.loadPresetExercises() ?? starterBase).map(normalized)
 
     /// 内置动作基础清单（原始 code/name/category/subcategory/equipmentType；category/subcategory 可能为旧 15 类形态）。
     /// 真实归位在 `normalized` 单点完成，避免逐条改 900+ 导入字面量。
@@ -62,7 +62,13 @@ extension BuiltinExercise {
         // ① L1 收缩到 11
         e.category = ExerciseCategory.collapseL1(oldCat)
         // ② 高亮区 / 要点（L2 由 primaryRegions 派生）
-        if let d = regionData[raw.code] {
+        if !raw.primaryRegions.isEmpty {
+            e.primaryRegions = refinedRegions(raw.primaryRegions, oldSub: oldSub)
+            e.secondaryRegions = raw.secondaryRegions
+            if e.formCues.isEmpty, let d = regionData[raw.code] {
+                e.formCues = d.cues
+            }
+        } else if let d = regionData[raw.code] {
             e.primaryRegions = refinedRegions(d.primary, oldSub: oldSub)
             e.secondaryRegions = d.secondary
             e.formCues = d.cues

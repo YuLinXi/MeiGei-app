@@ -44,8 +44,8 @@ struct WorkoutDetailView: View {
     /// 命中 PR 的动作 → 该次最大重量。用于在对应顶组行打 ▲ PR 徽标。
     private var prMaxByKey: [String: Double] {
         var out: [String: Double] = [:]
-        let prNames = Set(personalRecords.map(\.exerciseName))
-        for ex in sortedExercises where prNames.contains(ex.exerciseName) {
+        let prKeys = Set(personalRecords.map(\.exerciseKey))
+        for ex in sortedExercises where prKeys.contains(ex.historyKey) {
             if let m = ex.sets.filter(\.countsForStats).compactMap(\.weightKg).max() { out[ex.historyKey] = m }
         }
         return out
@@ -332,7 +332,7 @@ private struct ExerciseLogCard: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(exercise.exerciseName)
+                Text(exercise.displayExerciseName)
                     .font(Theme.Font.l2)
                     .foregroundStyle(Theme.Color.fg)
                 Spacer()
