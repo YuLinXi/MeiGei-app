@@ -142,7 +142,7 @@ private struct PaperActionMenuOverlay: View {
     @State private var shown = false
 
     private let menuWidth: CGFloat = 232
-    private let rowHeight: CGFloat = 52
+    private let rowHeight: CGFloat = PaperActionMenuMetrics.rowHeight
     private let edgePadding: CGFloat = 12
     /// 统一浮层锚定规范：菜单卡片与触发圆钮保持 8pt 垂直间距。
     private let anchorGap: CGFloat = 8
@@ -220,7 +220,7 @@ private struct PaperActionMenuCard: View {
                     Rectangle()
                         .fill(Theme.Color.border)
                         .frame(height: 1)
-                        .padding(.leading, 48)
+                        .padding(.leading, PaperActionMenuMetrics.dividerLeading)
                 }
             }
         }
@@ -233,26 +233,39 @@ private struct PaperActionMenuCard: View {
     }
 }
 
+private enum PaperActionMenuMetrics {
+    static let rowHeight: CGFloat = 52
+    static let horizontalPadding: CGFloat = 14
+    static let itemSpacing: CGFloat = 10
+    static let iconSize: CGFloat = 15
+    static let iconFrameWidth: CGFloat = 20
+    static let dividerLeading: CGFloat = horizontalPadding + iconFrameWidth + itemSpacing
+
+    static var titleFont: Font {
+        Theme.Font.body(size: 14, weight: .semibold)
+    }
+}
+
 private struct PaperActionMenuRow: View {
     let item: PaperMenuItem
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: PaperActionMenuMetrics.itemSpacing) {
                 Image(systemName: item.systemImage)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: PaperActionMenuMetrics.iconSize, weight: .semibold))
                     .foregroundStyle(iconColor)
-                    .frame(width: 22)
+                    .frame(width: PaperActionMenuMetrics.iconFrameWidth)
                 Text(item.title)
-                    .font(Theme.Font.l2)
+                    .font(PaperActionMenuMetrics.titleFont)
                     .foregroundStyle(textColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
                 Spacer(minLength: 0)
             }
-            .frame(height: 52)
-            .padding(.horizontal, 14)
+            .frame(height: PaperActionMenuMetrics.rowHeight)
+            .padding(.horizontal, PaperActionMenuMetrics.horizontalPadding)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle())

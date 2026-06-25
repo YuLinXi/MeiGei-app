@@ -119,7 +119,8 @@ struct MainTabView: View {
             // 挂在 NavigationStack 内 → push 进 Live 记录页时被全屏页自然盖住。
             .overlay {
                 if let active = activeSession {
-                    LiveSessionCapsule(title: active.title ?? "训练") {
+                    LiveSessionCapsule(title: active.title ?? "训练",
+                                       timerStartedAt: active.timerStartedAt) {
                         openedSession = active
                     }
                 }
@@ -154,27 +155,9 @@ struct MainTabView: View {
                 .transition(.opacity)
             }
         }
-        .overlay(alignment: .bottom) {
-            if let notice = teamShare.notice {
-                TeamShareNoticeBanner(message: notice)
-                    .padding(.horizontal, Theme.Spacing.lg)
-                    .padding(.bottom, 88)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .allowsHitTesting(false)
-            }
-        }
         .onChange(of: restTimer.isRunning) { _, running in
             // 倒计时归零（或外部结束）时自动渐隐收回弹窗。
             if !running { withAnimation(restAnim) { restTimer.isExpanded = false } }
-        }
-        .onChange(of: teamShare.notice) { _, message in
-            guard let message else { return }
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(2.8))
-                if teamShare.notice == message {
-                    withAnimation(.easeOut(duration: 0.18)) { teamShare.notice = nil }
-                }
-            }
         }
         // 根层弹窗队列：回写回执有撤销入口，优先展示；关闭后再展示 PR 庆祝与手动 Team 分享入口。
         .sheet(item: $activeRootSheet, onDismiss: clearPresentedRootSheetAndContinue) { sheet in
@@ -250,26 +233,5 @@ struct MainTabView: View {
         })
         guard !syncedDrafts.isEmpty else { return }
         await teamService.retryPendingShares(userId: userId, syncedDrafts: syncedDrafts)
-    }
-}
-
-private struct TeamShareNoticeBanner: View {
-    let message: String
-
-    var body: some View {
-        HStack(spacing: 9) {
-            Image(systemName: "person.2.fill")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-            Text(message)
-                .font(Theme.Font.body(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .lineLimit(2)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 11)
-        .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-        .paperShadow(.lg, cornerRadius: Theme.Radius.md)
     }
 }

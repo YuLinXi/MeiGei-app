@@ -1,0 +1,551 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": "docs/exercise-library-preset-v1.md",
+  "aliases": [
+    {
+      "targetCode": "LAT_PULLDOWN",
+      "targetName": "高位下拉",
+      "legacyCodes": [
+        "LAT_PULLDOWN"
+      ],
+      "legacyNames": [
+        "宽距下拉",
+        "宽握高位下拉",
+        "高位下拉"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "CABLE_TRICEP_EXT",
+      "targetName": "绳索臂屈伸",
+      "legacyCodes": [
+        "CABLE_TRICEP_EXT"
+      ],
+      "legacyNames": [
+        "绳索臂屈伸"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "MACHINE_REVERSE_FLY",
+      "targetName": "蝴蝶机反向飞鸟",
+      "legacyCodes": [
+        "MACHINE_REVERSE_FLY",
+        "REVERSE_PEC_DECK"
+      ],
+      "legacyNames": [
+        "蝴蝶机反向飞鸟",
+        "反向蝴蝶机"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "PEC_DECK_FLY",
+      "targetName": "蝴蝶机夹胸",
+      "legacyCodes": [
+        "PEC_DECK",
+        "PEC_DECK_FLY"
+      ],
+      "legacyNames": [
+        "蝴蝶机飞鸟",
+        "器械飞鸟",
+        "蝴蝶机夹胸"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "MACHINE_ROW",
+      "targetName": "坐姿器械划船",
+      "legacyCodes": [
+        "MACHINE_ROW"
+      ],
+      "legacyNames": [
+        "器械划船1",
+        "坐姿器械划船"
+      ],
+      "requiresNameMatch": true
+    },
+    {
+      "targetCode": "MACHINE_SINGLE_ARM_ROW",
+      "targetName": "单臂器械划船",
+      "legacyCodes": [
+        "MACHINE_ROW"
+      ],
+      "legacyNames": [
+        "器械单臂划船"
+      ],
+      "requiresNameMatch": true
+    },
+    {
+      "targetCode": "MACHINE_CHEST_PRESS",
+      "targetName": "器械推胸",
+      "legacyCodes": [
+        "MACHINE_CHEST_PRESS"
+      ],
+      "legacyNames": [
+        "器械推胸",
+        "器械推胸（版本3）",
+        "器械推胸（版本4）"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "HAMMER_ROW",
+      "targetName": "悍马机划船",
+      "legacyCodes": [
+        "HAMMER_ROW"
+      ],
+      "legacyNames": [
+        "悍马机划船",
+        "悍马机划船（版本2）"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "HAMMER_PULLDOWN",
+      "targetName": "悍马机下拉",
+      "legacyCodes": [
+        "HAMMER_PULLDOWN"
+      ],
+      "legacyNames": [
+        "悍马机下拉",
+        "悍马机正手下拉",
+        "悍马机下拉（版本2）"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "MACHINE_PULLDOWN",
+      "targetName": "器械下拉",
+      "legacyCodes": [
+        "MACHINE_PULLDOWN"
+      ],
+      "legacyNames": [
+        "器械下拉",
+        "器械下拉（版本2）"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "MACHINE_LEG_PRESS",
+      "targetName": "器械倒蹬机",
+      "legacyCodes": [
+        "MACHINE_LEG_PRESS"
+      ],
+      "legacyNames": [
+        "器械倒蹬",
+        "器械倒蹬(版本2)",
+        "器械倒蹬机"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "CABLE_CROSSOVER",
+      "targetName": "绳索夹胸",
+      "legacyCodes": [
+        "CABLE_FLY",
+        "CABLE_CROSSOVER"
+      ],
+      "legacyNames": [
+        "绳索十字夹胸",
+        "绳索夹胸"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "DB_ALTERNATING_CURL",
+      "targetName": "哑铃交替弯举",
+      "legacyCodes": [
+        "DB_ROTATING_CURL"
+      ],
+      "legacyNames": [
+        "哑铃轮换弯举",
+        "哑铃交替弯举"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "FACE_PULL",
+      "targetName": "绳索面拉",
+      "legacyCodes": [
+        "FACE_PULL"
+      ],
+      "legacyNames": [
+        "面拉",
+        "绳索面拉"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "DB_CROSS_HAMMER_CURL",
+      "targetName": "交叉锤式弯举",
+      "legacyCodes": [
+        "DB_CROSS_HAMMER_CURL"
+      ],
+      "legacyNames": [
+        "哑铃交叉锤式弯举（版本2）",
+        "交叉锤式弯举"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "T_BAR_ROW",
+      "targetName": "T杠划船",
+      "legacyCodes": [
+        "CLOSE_T_BAR_ROW"
+      ],
+      "legacyNames": [
+        "窄握 T杠划船",
+        "窄握T杠划船"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "EZ_BAR_CURL",
+      "targetName": "EZ 杠弯举",
+      "legacyCodes": [
+        "BB_EZ_BAR_CURL",
+        "EZ_BAR_CURL"
+      ],
+      "legacyNames": [
+        "EZ杆二头弯举",
+        "EZ杠弯举",
+        "EZ 杠弯举"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "BB_STRAIGHT_BAR_CURL",
+      "targetName": "直杆绳索弯举",
+      "legacyCodes": [
+        "BB_STRAIGHT_BAR_CURL"
+      ],
+      "legacyNames": [
+        "直杆绳索弯举"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "STRAIGHT_ARM_PULLDOWN",
+      "targetName": "直臂下压",
+      "legacyCodes": [
+        "BB_STRAIGHT_ARM_PUSHDOWN",
+        "STRAIGHT_ARM_PULLDOWN"
+      ],
+      "legacyNames": [
+        "铁杆直臂下压",
+        "直臂下压"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "BB_STRAIGHT_BAR_PUSHDOWN",
+      "targetName": "直杆绳索下压",
+      "legacyCodes": [
+        "BB_STRAIGHT_BAR_PUSHDOWN"
+      ],
+      "legacyNames": [
+        "直杆绳索下压"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "CABLE_V_BAR_PUSHDOWN",
+      "targetName": "V-bar 绳索下压",
+      "legacyCodes": [
+        "CABLE_V_BAR_PUSHDOWN"
+      ],
+      "legacyNames": [
+        "V-Bar 绳索下压",
+        "V-bar 绳索下压"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "DB_OVERHEAD_PRESS",
+      "targetName": "哑铃推肩",
+      "legacyCodes": [
+        "DB_OVERHEAD_PRESS",
+        "DB_SHOULDER_PRESS"
+      ],
+      "legacyNames": [
+        "哑铃推肩",
+        "哑铃肩推"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "BB_SQUAT",
+      "targetName": "杠铃深蹲",
+      "legacyCodes": [
+        "BB_SQUAT"
+      ],
+      "legacyNames": [
+        "深蹲",
+        "杠铃深蹲"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "ROMANIAN_DL",
+      "targetName": "罗马尼亚硬拉",
+      "legacyCodes": [
+        "ROMANIAN_DL"
+      ],
+      "legacyNames": [
+        "杠铃罗马尼亚硬拉",
+        "罗马尼亚硬拉"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "CABLE_SINGLE_ARM_PULLDOWN",
+      "targetName": "单臂绳索下拉",
+      "legacyCodes": [],
+      "legacyNames": [
+        "龙门架单边下拉练胸",
+        "单臂绳索下拉下压",
+        "单臂绳索下拉"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "DB_UPRIGHT_ROW",
+      "targetName": "哑铃直立划船",
+      "legacyCodes": [],
+      "legacyNames": [
+        "站姿哑铃划船",
+        "哑铃直立划船"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "CLOSE_GRIP_BENCH",
+      "targetName": "窄距卧推",
+      "legacyCodes": [],
+      "legacyNames": [
+        "窄距卧推(靠近式)",
+        "窄距卧推"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "SINGLE_ARM_PREACHER_CURL",
+      "targetName": "单臂牧师凳弯举",
+      "legacyCodes": [],
+      "legacyNames": [
+        "坐姿单手牧师凳弯举",
+        "单臂牧师凳弯举"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "CABLE_SEATED_BAR_CURL",
+      "targetName": "坐姿绳索拉杆二头弯举",
+      "legacyCodes": [],
+      "legacyNames": [
+        "坐姿绳索拉杆二头弯举"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "PREACHER_BENCH_REAR_DELT_FLY",
+      "targetName": "牧师凳俯身飞鸟",
+      "legacyCodes": [],
+      "legacyNames": [
+        "牧师凳 附身飞鸟",
+        "牧师凳俯身飞鸟"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "SHOULDER_WARMUP",
+      "targetName": "肩部热身",
+      "legacyCodes": [],
+      "legacyNames": [
+        "练肩热身",
+        "肩部热身"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "REVERSE_LAT_PULLDOWN",
+      "targetName": "反握高位下拉",
+      "legacyCodes": [
+        "WIDE_REVERSE_PULLDOWN"
+      ],
+      "legacyNames": [
+        "宽握反手下拉"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "WIDE_SEATED_ROW",
+      "targetName": "宽握坐姿划船",
+      "legacyCodes": [
+        "BB_WIDE_SEATED_ROW"
+      ],
+      "legacyNames": [
+        "拉杆坐姿划船(宽握)"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "CLOSE_LAT_PULLDOWN",
+      "targetName": "窄握高位下拉",
+      "legacyCodes": [
+        "CLOSE_PULLDOWN"
+      ],
+      "legacyNames": [
+        "窄距下拉"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "SINGLE_ARM_HAMMER_ROW",
+      "targetName": "单臂悍马机划船",
+      "legacyCodes": [
+        "HAMMER_SEATED_SINGLE_ARM_ROW"
+      ],
+      "legacyNames": [
+        "单手坐姿悍马机划船"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "CABLE_SINGLE_ARM_PULLDOWN",
+      "targetName": "单臂绳索下拉",
+      "legacyCodes": [
+        "SINGLE_ARM_PULLDOWN"
+      ],
+      "legacyNames": [
+        "单手下拉",
+        "龙门架绳索单臂侧拉"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "DB_PRONE_ROW",
+      "targetName": "俯卧哑铃划船",
+      "legacyCodes": [
+        "DB_PRONE_HAMMER_ROW"
+      ],
+      "legacyNames": [
+        "俯卧哑铃划船（锤式）"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "HANGING_LEG_RAISE",
+      "targetName": "悬挂举腿",
+      "legacyCodes": [
+        "BAR_HANGING_LEG_RAISE"
+      ],
+      "legacyNames": [
+        "悬挂抬腿"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "DB_PULLOVER",
+      "targetName": "哑铃仰卧上拉",
+      "legacyCodes": [
+        "DB_FLAT_BENCH_PULL"
+      ],
+      "legacyNames": [
+        "平板哑铃提拉"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "MACHINE_SHOULDER_PRESS",
+      "targetName": "器械肩推",
+      "legacyCodes": [
+        "MACHINE_SEATED_PRESS"
+      ],
+      "legacyNames": [
+        "器械坐姿推举"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "DB_FLY",
+      "targetName": "哑铃飞鸟",
+      "legacyCodes": [
+        "FLAT_DB_FLY"
+      ],
+      "legacyNames": [
+        "平躺哑铃飞鸟"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "REAR_DELT_FLY",
+      "targetName": "俯身飞鸟",
+      "legacyCodes": [
+        "HALF_BENT_LATERAL_RAISE"
+      ],
+      "legacyNames": [
+        "半俯身侧平举"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "SINGLE_ARM_DB_ROW",
+      "targetName": "单臂哑铃划船",
+      "legacyCodes": [
+        "DB_ROW"
+      ],
+      "legacyNames": [
+        "哑铃划船（手扶）"
+      ],
+      "requiresNameMatch": true
+    },
+    {
+      "targetCode": "BULGARIAN_SPLIT_SQUAT",
+      "targetName": "保加利亚分腿蹲",
+      "legacyCodes": [
+        "DB_BULGARIAN_SQUAT",
+        "WEIGHTED_BULGARIAN_SQUAT"
+      ],
+      "legacyNames": [
+        "哑铃保加利亚蹲",
+        "保加利亚蹲"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "INCLINE_PUSH_UP",
+      "targetName": "上斜俯卧撑",
+      "legacyCodes": [
+        "STEP_PUSH_UP"
+      ],
+      "legacyNames": [
+        "上台阶俯卧撑"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "SINGLE_ARM_CABLE_PUSHDOWN",
+      "targetName": "单臂绳索下压",
+      "legacyCodes": [
+        "CABLE_SINGLE_ARM_TRICEP_EXT"
+      ],
+      "legacyNames": [
+        "单手绳索臂屈伸"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "SKULL_CRUSHER",
+      "targetName": "仰卧臂屈伸",
+      "legacyCodes": [
+        "BODYWEIGHT_SKULL_CRUSHER"
+      ],
+      "legacyNames": [
+        "碎颅者"
+      ],
+      "requiresNameMatch": false
+    }
+  ]
+}

@@ -75,6 +75,16 @@ enum ExerciseCategory: String, CaseIterable, Identifiable, Codable, Hashable {
 
     /// 本 L1 覆盖的全部高亮叶级（`muscles` 各区并集）。非解剖类为空。
     var regions: [MuscleRegion] { muscles.flatMap(\.regions) }
+
+    /// 展示层是否折叠唯一的 L2 肌肉层：例如「胸 → 胸大肌 → 上胸」显示为「胸 → 上胸」。
+    var collapsesSingleMuscleForBrowsing: Bool {
+        muscles.count == 1 && muscles[0].hasHeads
+    }
+
+    /// 被展示层折叠的唯一 L2 肌肉。内部筛选与高亮仍保留完整 L2/L3 归属。
+    var collapsedBrowseMuscle: MuscleNode? {
+        collapsesSingleMuscleForBrowsing ? muscles[0] : nil
+    }
 }
 
 /// **L2 肌肉**（解剖 L1 下的肌肉节点）。`regions` 对齐高亮叶级、`heads` 为 L3 肌头（按需，可空）。

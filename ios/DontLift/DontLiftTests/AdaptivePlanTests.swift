@@ -75,6 +75,24 @@ struct AdaptivePlanTests {
         #expect(sets[2].reps == 7)                                // 逐组对位
     }
 
+    @Test func adaptivePrefillMergesAliasHistoryKeys() {
+        let history = [makeWorkout(historyKey: "CABLE_FLY", name: "绳索夹胸",
+                                   startedAt: Date(timeIntervalSince1970: 1000),
+                                   sets: [(22.5, 12, true, .working)])]
+        let item = PlanItem(builtinExerciseCode: "CABLE_CROSSOVER",
+                            exerciseName: "绳索十字夹胸",
+                            orderIndex: 0,
+                            suggestedSets: 1,
+                            suggestedReps: 10,
+                            suggestedWeightKg: 15)
+
+        let sets = PlanPrefill.sets(for: item, mode: .adaptive, history: history)
+
+        #expect(sets.count == 1)
+        #expect(sets[0].weightKg == 22.5)
+        #expect(sets[0].reps == 12)
+    }
+
     @Test func adaptiveFallsBackToPlanWhenNoHistory() {
         let item = PlanItem(builtinExerciseCode: "NEW", exerciseName: "新动作", orderIndex: 0,
                             suggestedSets: 2, suggestedReps: 10, suggestedWeightKg: 40)
@@ -250,7 +268,7 @@ struct AdaptivePlanTests {
         #expect(result.newItems.contains { $0.exerciseName == "深蹲" })        // 跳过的保留
         #expect(result.newItems.contains { $0.exerciseName == "弯举" })        // 新增 append
         #expect(result.diffs.contains { $0.kind == .added && $0.exerciseName == "弯举" })
-        #expect(result.diffs.contains { $0.kind == .kept && $0.exerciseName == "深蹲" })
+        #expect(result.diffs.contains { $0.kind == .kept && $0.exerciseName == "杠铃深蹲" })
     }
 
     /// 仅热身/未完成组的动作不回写。

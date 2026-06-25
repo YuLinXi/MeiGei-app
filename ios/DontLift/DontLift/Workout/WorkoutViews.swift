@@ -567,7 +567,7 @@ struct WorkoutLoggingView: View {
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(PRCelebrationCenter.self) private var prCelebration
     @Environment(PlanWritebackCenter.self) private var planWriteback
-    @Environment(TeamShareCenter.self) private var teamShare
+    @Environment(GlobalMessageCenter.self) private var globalMessage
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -575,6 +575,8 @@ struct WorkoutLoggingView: View {
     @State private var pickingExercise = false
     /// 结束二次确认弹窗。
     @State private var confirmingFinish = false
+    /// 放弃当前进行中训练的二次确认弹窗。
+    @State private var confirmingDiscard = false
     /// 手风琴互斥展开的三态：
     /// - `auto`：用户未交互，跟随默认计算值（第一个有未完成 set 的动作）；
     /// - `expanded(id)`：显式展开某动作；
@@ -591,10 +593,6 @@ struct WorkoutLoggingView: View {
     @State private var restEditingExerciseId: UUID?
     /// 自定义休息秒数输入缓冲（仅整数秒）。
     @State private var restEditBuffer: String = ""
-    /// 当前进行中的休息由哪一组触发。
-    @State private var activeRestSetId: UUID?
-    /// 当前进行中休息的真实开始时间。
-    @State private var activeRestStartedAt: Date?
     /// 每个已完成组的真实休息秒数（仅会话内展示）。
     @State private var actualRestBySet: [UUID: Int] = [:]
     /// 当前打开 ⋯ 菜单的动作 localId（nil = 无）。顶层浮层据 anchor 定位、外部点击关闭。
@@ -665,6 +663,15 @@ struct WorkoutLoggingView: View {
         workout.exercises.sorted { $0.orderIndex < $1.orderIndex }.map {
             ExerciseOrderItem(id: $0.localId, title: $0.exerciseName, subtitle: orderSubtitle(for: $0))
         }
+    }
+
+    private var loggingMenuItems: [PaperMenuItem] {
+        [
+            PaperMenuItem(title: "放弃此次训练", systemImage: "trash", role: .destructive) {
+                prepareForPresentation()
+                confirmingDiscard = true
+            }
+        ]
     }
 
     /// 休息弹窗开合动画：尊重「减弱动态效果」，开启时退化为短淡变而非弹簧。
@@ -818,7 +825,13 @@ struct WorkoutLoggingView: View {
         .paperToolbar(title: workout.isActive ? "训练进行中" : (workout.title ?? "训练"), onBack: {
             prepareForPresentation()
             dismiss()
-        })
+        }) {
+            if workout.isActive {
+                CircleIconMenu(systemName: "ellipsis",
+                               items: loggingMenuItems,
+                               accessibilityLabel: "训练更多操作")
+            }
+        }
         // 动作 ⋯ 组间休息菜单：顶层浮层，按 anchor 定位于 ⋯ 下方；外部点击关闭。
         .overlayPreferenceValue(ExerciseMenuAnchorKey.self) { anchor in
             if let id = menuExerciseId,
@@ -876,6 +889,13 @@ struct WorkoutLoggingView: View {
             confirmTitle: "结束训练",
             onConfirm: { finish() }
         )
+        .paperConfirmDialog(
+            isPresented: $confirmingDiscard,
+            title: "放弃此次训练?",
+            message: "当前训练的所有数据将作废，不会进入训练记录。",
+            confirmTitle: "放弃训练",
+            onConfirm: { discardWorkout() }
+        )
         // 删除组二次确认（自定义纸感弹窗）。
         .paperConfirmDialog(
             isPresented: Binding(get: { confirmDeleteSet != nil },
@@ -893,8 +913,11 @@ struct WorkoutLoggingView: View {
                                      items: workoutOrderItems,
                                      onCommit: applyWorkoutExerciseOrder)
         }
-        .onChange(of: restTimer.isRunning) { oldValue, newValue in
-            if oldValue && !newValue { recordActiveRestIfNeeded() }
+        .onAppear {
+            consumeRestCompletionIfNeeded()
+        }
+        .onChange(of: restTimer.completionEvent?.id) { _, _ in
+            consumeRestCompletionIfNeeded()
         }
     }
 
@@ -1077,12 +1100,11 @@ struct WorkoutLoggingView: View {
                                   let secs = restByExercise[ex.localId] ?? Int(restTimer.defaultDuration)
                                   if secs > 0 {
                                       recordActiveRestIfNeeded()
-                                      activeRestSetId = set.localId
-                                      activeRestStartedAt = .now
                                       let nextSet = nextSetSummary
                                       restTimer.start(duration: TimeInterval(secs),
                                                       label: nextSet?.exerciseName ?? ex.exerciseName,
-                                                      nextSet: nextSet)
+                                                      nextSet: nextSet,
+                                                      setId: set.localId)
                                       restTimer.nextHint = nextHint
                                   }
                               })
@@ -1184,7 +1206,9 @@ struct WorkoutLoggingView: View {
                                 )
                         }.buttonStyle(.plain)
                     }
-                    Button { beginRestDurationEditing(for: ex, current: current, isCustom: isCustom) } label: {
+                    Button {
+                        beginRestDurationEditing(for: ex, current: current, isCustom: isCustom)
+                    } label: {
                         HStack(spacing: 2) {
                             if customText.isEmpty {
                                 Text("自定义")
@@ -1217,7 +1241,11 @@ struct WorkoutLoggingView: View {
             }
             .padding(16)
             Rectangle().fill(Theme.Color.border).frame(height: 1)
-            Button { menuExerciseId = nil; dismissRestDurationEditor(); delete(ex) } label: {
+            Button {
+                menuExerciseId = nil
+                dismissRestDurationEditor()
+                delete(ex)
+            } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "trash").font(.system(size: 15, weight: .semibold))
                     Text("删除动作").font(Theme.Font.l2)
@@ -1417,14 +1445,17 @@ struct WorkoutLoggingView: View {
     }
 
     private func recordActiveRestIfNeeded(now: Date = .now) {
-        guard let setId = activeRestSetId, let startedAt = activeRestStartedAt else { return }
-        actualRestBySet[setId] = max(0, Int(now.timeIntervalSince(startedAt).rounded()))
-        clearActiveRest()
+        _ = restTimer.completeForWriteback(now: now)
+        consumeRestCompletionIfNeeded()
     }
 
-    private func clearActiveRest() {
-        activeRestSetId = nil
-        activeRestStartedAt = nil
+    private var workoutSetIds: Set<UUID> {
+        Set(workout.exercises.flatMap(\.sets).map(\.localId))
+    }
+
+    private func consumeRestCompletionIfNeeded() {
+        guard let event = restTimer.consumeCompletionEvent(matching: workoutSetIds) else { return }
+        actualRestBySet[event.setId] = event.elapsedSeconds
     }
 
     /// 启动训练计时（幂等）：仅在尚未启动时落定 timerStartedAt。
@@ -1439,7 +1470,6 @@ struct WorkoutLoggingView: View {
     /// 再置 endedAt + HealthKit 写入，最后统一重算派生数据。
     private func finish() {
         Theme.Haptics.notification(.success)
-        clearActiveRest()
         restTimer.stop()   // 结束训练即停止进行中的休息计时全套，避免倒计时/灵动岛残留。
         let endedAt = Date.now
         workout.endedAt = endedAt
@@ -1450,6 +1480,14 @@ struct WorkoutLoggingView: View {
         Task { await healthKit.saveStrengthWorkout(start: startedAt, end: endedAt) }
         applyAdaptiveWriteback()  // 自适应模式：实绩 upsert 回写来源计划（design.md D4）
         recomputeDerived()
+    }
+
+    private func discardWorkout() {
+        Theme.Haptics.notification(.warning)
+        restTimer.stop()
+        WorkoutSession.discard(workout, in: modelContext)
+        historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
+        dismiss()
     }
 
     /// 清理未打勾的预填残组（落值方案 D6）：删除 `completed=false` 的组，
@@ -1515,11 +1553,12 @@ struct WorkoutLoggingView: View {
             break
         case .shared(let count):
             guard count > 0 else { return }
-            teamShare.presentNotice(count == 1 ? "已自动分享到 1 个 Team" : "已自动分享到 \(count) 个 Team")
+            globalMessage.show(count == 1 ? "已自动分享到 1 个 Team" : "已自动分享到 \(count) 个 Team",
+                               style: .success)
         case .queued:
-            teamShare.presentNotice("Team 自动分享已排队，同步成功后重试")
+            globalMessage.show("Team 自动分享已排队，同步成功后重试", style: .warning)
         case .failed:
-            teamShare.presentNotice("Team 自动分享失败，可稍后重试")
+            globalMessage.show("Team 自动分享失败，可稍后重试", style: .error)
         }
     }
 
@@ -1666,6 +1705,7 @@ struct WorkoutLoggingView: View {
     private func keypadAddSet() {
         guard let cell = focused, let ex = exercise(containing: cell.setId) else { return }
         // 默认追加正式组，预填上一**正式**组重量与次数（热身组不作预填源）。
+        Theme.Feedback.addSetTap()
         let next = (ex.sets.map(\.setIndex).max() ?? -1) + 1
         let previous = ex.lastWorkingSetValues
         let newSet = WorkoutSet(setIndex: next, weightKg: previous.weightKg, reps: previous.reps, setType: .working)
@@ -1939,7 +1979,7 @@ private struct ExerciseBlock: View {
     // 卡头：展开态 = 名称 + ⋯ + 收起 ^；折叠态 = 名称 + 摘要 + 展开 ⌄。
     private var head: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            Text(exercise.exerciseName)
+            Text(exercise.displayExerciseName)
                 .font(Theme.Font.l2)
                 .foregroundStyle(isAllDone ? Theme.Color.muted : Theme.Color.fg)
                 .lineLimit(1)
@@ -1978,24 +2018,29 @@ private struct ExerciseBlock: View {
     }
 
     private var addSetButton: some View {
-        Button { addSet() } label: {
+        Button {
+            addSet()
+        } label: {
             HStack(spacing: 6) {
                 Image(systemName: "plus").font(.system(size: 12, weight: .bold))
                 Text("加一组").font(Theme.Font.body(size: 12.5, weight: .semibold))
             }
             .foregroundStyle(Theme.Color.muted)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 9)
+            .frame(height: 42)
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                     .stroke(Theme.Color.border2, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
             )
+            .contentShape(Rectangle())
             .padding(.horizontal, 12).padding(.bottom, 12)
-        }.buttonStyle(.plain)
+        }
+        .buttonStyle(PressableButtonStyle())
     }
 
     private func addSet() {
         // 默认追加正式组，预填上一**正式**组重量与次数（热身组不作预填源）。
+        Theme.Feedback.addSetTap()
         let next = (exercise.sets.map(\.setIndex).max() ?? -1) + 1
         let previous = exercise.lastWorkingSetValues
         exercise.sets.append(WorkoutSet(setIndex: next, weightKg: previous.weightKg, reps: previous.reps, setType: .working))
@@ -2067,7 +2112,6 @@ private struct SetRow: View {
             Spacer(minLength: 8)
             trailingControls
         }
-        .opacity(set.completed ? 0.52 : 1)
         .padding(.horizontal, 15)
         .padding(.vertical, 5)
     }
@@ -2103,23 +2147,23 @@ private struct SetRow: View {
         ZStack(alignment: .bottomTrailing) {
             Text(text.isEmpty ? placeholder : text)
                 .font(Theme.Font.number(size: 15, weight: .bold))
-                .foregroundStyle(text.isEmpty ? Theme.Color.muted : Theme.Color.fg)
+                .foregroundStyle(valueTextColor(isPlaceholder: text.isEmpty))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             if !text.isEmpty {
                 Text(unit)
                     .font(Theme.Font.mono(size: 8, weight: .bold))
-                    .foregroundStyle(Theme.Color.muted)
+                    .foregroundStyle(valueUnitColor)
                     .padding(.trailing, 5)
                     .padding(.bottom, 3)
             }
         }
         .frame(width: 64, height: 36)
-            .background(focused ? Theme.Color.accentSoft : (isEditing ? Theme.Color.surface : Theme.Color.bg),
+            .background(valueCellBackground(focused: focused),
                         in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                    .stroke(focused ? Theme.Color.accent : Theme.Color.border,
+                    .stroke(valueCellBorder(focused: focused),
                             lineWidth: focused ? 1.5 : 1)
             )
             .contentShape(Rectangle())
@@ -2127,6 +2171,28 @@ private struct SetRow: View {
             .accessibilityLabel("\(rowName) \(label)")
             .accessibilityValue(value ?? "未填写")
             .accessibilityAddTraits(.isButton)
+    }
+
+    private func valueCellBackground(focused: Bool) -> SwiftUI.Color {
+        if set.completed { return Theme.Color.accent }
+        if focused { return Theme.Color.accentSoft }
+        if isEditing { return Theme.Color.surface }
+        return Theme.Color.bg
+    }
+
+    private func valueCellBorder(focused: Bool) -> SwiftUI.Color {
+        if set.completed { return Theme.Color.accent }
+        if focused { return Theme.Color.accent }
+        return Theme.Color.border
+    }
+
+    private func valueTextColor(isPlaceholder: Bool) -> SwiftUI.Color {
+        if set.completed { return isPlaceholder ? .white.opacity(0.7) : .white }
+        return isPlaceholder ? Theme.Color.muted : Theme.Color.fg
+    }
+
+    private var valueUnitColor: SwiftUI.Color {
+        return self.set.completed ? .white.opacity(0.78) : Theme.Color.muted
     }
 
     /// 完成按钮：圆角方形复选框。完成=朱砂红实心白勾；未完成=淡勾引导用户勾选。
@@ -2145,12 +2211,10 @@ private struct SetRow: View {
                         .foregroundStyle(.white)
                 } else {
                     shape.fill(Theme.Color.bg)
-                    shape.stroke(emphasized ? Theme.Color.accent.opacity(0.5) : Theme.Color.border,
-                                 lineWidth: emphasized ? 2 : 1.5)
+                    shape.stroke(Theme.Color.border, lineWidth: 1.5)
                     // 未完成态显示淡勾，引导用户勾选完成。
                     Image(systemName: "checkmark").font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(emphasized ? Theme.Color.accent.opacity(0.5)
-                                         : Theme.Color.muted.opacity(0.4))
+                        .foregroundStyle(Theme.Color.muted.opacity(0.4))
                 }
             }
             .frame(width: 36, height: 36)   // 与重量/次数输入框等高

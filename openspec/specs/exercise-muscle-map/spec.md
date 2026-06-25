@@ -1,9 +1,7 @@
 ## Purpose
 
 定义 DontLift 细分肌群数据模型与肌群高亮图可视化的行为规约：`MuscleRegion` 16 区枚举、内置动作的主动肌/协同肌/动作要点、用户本地性别字段，以及男女正背人体高亮图的渲染与三态染色规则。本能力只产出数据与可复用高亮图组件，不改动动作详情页既有交互与同步契约。
-
 ## Requirements
-
 ### Requirement: 细分肌群区域模型
 
 系统 SHALL 定义 `MuscleRegion` 枚举，恰好包含 16 个区：`traps`、`deltFront`、`deltRear`、`chest`、`biceps`、`triceps`、`forearms`、`abs`、`obliques`、`lats`、`lowerBack`、`glutes`、`quads`、`hams`、`calves`。每个 case 的 rawValue MUST 与高亮图资产的图层/imageset 命名逐字一致，并附带中文显示名。该枚举 MUST 男女共用，与用户性别无关。
@@ -18,19 +16,23 @@
 
 ### Requirement: 内置动作细分肌群与要点
 
-`BuiltinExercise` SHALL 新增三个字段：`primaryRegions: [MuscleRegion]`（主动肌）、`secondaryRegions: [MuscleRegion]`（协同肌）、`formCues: [String]`（动作要点，3–5 条原创短句）。150 个内置动作 MUST 全部回填这三个字段。已有的 `primaryMuscle`（粗 8 类）、`equipmentType`、`code` MUST 保留不变，继续服务动作库筛选与 `historyKey` 归并。新字段为纯加法，MUST NOT 改变既有同步契约或 historyKey 计算。
+`BuiltinExercise` SHALL 提供 `primaryRegions: [MuscleRegion]`（主动肌）、`secondaryRegions: [MuscleRegion]`（协同肌）、`formCues: [String]`（动作要点）三字段。内置动作的浏览/筛选与 `historyKey` 归并由 `ExerciseCategory`（两级肌群浏览父级）承担——原 `primaryMuscle`（粗 8 类 `MuscleGroup`）已被 `ExerciseCategory` 取代并移除。`equipmentType`、`code` MUST 保留不变。region/要点为高亮与目标肌群展示服务，与浏览父级是同一套肌群的叶级；新动作回填前 region 可为空，高亮图按「空 region → 隐藏」降级。
 
 #### Scenario: 卧推的肌群数据
 - **WHEN** 读取 `BB_BENCH_PRESS`
 - **THEN** `primaryRegions` 含 `chest`，`secondaryRegions` 含 `deltFront` 与 `triceps`，`formCues` 含至少 3 条要点
 
-#### Scenario: primaryMuscle 仍可筛选
-- **WHEN** 动作库按「胸」chip 筛选
-- **THEN** 仍按 `primaryMuscle == "胸"` 过滤，行为与本 change 前一致
+#### Scenario: 按部位父级筛选
+- **WHEN** 动作库按「胸」部位轴筛选
+- **THEN** 按 `category` 命中「胸」过滤（取代原 `primaryMuscle == "胸"`），其子 region 含 `chest`
 
 #### Scenario: 协同肌可为空
 - **WHEN** 某动作为孤立单关节动作、无明确协同肌
 - **THEN** `secondaryRegions` 为空数组，渲染时仅主动肌染色
+
+#### Scenario: 未回填力量动作降级
+- **WHEN** 新导入力量动作尚未回填 region
+- **THEN** `primaryRegions` 为空，高亮图隐藏，但动作可正常浏览/筛选/记录
 
 ### Requirement: 用户性别字段
 
@@ -91,3 +93,4 @@
 #### Scenario: slug 着色映射
 - **WHEN** 某 slug 为 `deltoids` 且当前面为正面、动作协同肌含 `deltFront`
 - **THEN** 该 slug 全部 path 段着 `accentSofter`；`neck`/`hands` 等无映射 slug 着 idle
+

@@ -15,6 +15,7 @@ struct DontLiftApp: App {
     @State private var prCelebration = PRCelebrationCenter()
     @State private var planWriteback = PlanWritebackCenter()
     @State private var teamShare = TeamShareCenter()
+    @State private var globalMessage = GlobalMessageCenter()
 
     init() {
         let container = AppModelContainer.make()
@@ -32,7 +33,10 @@ struct DontLiftApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            ZStack {
+                RootView()
+                GlobalMessageOverlay()
+            }
                 .environment(session)
                 .environment(syncEngine)
                 .environment(historyStore)
@@ -42,6 +46,7 @@ struct DontLiftApp: App {
                 .environment(prCelebration)
                 .environment(planWriteback)
                 .environment(teamShare)
+                .environment(globalMessage)
                 .preferredColorScheme(.light)
                 .task(id: session.isLoggedIn) {
                     if session.isLoggedIn { await healthKit.requestAuthorization() }

@@ -5,9 +5,15 @@ import SwiftData
 // MARK: - 计划项归并 key（与 WorkoutExercise.historyKey 同公式）
 
 extension PlanItem {
-    /// 按动作归并的稳定 key：内置 code 优先，其次自定义 id，最后回退动作名。
+    /// 按动作归并的稳定 key：内置 code 优先且归并到 canonical code，其次自定义 id，最后回退动作名。
     /// 自适应回写去重、开始训练历史回填均复用此 key。
-    var historyKey: String { builtinExerciseCode ?? customExerciseId?.uuidString ?? exerciseName }
+    var historyKey: String {
+        ExerciseLibrary.canonicalHistoryKey(
+            code: builtinExerciseCode,
+            name: exerciseName,
+            customId: customExerciseId
+        )
+    }
 }
 
 // MARK: - 开始训练落值（task 4.x）

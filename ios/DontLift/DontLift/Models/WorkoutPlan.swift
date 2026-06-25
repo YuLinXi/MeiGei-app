@@ -83,8 +83,7 @@ extension PlanItem {
     }
 
     private var resolvedBuiltin: BuiltinExercise? {
-        guard let builtinExerciseCode else { return nil }
-        return BuiltinExercise.starter.first { $0.code == builtinExerciseCode }
+        ExerciseLibrary.resolve(code: builtinExerciseCode, name: trimmedSnapshotName)
     }
 
     /// 展示/开始训练优先使用本地动作库名称；本地未知时使用计划项随包保存的名称快照。

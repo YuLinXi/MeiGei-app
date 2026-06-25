@@ -1,0 +1,154 @@
+# exercise-library Specification
+
+## Purpose
+TBD - created by archiving change exercise-library-taxonomy-import. Update Purpose after archive.
+## Requirements
+### Requirement: 动作浏览分类轴（两级肌群）
+
+本 Requirement 由「两级肌群（父级 → 高亮叶级）」**升级为单一解剖三级树**：`L1 部位 → L2 肌肉 → L3 肌头/肌区`，作为动作库唯一浏览主干（采用「解剖肌群」分类轴；器械/动作模式/复合孤立等 MUST NOT 充当主干，至多作正交筛选标签）。
+
+- **L1 部位** MUST 收敛为 11 个：解剖类 `胸/背/肩/手臂/腿/臀/核心/颈部`（8）+ 非解剖类 `有氧/功能性/热身拉伸`（3）。原以单块肌肉冒充父级者 MUST 降级为 L2：`二头/三头/前臂 → 手臂`、`小腿 → 腿`、`斜方肌 → 背`；`颈部` 保持独立 L1。
+- **L2 肌肉** SHALL 为每个解剖 L1 声明其肌肉列表（如 胸→胸大肌；背→背阔肌/斜方肌/菱形肌/竖脊肌；手臂→肱二头肌/肱三头肌/前臂；腿→股四头肌/腘绳肌/内收肌/小腿；臀→臀大肌/臀中肌；核心→腹直肌/腹斜肌）。非解剖 L1 无 L2。
+- **L3 肌头/肌区** MUST 按需配置（不强配）：仅给用户真会区分的肌肉配（胸大肌→上胸/中下胸；三角肌→前束/中束/后束；腹直肌→上腹/下腹），其余 L2 的 L3 留空。
+- 力量类 L1/L2/L3 MUST 与 `MuscleRegion`（高亮叶级）对齐为**同一棵树**（见「浏览与高亮同源」）；非解剖 L1 MUST 映射为空 region、不显高亮。`historyKey`（`builtinCode ?? customId ?? name`）计算式 MUST NOT 改变。
+
+#### Scenario: L1 收敛为 11 个真部位
+- **WHEN** 枚举浏览 L1
+- **THEN** 恰为 11 个（解剖 8 + 非解剖 3）；不存在「二头/三头/前臂/小腿/斜方肌」作为 L1（它们为某 L1 的 L2）
+
+#### Scenario: 三级逐级归属
+- **WHEN** 取「胸 → 胸大肌 → 上胸」一条链
+- **THEN** L2「胸大肌」属 L1「胸」、L3「上胸」属 L2「胸大肌」；任一级归属非法则校验失败
+
+#### Scenario: L3 按需不强配
+- **WHEN** 取某 L2（如「背阔肌」「肱二头肌」）的 L3 列表
+- **THEN** 可为空（该肌肉不细分肌头），浏览到该 L2 即平铺其动作，不强制三级
+
+#### Scenario: 展示层折叠单一中间肌肉层
+- **WHEN** 某 L1 只有一个 L2 且该 L2 有 L3（如「胸→胸大肌→上胸/中下胸」「肩→三角肌→前束/中束/后束」）
+- **THEN** UI 可直接展示为「胸→上胸/中下胸」「肩→前束/中束/后束」；内部归位、高亮、校验仍保留完整 L2 节点
+
+### Requirement: 部位子分类（三层浏览结构）
+
+`BuiltinExercise.subcategory` 由「父级内子分类」**重锚为 L3 肌头/肌区**：非空时其值 MUST 属于该动作所归 L2 肌肉的合法 L3 列表；为空表示未细分到肌头（归该 L2「全部」）。L3 MUST 仅在其 L2 作用域内有效，MUST NOT 跨 L2 复用。
+
+非解剖 L1「功能性」无肌肉/高亮，但 SHALL 在其枝下提供 5 个浏览子类用于下钻：`爆发奥举 / 抗旋稳定 / 髋臀激活 / 负重搬运 / 动态控制`（命名 MUST 避开「核心」的「核心稳定」）。非解剖 L1「有氧」移除「间歇·Tabata」后仅余稳态有氧，其子类列表 MUST 为空、不出现二级。功能性动作逐条归子类属数据债、MAY 分批；未归类者落「全部」、MUST NOT 阻塞浏览。
+
+#### Scenario: 胸大肌下钻到肌头
+- **WHEN** 用户在左栏选「胸 → 胸大肌」
+- **THEN** 其下展开「上胸 / 中下胸」可三级收窄；上斜卧推类 `subcategory`=「上胸」，平/下斜类=「中下胸」
+
+#### Scenario: 功能性可下钻
+- **WHEN** 用户在左栏选「功能性」
+- **THEN** 其下展开「爆发奥举/抗旋稳定/髋臀激活/负重搬运/动态控制」；已归类动作进对应子类，未归类仍可在「全部」浏览到
+
+#### Scenario: 有氧不再细分
+- **WHEN** 读取「有氧」子类列表
+- **THEN** 为空；不出现二级，且不含「间歇·Tabata」
+
+### Requirement: 器械类型扩展与拆细
+
+系统 SHALL 把 `EquipmentType` 从 6 类扩展到约 11 类，新增 `史密斯`、`悍马机`、`T杠`、`弹力带`、`悬挂`（TRX/吊环）、`其他`。悍马机、史密斯、T杠 MUST 作为独立类型，从原「器械/杠铃」拆出。所有 rawValue MUST 为中文且无重复。现有内置动作 MUST 按新粒度重新标注 `equipmentType`，且重标注 MUST NOT 改变其 `code`。
+
+#### Scenario: 史密斯动作重标注但 code 不变
+- **WHEN** 现有 `SMITH_BENCH_PRESS` 的 `equipmentType` 由「器械」改为「史密斯」
+- **THEN** 其 `code` 保持 `SMITH_BENCH_PRESS` 不变，依赖 code 的历史归并不受影响
+
+#### Scenario: 器械轴可独立筛选
+- **WHEN** 用户在器械轴选择「弹力带」
+- **THEN** 列表过滤为 `equipmentType == "弹力带"` 的动作，与部位轴正交叠加
+
+### Requirement: 内置动作 code 生成与冻结
+
+每个内置动作 SHALL 拥有唯一、稳定、随包发布的 `code`，作为 `historyKey` 第一主键。新导入动作的 `code` MUST 按「`[器械前缀_]动作主体[_修饰]` 语义英文蛇形」规则由中文名生成，与训记内部序号无关；真碰撞时 MUST 以确定性规则追加 `_2`/`_3`。系统 MUST 维护一份 `中文名 → code` 映射作为唯一权威源。已发布的 `code` MUST NOT 被重算或变更。
+
+#### Scenario: code 全库唯一
+- **WHEN** 校验内置动作集（现有 153 + 新导入 928）
+- **THEN** 所有 `code` 唯一，无重复
+
+#### Scenario: code 与训记序号无关
+- **WHEN** 训记动作表的序号发生变化或某动作下架
+- **THEN** 别练了已发布动作的 `code` 不受影响、保持不变
+
+### Requirement: 训记动作全量导入与去重
+
+系统 SHALL 把训记标准动作表中别练了尚未支持的动作导入内置动作库，每条含 `code`、`name`（训记中文名）、`category`（`ExerciseCategory`）、`equipmentType`。拉伸/放松/泡沫轴/有氧/Tabata 等非力量动作 MUST 被收录，但其 `primaryRegions` MUST 为空（触发高亮自动隐藏）。导入前 MUST 对训记动作做归一化匹配；命中现有内置动作的，MUST 复用现有条目与其 `code`，MUST NOT 新建重复条目。
+
+#### Scenario: 非力量动作收录且不显高亮
+- **WHEN** 导入「泡沫轴小腿放松」「跑步」「开合跳-Tabata」等
+- **THEN** 它们作为内置动作可被搜索/筛选/计划引用，但 `primaryRegions` 为空，详情页不渲染肌群高亮图
+
+#### Scenario: 概念重叠复用旧 code
+- **WHEN** 训记「史密斯机卧推」经归一化匹配到现有 `SMITH_BENCH_PRESS`
+- **THEN** 不新建条目，沿用现有 `SMITH_BENCH_PRESS`（含其已回填 region/要点与现名）
+
+#### Scenario: 力量类新动作可后续回填
+- **WHEN** 新导入的力量动作尚未回填 region/要点
+- **THEN** 该动作可正常浏览/筛选/记录/被计划引用，高亮图按「空 region → 隐藏」降级，不阻塞任何流程
+
+### Requirement: 同名动作历史自动合并
+
+导入内置动作时，若某内置动作的 `name` 撞上用户已有的手填/自定义动作名（其历史此前按 `name` 归并），系统 SHALL 执行一次性本地迁移，把这些旧记录改挂到该内置动作的 `code`，使同一动作的历史曲线连续。该迁移 MUST 仅在本地进行，MUST NOT 新增同步实体或改动 LWW/幂等约定，且 MUST 幂等（可安全重跑）。
+
+#### Scenario: 旧手填记录并入新内置动作
+- **WHEN** 用户过去以手填名「战绳」记录过训练，现导入内置「战绳」(code `CARDIO_BATTLE_ROPE`)
+- **THEN** 旧记录的 `historyKey` 迁移为指向 `CARDIO_BATTLE_ROPE`，历史曲线连续不断裂
+
+#### Scenario: 无同名不动数据
+- **WHEN** 用户无与任何新内置动作同名的历史/自定义动作
+- **THEN** 迁移不改动任何记录
+
+#### Scenario: 迁移幂等
+- **WHEN** 同名合并迁移被重复执行
+- **THEN** 结果与执行一次相同，无重复迁移或数据损坏
+
+### Requirement: 浏览与高亮同源（单一解剖树 + 优雅回退）
+
+系统 SHALL 以**同一棵解剖树**驱动浏览归位与肌群高亮，二者 MUST 同源于动作的 `primaryRegions`/`secondaryRegions`（+ `subcategory` 肌头），MUST NOT 维护两套脱节的分类。
+
+- **浏览归位**：L1 取 `category`（显式）；L2 由 `primaryRegions` 派生（命中哪块肌肉）；L3 取 `subcategory`（显式、按需）。
+- **高亮染色**：把目标区染到**美术支持的最深一级**；美术不支持该级时 MUST **优雅回退**到最近可染父级（如美术未拆上/下胸 → 染整块胸；三头未拆头 → 染整三头），MUST NOT 报错或留白崩溃。
+- `MuscleRegion` MUST 补齐与树对齐所需的缺失区（至少 `deltSide` 肩中束、`rhomboids` 中背/菱形）。新增区的美术补绘可分批（归 `muscle-map-detailed-art`），补绘前按优雅回退降级。
+- `primaryRegions` 为空的动作（如未回填的导入条、非力量动作）MUST 落「L1 → 全部」可浏览、不显高亮，回填后自动归到 L2/L3。
+
+#### Scenario: 高亮回退到可染父级
+- **WHEN** 某动作目标为「上胸」但美术尚未拆分上/下胸
+- **THEN** 高亮染整块胸（回退父级），不报错；待美术补 L3 区后自动染到「上胸」
+
+#### Scenario: 浏览与高亮不脱节
+- **WHEN** 某动作 `primaryRegions` 命中「胸大肌」
+- **THEN** 它在浏览中归「胸 → 胸大肌」段，且高亮染胸大肌区——二者同源、不出现「浏览在胸、高亮在别处」
+
+#### Scenario: 缺区补齐
+- **WHEN** 校验 `MuscleRegion` 全集对树的覆盖
+- **THEN** 含 `deltSide`（肩中束）、`rhomboids`（中背）等原缺失区，使每个 L2/L3 力量节点有可归属的高亮区（美术可后补）
+
+### Requirement: 发布前内置动作去噪清理
+
+系统 SHALL 在内置动作正式发布前，对 `exercise-library-taxonomy-import` 导入的、**尚未随任何已发布 build 发布**的动作 code 做去噪清理。因这批 code 未发布，「code 一经发布即冻结」MUST NOT 视为已触发——清理 MAY 直接删除或改名，MUST NOT 触发历史合并（无用户历史挂在这些 code 上）。本清理 MUST NOT 删除或改名任何**已发布**的 code（如原 153 curated）；已发布动作在三级树上重新归位 L1/L2/L3 时其 `code` MUST 保持不变。
+
+清理 SHALL 覆盖四类噪声：
+
+1. **间歇·Tabata 全删**：按计时方案命名（如「XX-Tabata」「进阶版N」）的条目 MUST 整体移除。
+2. **版本号去重·有本体**：存在「无版本本体」与其「（版本N）」近重复（元数据相同）时，MUST 保留本体、删除版本条目。
+3. **版本号去重·孤儿**：只有「（版本N）/_版本N」而无本体时，MUST 去名称版本尾缀与 code 版本后缀（转正，不删）。
+4. **难度/负重变体合并**：存在「本体」与其「（中难度）/（高难度）/（负重）」变体时，MUST 合并为一条本体——负重/难度由训练记录的重量×次数体现。
+
+清理后系统 MUST 满足：全库 `code` 唯一；库内任何动作名 MUST NOT 含「（版本」字样；`historyKey` 计算式 MUST NOT 改变。
+
+#### Scenario: 同名版本留本体删版本
+- **WHEN** 库中存在 `HAMMER_CHEST_PRESS`、`HAMMER_CHEST_PRESS_V2`、`HAMMER_CHEST_PRESS_V3`，元数据相同且均未发布
+- **THEN** 保留 `HAMMER_CHEST_PRESS`，删除 V2、V3；干净删除、不产生孤儿历史、不触发历史合并
+
+#### Scenario: 孤儿版本转正
+- **WHEN** 仅有 `XXX_V2`（名「仰卧哑铃锤式卧推_版本2」）而无本体，且未发布
+- **THEN** 名称去尾缀为「仰卧哑铃锤式卧推」、code 去 `_V2` 后缀，条目保留
+
+#### Scenario: 难度变体合并
+- **WHEN** 存在「地板飞鸟」「地板飞鸟（中难度）」「地板飞鸟（负重）」且均未发布
+- **THEN** 合并为单条「地板飞鸟」本体
+
+#### Scenario: 不动已发布 code
+- **WHEN** 清理与三级树归位遍历全库
+- **THEN** 已随发布 build 上线的 code（如原 153 curated）MUST NOT 被删除或改名（仅可改其 L1/L2/L3 归属）
+

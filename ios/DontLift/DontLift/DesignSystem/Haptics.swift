@@ -1,3 +1,4 @@
+import AudioToolbox
 import UIKit
 
 extension Theme {
@@ -17,6 +18,25 @@ extension Theme {
         /// 通知触感（成功 / 警告 / 失败）。用于结果反馈（完成、删除确认等）。
         static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
             UINotificationFeedbackGenerator().notificationOccurred(type)
+        }
+
+        /// 休息结束触感：两次短促震动，区别于普通完成反馈。
+        static func restComplete() {
+            UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 1)
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(180))
+                UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 1)
+            }
+        }
+    }
+
+    /// 「加一组」按钮反馈：轻点击声 + 轻触感。
+    enum Feedback {
+        private static let clickSoundId: SystemSoundID = 1104
+
+        static func addSetTap() {
+            Haptics.impact(.light)
+            AudioServicesPlaySystemSound(clickSoundId)
         }
     }
 }

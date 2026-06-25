@@ -4,6 +4,7 @@
 #   - 自动检测并启动 PostgreSQL 16（已运行则跳过）
 #   - 设置 JDK 21
 #   - 注入 APP_DEV_TOKEN=true 便于本机免 Apple 登录
+#   - 默认绑定 0.0.0.0，允许同一局域网真机访问本机后端
 #   - 前台运行 bootRun，Ctrl+C 仅停后端，PG 保持运行（要全停用 dev-stop.sh）
 
 # 防御：若被 sh / dash 误调用（无 BASH_VERSION），自动用 bash 重启自身
@@ -19,6 +20,7 @@ PG_BIN="/opt/homebrew/opt/postgresql@16/bin/pg_ctl"
 PG_DATA="/opt/homebrew/var/postgresql@16"
 PG_LOG="/tmp/pg_dontlift.log"
 APP_PORT="${PORT:-8001}"
+APP_BIND_ADDRESS="${SERVER_ADDRESS:-0.0.0.0}"
 
 # ---- 颜色输出 ----
 GREEN='\033[0;32m'
@@ -28,6 +30,21 @@ NC='\033[0m'
 info()  { echo -e "${GREEN}[INFO]${NC}  $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 error() { echo -e "${RED}[ERR]${NC}   $*" >&2; }
+
+detect_lan_ip() {
+  local iface=""
+  iface="$(route get default 2>/dev/null | awk '/interface:/{print $2; exit}' || true)"
+  if [ -n "$iface" ]; then
+    local ip=""
+    ip="$(ipconfig getifaddr "$iface" 2>/dev/null || true)"
+    if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+      echo "$ip"
+      return
+    fi
+  fi
+
+  ifconfig 2>/dev/null | awk '/inet / && $2 !~ /^127\./ {print $2; exit}' || true
+}
 
 # ---- 切到 backend/ 根目录（脚本在 backend/scripts/ 下）----
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,13 +96,21 @@ if lsof -ti:"$APP_PORT" > /dev/null 2>&1; then
 fi
 
 # ---- 5. 启动 Spring Boot ----
-info "启动 Spring Boot（端口 ${APP_PORT}，APP_DEV_TOKEN=true）"
+LAN_IP="$(detect_lan_ip)"
+info "启动 Spring Boot（绑定 ${APP_BIND_ADDRESS}:${APP_PORT}，APP_DEV_TOKEN=true）"
 info "就绪后可访问："
 info "  - Swagger UI:  http://localhost:$APP_PORT/swagger-ui.html"
 info "  - Health:      http://localhost:$APP_PORT/actuator/health"
 info "  - Dev token:   POST http://localhost:$APP_PORT/auth/dev/token"
+if [ -n "$LAN_IP" ]; then
+  info "  - 真机 LAN:    http://$LAN_IP:$APP_PORT/actuator/health"
+  info "    iOS 真机联调配置：LAN_IP=$LAN_IP ./scripts/ios-device-lan-dev.sh apply"
+else
+  warn "未能检测到局域网 IP；真机联调时可手动传 LAN_IP 给 scripts/ios-device-lan-dev.sh。"
+fi
 info "Ctrl+C 停止后端（PG 保持运行；要全停执行 ./scripts/dev-stop.sh）"
 echo ""
 
 export APP_DEV_TOKEN=true
+export SERVER_ADDRESS="$APP_BIND_ADDRESS"
 exec ./gradlew bootRun

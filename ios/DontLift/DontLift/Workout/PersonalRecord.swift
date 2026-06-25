@@ -22,11 +22,19 @@ final class PRCelebrationCenter {
 
 /// 一条个人记录：由原始训练记录重算得出，不持久化（design.md Non-Goals）。
 struct PersonalRecord: Identifiable, Equatable {
+    let exerciseKey: String
     let exerciseName: String
     let weightKg: Double
     /// 此前历史最大重量；nil 表示该动作首次有重量记录。
     let previousBestKg: Double?
-    var id: String { exerciseName }
+    var id: String { exerciseKey }
+
+    init(exerciseKey: String? = nil, exerciseName: String, weightKg: Double, previousBestKg: Double?) {
+        self.exerciseKey = exerciseKey ?? exerciseName
+        self.exerciseName = exerciseName
+        self.weightKg = weightKg
+        self.previousBestKg = previousBestKg
+    }
 }
 
 /// 比较本次训练各动作的最大重量与历史最大值，识别新 PR。
@@ -55,7 +63,10 @@ func detectPersonalRecords(in workout: Workout, priorBestByKey: [String: Double]
         guard !seen.contains(key) else { continue }
         let prior = priorBestByKey[key]
         if prior == nil || sessionMax > prior! {
-            prs.append(PersonalRecord(exerciseName: ex.exerciseName, weightKg: sessionMax, previousBestKg: prior))
+            prs.append(PersonalRecord(exerciseKey: key,
+                                      exerciseName: ex.displayExerciseName,
+                                      weightKg: sessionMax,
+                                      previousBestKg: prior))
             seen.insert(key)
         }
     }

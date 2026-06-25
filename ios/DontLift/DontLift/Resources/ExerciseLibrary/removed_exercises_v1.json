@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": "docs/exercise-library-preset-v1.md",
+  "removed": [
+    {
+      "name": "杠铃单臂推",
+      "reason": "lowValue",
+      "note": "不进入新预置库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "派克俯卧撑",
+      "reason": "lowValue",
+      "note": "不进入新预置库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "扎特曼弯举",
+      "reason": "lowValue",
+      "note": "不进入新预置库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "JM 推",
+      "reason": "lowValue",
+      "note": "不进入新预置库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "JM推",
+      "reason": "lowValue",
+      "note": "不进入新预置库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "西西深蹲",
+      "reason": "lowValue",
+      "note": "不进入新预置库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "西西里深蹲",
+      "reason": "lowValue",
+      "note": "不进入新预置库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "哑铃腿弯举",
+      "reason": "lowValue",
+      "note": "不进入新预置库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "腿举机提踵",
+      "reason": "lowValue",
+      "note": "不进入新预置库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "弹力带蚌式",
+      "reason": "lowValue",
+      "note": "不进入新预置库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "平板臂屈伸",
+      "reason": "lowValue",
+      "note": "不进入新预置库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "跑步",
+      "reason": "timedCardio",
+      "note": "计时型训练动作，历史保留原名",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "椭圆机",
+      "reason": "timedCardio",
+      "note": "计时型训练动作，历史保留原名",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "划船机",
+      "reason": "timedCardio",
+      "note": "计时型训练动作，历史保留原名",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "动感单车",
+      "reason": "timedCardio",
+      "note": "计时型训练动作，历史保留原名",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "跳绳",
+      "reason": "timedCardio",
+      "note": "计时型训练动作，历史保留原名",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "跑步（有氧）",
+      "reason": "timedCardio",
+      "note": "计时型训练动作，历史保留原名",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "四足向后旋转",
+      "reason": "lowValue",
+      "note": "不进入新预置库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "TraditionalStrengthTraining",
+      "reason": "healthKitGeneric",
+      "note": "HealthKit 泛称，不进入动作库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    },
+    {
+      "name": "沙发伸展",
+      "reason": "lowValue",
+      "note": "不进入新预置库",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
+    }
+  ]
+}

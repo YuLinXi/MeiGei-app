@@ -131,7 +131,7 @@ struct RestTimerSheet: View {
     private var doneControl: some View {
         Button {
             if controller.hapticsEnabled { Theme.Haptics.notification(.success) }
-            controller.stop()
+            controller.completeEarly()
             onDismiss()
         } label: {
             Image(systemName: "checkmark")
