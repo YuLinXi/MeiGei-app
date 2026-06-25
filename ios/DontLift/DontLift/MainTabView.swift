@@ -119,7 +119,8 @@ struct MainTabView: View {
             // 挂在 NavigationStack 内 → push 进 Live 记录页时被全屏页自然盖住。
             .overlay {
                 if let active = activeSession {
-                    LiveSessionCapsule(title: active.title ?? "训练") {
+                    LiveSessionCapsule(title: active.title ?? "训练",
+                                       timerStartedAt: active.timerStartedAt) {
                         openedSession = active
                     }
                 }

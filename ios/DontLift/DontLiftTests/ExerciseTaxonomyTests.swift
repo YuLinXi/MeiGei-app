@@ -116,6 +116,18 @@ struct ExerciseTaxonomyTests {
         }
     }
 
+    @Test func mobilityExercisesHaveBrowsableSubcategories() {
+        let allowed = Set(ExerciseCategory.mobility.browseSubcategories)
+        for ex in BuiltinExercise.starter where ex.category == "热身拉伸" {
+            #expect(ex.subcategory.map { allowed.contains($0) } == true, "热身拉伸缺少可浏览子类: \(ex.code)")
+        }
+    }
+
+    @Test func kettlebellSwingUsesKettlebellEquipment() {
+        let swing = BuiltinExercise.starter.first { $0.code == "KETTLEBELL_SWING" }
+        #expect(swing?.equipmentType == "壶铃")
+    }
+
     /// 浏览与高亮同源：命中 chest 区者归「胸 → 胸大肌」。
     @Test func browseHighlightSameSource() {
         let bench = BuiltinExercise.starter.first { $0.code == "BB_BENCH_PRESS" }!
@@ -216,6 +228,28 @@ struct ExerciseTaxonomyTests {
                                   exerciseName: "器械单臂划船",
                                   orderIndex: 1)
         #expect(machineRow.displayExerciseName == "单臂器械划船")
+    }
+
+    @Test func historyKeysUseCanonicalAliasCode() {
+        let legacyWorkoutExercise = WorkoutExercise(
+            builtinExerciseCode: "CABLE_FLY",
+            exerciseName: "绳索夹胸",
+            orderIndex: 0
+        )
+        let canonicalWorkoutExercise = WorkoutExercise(
+            builtinExerciseCode: "CABLE_CROSSOVER",
+            exerciseName: "绳索十字夹胸",
+            orderIndex: 1
+        )
+        let legacyPlanItem = PlanItem(
+            builtinExerciseCode: "CABLE_FLY",
+            exerciseName: "绳索夹胸",
+            orderIndex: 0
+        )
+
+        #expect(legacyWorkoutExercise.historyKey == "CABLE_CROSSOVER")
+        #expect(canonicalWorkoutExercise.historyKey == "CABLE_CROSSOVER")
+        #expect(legacyPlanItem.historyKey == "CABLE_CROSSOVER")
     }
 
     // MARK: 5.4 中文模糊多词搜索

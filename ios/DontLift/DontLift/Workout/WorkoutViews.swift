@@ -575,6 +575,8 @@ struct WorkoutLoggingView: View {
     @State private var pickingExercise = false
     /// 结束二次确认弹窗。
     @State private var confirmingFinish = false
+    /// 放弃当前进行中训练的二次确认弹窗。
+    @State private var confirmingDiscard = false
     /// 手风琴互斥展开的三态：
     /// - `auto`：用户未交互，跟随默认计算值（第一个有未完成 set 的动作）；
     /// - `expanded(id)`：显式展开某动作；
@@ -661,6 +663,15 @@ struct WorkoutLoggingView: View {
         workout.exercises.sorted { $0.orderIndex < $1.orderIndex }.map {
             ExerciseOrderItem(id: $0.localId, title: $0.exerciseName, subtitle: orderSubtitle(for: $0))
         }
+    }
+
+    private var loggingMenuItems: [PaperMenuItem] {
+        [
+            PaperMenuItem(title: "放弃此次训练", systemImage: "trash", role: .destructive) {
+                prepareForPresentation()
+                confirmingDiscard = true
+            }
+        ]
     }
 
     /// 休息弹窗开合动画：尊重「减弱动态效果」，开启时退化为短淡变而非弹簧。
@@ -814,7 +825,13 @@ struct WorkoutLoggingView: View {
         .paperToolbar(title: workout.isActive ? "训练进行中" : (workout.title ?? "训练"), onBack: {
             prepareForPresentation()
             dismiss()
-        })
+        }) {
+            if workout.isActive {
+                CircleIconMenu(systemName: "ellipsis",
+                               items: loggingMenuItems,
+                               accessibilityLabel: "训练更多操作")
+            }
+        }
         // 动作 ⋯ 组间休息菜单：顶层浮层，按 anchor 定位于 ⋯ 下方；外部点击关闭。
         .overlayPreferenceValue(ExerciseMenuAnchorKey.self) { anchor in
             if let id = menuExerciseId,
@@ -871,6 +888,13 @@ struct WorkoutLoggingView: View {
             message: finishConfirmMessage,
             confirmTitle: "结束训练",
             onConfirm: { finish() }
+        )
+        .paperConfirmDialog(
+            isPresented: $confirmingDiscard,
+            title: "放弃此次训练?",
+            message: "当前训练的所有数据将作废，不会进入训练记录。",
+            confirmTitle: "放弃训练",
+            onConfirm: { discardWorkout() }
         )
         // 删除组二次确认（自定义纸感弹窗）。
         .paperConfirmDialog(
@@ -1182,7 +1206,9 @@ struct WorkoutLoggingView: View {
                                 )
                         }.buttonStyle(.plain)
                     }
-                    Button { beginRestDurationEditing(for: ex, current: current, isCustom: isCustom) } label: {
+                    Button {
+                        beginRestDurationEditing(for: ex, current: current, isCustom: isCustom)
+                    } label: {
                         HStack(spacing: 2) {
                             if customText.isEmpty {
                                 Text("自定义")
@@ -1215,7 +1241,11 @@ struct WorkoutLoggingView: View {
             }
             .padding(16)
             Rectangle().fill(Theme.Color.border).frame(height: 1)
-            Button { menuExerciseId = nil; dismissRestDurationEditor(); delete(ex) } label: {
+            Button {
+                menuExerciseId = nil
+                dismissRestDurationEditor()
+                delete(ex)
+            } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "trash").font(.system(size: 15, weight: .semibold))
                     Text("删除动作").font(Theme.Font.l2)
@@ -1452,6 +1482,14 @@ struct WorkoutLoggingView: View {
         recomputeDerived()
     }
 
+    private func discardWorkout() {
+        Theme.Haptics.notification(.warning)
+        restTimer.stop()
+        WorkoutSession.discard(workout, in: modelContext)
+        historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
+        dismiss()
+    }
+
     /// 清理未打勾的预填残组（落值方案 D6）：删除 `completed=false` 的组，
     /// 并移除因此变空的动作，保证训练记录与回写只含真实发生的数据。
     private func cleanupIncompleteSets() {
@@ -1667,6 +1705,7 @@ struct WorkoutLoggingView: View {
     private func keypadAddSet() {
         guard let cell = focused, let ex = exercise(containing: cell.setId) else { return }
         // 默认追加正式组，预填上一**正式**组重量与次数（热身组不作预填源）。
+        Theme.Feedback.addSetTap()
         let next = (ex.sets.map(\.setIndex).max() ?? -1) + 1
         let previous = ex.lastWorkingSetValues
         let newSet = WorkoutSet(setIndex: next, weightKg: previous.weightKg, reps: previous.reps, setType: .working)
@@ -1979,24 +2018,29 @@ private struct ExerciseBlock: View {
     }
 
     private var addSetButton: some View {
-        Button { addSet() } label: {
+        Button {
+            addSet()
+        } label: {
             HStack(spacing: 6) {
                 Image(systemName: "plus").font(.system(size: 12, weight: .bold))
                 Text("加一组").font(Theme.Font.body(size: 12.5, weight: .semibold))
             }
             .foregroundStyle(Theme.Color.muted)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 9)
+            .frame(height: 42)
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                     .stroke(Theme.Color.border2, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
             )
+            .contentShape(Rectangle())
             .padding(.horizontal, 12).padding(.bottom, 12)
-        }.buttonStyle(.plain)
+        }
+        .buttonStyle(PressableButtonStyle())
     }
 
     private func addSet() {
         // 默认追加正式组，预填上一**正式**组重量与次数（热身组不作预填源）。
+        Theme.Feedback.addSetTap()
         let next = (exercise.sets.map(\.setIndex).max() ?? -1) + 1
         let previous = exercise.lastWorkingSetValues
         exercise.sets.append(WorkoutSet(setIndex: next, weightKg: previous.weightKg, reps: previous.reps, setType: .working))
@@ -2068,7 +2112,6 @@ private struct SetRow: View {
             Spacer(minLength: 8)
             trailingControls
         }
-        .opacity(set.completed ? 0.52 : 1)
         .padding(.horizontal, 15)
         .padding(.vertical, 5)
     }
@@ -2104,23 +2147,23 @@ private struct SetRow: View {
         ZStack(alignment: .bottomTrailing) {
             Text(text.isEmpty ? placeholder : text)
                 .font(Theme.Font.number(size: 15, weight: .bold))
-                .foregroundStyle(text.isEmpty ? Theme.Color.muted : Theme.Color.fg)
+                .foregroundStyle(valueTextColor(isPlaceholder: text.isEmpty))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             if !text.isEmpty {
                 Text(unit)
                     .font(Theme.Font.mono(size: 8, weight: .bold))
-                    .foregroundStyle(Theme.Color.muted)
+                    .foregroundStyle(valueUnitColor)
                     .padding(.trailing, 5)
                     .padding(.bottom, 3)
             }
         }
         .frame(width: 64, height: 36)
-            .background(focused ? Theme.Color.accentSoft : (isEditing ? Theme.Color.surface : Theme.Color.bg),
+            .background(valueCellBackground(focused: focused),
                         in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                    .stroke(focused ? Theme.Color.accent : Theme.Color.border,
+                    .stroke(valueCellBorder(focused: focused),
                             lineWidth: focused ? 1.5 : 1)
             )
             .contentShape(Rectangle())
@@ -2128,6 +2171,28 @@ private struct SetRow: View {
             .accessibilityLabel("\(rowName) \(label)")
             .accessibilityValue(value ?? "未填写")
             .accessibilityAddTraits(.isButton)
+    }
+
+    private func valueCellBackground(focused: Bool) -> SwiftUI.Color {
+        if set.completed { return Theme.Color.accent }
+        if focused { return Theme.Color.accentSoft }
+        if isEditing { return Theme.Color.surface }
+        return Theme.Color.bg
+    }
+
+    private func valueCellBorder(focused: Bool) -> SwiftUI.Color {
+        if set.completed { return Theme.Color.accent }
+        if focused { return Theme.Color.accent }
+        return Theme.Color.border
+    }
+
+    private func valueTextColor(isPlaceholder: Bool) -> SwiftUI.Color {
+        if set.completed { return isPlaceholder ? .white.opacity(0.7) : .white }
+        return isPlaceholder ? Theme.Color.muted : Theme.Color.fg
+    }
+
+    private var valueUnitColor: SwiftUI.Color {
+        return self.set.completed ? .white.opacity(0.78) : Theme.Color.muted
     }
 
     /// 完成按钮：圆角方形复选框。完成=朱砂红实心白勾；未完成=淡勾引导用户勾选。
@@ -2146,12 +2211,10 @@ private struct SetRow: View {
                         .foregroundStyle(.white)
                 } else {
                     shape.fill(Theme.Color.bg)
-                    shape.stroke(emphasized ? Theme.Color.accent.opacity(0.5) : Theme.Color.border,
-                                 lineWidth: emphasized ? 2 : 1.5)
+                    shape.stroke(Theme.Color.border, lineWidth: 1.5)
                     // 未完成态显示淡勾，引导用户勾选完成。
                     Image(systemName: "checkmark").font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(emphasized ? Theme.Color.accent.opacity(0.5)
-                                         : Theme.Color.muted.opacity(0.4))
+                        .foregroundStyle(Theme.Color.muted.opacity(0.4))
                 }
             }
             .frame(width: 36, height: 36)   // 与重量/次数输入框等高

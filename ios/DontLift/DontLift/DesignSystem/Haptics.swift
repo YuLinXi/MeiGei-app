@@ -1,3 +1,4 @@
+import AudioToolbox
 import UIKit
 
 extension Theme {
@@ -26,6 +27,16 @@ extension Theme {
                 try? await Task.sleep(for: .milliseconds(180))
                 UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 1)
             }
+        }
+    }
+
+    /// 「加一组」按钮反馈：轻点击声 + 轻触感。
+    enum Feedback {
+        private static let clickSoundId: SystemSoundID = 1104
+
+        static func addSetTap() {
+            Haptics.impact(.light)
+            AudioServicesPlaySystemSound(clickSoundId)
         }
     }
 }

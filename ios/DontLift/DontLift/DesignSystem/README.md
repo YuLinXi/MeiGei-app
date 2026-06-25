@@ -52,6 +52,15 @@ struct VolumeCard: View {
 
 **圆形图标钮单一来源**：`CircleIconButton`（点击版）/ `CircleIconMenu`（Menu 版）共用 `CircleIconLabel` 外观。默认直径 **36**，图标字号按直径 ×0.42 推导（勿在调用点硬编码）。支持 `active`（accent 高亮）/ `rotated`（旋转 90°）。**禁止**在页面内本地复制等价圆钮实现。
 
+## 纸感动作菜单
+
+统一使用 `PaperMenuItem` + `CircleIconMenu` / `PaperActionMenuButton` 渲染，不在页面内自定义同类菜单行。菜单行规范集中在 `PaperActionMenuMetrics`：
+
+- 行高 **52**，水平内边距 **14**，图标与文字间距 **10**。
+- SF Symbol 图标 **15pt semibold**，固定占位宽 **20pt**。
+- 菜单文字 **14pt semibold**。
+- 普通项图标用 `Theme.Color.accent`、文字用 `Theme.Color.fg`；危险项图标和文字统一用 `Theme.Color.danger`。
+
 ## 色板刷新
 
 设计稿微调时，修改 `scripts/oklch-to-srgb.mjs` 中的 `tokens` 表，运行：

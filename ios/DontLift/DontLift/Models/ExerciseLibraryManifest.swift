@@ -115,6 +115,16 @@ enum ExerciseLibrary {
         resolve(code: code, name: snapshotName)?.name ?? snapshotName
     }
 
+    static func canonicalHistoryKey(code: String?, name: String?, customId: UUID?) -> String {
+        let trimmedCode = code?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        if let trimmedCode {
+            return resolve(code: trimmedCode, name: name)?.code ?? trimmedCode
+        }
+        if let customId { return customId.uuidString }
+        if let resolved = resolve(code: nil, name: name) { return resolved.code }
+        return name ?? ""
+    }
+
     static func searchableText(for exercise: BuiltinExercise) -> [String] {
         var values = Set([exercise.name, exercise.code])
         values.formUnion(aliasNamesByTargetCode[exercise.code] ?? [])
