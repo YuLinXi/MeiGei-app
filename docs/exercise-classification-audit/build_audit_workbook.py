@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parent
 ALL_CSV = ROOT / "all-exercises.csv"
 FLAGGED_CSV = ROOT / "flagged-exercises.csv"
 OUTPUT_XLSX = ROOT / "动作分类审核表.xlsx"
+OPTIONS_SHEET_NAME = "平台支持选项"
 
 REGION_NAMES = {
     "traps": "斜方肌",
@@ -44,7 +45,7 @@ OPTION_GROUPS = {
         "胸大肌", "背阔肌", "斜方肌", "菱形肌", "竖脊肌", "三角肌", "肱二头肌", "肱三头肌", "前臂",
         "股四头肌", "腘绳肌", "内收肌", "小腿", "臀大肌", "臀中肌", "腹直肌", "腹斜肌", "颈部肌",
     ],
-    "三级肌区": [
+    "三级肌区/浏览子类": [
         "上胸", "中下胸", "前束", "中束", "后束", "上腹", "下腹",
         "爆发奥举", "抗旋稳定", "髋臀激活", "负重搬运", "动态控制",
         "动态热身", "静态拉伸", "泡沫轴放松",
@@ -163,7 +164,7 @@ def setup_sheet(ws, table_name: str) -> None:
 
 
 def write_options_sheet(wb: Workbook):
-    ws = wb.create_sheet("选项")
+    ws = wb.create_sheet(OPTIONS_SHEET_NAME)
     ws.append(list(OPTION_GROUPS.keys()))
     max_len = max(len(values) for values in OPTION_GROUPS.values())
     for row_idx in range(max_len):
@@ -173,10 +174,13 @@ def write_options_sheet(wb: Workbook):
         ])
     for cell in ws[1]:
         cell.font = Font(bold=True)
-        cell.fill = PatternFill("solid", fgColor="EDE6D8")
+        cell.fill = PatternFill("solid", fgColor="1F2937")
+        cell.font = Font(color="FFFFFF", bold=True)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
     for col_idx in range(1, len(OPTION_GROUPS) + 1):
         ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = 18
-    ws.sheet_state = "hidden"
+    ws.freeze_panes = "A2"
+    ws.sheet_view.showGridLines = False
     return ws
 
 
@@ -185,7 +189,7 @@ def option_range(group_name: str) -> str:
     col_idx = group_names.index(group_name) + 1
     col_letter = chr(ord("A") + col_idx - 1)
     end_row = len(OPTION_GROUPS[group_name]) + 1
-    return f"'选项'!${col_letter}$2:${col_letter}${end_row}"
+    return f"'{OPTIONS_SHEET_NAME}'!${col_letter}$2:${col_letter}${end_row}"
 
 
 def add_dropdown(ws, header_name: str, option_group: str, prompt: Optional[str] = None) -> None:
@@ -210,7 +214,7 @@ def add_dropdowns(ws) -> None:
     add_dropdown(ws, "审核结论", "审核结论")
     add_dropdown(ws, "实际一级分类", "一级分类")
     add_dropdown(ws, "实际二级肌肉", "二级肌肉")
-    add_dropdown(ws, "实际三级肌区", "三级肌区")
+    add_dropdown(ws, "实际三级肌区", "三级肌区/浏览子类")
     add_dropdown(ws, "器械", "器械")
 
 
@@ -222,9 +226,10 @@ def write_instruction_sheet(wb: Workbook) -> None:
         ["1. 优先看「可疑优先」工作表，处理脚本标出的明显错位。"],
         ["2. 黄色列可直接修改：器械、实际一级分类、实际二级肌肉、实际三级肌区、主动肌区、协同肌区、审核结论、审核备注。"],
         ["3. 「主动肌区」「协同肌区」已经改成中文显示，并带中文下拉选项。"],
-        ["4. Excel 原生下拉一次只能选一个肌区；多个肌区请手动用顿号分隔，例如：三角肌前束、肱三头肌。"],
-        ["5. 审核结论建议填：通过 / 调整分类 / 删除 / 合并 / 改名 / 待确认。"],
-        ["6. 审完后只需要保留/告诉我「审核结论」和「审核备注」，我会读取你直接调整后的原列并回填到 Swift 动作数据。"],
+        ["4. 所有平台支持的下拉项都在「平台支持选项」工作表中可见：审核结论、一级分类、二级肌肉、三级肌区/浏览子类、器械、肌区。"],
+        ["5. Excel 原生下拉一次只能选一个肌区；多个肌区请手动用顿号分隔，例如：三角肌前束、肱三头肌。"],
+        ["6. 审核结论建议填：通过 / 调整分类 / 删除 / 合并 / 改名 / 待确认。"],
+        ["7. 审完后只需要保留/告诉我「审核结论」和「审核备注」，我会读取你直接调整后的原列并回填到 Swift 动作数据。"],
     ]
     for row in rows:
         ws.append(row)
