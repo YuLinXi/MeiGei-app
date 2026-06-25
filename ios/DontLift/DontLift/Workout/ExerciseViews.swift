@@ -265,7 +265,14 @@ private struct ExerciseLibraryContentView: View {
     /// L2/L3 子行（手风琴展开）。
     @ViewBuilder
     private func childRows(_ cat: ExerciseCategory) -> some View {
-        if cat.isAnatomical {
+        if let collapsed = cat.collapsedBrowseMuscle {
+            ForEach(collapsed.heads, id: \.self) { h in
+                railRow(title: h, level: 1, count: nil,
+                        selected: isSelectedHead(cat, collapsed.name, h), dimmed: searching) {
+                    selectHead(cat, collapsed.name, h)
+                }
+            }
+        } else if cat.isAnatomical {
             ForEach(cat.muscles) { m in
                 railRow(title: m.name, level: 1, count: nil,
                         selected: isSelectedNode(cat, m.name), dimmed: searching,
@@ -518,6 +525,7 @@ private struct ExerciseLibraryContentView: View {
         switch selection {
         case .category(let c):
             guard let cat = ExerciseCategory(rawValue: c) else { return flat(items) }
+            if let collapsed = cat.collapsedBrowseMuscle { return groupByHead(items, muscle: collapsed) }
             if cat.isAnatomical { return groupByMuscle(items, cat: cat) }
             return groupByBrowseSub(items, cat: cat)
         case .node(let c, let n):
@@ -604,7 +612,7 @@ private struct ExerciseLibraryContentView: View {
     }
 
     private func builtinRow(_ ex: BuiltinExercise, prWeights: [String: Double]) -> some View {
-        let muscle = muscleNames(ex).first
+        let muscle = displayMuscleName(for: ex)
         let sub = [muscle, ex.subcategory].compactMap { $0 }.joined(separator: " · ")
         let meta = sub.isEmpty ? "\(ex.category) · \(ex.equipmentType)" : "\(ex.category) · \(sub) · \(ex.equipmentType)"
         return HStack(spacing: 12) {
@@ -625,6 +633,15 @@ private struct ExerciseLibraryContentView: View {
         .padding(.horizontal, 13)
         .padding(.vertical, 11)
         .contentShape(Rectangle())
+    }
+
+    private func displayMuscleName(for ex: BuiltinExercise) -> String? {
+        guard let muscle = muscleNames(ex).first else { return nil }
+        guard let cat = ExerciseCategory(rawValue: ex.category),
+              cat.collapsedBrowseMuscle?.name == muscle else {
+            return muscle
+        }
+        return nil
     }
 
     private func customRow(_ ex: CustomExercise, prWeights: [String: Double]) -> some View {

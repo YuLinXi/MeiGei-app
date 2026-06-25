@@ -60,6 +60,15 @@ struct ExerciseTaxonomyTests {
         #expect(delt?.heads == ["前束", "中束", "后束"])
     }
 
+    /// 展示层折叠单一中间肌肉层：胸/肩直接露出 L3，内部三级树不变。
+    @Test func displayCollapsesSingleMuscleWithHeads() {
+        #expect(ExerciseCategory.chest.collapsedBrowseMuscle?.name == "胸大肌")
+        #expect(ExerciseCategory.shoulders.collapsedBrowseMuscle?.name == "三角肌")
+        #expect(ExerciseCategory.back.collapsedBrowseMuscle == nil)
+        #expect(ExerciseCategory.core.collapsedBrowseMuscle == nil)
+        #expect(ExerciseCategory.neck.collapsedBrowseMuscle == nil)
+    }
+
     /// 非解剖 L1（有氧/功能性/热身拉伸）无 region；功能性/热身拉伸有浏览子类，有氧无。
     @Test func nonAnatomicalParts() {
         for c in [ExerciseCategory.cardio, .functional, .mobility] {
