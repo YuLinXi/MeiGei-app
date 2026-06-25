@@ -567,7 +567,7 @@ struct WorkoutLoggingView: View {
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(PRCelebrationCenter.self) private var prCelebration
     @Environment(PlanWritebackCenter.self) private var planWriteback
-    @Environment(TeamShareCenter.self) private var teamShare
+    @Environment(GlobalMessageCenter.self) private var globalMessage
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -591,10 +591,6 @@ struct WorkoutLoggingView: View {
     @State private var restEditingExerciseId: UUID?
     /// 自定义休息秒数输入缓冲（仅整数秒）。
     @State private var restEditBuffer: String = ""
-    /// 当前进行中的休息由哪一组触发。
-    @State private var activeRestSetId: UUID?
-    /// 当前进行中休息的真实开始时间。
-    @State private var activeRestStartedAt: Date?
     /// 每个已完成组的真实休息秒数（仅会话内展示）。
     @State private var actualRestBySet: [UUID: Int] = [:]
     /// 当前打开 ⋯ 菜单的动作 localId（nil = 无）。顶层浮层据 anchor 定位、外部点击关闭。
@@ -893,8 +889,11 @@ struct WorkoutLoggingView: View {
                                      items: workoutOrderItems,
                                      onCommit: applyWorkoutExerciseOrder)
         }
-        .onChange(of: restTimer.isRunning) { oldValue, newValue in
-            if oldValue && !newValue { recordActiveRestIfNeeded() }
+        .onAppear {
+            consumeRestCompletionIfNeeded()
+        }
+        .onChange(of: restTimer.completionEvent?.id) { _, _ in
+            consumeRestCompletionIfNeeded()
         }
     }
 
@@ -1077,12 +1076,11 @@ struct WorkoutLoggingView: View {
                                   let secs = restByExercise[ex.localId] ?? Int(restTimer.defaultDuration)
                                   if secs > 0 {
                                       recordActiveRestIfNeeded()
-                                      activeRestSetId = set.localId
-                                      activeRestStartedAt = .now
                                       let nextSet = nextSetSummary
                                       restTimer.start(duration: TimeInterval(secs),
                                                       label: nextSet?.exerciseName ?? ex.exerciseName,
-                                                      nextSet: nextSet)
+                                                      nextSet: nextSet,
+                                                      setId: set.localId)
                                       restTimer.nextHint = nextHint
                                   }
                               })
@@ -1417,14 +1415,17 @@ struct WorkoutLoggingView: View {
     }
 
     private func recordActiveRestIfNeeded(now: Date = .now) {
-        guard let setId = activeRestSetId, let startedAt = activeRestStartedAt else { return }
-        actualRestBySet[setId] = max(0, Int(now.timeIntervalSince(startedAt).rounded()))
-        clearActiveRest()
+        _ = restTimer.completeForWriteback(now: now)
+        consumeRestCompletionIfNeeded()
     }
 
-    private func clearActiveRest() {
-        activeRestSetId = nil
-        activeRestStartedAt = nil
+    private var workoutSetIds: Set<UUID> {
+        Set(workout.exercises.flatMap(\.sets).map(\.localId))
+    }
+
+    private func consumeRestCompletionIfNeeded() {
+        guard let event = restTimer.consumeCompletionEvent(matching: workoutSetIds) else { return }
+        actualRestBySet[event.setId] = event.elapsedSeconds
     }
 
     /// 启动训练计时（幂等）：仅在尚未启动时落定 timerStartedAt。
@@ -1439,7 +1440,6 @@ struct WorkoutLoggingView: View {
     /// 再置 endedAt + HealthKit 写入，最后统一重算派生数据。
     private func finish() {
         Theme.Haptics.notification(.success)
-        clearActiveRest()
         restTimer.stop()   // 结束训练即停止进行中的休息计时全套，避免倒计时/灵动岛残留。
         let endedAt = Date.now
         workout.endedAt = endedAt
@@ -1515,11 +1515,12 @@ struct WorkoutLoggingView: View {
             break
         case .shared(let count):
             guard count > 0 else { return }
-            teamShare.presentNotice(count == 1 ? "已自动分享到 1 个 Team" : "已自动分享到 \(count) 个 Team")
+            globalMessage.show(count == 1 ? "已自动分享到 1 个 Team" : "已自动分享到 \(count) 个 Team",
+                               style: .success)
         case .queued:
-            teamShare.presentNotice("Team 自动分享已排队，同步成功后重试")
+            globalMessage.show("Team 自动分享已排队，同步成功后重试", style: .warning)
         case .failed:
-            teamShare.presentNotice("Team 自动分享失败，可稍后重试")
+            globalMessage.show("Team 自动分享失败，可稍后重试", style: .error)
         }
     }
 

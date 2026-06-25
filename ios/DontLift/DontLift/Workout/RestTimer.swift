@@ -3,6 +3,7 @@ import AVFoundation
 import Foundation
 import os.log
 import SwiftUI
+import UIKit
 import UserNotifications
 
 extension Notification.Name {
@@ -19,6 +20,15 @@ extension Notification.Name {
 @Observable
 final class RestTimerController {
     private static let log = Logger(subsystem: "com.yulinxi.app.DontLift", category: "RestTimer")
+
+    struct CompletionEvent: Identifiable, Equatable {
+        let id = UUID()
+        let setId: UUID
+        let elapsedSeconds: Int
+        let startedAt: Date
+        let completedAt: Date
+        let plannedEndDate: Date
+    }
 
     /// 默认休息时长（秒），持久化到 UserDefaults。
     var defaultDuration: TimeInterval {
@@ -47,6 +57,8 @@ final class RestTimerController {
     private(set) var contextNextSet: RestActivityAttributes.NextSet?
     /// 前台 ticker 写入，仅用于驱动 SwiftUI 每秒刷新。
     private(set) var tick: Date = .now
+    /// 等待训练页消费的休息完成事件；页面切换/销毁期间保留，避免实际休息回写丢失。
+    private(set) var completionEvent: CompletionEvent?
 
     /// 全屏休息弹窗是否展开（共享态：训练页 FAB 触发置真，根层 overlay 渲染，层级天然高于 Tab/Nav）。
     var isExpanded = false
@@ -56,6 +68,12 @@ final class RestTimerController {
     private var ticker: Timer?
     private var activity: Activity<RestActivityAttributes>?
     private var activityEndTask: Task<Void, Never>?
+    /// 本次休息对应的已完成组；nil 表示只展示计时，不产生训练页回写事件。
+    private var activeSetId: UUID?
+    /// 本次休息真实开始时刻，用于计算实际休息秒数。
+    private var startedAt: Date?
+    /// 当前休息是否经历过后台；用于避免后台通知已响后回前台再补播 App 内声音。
+    private var backgroundedDuringCurrentRest = false
     /// 提醒音效播放器（懒加载并预备，复用同一实例）。
     private var audioPlayer: AVAudioPlayer?
     private static let durationKey = "dontlift.rest.defaultDuration"
@@ -63,6 +81,8 @@ final class RestTimerController {
     private static let soundKey = "dontlift.rest.soundEnabled"
     /// 休息结束本地通知标识（PushManager 据此在前台抑制其声音，避免与前台音效双响）。
     static let notificationId = "dontlift.rest.timer"
+    /// 系统通知使用与 App 内一致的双响提示音，避免两套声音体验不一致。
+    static let notificationSoundName = "rest_complete.caf"
     /// Live Activity 到点后自动消失的宽限秒数：给「00:00 + 一声提醒」留出可见窗口再收回。
     private static let dismissGrace: TimeInterval = 15
     /// 前台展示休息结束横幅后，延迟清掉通知中心残留；锁屏/后台场景等用户回到 App 再清理。
@@ -75,6 +95,7 @@ final class RestTimerController {
         hapticsEnabled = (UserDefaults.standard.object(forKey: Self.hapticsKey) as? Bool) ?? true
         soundEnabled = (UserDefaults.standard.object(forKey: Self.soundKey) as? Bool) ?? true
         observeExternalEnd()
+        observeAppBackground()
     }
 
     /// 是否有进行中的休息（剩余 > 0）。
@@ -89,13 +110,18 @@ final class RestTimerController {
     /// 开始/重启一次休息倒计时，安排结束本地通知，并启动 Live Activity。
     func start(duration: TimeInterval? = nil,
                label: String? = nil,
-               nextSet: RestActivityAttributes.NextSet? = nil) {
+               nextSet: RestActivityAttributes.NextSet? = nil,
+               setId: UUID? = nil) {
         let secs = duration ?? defaultDuration
-        let end = Date.now.addingTimeInterval(secs)
+        let now = Date.now
+        let end = now.addingTimeInterval(secs)
         endDate = end
         totalDuration = secs
         contextLabel = nextSet?.exerciseName ?? label
         contextNextSet = nextSet
+        activeSetId = setId
+        startedAt = now
+        backgroundedDuringCurrentRest = false
         scheduleNotification(after: secs)
         startTicker()
         startActivity(totalDuration: secs, endDate: end, label: label, nextSet: nextSet)
@@ -121,6 +147,41 @@ final class RestTimerController {
         Self.clearRestNotifications(removePending: true, removeDelivered: true)
     }
 
+    /// 手动提前完成休息：产生实际休息回写事件，但不播放结束音，避免与用户主动操作重复反馈。
+    func completeEarly(now: Date = .now) {
+        completeCurrentRest(now: now, playFeedback: false, endingActivity: true)
+        Self.clearRestNotifications(removePending: true, removeDelivered: true)
+    }
+
+    /// 训练页在开始下一段休息前消费上一段休息，保留“提前进入下一组”的实际休息秒数。
+    @discardableResult
+    func completeForWriteback(now: Date = .now) -> CompletionEvent? {
+        completeCurrentRest(now: now, playFeedback: false, endingActivity: true)
+        return completionEvent
+    }
+
+    /// App 回到前台时兜底收束后台到点的休息。后台通知已负责提示音，这里不再补播。
+    func handleAppBecameActive(now: Date = .now) {
+        tick = now
+        guard let endDate else {
+            backgroundedDuringCurrentRest = false
+            return
+        }
+        if endDate.timeIntervalSince(now) <= 0 {
+            completeCurrentRest(now: now, playFeedback: false, endingActivity: false)
+            Self.clearDeliveredRestNotification()
+        } else {
+            backgroundedDuringCurrentRest = false
+        }
+    }
+
+    @discardableResult
+    func consumeCompletionEvent(matching setIds: Set<UUID>) -> CompletionEvent? {
+        guard let event = completionEvent, setIds.contains(event.setId) else { return nil }
+        completionEvent = nil
+        return event
+    }
+
     /// 清理通知中心里已投递的休息结束通知；用于 App 回前台、用户点通知、开始下一次休息等可执行时机。
     static func clearDeliveredRestNotification() {
         clearRestNotifications(removePending: false, removeDelivered: true)
@@ -142,6 +203,9 @@ final class RestTimerController {
         contextLabel = nil
         contextNextSet = nil
         nextHint = nil
+        activeSetId = nil
+        startedAt = nil
+        backgroundedDuringCurrentRest = false
         // isExpanded 不在此清，交给根层 onChange(isRunning) 动画收起，保证渐隐。
         if endingActivity {
             endActivity()
@@ -161,10 +225,31 @@ final class RestTimerController {
         // 同刻本地通知由 PushManager 在前台抑制其声音，避免双响。
         if let endDate, endDate.timeIntervalSinceNow <= 0 {
             // App 内休息态立即结束，但 Live Activity 继续停在 00:00 一小段时间，由 activityEndTask 自动收回。
-            clear(endingActivity: false)
-            playEndSound()
-            if hapticsEnabled { Theme.Haptics.notification(.success) }
+            completeCurrentRest(now: .now,
+                                playFeedback: !backgroundedDuringCurrentRest,
+                                endingActivity: false)
         }
+    }
+
+    private func completeCurrentRest(now: Date, playFeedback: Bool, endingActivity: Bool) {
+        recordCompletion(now: now)
+        clear(endingActivity: endingActivity)
+        if playFeedback {
+            playEndSound()
+            if hapticsEnabled { Theme.Haptics.restComplete() }
+        }
+    }
+
+    private func recordCompletion(now: Date) {
+        guard let setId = activeSetId, let startedAt else { return }
+        let plannedEndDate = endDate ?? now
+        let completedAt = min(now, plannedEndDate)
+        let elapsed = max(0, min(totalDuration, completedAt.timeIntervalSince(startedAt)))
+        completionEvent = CompletionEvent(setId: setId,
+                                          elapsedSeconds: Int(elapsed.rounded()),
+                                          startedAt: startedAt,
+                                          completedAt: completedAt,
+                                          plannedEndDate: plannedEndDate)
     }
 
     /// 前台播放一声休息结束提醒音：`AVAudioSession.playback` + duck，无视静音键、瞬时压低背景音乐。
@@ -196,9 +281,9 @@ final class RestTimerController {
         let content = UNMutableNotificationContent()
         content.title = "休息结束"
         content.body = contextLabel.map { "继续：\($0)" } ?? "开始下一组"
-        // 后台/锁屏到点的提醒音用自定义 caf（与前台 playEndSound 同源），而非系统默认音。
+        // 后台/锁屏到点的提醒音由系统通知播放；前台音效由 AVAudioPlayer 播放同一份 caf。
         // 注意：通知声音仍服从静音键，静音下无声——突破静音需 Critical Alerts 特权（健身场景大概率被拒），不做。
-        content.sound = UNNotificationSound(named: UNNotificationSoundName("rest_complete.caf"))
+        content.sound = UNNotificationSound(named: UNNotificationSoundName(Self.notificationSoundName))
         content.interruptionLevel = .timeSensitive
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
         center.add(UNNotificationRequest(identifier: Self.notificationId, content: content, trigger: trigger))
@@ -275,7 +360,18 @@ final class RestTimerController {
             .deliverImmediately)
         NotificationCenter.default.addObserver(
             forName: .dontliftRestEndedExternally, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.stop() }
+            Task { @MainActor in self?.completeEarly() }
+        }
+    }
+
+    private func observeAppBackground() {
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                if self?.endDate != nil {
+                    self?.backgroundedDuringCurrentRest = true
+                }
+            }
         }
     }
 }

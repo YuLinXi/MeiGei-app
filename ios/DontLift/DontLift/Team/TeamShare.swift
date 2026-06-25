@@ -3,14 +3,9 @@ import SwiftUI
 @Observable
 final class TeamShareCenter {
     var draft: TeamShareDraft?
-    var notice: String?
 
     func present(_ workout: Workout) {
         draft = TeamShareDraft(workout: workout)
-    }
-
-    func presentNotice(_ message: String) {
-        notice = message
     }
 }
 

@@ -18,5 +18,14 @@ extension Theme {
         static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
             UINotificationFeedbackGenerator().notificationOccurred(type)
         }
+
+        /// 休息结束触感：两次短促震动，区别于普通完成反馈。
+        static func restComplete() {
+            UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 1)
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(180))
+                UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 1)
+            }
+        }
     }
 }

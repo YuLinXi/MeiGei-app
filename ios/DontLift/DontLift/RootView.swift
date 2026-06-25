@@ -6,6 +6,7 @@ struct RootView: View {
     @Environment(SessionStore.self) private var session
     @Environment(SyncEngine.self) private var syncEngine
     @Environment(WorkoutHistoryStore.self) private var historyStore
+    @Environment(RestTimerController.self) private var restTimer
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -30,6 +31,7 @@ struct RootView: View {
         MainTabView()
             .task {
                 PushManager.shared.requestAuthorizationAndRegister()
+                restTimer.handleAppBecameActive()
                 RestTimerController.clearDeliveredRestNotification()
                 historyStore.ensureLoaded(reason: .login)
                 await syncEngine.syncAll()
@@ -39,6 +41,7 @@ struct RootView: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
+                    restTimer.handleAppBecameActive()
                     RestTimerController.clearDeliveredRestNotification()
                     historyStore.ensureLoaded(reason: .appLaunch)
                     Task { await syncEngine.syncAll() }
