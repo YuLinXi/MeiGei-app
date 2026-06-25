@@ -1,22 +1,34 @@
 ## Purpose
 
-Neon Design System：以黑底霓虹辉光、JetBrains Mono 等宽数字、`Theme.*` token 与少量 Modifier 组合，为 DontLift 提供「严肃健身工具」的统一视觉系统。
+Paper Design System：以纸白底、近黑文字、朱砂红单点强调、JetBrains Mono 等宽数字、`Theme.*` token 与少量 Modifier 组合，为 DontLift 提供「严肃健身工具」的统一视觉系统。
 ## Requirements
-### Requirement: 强制深色外观
+### Requirement: 强制浅色外观
 
-iOS App SHALL 在顶层 `WindowGroup` 上强制 `.preferredColorScheme(.dark)`，不响应系统浅色/深色切换。MVP 阶段 MUST NOT 提供外观切换设置项。
+iOS App SHALL 在顶层 `WindowGroup` 上强制 `.preferredColorScheme(.light)`，不响应系统浅色/深色切换。MVP 阶段 MUST NOT 提供外观切换设置项。纸感极简视觉以纸白底（`#f4f2ec`）+ 近黑文字（`#1c1a17`）+ 朱砂红单点强调（`#d9482b`）呈现。
 
-#### Scenario: 系统切换为浅色
-- **WHEN** 用户在 iOS 设置中将系统外观切换为浅色
-- **THEN** DontLift App 内所有界面仍保持深色
+#### Scenario: 系统切换为深色
+- **WHEN** 用户在 iOS 设置中将系统外观切换为深色
+- **THEN** DontLift App 内所有界面仍保持纸感浅色
 
 ### Requirement: Theme Token 命名空间
 
-App 的颜色、字体、间距、圆角 SHALL 以 `Theme.Color.*` / `Theme.Font.*` / `Theme.Spacing.*` / `Theme.Radius.*` 命名空间集中暴露；视图代码 MUST NOT 直接使用颜色字面量（如 `Color(red:...)`、`Color.cyan`）或字号字面量。
+App 的颜色、字体、间距、圆角 SHALL 以 `Theme.Color.*` / `Theme.Font.*` / `Theme.Spacing.*` / `Theme.Radius.*` 命名空间集中暴露；视图代码 MUST NOT 直接使用颜色字面量（如 `Color(red:...)`、`Color.cyan`、`Color.red`）或字号字面量。
 
 #### Scenario: 引用颜色
 - **WHEN** 新视图需要主色 CTA 背景
-- **THEN** 视图通过 `Theme.Color.accentCyan` 获取色值，不允许在视图内直接构造 `Color`
+- **THEN** 视图通过 `Theme.Color.accent` 获取色值，不允许在视图内直接构造 `Color`
+
+### Requirement: 纸感色板 Token
+
+设计系统 SHALL 提供以下颜色 token，色值精确对齐 C 设计稿：背景 `bg=#f4f2ec`、暖背景/次表面 `surface2=#efece5`、表面/卡片 `surface=#ffffff`、主边框 `border=#e4ddd0`、次边框 `border2=#d8d2c6`、正文 `fg=#1c1a17`、次级文字 `fg2=#5e5950`、静音文字 `muted=#9a9486`、强调 `accent=#d9482b`、强调浅底 `accentSoft=rgba(217,72,43,0.08)`、强调浅边 `accentSofter=rgba(217,72,43,0.18)`、成功 `ok=#3f9a5a`、错误 `danger=#d9482b`（与 accent 同源或更深红）。所有 colorset MUST 为 universal 单值（因强制浅色，无需明暗变体）。
+
+#### Scenario: 卡片描边与背景
+- **WHEN** 渲染任意 `cardStyle()` 卡片
+- **THEN** 背景为 `surface`（白）、描边 1px `border`，与纸白页面 `bg` 形成层次
+
+#### Scenario: 强调浅底着色
+- **WHEN** 渲染 LIVE 横幅或选中态浅底
+- **THEN** 背景使用 `accentSoft`（8% 朱砂红）、边框使用 `accentSofter`（18% 朱砂红）
 
 ### Requirement: 等宽数字字体回退
 
@@ -30,17 +42,29 @@ App SHALL 加载 JetBrains Mono 字体用于所有等宽数字展示（训练量
 - **WHEN** Bundle 中缺少字体文件
 - **THEN** `Theme.Font.mono(size:)` 返回 `.system(size:design:.monospaced)`，DEBUG 构建打印一次 OSLog warning，Release 构建静默回退
 
-### Requirement: 品红色专用语义
+### Requirement: 字号语义层
 
-`Theme.Color.accentMagenta` MUST 仅用于「Personal Record（PR）」相关视觉元素——包括 PR 卡边光、PR 徽标、新增 PR 文字与 PR 庆祝 toast。视图代码 MUST NOT 将该色用于非 PR 语义（如普通 CTA、普通错误、普通高亮）。
+`Theme.Font` SHALL 暴露与 C 设计稿一致的字号语义：Hero `32pt`、L1 `23pt`、L2 `16pt`、L3 `15pt`、L4 `13pt`、L5 `11pt`、计时器大字 `58pt`（mono）、标题帽 `10pt`（uppercase + tracking）。中文/标题用系统 PingFang SC（`.default` design），等宽数字用 JetBrains Mono（缺失回退系统 `.monospaced`）。
 
-#### Scenario: PR 元素使用品红
-- **WHEN** 渲染动作详情的 Personal Record 卡片
-- **THEN** 卡片左侧 3px 竖条与外发光使用 `Theme.Color.accentMagenta`
+#### Scenario: 渲染屏幕大标题
+- **WHEN** 视图需要屏幕级大标题
+- **THEN** 使用 L1（23pt）或 Hero（32pt）语义字号，不写裸 `size:` 字面量
 
-#### Scenario: 非 PR 元素禁用品红
-- **WHEN** 渲染普通错误提示或非 PR 类高亮
-- **THEN** 必须使用 `Theme.Color.danger`（错误）或 `Theme.Color.accentCyan`（高亮），不得使用 magenta
+#### Scenario: 渲染计时器数字
+- **WHEN** 休息计时弹窗渲染中心剩余时间
+- **THEN** 使用 58pt mono tabular 数字
+
+### Requirement: 纸感阴影修饰符
+
+设计系统 SHALL 提供 `paperShadow(_ level:)` 修饰符，三级对齐设计稿：`sh-sm`=`shadow(rgba(28,26,23,.07), radius 4, y 1)`、`sh-md`=`shadow(rgba(28,26,23,.09), radius 8, y 4)`、`sh-lg`=`shadow(rgba(28,26,23,.12), radius 16, y 8)`，均附 `~0.5px` 描边近似。视图 MUST NOT 直接写 `.shadow(...)` 字面量参数，而 SHALL 通过 `paperShadow` 取得统一阴影。霓虹辉光质感 MUST NOT 出现在任何界面。
+
+#### Scenario: 卡片纸感阴影
+- **WHEN** 渲染 Hero 统计卡或 Sheet
+- **THEN** 卡片用 `paperShadow(.sm)`、Sheet 用 `paperShadow(.lg)`，无任何彩色辉光
+
+#### Scenario: 无霓虹辉光
+- **WHEN** 渲染任意强调元素（CTA、PR 徽标、选中 chip）
+- **THEN** 仅用纯色填充 + 纸感阴影，不出现 cyan/magenta 外发光
 
 ### Requirement: 禁用 List/Form 顶层容器
 
@@ -56,11 +80,11 @@ App SHALL 加载 JetBrains Mono 字体用于所有等宽数字展示（训练量
 
 ### Requirement: 横向 Chip 选择器组件
 
-设计系统 SHALL 提供 `HorizontalChipPicker<Item: Identifiable>` 组件：水平 `ScrollView` + `HStack(spacing: Theme.Spacing.sm)` + 每个 chip 高 32pt、横 padding 14pt、`Theme.Radius.pill` 圆角。选中态背景 `Theme.Color.accentCyan` + `Theme.Color.accentInk` 文字 + `.neonGlow(.cyan, .sm)`；未选中态背景 `Theme.Color.surface` + 1pt `Theme.Color.border` + `Theme.Color.fg2` 文字。
+设计系统 SHALL 提供 `HorizontalChipPicker<Item: Identifiable>` 组件：水平 `ScrollView` + `HStack(spacing: Theme.Spacing.sm)` + 每个 chip 高 32pt、横 padding 14pt、`Theme.Radius.pill` 圆角。选中态背景 `Theme.Color.accent` + 白色文字（无辉光）；未选中态背景 `Theme.Color.surface` + 1pt `Theme.Color.border` + `Theme.Color.fg2` 文字。
 
 #### Scenario: 动作库部位筛选
 - **WHEN** ExerciseLibraryView 渲染部位筛选 chips
-- **THEN** 使用 `HorizontalChipPicker`，传入 `[全部, 胸, 背, 腿, 肩, 手臂, 核心]`，默认选中第 0 个。
+- **THEN** 使用 `HorizontalChipPicker`，传入 `[全部, 胸, 背, 腿, 肩, 手臂, 核心]`，默认选中第 0 个，选中态为朱砂红实底白字。
 
 ### Requirement: 统一触感反馈封装
 
@@ -88,11 +112,11 @@ App SHALL 加载 JetBrains Mono 字体用于所有等宽数字展示（训练量
 
 ### Requirement: 动效降级与 Dynamic Type 防截断基线
 
-设计系统中持续性 / 重复性动效（如 `repeatForever` 脉冲、持续辉光、`spring` 过渡）MUST 在 `@Environment(\.accessibilityReduceMotion)` 开启时退化为静态或淡入淡出。固定字号文本在易截断处 SHALL 配置 `minimumScaleFactor` 与合理 `lineLimit`，保证在系统放大字号（Dynamic Type）下不溢出、不破版。
+设计系统中持续性 / 重复性动效（如 `repeatForever` 脉冲、`spring` 过渡）MUST 在 `@Environment(\.accessibilityReduceMotion)` 开启时退化为静态或淡入淡出。固定字号文本在易截断处 SHALL 配置 `minimumScaleFactor` 与合理 `lineLimit`，保证在系统放大字号（Dynamic Type）下不溢出、不破版。
 
 #### Scenario: 减弱动态效果关闭重复动画
-- **WHEN** 用户开启「减弱动态效果」并进入含 LIVE 脉冲 / 辉光的界面
-- **THEN** 脉冲与持续辉光停止重复，呈现为静态样式
+- **WHEN** 用户开启「减弱动态效果」并进入含 LIVE 脉冲的界面
+- **THEN** 脉冲停止重复，呈现为静态样式
 
 #### Scenario: 超大动态字号
 - **WHEN** 用户将系统字号调至较大档位并浏览首页
@@ -105,42 +129,57 @@ App SHALL 加载 JetBrains Mono 字体用于所有等宽数字展示（训练量
 - 默认直径 SHALL 为 36pt（导航类圆钮与主操作钮 `CircleAddButton` 直径对齐）。
 - 图标字号 SHALL 由组件按统一规则从直径推导，MUST NOT 在调用点硬编码图标字号；同一直径下所有圆钮的图标视觉重量一致。
 - 外观为白底（`Theme.Color.surface`）+ 1pt `Theme.Color.border` 描边 + 圆形，按压走 `PressableButtonStyle`。
-- SHALL 支持 `active` 高亮态（选中/展开时用 `Theme.Color.accent` 前景 + `Theme.Color.accentSoft` 底 + `Theme.Color.accentSofter` 描边）与 `rotated` 旋转态（如 ⋯ 展开时旋转 90°）。
-- SHALL 提供 Menu 版入口：以同一外观 label 包裹 SwiftUI `Menu`，确保「点击触发」与「弹出菜单」两类圆钮视觉完全一致。
+- SHALL 支持 `active` 高亮态（选中/展开时用 `Theme.Color.accent` 前景 + `Theme.Color.accentSoft` 底 + `Theme.Color.accentSofter` 描边）与 `rotated` 旋转态（如 `...` 展开时旋转 90°）。
+- SHALL 提供动作菜单入口：以同一外观 label 触发 `PaperActionMenu`，确保「点击触发」与「弹出菜单」两类圆钮视觉完全一致；该动作菜单入口 MUST NOT 继续包装 SwiftUI `Menu`。
 
 #### Scenario: 子页接入返回按钮
 
 - **WHEN** 任一 push/sheet 子页需要返回按钮
-- **THEN** 使用 `CircleIconButton(systemName: "chevron.left", …)`，直径 36pt，图标字号由组件推导，外观为纸感白底圆形
+- **THEN** 使用 `CircleIconButton(systemName: "chevron.left", ...)`，直径 36pt，图标字号由组件推导，外观为纸感白底圆形
 - **AND** 不出现系统默认蓝色返回箭头
 
 #### Scenario: 更多操作菜单圆钮
 
-- **WHEN** Header 右侧需要「⋯ 更多操作」弹出菜单
-- **THEN** 使用 `CircleIconButton` 的 Menu 版，其外观与点击触发版完全一致
+- **WHEN** Header 右侧需要 `...` 更多操作弹出菜单
+- **THEN** 使用圆形图标按钮的动作菜单入口，其外观与点击触发版完全一致
 - **AND** 菜单展开时圆钮进入 `active` + `rotated` 态
+- **AND** 弹出的菜单为项目自绘 `PaperActionMenu`，不是 SwiftUI `Menu`
 
 #### Scenario: 禁止本地复制实现
 
 - **WHEN** 新增或修改任意页面的 Header 圆形按钮
-- **THEN** 复用 `CircleIconButton`，MUST NOT 在该页内重新声明等价的圆形按钮外观函数
+- **THEN** 复用 `CircleIconButton` 或设计系统提供的同源动作菜单入口
+- **AND** MUST NOT 在该页内重新声明等价的圆形按钮外观函数
 
 ### Requirement: 统一子页 Header 容器
 
 设计系统 SHALL 提供子页（push/sheet 二级及以上页面）的 Header 容器 `PaperNavBar`（或等价的 `.paperToolbar()` 修饰符），封装以下职责，使各子页以单一接入点获得一致的导航栏：
 
 - 隐藏系统默认返回按钮（`navigationBarBackButtonHidden(true)`）。
+- 在隐藏系统返回按钮的同时，SHALL 恢复 iOS 左边缘侧滑返回手势（`interactivePopGestureRecognizer`），使所有 push 子页可通过侧滑返回上一页，行为与点击纸感圆形返回钮等价（标准 pop + 原生跟手转场）；该恢复 MUST 收口在容器内部，受益子页 MUST NOT 逐页自行处理。
+- 侧滑返回的接管 MUST 做栈根页保护：仅当导航栈 `viewControllers.count > 1` 时允许手势开始，避免在 Tab 根页误触发 pop。
 - 在 iOS 26+ 对工具栏按钮施加 `sharedBackgroundVisibility(.hidden)`，消除 Liquid Glass 自动圆形背景与纸感圆钮叠成的「双环」；低于 iOS 26 走等价无背景分支。
 - 提供左（返回）/ 中（标题）/ 右（操作）三槽位；左、右槽位默认承载 `CircleIconButton`。
 - 标题 SHALL 使用单一字体 token（取代既有系统 inline / `body(15,heavy)` / `display(30)` 等并存写法），居中、单行截断。
 
-所有 push/sheet 子页的标题栏 MUST 经由该容器实现；MUST NOT 直接散用裸 `.toolbar { … }` + 手搓圆钮 + 逐 `ToolbarItem` 打 `sharedBackgroundVisibility` 补丁的旧写法。Tab 根页（训练 / 计划 / 动作 / Team / 我的）的自绘大标题范式不受此要求约束——其中「我的」(`ProfileView`) 作为 Tab 根页（无返回箭头）SHALL 归入自绘大标题范式（`display(36, heavy)`），不走 `.paperToolbar()`。
+所有 push/sheet 子页的标题栏 MUST 经由该容器实现；MUST NOT 直接散用裸 `.toolbar { … }` + 手搓圆钮 + 逐 `ToolbarItem` 打 `sharedBackgroundVisibility` 补丁的旧写法。Tab 根页（训练 / 计划 / 动作 / Team / 我的）的自绘大标题范式不受此要求约束——其中「我的」(`ProfileView`) 作为 Tab 根页（无返回箭头）SHALL 归入自绘大标题范式（`display(36, heavy)`），不走 `.paperToolbar()`。侧滑返回手势仅作用于 push 出的子页，`fullScreenCover` / `sheet` 模态页不在此手势范围（其退出语义为下滑 dismiss）。
 
 #### Scenario: 子页统一接入
 
 - **WHEN** `WorkoutDetailView` / `PlanDetailView` / `TeamDetailView` / `ExerciseDetailView` / `TeamPlansView`（push/sheet 子页）渲染顶部标题栏
 - **THEN** 均经由 `.paperToolbar()` 接入，标题字体一致、返回/操作钮均为 36pt 纸感圆钮
 - **AND** 不再各自处理 `navigationBarBackButtonHidden` 与 iOS 26 双环补丁
+
+#### Scenario: push 子页支持侧滑返回
+
+- **WHEN** 用户在任一经 `.paperToolbar()` 接入的 push 子页（`PlanDetailView` / `PlanEditorView` / `WorkoutLoggingView` / `WorkoutDetailView` / `TeamDetailView` / `TeamPlansView` / `ExerciseDetailView`）从屏幕左边缘向右侧滑
+- **THEN** 触发标准 pop 返回上一页，带原生跟手转场动画，效果与点击纸感圆形返回钮一致
+- **AND** 该行为由 `.paperToolbar()` 容器统一提供，无需子页各自实现
+
+#### Scenario: Tab 根页不被误触发返回
+
+- **WHEN** 用户在导航栈根层（Tab 根页，`viewControllers.count == 1`）从左边缘侧滑
+- **THEN** 不触发 pop，页面保持当前状态，不出现异常空白页或栈崩溃
 
 #### Scenario: 我的页归入大标题范式
 
@@ -157,4 +196,61 @@ App SHALL 加载 JetBrains Mono 字体用于所有等宽数字展示（训练量
 
 - **WHEN** 任意子页显示标题文字
 - **THEN** 使用容器约定的单一标题字体 token，跨子页字号、字重一致
+
+### Requirement: 统一纸感动作菜单
+
+设计系统 SHALL 提供统一纸感动作菜单组件，用于呈现轻量动作入口（例如顶部 `+`、Header `...`、分组 `...`）。本组件 MUST 使用项目自绘浮层，不得依赖 SwiftUI `Menu`、`.confirmationDialog` 或系统 action sheet 作为主要呈现方式。
+
+菜单组件 MUST 支持：
+
+- 由圆形 `+` 或圆形 `...` 触发。
+- 菜单项标题、SF Symbol 图标、普通/危险角色、禁用态与动作回调。
+- 展开时触发按钮进入 active 态；`...` 触发按钮可进入 rotated 态。
+- 点菜单外区域关闭；选择菜单项后关闭菜单并执行对应动作。
+- 根据触发按钮位置锚定弹出：默认右边缘对齐、显示在触发按钮下方，卡片顶部与触发圆钮底部保持 8pt 垂直间距，并在靠近屏幕边缘时保持菜单完整可见。
+- 使用 `Theme.Color.surface`、`Theme.Color.border`、`Theme.Radius.lg`、`Theme.Font.*`、`paperShadow` 与 `PressableButtonStyle` 等现有纸感 token。
+- 在系统开启 Reduce Motion 时禁用缩放/位移动效，退化为淡入淡出。
+
+本 change 覆盖范围内的动作菜单入口 MUST 使用该组件，包括计划列表顶部 `+`、计划列表分组 `...`、计划详情 `...`、Team 列表顶部 `+`。二次确认弹窗和错误提示不属于本组件职责。
+
+#### Scenario: 顶部添加菜单使用纸感组件
+
+- **WHEN** 用户点击计划页或 Team 页右上角 `+`
+- **THEN** 系统 SHALL 显示纸感动作菜单
+- **AND** 菜单使用项目自绘白底卡片、描边、圆角和阴影
+- **AND** 不显示 SwiftUI `Menu` 的系统弹层样式
+
+#### Scenario: 分组更多菜单使用纸感组件
+
+- **WHEN** 用户点击计划分组 header 右侧 `...`
+- **THEN** 系统 SHALL 显示纸感动作菜单
+- **AND** 菜单 SHALL 提供该分组可用操作，例如新建计划、调整计划顺序、重命名分组、删除分组
+- **AND** 危险操作 SHALL 使用危险角色视觉或明确的危险文案
+
+#### Scenario: 选择菜单项后关闭菜单
+
+- **WHEN** 用户在纸感动作菜单中选择任一可用菜单项
+- **THEN** 菜单 SHALL 先关闭
+- **AND** 系统 SHALL 执行该菜单项对应动作
+- **AND** 不得在后续 sheet、导航或确认弹窗出现时残留菜单浮层
+
+#### Scenario: 点外关闭
+
+- **WHEN** 纸感动作菜单已展开，用户点击菜单外的页面区域
+- **THEN** 菜单 SHALL 关闭
+- **AND** 不执行任何菜单项动作
+
+#### Scenario: 边缘定位不溢出
+
+- **WHEN** 触发按钮位于屏幕右上角或靠近安全区域边缘
+- **THEN** 菜单 SHALL 默认与触发按钮右边缘对齐
+- **AND** 菜单顶部与触发圆钮底部 SHALL 保持 8pt 垂直间距
+- **AND** 菜单 SHALL 自动避让屏幕边缘
+- **AND** 菜单内容 SHALL 完整可见，不被屏幕裁切
+
+#### Scenario: 减弱动态效果
+
+- **WHEN** 系统「减弱动态效果」开启，用户展开或关闭纸感动作菜单
+- **THEN** 菜单 SHALL 使用淡入淡出过渡
+- **AND** 不执行缩放或位移动效
 
