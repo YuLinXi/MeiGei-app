@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import Charts
 
 // MARK: - 训练首页（设计稿 01）
 
@@ -180,47 +179,23 @@ struct WorkoutListView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .cardStyle()
         } else {
-            HStack(alignment: .top, spacing: Theme.Spacing.md) {
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("本周训练量").eyebrowStyle()
-                    HStack(alignment: .lastTextBaseline, spacing: 6) {
-                        Text(formatTons(stats.volumeKg)).numStyle(size: 56)
-                            .foregroundStyle(Theme.Color.accent)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                        Text("t").numStyle(size: 22).foregroundStyle(Theme.Color.fg2)
-                    }
-                    Text("本周第 \(weeklyDoneCount) 次训练")
-                        .font(Theme.Font.l4)
-                        .foregroundStyle(Theme.Color.fg2)
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                Text("本周训练量").eyebrowStyle()
+                HStack(alignment: .lastTextBaseline, spacing: 6) {
+                    Text(formatTons(stats.volumeKg)).numStyle(size: 56)
+                        .foregroundStyle(Theme.Color.accent)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.85)
+                        .minimumScaleFactor(0.6)
+                    Text("t").numStyle(size: 22).foregroundStyle(Theme.Color.fg2)
                 }
-                Spacer(minLength: 0)
-                volumeSparkline
+                Text("本周第 \(weeklyDoneCount) 次训练")
+                    .font(Theme.Font.l4)
+                    .foregroundStyle(Theme.Color.fg2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .cardStyle()
-        }
-    }
-
-    /// 近期每次训练训练量的迷你折线（Swift Charts），对齐设计稿 hero 右侧趋势图。
-    @ViewBuilder private var volumeSparkline: some View {
-        let series: [(idx: Int, vol: Double)] = Array(historyStore.home.recent.prefix(8))
-            .reversed().enumerated().map { ($0.offset, $0.element.volumeKg) }
-        if series.count >= 2 {
-            Chart(series, id: \.idx) { point in
-                LineMark(x: .value("序", point.idx), y: .value("量", point.vol))
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(Theme.Color.accent)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                AreaMark(x: .value("序", point.idx), y: .value("量", point.vol))
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(Theme.Color.accentSoft)
-            }
-            .chartXAxis(.hidden)
-            .chartYAxis(.hidden)
-            .frame(width: 88, height: 56)
         }
     }
 

@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import Charts
 
 /// 选择动作的结果：内置 code 或自定义 id 二选一。
 struct ExercisePick: Identifiable, Hashable {
@@ -1429,7 +1428,6 @@ struct ExerciseDetailView: View {
                 dataCell("最近一组", lastSetText(last))
                 dataCell("PR", pr.map { "\(formatKg($0.weightKg))kg" } ?? "—", accent: true)
             }
-            miniChart
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
@@ -1442,24 +1440,6 @@ struct ExerciseDetailView: View {
                 .foregroundStyle(accent ? Theme.Color.accent : Theme.Color.fg)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// 每训练日最大重量序列（按时间升序）。
-    private var chartData: [(idx: Int, weight: Double)] {
-        history.chartPoints
-    }
-
-    @ViewBuilder private var miniChart: some View {
-        let data = chartData
-        if data.count >= 2 {
-            Chart(data, id: \.idx) { p in
-                BarMark(x: .value("次", p.idx), y: .value("kg", p.weight))
-                    .foregroundStyle(Theme.Color.accentSofter)
-                    .cornerRadius(2)
-            }
-            .chartXAxis(.hidden).chartYAxis(.hidden)
-            .frame(height: 46)
-        }
     }
 
     private func lastAgoText(_ point: ExerciseHistoryPoint?) -> String {

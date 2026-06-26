@@ -38,11 +38,6 @@ struct ExerciseHistorySnapshot: Equatable {
 
     var isEmpty: Bool { points.isEmpty }
     var last: ExerciseHistoryPoint? { points.last }
-    var chartPoints: [(idx: Int, weight: Double)] {
-        Array(points.suffix(120)).enumerated().compactMap { idx, point in
-            point.maxWeightKg.map { (idx, $0) }
-        }
-    }
 }
 
 struct WorkoutRowSummary: Identifiable, Equatable, Hashable {
