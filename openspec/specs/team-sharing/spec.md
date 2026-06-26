@@ -52,7 +52,7 @@
 
 ### Requirement: 表情回应
 
-系统 SHALL 允许成员对 Team 内的训练打卡给予固定 4 个预设 emoji 之一的回应。emoji 集合 MUST 与客户端 Feed 保持一致：🔥 / 💪 / 😱 / 👏。系统 MUST NOT 提供文字评论、群聊或私信功能。
+系统 SHALL 允许成员对 Team 内的训练打卡给予固定 4 个预设 emoji 之一的回应。emoji 集合 MUST 与当前客户端和后端协议保持一致：`fire`/🔥、`muscle`/💪、`heart`/❤️、`clap`/👏。系统 MUST NOT 提供文字评论、群聊或私信功能。
 
 #### Scenario: 给队友打卡点表情
 - **WHEN** 成员对某条打卡选择一个 emoji 回应

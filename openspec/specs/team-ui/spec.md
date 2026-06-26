@@ -37,11 +37,11 @@ Cover 卡下方 SHALL 渲染成员头像横向列表：每个头像 28×28pt 圆
 
 ### Requirement: 4 emoji 反应行
 
-每张 feed 卡底部 SHALL 渲染固定 4 个 emoji 反应位 + 1 个 + 按钮：emoji 顺序固定为 🔥 / 💪 / 😱 / 👏。每个 emoji chip 显示「emoji + 计数」，计数 0 时 chip 背景 `Theme.Color.surface2` + muted 文字，计数 > 0 时 chip 背景 `accentSoft`（浅朱砂底）+ `Theme.Color.fg`。点击 chip 切换当前用户的该 emoji 反应。
+每张 feed 卡底部 SHALL 渲染固定 4 个 emoji 反应位：emoji 顺序固定为 🔥 / 💪 / ❤️ / 👏，对应后端 code 为 `fire` / `muscle` / `heart` / `clap`。每个 emoji chip 始终显示 emoji；计数 > 0 时追加计数。当前用户点亮的 chip 背景为 `accentSoft`（浅朱砂底），未点亮 chip 背景为 `Theme.Color.bg`。点击 chip 切换当前用户的该 emoji 反应。
 
 #### Scenario: 用户点击未点亮的 🔥
 - **WHEN** 用户点击 🔥 chip 且自己尚未对该动态点 🔥
-- **THEN** 计数 +1，chip 切到「点亮」样式（浅朱砂底），同时调用 `TeamService.react(activityId:, emoji:)`。
+- **THEN** 计数 +1，chip 切到「点亮」样式（浅朱砂底），同时调用 `TeamService.react(checkinId:, emoji:)`。
 
 #### Scenario: 用户取消已点亮的 🔥
 - **WHEN** 用户点击 🔥 chip 且自己已点亮
