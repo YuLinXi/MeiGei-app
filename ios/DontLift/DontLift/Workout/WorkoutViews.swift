@@ -595,6 +595,8 @@ struct WorkoutLoggingView: View {
     @State private var restEditBuffer: String = ""
     /// 每个已完成组的真实休息秒数（仅会话内展示）。
     @State private var actualRestBySet: [UUID: Int] = [:]
+    /// 通过组级菜单追加休息时，该组已有的累计休息秒数；完成后用 base + 本段实际秒数写回。
+    @State private var continuedRestBaseBySet: [UUID: Int] = [:]
     /// 当前打开 ⋯ 菜单的动作 localId（nil = 无）。顶层浮层据 anchor 定位、外部点击关闭。
     @State private var menuExerciseId: UUID?
     /// 自研数字键盘的焦点单元（nil = 键盘收起）。
@@ -621,6 +623,8 @@ struct WorkoutLoggingView: View {
     @GestureState private var fabDrag: CGSize = .zero
     /// 显式动作排序面板。
     @State private var showingOrderEditor = false
+
+    private static let continuedRestDuration: TimeInterval = 30
 
     /// 是否允许编辑内容（勾选完成 / 改重量次数 / 加删动作）：仅进行中会话可编辑；
     /// 已完成训练一律只读，产品逻辑不支持二次编辑。
@@ -937,6 +941,12 @@ struct WorkoutLoggingView: View {
                     ex.toggleSetType(set); Theme.Haptics.impact(.light); touch()
                 }
             }
+            if canContinueRest(for: set) {
+                Rectangle().fill(Theme.Color.border).frame(height: 1)
+                setMenuItem(icon: "timer", title: "继续休息") {
+                    continueRest(for: set)
+                }
+            }
             Rectangle().fill(Theme.Color.border).frame(height: 1)
             setMenuItem(icon: "trash", title: "删除组", destructive: true) {
                 menuSetId = nil
@@ -969,6 +979,7 @@ struct WorkoutLoggingView: View {
     /// 删除某组：从聚合子树移除并落库，随后重排剩余组 setIndex 保持序号连续（第 1/2/3 组），最后即时落盘。
     private func deleteSet(_ set: WorkoutSet) {
         guard let ex = set.exercise else { return }
+        clearRestRecord(for: set.localId)
         ex.sets.removeAll { $0.localId == set.localId }
         modelContext.delete(set)
         for (i, s) in ex.sets.sorted(by: { $0.setIndex < $1.setIndex }).enumerated() {
@@ -1100,6 +1111,7 @@ struct WorkoutLoggingView: View {
                                   let secs = restByExercise[ex.localId] ?? Int(restTimer.defaultDuration)
                                   if secs > 0 {
                                       recordActiveRestIfNeeded()
+                                      continuedRestBaseBySet[set.localId] = nil
                                       let nextSet = nextSetSummary
                                       restTimer.start(duration: TimeInterval(secs),
                                                       label: nextSet?.exerciseName ?? ex.exerciseName,
@@ -1107,6 +1119,9 @@ struct WorkoutLoggingView: View {
                                                       setId: set.localId)
                                       restTimer.nextHint = nextHint
                                   }
+                              },
+                              onUncompleteSet: { set in
+                                  clearRestRecord(for: set.localId)
                               })
             }
             // 只读（已完成且未进入编辑态）时隐藏「添加动作」入口。
@@ -1444,6 +1459,30 @@ struct WorkoutLoggingView: View {
         }
     }
 
+    private func canContinueRest(for set: WorkoutSet) -> Bool {
+        canEdit && set.completed && actualRestBySet[set.localId] != nil && !restTimer.isRunning
+    }
+
+    private func continueRest(for set: WorkoutSet) {
+        guard canContinueRest(for: set),
+              let accumulated = actualRestBySet[set.localId] else { return }
+        prepareForPresentation()
+        startTimerIfNeeded()
+        continuedRestBaseBySet[set.localId] = accumulated
+        let nextSet = nextSetSummary
+        restTimer.start(duration: Self.continuedRestDuration,
+                        label: nextSet?.exerciseName,
+                        nextSet: nextSet,
+                        setId: set.localId)
+        restTimer.nextHint = nextHint
+        Theme.Haptics.impact(.light)
+    }
+
+    private func clearRestRecord(for setId: UUID) {
+        actualRestBySet[setId] = nil
+        continuedRestBaseBySet[setId] = nil
+    }
+
     private func recordActiveRestIfNeeded(now: Date = .now) {
         _ = restTimer.completeForWriteback(now: now)
         consumeRestCompletionIfNeeded()
@@ -1455,7 +1494,15 @@ struct WorkoutLoggingView: View {
 
     private func consumeRestCompletionIfNeeded() {
         guard let event = restTimer.consumeCompletionEvent(matching: workoutSetIds) else { return }
-        actualRestBySet[event.setId] = event.elapsedSeconds
+        guard set(for: event.setId)?.completed == true else {
+            continuedRestBaseBySet[event.setId] = nil
+            return
+        }
+        if let base = continuedRestBaseBySet.removeValue(forKey: event.setId) {
+            actualRestBySet[event.setId] = base + event.elapsedSeconds
+        } else {
+            actualRestBySet[event.setId] = event.elapsedSeconds
+        }
     }
 
     /// 启动训练计时（幂等）：仅在尚未启动时落定 timerStartedAt。
@@ -1895,6 +1942,7 @@ private struct ExerciseBlock: View {
     var onMoreSet: (WorkoutSet) -> Void = { _ in }
     let onChange: () -> Void
     let onCompleteSet: (WorkoutSet) -> Void
+    let onUncompleteSet: (WorkoutSet) -> Void
 
     /// 展示序：热身组吸顶（warmup 段在前），段内按 setIndex 稳定升序。
     private var sortedSets: [WorkoutSet] {
@@ -1947,6 +1995,7 @@ private struct ExerciseBlock: View {
                                isMenuOpen: menuSetId == set.localId,
                                onChange: onChange,
                                onComplete: { onCompleteSet(set) },
+                               onUncomplete: { onUncompleteSet(set) },
                                onToggleType: { toggleType(set) },
                                onMore: { onMoreSet(set) },
                                onFocus: { field in
@@ -2079,6 +2128,7 @@ private struct SetRow: View {
     var isMenuOpen: Bool = false
     let onChange: () -> Void
     let onComplete: () -> Void
+    let onUncomplete: () -> Void
     /// 点击序号徽章：切换 working ⇄ warmup（只读态不可点）。
     var onToggleType: () -> Void = {}
     /// 点击「更多操作」⋯：由父视图打开本组的菜单浮层。
@@ -2198,9 +2248,14 @@ private struct SetRow: View {
     /// 完成按钮：圆角方形复选框。完成=朱砂红实心白勾；未完成=淡勾引导用户勾选。
     private var checkButton: some View {
         Button {
-            set.completed.toggle()
+            let willComplete = !set.completed
+            set.completed = willComplete
             onChange()
-            if set.completed { onComplete() }
+            if willComplete {
+                onComplete()
+            } else {
+                onUncomplete()
+            }
         } label: {
             let shape = RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
             ZStack {
