@@ -325,7 +325,10 @@ struct TeamListView: View {
         isReloading = true
         defer { isReloading = false }
         do { try await teamService.loadMyTeams() }
-        catch { self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
+        catch {
+            guard !error.isCancellationError else { return }
+            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
     }
 }
 
@@ -376,7 +379,10 @@ struct CreateTeamSheet: View {
         guard canSubmit else { return }
         busy = true; defer { busy = false }
         do { _ = try await teamService.create(name: trimmed); dismiss() }
-        catch { self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
+        catch {
+            guard !error.isCancellationError else { return }
+            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
     }
 }
 
@@ -415,7 +421,10 @@ struct JoinTeamSheet: View {
         guard canSubmit else { return }
         busy = true; defer { busy = false }
         do { _ = try await teamService.join(inviteCode: code); dismiss() }
-        catch { self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
+        catch {
+            guard !error.isCancellationError else { return }
+            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
     }
 }
 
@@ -646,29 +655,9 @@ struct TeamDetailView: View {
                         }
                         headerCard
                         autoSharePreferenceCard
-                        historyEntry
-
-                        Text("今日动态").eyebrowStyle()
-                        if checkins.isEmpty {
-                            emptyFeedCard
-                        } else {
-                            VStack(spacing: Theme.Spacing.md) {
-                                ForEach(checkins) { c in
-                                    FeedItemCard(
-                                        checkin: c,
-                                        memberName: displayName(for: c.userId),
-                                        reactions: reactions[c.id] ?? [],
-                                        myUserId: session.currentUserId,
-                                        canWithdraw: session.currentUserId.map { $0 == c.userId } ?? false,
-                                        onReact: { emoji in await react(checkinId: c.id, emoji: emoji) },
-                                        onWithdraw: { presentWithdrawConfirmation(c) },
-                                        onOpen: { openedCheckin = c }
-                                    )
-                                }
-                            }
-                        }
-
                         planEntry
+
+                        todayFeedSection
 
                         Color.clear.frame(height: 24)
                     }
@@ -818,15 +807,9 @@ struct TeamDetailView: View {
 
     private var autoSharePreferenceCard: some View {
         HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("训练完成后自动分享")
-                    .font(Theme.Font.body(size: 15, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg)
-                Text(autoShareWorkouts ? "已开启。后续训练会自动进入这个 Team，可按次撤回。" : "默认仅自己可见。开启后不再在训练结束时打扰你。")
-                    .font(Theme.Font.body(size: 12))
-                    .foregroundStyle(Theme.Color.fg2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text("训练完成后自动分享")
+                .font(Theme.Font.body(size: 15, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
             Spacer(minLength: 8)
             if autoSharePreferenceBusy {
                 ProgressView()
@@ -849,29 +832,46 @@ struct TeamDetailView: View {
         .cardStyle()
     }
 
-    private var historyEntry: some View {
-        Button { showingHistory = true } label: {
-            HStack(spacing: 9) {
+    private var todayFeedSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            todayFeedHeader
+            if checkins.isEmpty {
+                emptyFeedCard
+            } else {
+                VStack(spacing: Theme.Spacing.md) {
+                    ForEach(checkins) { c in
+                        let isMine = session.currentUserId.map { $0 == c.userId } ?? false
+                        FeedItemCard(
+                            checkin: c,
+                            memberName: displayName(for: c.userId),
+                            reactions: reactions[c.id] ?? [],
+                            myUserId: session.currentUserId,
+                            canWithdraw: isMine,
+                            canOpenDetail: !isMine,
+                            onReact: { emoji in await react(checkinId: c.id, emoji: emoji) },
+                            onWithdraw: { presentWithdrawConfirmation(c) },
+                            onOpen: { openedCheckin = c }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private var todayFeedHeader: some View {
+        HStack(spacing: 9) {
+            Text("今日动态").eyebrowStyle()
+            Button {
+                showingHistory = true
+            } label: {
                 Image(systemName: "calendar")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg2)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("历史训练")
-                        .font(Theme.Font.body(size: 15, weight: .bold))
-                        .foregroundStyle(Theme.Color.fg)
-                    Text("按月回看 Team 已分享训练")
-                        .font(Theme.Font.body(size: 12))
-                        .foregroundStyle(Theme.Color.fg2)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
+                    .frame(width: 28, height: 26)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .cardStyle()
+            .buttonStyle(.plain)
+            .accessibilityLabel("历史训练")
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // monogram 头像栈：me 在前高亮，−7px 重叠，超 5 折叠 +N。
@@ -1201,6 +1201,7 @@ struct TeamDetailView: View {
             checkins = loadedFeed.checkins
             reactions = Dictionary(grouping: loadedFeed.reactions, by: \.checkinId)
         } catch {
+            guard !error.isCancellationError else { return }
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
@@ -1225,6 +1226,7 @@ struct TeamDetailView: View {
             reactions[checkinId] = server
         } catch {
             reactions[checkinId] = prior
+            guard !error.isCancellationError else { return }
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
@@ -1236,6 +1238,7 @@ struct TeamDetailView: View {
             reactions[checkin.id] = nil
             pendingWithdrawCheckin = nil
         } catch {
+            guard !error.isCancellationError else { return }
             self.error = "撤回失败，请稍后重试"
         }
     }
@@ -1265,6 +1268,10 @@ struct TeamDetailView: View {
                 members[idx] = updated
             }
         } catch {
+            guard !error.isCancellationError else {
+                autoShareWorkouts = previous
+                return
+            }
             autoShareWorkouts = previous
             self.error = enabled ? "开启自动分享失败，请稍后重试" : "关闭自动分享失败，请稍后重试"
         }
@@ -1283,6 +1290,7 @@ struct TeamDetailView: View {
                 : "已退出「\(team.name)」"
             dismiss()
         } catch {
+            guard !error.isCancellationError else { return }
             await flashFailureToast()
         }
     }
@@ -1302,6 +1310,7 @@ struct FeedItemCard: View {
     let reactions: [CheckinReactionDTO]
     let myUserId: UUID?
     let canWithdraw: Bool
+    let canOpenDetail: Bool
     let onReact: (String) async -> Void
     let onWithdraw: () -> Void
     let onOpen: () -> Void
@@ -1320,25 +1329,63 @@ struct FeedItemCard: View {
     private var summary: CheckinSummary { checkin.parsedSummary }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            head
-            body(text: bodyText)
-            ReactionRow(
-                reactions: reactions,
-                myUserId: myUserId,
-                emojis: displayEmojis,
-                onTap: { emoji in
-                    guard !busy else { return }
-                    Task { busy = true; await onReact(emoji); busy = false }
+        ZStack(alignment: .trailing) {
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                HStack(alignment: .top, spacing: Theme.Spacing.sm) {
+                    tappableSummary
+                    if canWithdraw {
+                        withdrawButton
+                    }
                 }
-            )
-            .disabled(busy)
+                .padding(.trailing, detailAccessoryPadding)
+                ReactionRow(
+                    reactions: reactions,
+                    myUserId: myUserId,
+                    emojis: displayEmojis,
+                    onTap: { emoji in
+                        guard !busy else { return }
+                        Task { busy = true; await onReact(emoji); busy = false }
+                    }
+                )
+                .padding(.trailing, detailAccessoryPadding)
+                .disabled(busy)
+            }
+            if canOpenDetail {
+                openIndicator
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
     }
 
-    private var head: some View {
+    private var detailAccessoryPadding: CGFloat {
+        canOpenDetail ? 34 : 0
+    }
+
+    @ViewBuilder
+    private var tappableSummary: some View {
+        let summary = VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            memberHead
+            body(text: bodyText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        if canOpenDetail {
+            summary
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onOpen()
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction {
+                    onOpen()
+                }
+        } else {
+            summary
+        }
+    }
+
+    private var memberHead: some View {
         HStack(spacing: Theme.Spacing.sm) {
             Text(String(memberName.prefix(1)))
                 .font(Theme.Font.body(size: 13, weight: .bold))
@@ -1354,38 +1401,35 @@ struct FeedItemCard: View {
                     .font(Theme.Font.mono(size: 10))
                     .foregroundStyle(Theme.Color.muted)
             }
-            Spacer()
-            Button {
-                onOpen()
-            } label: {
-                HStack(spacing: 4) {
-                    Text("详情")
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
-                }
+        }
+    }
+
+    private var withdrawButton: some View {
+        Button {
+            onWithdraw()
+        } label: {
+            Text("撤回")
                 .font(Theme.Font.body(size: 12, weight: .semibold))
-                .foregroundStyle(Theme.Color.fg2)
+                .foregroundStyle(Theme.Color.danger)
                 .padding(.horizontal, 9)
                 .frame(height: 28)
                 .background(Theme.Color.bg, in: Capsule())
                 .overlay(Capsule().stroke(Theme.Color.border, lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-            if canWithdraw {
-                Button {
-                    onWithdraw()
-                } label: {
-                    Text("撤回")
-                        .font(Theme.Font.body(size: 12, weight: .semibold))
-                        .foregroundStyle(Theme.Color.danger)
-                        .padding(.horizontal, 9)
-                        .frame(height: 28)
-                        .background(Theme.Color.bg, in: Capsule())
-                        .overlay(Capsule().stroke(Theme.Color.border, lineWidth: 1))
-                }
-                .buttonStyle(.plain)
-            }
         }
+        .buttonStyle(.plain)
+        .layoutPriority(1)
+    }
+
+    private var openIndicator: some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(Theme.Color.muted)
+            .frame(width: 28, height: 44)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onOpen()
+            }
+            .accessibilityHidden(true)
     }
 
     private var bodyText: AttributedString {
@@ -1576,7 +1620,10 @@ struct TeamPlansView: View {
         isReloading = true
         defer { isReloading = false }
         do { plans = try await teamService.plans(of: team.id) }
-        catch { self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
+        catch {
+            guard !error.isCancellationError else { return }
+            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
     }
 
     private func fork(_ p: ServerPlanDTO) async {
@@ -1586,6 +1633,7 @@ struct TeamPlansView: View {
             await syncEngine.syncAll()
             await showToast("已复制到「计划」")
         } catch {
+            guard !error.isCancellationError else { return }
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }

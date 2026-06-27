@@ -202,6 +202,7 @@ struct TeamDTO: Decodable, Identifiable, Hashable {
     var name: String
     var ownerUserId: UUID
     var inviteCode: String
+    var createdAt: Date?
     var ownerTransferredAt: Date?
     var ownerTransferredFromUserId: UUID?
 }

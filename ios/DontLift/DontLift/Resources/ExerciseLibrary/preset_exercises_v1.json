@@ -264,8 +264,7 @@
         "chest"
       ],
       "secondaryRegions": [
-        "deltFront",
-        "triceps"
+        "deltFront"
       ],
       "formCues": [],
       "source": "preset-v1",
@@ -282,8 +281,7 @@
         "chest"
       ],
       "secondaryRegions": [
-        "deltFront",
-        "triceps"
+        "deltFront"
       ],
       "formCues": [],
       "source": "preset-v1",
@@ -300,8 +298,7 @@
         "chest"
       ],
       "secondaryRegions": [
-        "deltFront",
-        "triceps"
+        "deltFront"
       ],
       "formCues": [],
       "source": "preset-v1",
@@ -318,8 +315,7 @@
         "chest"
       ],
       "secondaryRegions": [
-        "deltFront",
-        "triceps"
+        "deltFront"
       ],
       "formCues": [],
       "source": "preset-v1",
@@ -336,8 +332,7 @@
         "chest"
       ],
       "secondaryRegions": [
-        "deltFront",
-        "triceps"
+        "deltFront"
       ],
       "formCues": [],
       "source": "preset-v1",
@@ -354,8 +349,7 @@
         "chest"
       ],
       "secondaryRegions": [
-        "deltFront",
-        "triceps"
+        "deltFront"
       ],
       "formCues": [],
       "source": "preset-v1",
@@ -437,15 +431,15 @@
     {
       "code": "DIAMOND_PUSH_UP",
       "name": "钻石俯卧撑",
-      "category": "胸",
-      "subcategory": "中下胸",
+      "category": "手臂",
+      "subcategory": null,
       "equipmentType": "自重",
       "primaryRegions": [
-        "chest"
+        "triceps"
       ],
       "secondaryRegions": [
-        "deltFront",
-        "triceps"
+        "chest",
+        "deltFront"
       ],
       "formCues": [],
       "source": "preset-v1",
@@ -615,24 +609,6 @@
       "note": "保留，线上有历史"
     },
     {
-      "code": "SINGLE_ARM_LAT_PULLDOWN",
-      "name": "单臂高位下拉",
-      "category": "背",
-      "subcategory": null,
-      "equipmentType": "绳索",
-      "primaryRegions": [
-        "lats"
-      ],
-      "secondaryRegions": [
-        "biceps",
-        "deltRear"
-      ],
-      "formCues": [],
-      "source": "preset-v1",
-      "order": 34,
-      "note": "保留，线上有历史"
-    },
-    {
       "code": "MACHINE_PULLDOWN",
       "name": "器械下拉",
       "category": "背",
@@ -647,7 +623,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 35,
+      "order": 34,
       "note": "保留"
     },
     {
@@ -665,7 +641,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 36,
+      "order": 35,
       "note": "必留，线上有历史"
     },
     {
@@ -683,7 +659,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 37,
+      "order": 36,
       "note": "保留，线上有历史"
     },
     {
@@ -696,12 +672,11 @@
         "lats"
       ],
       "secondaryRegions": [
-        "biceps",
         "deltRear"
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 38,
+      "order": 37,
       "note": "必留，线上有历史"
     },
     {
@@ -711,6 +686,7 @@
       "subcategory": null,
       "equipmentType": "杠铃",
       "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -719,7 +695,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 39,
+      "order": 38,
       "note": "必留，线上高频"
     },
     {
@@ -729,6 +705,7 @@
       "subcategory": null,
       "equipmentType": "杠铃",
       "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -737,7 +714,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 40,
+      "order": 39,
       "note": "保留"
     },
     {
@@ -747,6 +724,26 @@
       "subcategory": null,
       "equipmentType": "T杠",
       "primaryRegions": [
+        "lats",
+        "rhomboids"
+      ],
+      "secondaryRegions": [
+        "biceps",
+        "deltRear"
+      ],
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 40,
+      "note": "必留"
+    },
+    {
+      "code": "DB_BENT_OVER_ROW",
+      "name": "哑铃划船",
+      "category": "背",
+      "subcategory": null,
+      "equipmentType": "哑铃",
+      "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -759,12 +756,13 @@
       "note": "必留"
     },
     {
-      "code": "DB_BENT_OVER_ROW",
-      "name": "哑铃划船",
+      "code": "SINGLE_ARM_DB_ROW",
+      "name": "单臂哑铃划船",
       "category": "背",
       "subcategory": null,
       "equipmentType": "哑铃",
       "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -777,12 +775,13 @@
       "note": "必留"
     },
     {
-      "code": "SINGLE_ARM_DB_ROW",
-      "name": "单臂哑铃划船",
+      "code": "DB_PRONE_ROW",
+      "name": "俯卧哑铃划船",
       "category": "背",
       "subcategory": null,
       "equipmentType": "哑铃",
       "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -792,24 +791,6 @@
       "formCues": [],
       "source": "preset-v1",
       "order": 43,
-      "note": "必留"
-    },
-    {
-      "code": "DB_PRONE_ROW",
-      "name": "俯卧哑铃划船",
-      "category": "背",
-      "subcategory": null,
-      "equipmentType": "哑铃",
-      "primaryRegions": [
-        "rhomboids"
-      ],
-      "secondaryRegions": [
-        "biceps",
-        "deltRear"
-      ],
-      "formCues": [],
-      "source": "preset-v1",
-      "order": 44,
       "note": "保留，线上有历史"
     },
     {
@@ -819,6 +800,7 @@
       "subcategory": null,
       "equipmentType": "绳索",
       "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -827,7 +809,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 45,
+      "order": 44,
       "note": "必留，线上有历史"
     },
     {
@@ -837,6 +819,26 @@
       "subcategory": null,
       "equipmentType": "绳索",
       "primaryRegions": [
+        "lats",
+        "rhomboids"
+      ],
+      "secondaryRegions": [
+        "biceps",
+        "deltRear"
+      ],
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 45,
+      "note": "保留，线上有历史"
+    },
+    {
+      "code": "WIDE_SEATED_ROW",
+      "name": "宽握坐姿划船",
+      "category": "背",
+      "subcategory": null,
+      "equipmentType": "绳索",
+      "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -849,12 +851,13 @@
       "note": "保留，线上有历史"
     },
     {
-      "code": "WIDE_SEATED_ROW",
-      "name": "宽握坐姿划船",
+      "code": "MACHINE_ROW",
+      "name": "坐姿器械划船",
       "category": "背",
       "subcategory": null,
-      "equipmentType": "绳索",
+      "equipmentType": "器械",
       "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -864,24 +867,6 @@
       "formCues": [],
       "source": "preset-v1",
       "order": 47,
-      "note": "保留，线上有历史"
-    },
-    {
-      "code": "MACHINE_ROW",
-      "name": "坐姿器械划船",
-      "category": "背",
-      "subcategory": null,
-      "equipmentType": "器械",
-      "primaryRegions": [
-        "rhomboids"
-      ],
-      "secondaryRegions": [
-        "biceps",
-        "deltRear"
-      ],
-      "formCues": [],
-      "source": "preset-v1",
-      "order": 48,
       "note": "必留，线上计划有历史"
     },
     {
@@ -891,6 +876,7 @@
       "subcategory": null,
       "equipmentType": "器械",
       "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -899,7 +885,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 49,
+      "order": 48,
       "note": "保留，线上有历史"
     },
     {
@@ -909,6 +895,7 @@
       "subcategory": null,
       "equipmentType": "悍马机",
       "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -917,7 +904,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 50,
+      "order": 49,
       "note": "必留，线上有历史"
     },
     {
@@ -927,6 +914,7 @@
       "subcategory": null,
       "equipmentType": "悍马机",
       "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -935,7 +923,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 51,
+      "order": 50,
       "note": "保留，线上有历史"
     },
     {
@@ -945,6 +933,7 @@
       "subcategory": null,
       "equipmentType": "史密斯",
       "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -953,7 +942,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 52,
+      "order": 51,
       "note": "保留，线上自定义有历史；与反手区分"
     },
     {
@@ -972,7 +961,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 53,
+      "order": 52,
       "note": "保留；与正手区分"
     },
     {
@@ -982,6 +971,7 @@
       "subcategory": null,
       "equipmentType": "器械",
       "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -990,7 +980,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 54,
+      "order": 53,
       "note": "保留，线上计划有历史"
     },
     {
@@ -1000,6 +990,7 @@
       "subcategory": null,
       "equipmentType": "自重",
       "primaryRegions": [
+        "lats",
         "rhomboids"
       ],
       "secondaryRegions": [
@@ -1008,7 +999,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 55,
+      "order": 54,
       "note": "保留"
     },
     {
@@ -1018,12 +1009,18 @@
       "subcategory": null,
       "equipmentType": "杠铃",
       "primaryRegions": [
-        "lowerBack"
+        "lowerBack",
+        "glutes"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "hams",
+        "quads",
+        "traps",
+        "forearms"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 56,
+      "order": 55,
       "note": "必留，线上有历史"
     },
     {
@@ -1033,12 +1030,17 @@
       "subcategory": null,
       "equipmentType": "杠铃",
       "primaryRegions": [
-        "lowerBack"
+        "lowerBack",
+        "glutes",
+        "traps"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "hams",
+        "forearms"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 57,
+      "order": 56,
       "note": "保留，线上有历史"
     },
     {
@@ -1048,15 +1050,17 @@
       "subcategory": null,
       "equipmentType": "杠铃",
       "primaryRegions": [
-        "lowerBack"
+        "lowerBack",
+        "glutes",
+        "traps"
       ],
       "secondaryRegions": [
-        "biceps",
-        "deltRear"
+        "hams",
+        "forearms"
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 58,
+      "order": 57,
       "note": "保留"
     },
     {
@@ -1068,10 +1072,13 @@
       "primaryRegions": [
         "lowerBack"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "glutes",
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 59,
+      "order": 58,
       "note": "必留"
     },
     {
@@ -1081,13 +1088,15 @@
       "subcategory": null,
       "equipmentType": "自重",
       "primaryRegions": [
-        "lowerBack",
-        "glutes"
+        "glutes",
+        "lowerBack"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 60,
+      "order": 59,
       "note": "保留，线上自定义有历史"
     },
     {
@@ -1097,12 +1106,15 @@
       "subcategory": null,
       "equipmentType": "杠铃",
       "primaryRegions": [
+        "hams",
         "lowerBack"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "glutes"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 61,
+      "order": 60,
       "note": "保留"
     },
     {
@@ -1115,12 +1127,12 @@
         "lats"
       ],
       "secondaryRegions": [
-        "biceps",
-        "deltRear"
+        "chest",
+        "triceps"
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 62,
+      "order": 61,
       "note": "保留，线上有历史"
     },
     {
@@ -1132,13 +1144,10 @@
       "primaryRegions": [
         "traps"
       ],
-      "secondaryRegions": [
-        "biceps",
-        "deltRear"
-      ],
+      "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 63,
+      "order": 62,
       "note": "保留"
     },
     {
@@ -1150,13 +1159,10 @@
       "primaryRegions": [
         "traps"
       ],
-      "secondaryRegions": [
-        "biceps",
-        "deltRear"
-      ],
+      "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 64,
+      "order": 63,
       "note": "保留"
     },
     {
@@ -1169,11 +1175,12 @@
         "deltFront"
       ],
       "secondaryRegions": [
-        "triceps"
+        "triceps",
+        "deltSide"
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 65,
+      "order": 64,
       "note": "必留"
     },
     {
@@ -1186,11 +1193,12 @@
         "deltFront"
       ],
       "secondaryRegions": [
-        "triceps"
+        "triceps",
+        "deltSide"
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 66,
+      "order": 65,
       "note": "保留"
     },
     {
@@ -1203,11 +1211,12 @@
         "deltFront"
       ],
       "secondaryRegions": [
-        "triceps"
+        "triceps",
+        "deltSide"
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 67,
+      "order": 66,
       "note": "必留，线上高频"
     },
     {
@@ -1220,11 +1229,12 @@
         "deltFront"
       ],
       "secondaryRegions": [
-        "triceps"
+        "triceps",
+        "deltSide"
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 68,
+      "order": 67,
       "note": "保留"
     },
     {
@@ -1237,11 +1247,12 @@
         "deltFront"
       ],
       "secondaryRegions": [
-        "triceps"
+        "triceps",
+        "deltSide"
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 69,
+      "order": 68,
       "note": "必留，线上有历史"
     },
     {
@@ -1254,11 +1265,12 @@
         "deltFront"
       ],
       "secondaryRegions": [
-        "triceps"
+        "triceps",
+        "deltSide"
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 70,
+      "order": 69,
       "note": "必留，线上有历史"
     },
     {
@@ -1271,11 +1283,12 @@
         "deltFront"
       ],
       "secondaryRegions": [
-        "triceps"
+        "triceps",
+        "deltSide"
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 71,
+      "order": 70,
       "note": "必留，线上有历史"
     },
     {
@@ -1290,7 +1303,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 72,
+      "order": 71,
       "note": "必留，线上高频"
     },
     {
@@ -1305,7 +1318,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 73,
+      "order": 72,
       "note": "必留，线上有历史"
     },
     {
@@ -1320,7 +1333,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 74,
+      "order": 73,
       "note": "保留，线上有历史"
     },
     {
@@ -1335,7 +1348,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 75,
+      "order": 74,
       "note": "保留"
     },
     {
@@ -1350,7 +1363,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 76,
+      "order": 75,
       "note": "保留，线上有历史"
     },
     {
@@ -1365,7 +1378,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 77,
+      "order": 76,
       "note": "保留"
     },
     {
@@ -1380,7 +1393,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 78,
+      "order": 77,
       "note": "保留，线上有历史"
     },
     {
@@ -1395,7 +1408,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 79,
+      "order": 78,
       "note": "保留"
     },
     {
@@ -1407,10 +1420,13 @@
       "primaryRegions": [
         "deltRear"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "traps",
+        "rhomboids"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 80,
+      "order": 79,
       "note": "必留，线上有历史"
     },
     {
@@ -1422,10 +1438,13 @@
       "primaryRegions": [
         "deltRear"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "traps",
+        "rhomboids"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 81,
+      "order": 80,
       "note": "必留，线上高频"
     },
     {
@@ -1437,10 +1456,14 @@
       "primaryRegions": [
         "deltRear"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "traps",
+        "rhomboids",
+        "deltSide"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 82,
+      "order": 81,
       "note": "必留，线上高频"
     },
     {
@@ -1452,10 +1475,13 @@
       "primaryRegions": [
         "deltRear"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "traps",
+        "rhomboids"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 83,
+      "order": 82,
       "note": "保留，线上有历史"
     },
     {
@@ -1467,40 +1493,31 @@
       "primaryRegions": [
         "deltRear"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "traps",
+        "rhomboids"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 84,
+      "order": 83,
       "note": "保留，线上自定义有历史"
     },
     {
-      "code": "UPRIGHT_ROW",
-      "name": "杠铃直立划船",
-      "category": "肩",
-      "subcategory": "中束",
-      "equipmentType": "杠铃",
-      "primaryRegions": [
-        "deltSide"
-      ],
-      "secondaryRegions": [],
-      "formCues": [],
-      "source": "preset-v1",
-      "order": 85,
-      "note": "保留，线上有历史"
-    },
-    {
       "code": "DB_UPRIGHT_ROW",
-      "name": "哑铃直立划船",
+      "name": "哑铃提拉",
       "category": "肩",
-      "subcategory": "中束",
+      "subcategory": null,
       "equipmentType": "哑铃",
       "primaryRegions": [
+        "deltFront",
         "deltSide"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "traps"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 86,
+      "order": 84,
       "note": "保留，覆盖“站姿哑铃划船”"
     },
     {
@@ -1510,13 +1527,15 @@
       "subcategory": null,
       "equipmentType": "杠铃",
       "primaryRegions": [
-        "deltSide",
+        "deltFront",
+        "deltSide"
+      ],
+      "secondaryRegions": [
         "traps"
       ],
-      "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 87,
+      "order": 85,
       "note": "保留，线上有历史"
     },
     {
@@ -1531,7 +1550,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 88,
+      "order": 86,
       "note": "必留"
     },
     {
@@ -1546,7 +1565,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 89,
+      "order": 87,
       "note": "必留，线上有历史"
     },
     {
@@ -1561,7 +1580,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 90,
+      "order": 88,
       "note": "必留"
     },
     {
@@ -1576,7 +1595,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 91,
+      "order": 89,
       "note": "保留，覆盖哑铃轮换弯举"
     },
     {
@@ -1591,7 +1610,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 92,
+      "order": 90,
       "note": "必留"
     },
     {
@@ -1606,7 +1625,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 93,
+      "order": 91,
       "note": "保留，线上有历史"
     },
     {
@@ -1621,7 +1640,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 94,
+      "order": 92,
       "note": "保留"
     },
     {
@@ -1636,7 +1655,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 95,
+      "order": 93,
       "note": "保留"
     },
     {
@@ -1651,27 +1670,42 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 96,
+      "order": 94,
       "note": "保留"
     },
     {
-      "code": "PREACHER_CURL",
-      "name": "牧师凳弯举",
+      "code": "EZ_BAR_PREACHER_CURL",
+      "name": "牧师凳 EZ 杠弯举",
       "category": "手臂",
       "subcategory": null,
-      "equipmentType": "器械",
+      "equipmentType": "杠铃",
       "primaryRegions": [
         "biceps"
       ],
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 97,
-      "note": "必留，线上有历史"
+      "order": 95,
+      "note": "按审核新增，EZ 杠归杠铃"
     },
     {
-      "code": "SINGLE_ARM_PREACHER_CURL",
-      "name": "单臂牧师凳弯举",
+      "code": "BB_PREACHER_CURL",
+      "name": "牧师凳杠铃弯举",
+      "category": "手臂",
+      "subcategory": null,
+      "equipmentType": "杠铃",
+      "primaryRegions": [
+        "biceps"
+      ],
+      "secondaryRegions": [],
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 96,
+      "note": "原牧师凳弯举历史并入"
+    },
+    {
+      "code": "DB_PREACHER_CURL",
+      "name": "牧师凳哑铃弯举",
       "category": "手臂",
       "subcategory": null,
       "equipmentType": "哑铃",
@@ -1681,8 +1715,8 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 98,
-      "note": "保留，覆盖线上自定义"
+      "order": 97,
+      "note": "原单臂牧师凳弯举历史并入"
     },
     {
       "code": "CABLE_CURL",
@@ -1696,7 +1730,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 99,
+      "order": 98,
       "note": "必留，线上有历史"
     },
     {
@@ -1711,7 +1745,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 100,
+      "order": 99,
       "note": "独立保留，线上有历史"
     },
     {
@@ -1726,7 +1760,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 101,
+      "order": 100,
       "note": "独立保留，线上自定义有历史"
     },
     {
@@ -1741,7 +1775,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 102,
+      "order": 101,
       "note": "保留"
     },
     {
@@ -1751,13 +1785,12 @@
       "subcategory": null,
       "equipmentType": "杠铃",
       "primaryRegions": [
-        "biceps",
-        "forearms"
+        "biceps"
       ],
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 103,
+      "order": 102,
       "note": "保留"
     },
     {
@@ -1772,7 +1805,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 104,
+      "order": 103,
       "note": "必留"
     },
     {
@@ -1787,7 +1820,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 105,
+      "order": 104,
       "note": "必留"
     },
     {
@@ -1802,7 +1835,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 106,
+      "order": 105,
       "note": "保留，线上有历史"
     },
     {
@@ -1817,7 +1850,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 107,
+      "order": 106,
       "note": "保留，线上有历史"
     },
     {
@@ -1832,7 +1865,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 108,
+      "order": 107,
       "note": "保留，线上有历史"
     },
     {
@@ -1847,7 +1880,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 109,
+      "order": 108,
       "note": "必留，线上有历史"
     },
     {
@@ -1859,10 +1892,13 @@
       "primaryRegions": [
         "triceps"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "chest",
+        "deltFront"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 110,
+      "order": 109,
       "note": "必留，线上自定义有历史"
     },
     {
@@ -1877,7 +1913,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 111,
+      "order": 110,
       "note": "必留，线上高频"
     },
     {
@@ -1892,7 +1928,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 112,
+      "order": 111,
       "note": "必留"
     },
     {
@@ -1907,7 +1943,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 113,
+      "order": 112,
       "note": "必留"
     },
     {
@@ -1922,7 +1958,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 114,
+      "order": 113,
       "note": "保留"
     },
     {
@@ -1934,10 +1970,13 @@
       "primaryRegions": [
         "triceps"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "chest",
+        "deltFront"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 115,
+      "order": 114,
       "note": "保留"
     },
     {
@@ -1949,10 +1988,13 @@
       "primaryRegions": [
         "triceps"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "chest",
+        "deltFront"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 116,
+      "order": 115,
       "note": "保留"
     },
     {
@@ -1967,7 +2009,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 117,
+      "order": 116,
       "note": "保留"
     },
     {
@@ -1982,7 +2024,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 118,
+      "order": 117,
       "note": "保留"
     },
     {
@@ -1997,7 +2039,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 119,
+      "order": 118,
       "note": "保留"
     },
     {
@@ -2009,10 +2051,14 @@
       "primaryRegions": [
         "quads"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "glutes",
+        "adductors",
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 120,
+      "order": 119,
       "note": "必留，线上有历史"
     },
     {
@@ -2024,10 +2070,14 @@
       "primaryRegions": [
         "quads"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "glutes",
+        "adductors",
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 121,
+      "order": 120,
       "note": "必留"
     },
     {
@@ -2039,10 +2089,14 @@
       "primaryRegions": [
         "quads"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "glutes",
+        "adductors",
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 122,
+      "order": 121,
       "note": "必留，线上有历史"
     },
     {
@@ -2054,10 +2108,14 @@
       "primaryRegions": [
         "quads"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "glutes",
+        "adductors",
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 123,
+      "order": 122,
       "note": "保留"
     },
     {
@@ -2069,26 +2127,15 @@
       "primaryRegions": [
         "quads"
       ],
-      "secondaryRegions": [],
-      "formCues": [],
-      "source": "preset-v1",
-      "order": 124,
-      "note": "保留"
-    },
-    {
-      "code": "LEG_PRESS",
-      "name": "腿举",
-      "category": "腿",
-      "subcategory": null,
-      "equipmentType": "器械",
-      "primaryRegions": [
-        "quads"
+      "secondaryRegions": [
+        "glutes",
+        "adductors",
+        "hams"
       ],
-      "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 125,
-      "note": "必留"
+      "order": 123,
+      "note": "保留"
     },
     {
       "code": "MACHINE_LEG_PRESS",
@@ -2099,10 +2146,14 @@
       "primaryRegions": [
         "quads"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "glutes",
+        "adductors",
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 126,
+      "order": 124,
       "note": "独立保留，线上有历史"
     },
     {
@@ -2117,7 +2168,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 127,
+      "order": 125,
       "note": "必留，线上自定义有历史；主流腿部动作"
     },
     {
@@ -2132,7 +2183,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 128,
+      "order": 126,
       "note": "保留，线上有历史"
     },
     {
@@ -2142,12 +2193,16 @@
       "subcategory": null,
       "equipmentType": "哑铃",
       "primaryRegions": [
-        "quads"
+        "quads",
+        "glutes"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "adductors",
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 129,
+      "order": 127,
       "note": "必留，线上有历史"
     },
     {
@@ -2157,12 +2212,16 @@
       "subcategory": null,
       "equipmentType": "哑铃",
       "primaryRegions": [
-        "quads"
+        "quads",
+        "glutes"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "adductors",
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 130,
+      "order": 128,
       "note": "保留，线上有历史"
     },
     {
@@ -2172,12 +2231,16 @@
       "subcategory": null,
       "equipmentType": "哑铃",
       "primaryRegions": [
-        "quads"
+        "quads",
+        "glutes"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "adductors",
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 131,
+      "order": 129,
       "note": "保留"
     },
     {
@@ -2187,12 +2250,16 @@
       "subcategory": null,
       "equipmentType": "哑铃",
       "primaryRegions": [
-        "quads"
+        "quads",
+        "glutes"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "adductors",
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 132,
+      "order": 130,
       "note": "保留"
     },
     {
@@ -2204,10 +2271,14 @@
       "primaryRegions": [
         "quads"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "glutes",
+        "adductors",
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 133,
+      "order": 131,
       "note": "保留"
     },
     {
@@ -2222,7 +2293,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 134,
+      "order": 132,
       "note": "必留，线上有历史"
     },
     {
@@ -2237,7 +2308,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 135,
+      "order": 133,
       "note": "必留"
     },
     {
@@ -2252,7 +2323,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 136,
+      "order": 134,
       "note": "保留"
     },
     {
@@ -2265,11 +2336,12 @@
         "hams"
       ],
       "secondaryRegions": [
-        "glutes"
+        "glutes",
+        "lowerBack"
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 137,
+      "order": 135,
       "note": "必留，主腿副臀，线上有历史"
     },
     {
@@ -2282,11 +2354,12 @@
         "hams"
       ],
       "secondaryRegions": [
-        "glutes"
+        "glutes",
+        "lowerBack"
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 138,
+      "order": 136,
       "note": "保留"
     },
     {
@@ -2296,13 +2369,17 @@
       "subcategory": null,
       "equipmentType": "杠铃",
       "primaryRegions": [
-        "adductors",
-        "glutes"
+        "glutes",
+        "adductors"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "quads",
+        "hams",
+        "lowerBack"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 139,
+      "order": 137,
       "note": "保留"
     },
     {
@@ -2317,7 +2394,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 140,
+      "order": 138,
       "note": "保留，线上有历史"
     },
     {
@@ -2332,7 +2409,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 141,
+      "order": 139,
       "note": "必留"
     },
     {
@@ -2347,7 +2424,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 142,
+      "order": 140,
       "note": "必留"
     },
     {
@@ -2362,7 +2439,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 143,
+      "order": 141,
       "note": "保留，线上有历史"
     },
     {
@@ -2374,10 +2451,12 @@
       "primaryRegions": [
         "glutes"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 144,
+      "order": 142,
       "note": "必留，线上有历史"
     },
     {
@@ -2389,10 +2468,12 @@
       "primaryRegions": [
         "glutes"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 145,
+      "order": 143,
       "note": "保留"
     },
     {
@@ -2404,10 +2485,12 @@
       "primaryRegions": [
         "glutes"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 146,
+      "order": 144,
       "note": "保留，线上自定义有历史"
     },
     {
@@ -2419,10 +2502,12 @@
       "primaryRegions": [
         "glutes"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "hams"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 147,
+      "order": 145,
       "note": "保留"
     },
     {
@@ -2437,7 +2522,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 148,
+      "order": 146,
       "note": "保留"
     },
     {
@@ -2452,7 +2537,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 149,
+      "order": 147,
       "note": "保留"
     },
     {
@@ -2462,15 +2547,15 @@
       "subcategory": null,
       "equipmentType": "哑铃",
       "primaryRegions": [
-        "hams",
-        "glutes"
+        "glutes",
+        "hams"
       ],
       "secondaryRegions": [
-        "hams"
+        "lowerBack"
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 150,
+      "order": 148,
       "note": "主臀副腿"
     },
     {
@@ -2480,13 +2565,14 @@
       "subcategory": null,
       "equipmentType": "器械",
       "primaryRegions": [
-        "gluteMed",
+        "gluteMed"
+      ],
+      "secondaryRegions": [
         "glutes"
       ],
-      "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 151,
+      "order": 149,
       "note": "主臀副腿"
     },
     {
@@ -2496,13 +2582,14 @@
       "subcategory": null,
       "equipmentType": "弹力带",
       "primaryRegions": [
-        "gluteMed",
+        "gluteMed"
+      ],
+      "secondaryRegions": [
         "glutes"
       ],
-      "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 152,
+      "order": 150,
       "note": "保留"
     },
     {
@@ -2517,7 +2604,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 153,
+      "order": 151,
       "note": "必留"
     },
     {
@@ -2532,7 +2619,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 154,
+      "order": 152,
       "note": "保留"
     },
     {
@@ -2547,7 +2634,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 155,
+      "order": 153,
       "note": "保留"
     },
     {
@@ -2562,7 +2649,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 156,
+      "order": 154,
       "note": "必留，线上有历史"
     },
     {
@@ -2578,7 +2665,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 157,
+      "order": 155,
       "note": "必留"
     },
     {
@@ -2593,7 +2680,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 158,
+      "order": 156,
       "note": "保留"
     },
     {
@@ -2609,7 +2696,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 159,
+      "order": 157,
       "note": "保留"
     },
     {
@@ -2622,10 +2709,13 @@
         "abs",
         "obliques"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "lowerBack",
+        "glutes"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 160,
+      "order": 158,
       "note": "保留"
     },
     {
@@ -2637,10 +2727,12 @@
       "primaryRegions": [
         "obliques"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "abs"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 161,
+      "order": 159,
       "note": "保留"
     },
     {
@@ -2655,7 +2747,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 162,
+      "order": 160,
       "note": "保留"
     },
     {
@@ -2667,10 +2759,12 @@
       "primaryRegions": [
         "obliques"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "abs"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 163,
+      "order": 161,
       "note": "保留"
     },
     {
@@ -2685,7 +2779,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 164,
+      "order": 162,
       "note": "保留"
     },
     {
@@ -2700,7 +2794,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 165,
+      "order": 163,
       "note": "保留"
     },
     {
@@ -2712,10 +2806,12 @@
       "primaryRegions": [
         "obliques"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "abs"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 166,
+      "order": 164,
       "note": "保留，线上有历史"
     },
     {
@@ -2730,7 +2826,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 167,
+      "order": 165,
       "note": "保留，线上有历史"
     },
     {
@@ -2742,95 +2838,112 @@
       "primaryRegions": [
         "abs"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "obliques"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 168,
+      "order": 166,
       "note": "保留"
     },
     {
       "code": "BATTLE_ROPE",
       "name": "战绳",
       "category": "功能性",
-      "subcategory": null,
-      "equipmentType": "自重",
+      "subcategory": "动态控制",
+      "equipmentType": "其他",
       "primaryRegions": [
         "deltFront",
         "forearms"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "abs",
+        "obliques"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 169,
+      "order": 167,
       "note": "保留"
     },
     {
       "code": "BURPEE",
       "name": "波比跳",
       "category": "功能性",
-      "subcategory": null,
+      "subcategory": "动态控制",
       "equipmentType": "自重",
       "primaryRegions": [
         "quads",
         "chest"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "triceps",
+        "deltFront",
+        "abs"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 170,
+      "order": 168,
       "note": "保留"
     },
     {
       "code": "KETTLEBELL_SWING",
       "name": "壶铃摆荡",
       "category": "功能性",
-      "subcategory": null,
+      "subcategory": "动态控制",
       "equipmentType": "壶铃",
       "primaryRegions": [
         "glutes",
         "hams"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "lowerBack"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 171,
+      "order": 169,
       "note": "保留"
     },
     {
       "code": "TURKISH_GET_UP",
       "name": "土耳其起立",
       "category": "功能性",
-      "subcategory": null,
-      "equipmentType": "自重",
+      "subcategory": "动态控制",
+      "equipmentType": "壶铃",
       "primaryRegions": [
         "abs",
         "deltFront"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "obliques",
+        "glutes"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 172,
+      "order": 170,
       "note": "保留"
     },
     {
       "code": "FARMER_CARRY",
       "name": "农夫行走",
       "category": "功能性",
-      "subcategory": null,
-      "equipmentType": "自重",
+      "subcategory": "负重搬运",
+      "equipmentType": "其他",
       "primaryRegions": [
         "forearms",
         "traps"
       ],
-      "secondaryRegions": [],
+      "secondaryRegions": [
+        "abs",
+        "obliques"
+      ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 173,
+      "order": 171,
       "note": "保留"
     },
     {
       "code": "SHOULDER_WARMUP",
-      "name": "肩部热身",
+      "name": "肩部动态热身",
       "category": "热身拉伸",
       "subcategory": "动态热身",
       "equipmentType": "自重",
@@ -2838,7 +2951,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 174,
+      "order": 172,
       "note": "覆盖线上“练肩热身”"
     },
     {
@@ -2846,12 +2959,12 @@
       "name": "弹力带绕肩",
       "category": "热身拉伸",
       "subcategory": "动态热身",
-      "equipmentType": "自重",
+      "equipmentType": "弹力带",
       "primaryRegions": [],
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 175,
+      "order": 173,
       "note": "线上自定义有历史"
     },
     {
@@ -2864,7 +2977,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 176,
+      "order": 174,
       "note": "线上自定义有历史"
     },
     {
@@ -2877,7 +2990,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 177,
+      "order": 175,
       "note": "保留"
     },
     {
@@ -2890,7 +3003,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 178,
+      "order": 176,
       "note": "保留"
     },
     {
@@ -2903,7 +3016,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 179,
+      "order": 177,
       "note": "保留"
     },
     {
@@ -2916,7 +3029,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 180,
+      "order": 178,
       "note": "保留"
     },
     {
@@ -2929,7 +3042,7 @@
       "secondaryRegions": [],
       "formCues": [],
       "source": "preset-v1",
-      "order": 181,
+      "order": 179,
       "note": "保留"
     },
     {
@@ -2947,7 +3060,7 @@
       ],
       "formCues": [],
       "source": "preset-v1",
-      "order": 182,
+      "order": 180,
       "note": "保留，覆盖线上自定义旧名称"
     }
   ]

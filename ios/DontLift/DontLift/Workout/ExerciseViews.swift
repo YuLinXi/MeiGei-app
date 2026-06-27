@@ -84,7 +84,7 @@ struct ExerciseLibraryView: View {
 
     private var header: some View {
         HStack {
-            Text("动作")
+            Text("动作库")
                 .font(Theme.Font.display(size: 36, weight: .heavy))
                 .tracking(-1.08)
                 .foregroundStyle(Theme.Color.fg)
@@ -124,8 +124,6 @@ private struct ExerciseLibraryContentView: View {
     /// 全部内置（已归一到解剖三级树）。
     private var allBuiltin: [BuiltinExercise] { BuiltinExercise.starter }
     private var allCustom: [CustomExercise] { custom.filter { $0.deletedAt == nil } }
-    private var totalCount: Int { allBuiltin.count + allCustom.count }
-
     // MARK: 中文模糊多关键词 AND
 
     private func matchesQuery(_ name: String) -> Bool {
@@ -189,13 +187,6 @@ private struct ExerciseLibraryContentView: View {
         }
     }
 
-    // MARK: 左栏数量角标（仅按部位归属计，不随器械/搜索变化）
-
-    private func builtinCount(_ c: ExerciseCategory) -> Int {
-        allBuiltin.filter { $0.category == c.rawValue }.count
-            + allCustom.filter { $0.primaryMuscle == c.rawValue }.count
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             searchBar.padding(.horizontal, Theme.Spacing.lg).padding(.bottom, 8)
@@ -213,7 +204,7 @@ private struct ExerciseLibraryContentView: View {
                 .font(.system(size: 16, weight: .regular))
                 .foregroundStyle(Theme.Color.muted)
             TextField("", text: $query,
-                      prompt: Text("搜索 \(totalCount) 个动作").foregroundColor(Theme.Color.muted))
+                      prompt: Text("搜索动作").foregroundColor(Theme.Color.muted))
                 .font(Theme.Font.body(size: 14))
                 .foregroundStyle(Theme.Color.fg)
                 .submitLabel(.search)
@@ -243,13 +234,13 @@ private struct ExerciseLibraryContentView: View {
     private var leftRail: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 2) {
-                railRow(title: "全部", level: 0, count: totalCount,
+                railRow(title: "全部", level: 0,
                         selected: isAll, dimmed: searching) { selectAll() }
-                railRow(title: "自定义", level: 0, count: allCustom.count,
+                railRow(title: "自定义", level: 0,
                         selected: isMine, dimmed: searching) { selectMine() }
                 Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.vertical, 4)
                 ForEach(ExerciseCategory.allCases) { cat in
-                    railRow(title: cat.rawValue, level: 0, count: builtinCount(cat),
+                    railRow(title: cat.rawValue, level: 0,
                             selected: isSelectedCat(cat), dimmed: searching,
                             chevron: hasChildren(cat) ? (expandedCat == cat.rawValue ? .down : .right) : .none) {
                         tapCategory(cat)
@@ -270,21 +261,21 @@ private struct ExerciseLibraryContentView: View {
     private func childRows(_ cat: ExerciseCategory) -> some View {
         if let collapsed = cat.collapsedBrowseMuscle {
             ForEach(collapsed.heads, id: \.self) { h in
-                railRow(title: h, level: 1, count: nil,
+                railRow(title: h, level: 1,
                         selected: isSelectedHead(cat, collapsed.name, h), dimmed: searching) {
                     selectHead(cat, collapsed.name, h)
                 }
             }
         } else if cat.isAnatomical {
             ForEach(cat.muscles) { m in
-                railRow(title: m.name, level: 1, count: nil,
+                railRow(title: m.name, level: 1,
                         selected: isSelectedNode(cat, m.name), dimmed: searching,
                         chevron: m.hasHeads ? (expandedNode == m.name ? .down : .right) : .none) {
                     tapNode(cat, m.name, hasHeads: m.hasHeads)
                 }
                 if m.hasHeads && expandedNode == m.name {
                     ForEach(m.heads, id: \.self) { h in
-                        railRow(title: h, level: 2, count: nil,
+                        railRow(title: h, level: 2,
                                 selected: isSelectedHead(cat, m.name, h), dimmed: searching) {
                             selectHead(cat, m.name, h)
                         }
@@ -293,7 +284,7 @@ private struct ExerciseLibraryContentView: View {
             }
         } else {
             ForEach(cat.browseSubcategories, id: \.self) { sub in
-                railRow(title: sub, level: 1, count: nil,
+                railRow(title: sub, level: 1,
                         selected: isSelectedNode(cat, sub), dimmed: searching) {
                     selectNode(cat, sub)
                 }
@@ -303,7 +294,7 @@ private struct ExerciseLibraryContentView: View {
 
     private enum Chevron { case none, right, down }
 
-    private func railRow(title: String, level: Int, count: Int?, selected: Bool,
+    private func railRow(title: String, level: Int, selected: Bool,
                          dimmed: Bool, chevron: Chevron = .none,
                          action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -315,7 +306,6 @@ private struct ExerciseLibraryContentView: View {
                                      : (dimmed ? Theme.Color.muted : Theme.Color.fg))
                     .lineLimit(1).minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
-                if let count { Text("\(count)").font(Theme.Font.mono(size: 10)).foregroundStyle(Theme.Color.muted) }
                 switch chevron {
                 case .none:  EmptyView()
                 case .right: Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.Color.muted)

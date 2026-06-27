@@ -20,6 +20,19 @@ enum APIError: Error, LocalizedError {
     }
 }
 
+extension Error {
+    nonisolated var isCancellationError: Bool {
+        if self is CancellationError { return true }
+        if let error = self as? URLError, error.code == .cancelled { return true }
+        if let error = self as? APIError,
+           case .transport(let underlying) = error {
+            return underlying.isCancellationError
+        }
+        let nsError = self as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == URLError.cancelled.rawValue
+    }
+}
+
 /// 轻量 HTTP 客户端：注入 Bearer token、可选 Idempotency-Key、统一 JSON 编解码与错误映射。
 actor APIClient {
     static let shared = APIClient()
@@ -162,6 +175,11 @@ actor APIClient {
         do {
             (data, response) = try await fetch(req, id: id, retryOnConnectivity: retryOnConnectivity)
         } catch {
+            if error.isCancellationError {
+                let ms = Int(Date().timeIntervalSince(started) * 1000)
+                netLog.info("⊘ #\(id, privacy: .public) \(method, privacy: .public) \(endpoint, privacy: .public) · ⏱\(ms, privacy: .public)ms · 请求已取消")
+                throw error
+            }
             let ms = Int(Date().timeIntervalSince(started) * 1000)
             netLog.error("❌ #\(id, privacy: .public) \(method, privacy: .public) \(endpoint, privacy: .public) · ⏱\(ms, privacy: .public)ms · 网络异常：\(error.localizedDescription, privacy: .public)")
             throw APIError.transport(error)

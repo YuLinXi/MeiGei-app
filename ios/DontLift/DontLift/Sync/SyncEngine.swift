@@ -20,6 +20,7 @@ final class SyncEngine {
     private let modelContext: ModelContext
     private let api: APIClient
     private(set) var isSyncing = false
+    private var needsFollowUpSync = false
     /// 最近一次同步产生的「本地修改被覆盖」提示，供 UI 展示后清空。
     private(set) var pendingConflictNotices: [ConflictNotice] = []
 
@@ -32,9 +33,19 @@ final class SyncEngine {
 
     /// 串行同步全部域。单域失败不阻断其余域，失败项留待下次重试。
     func syncAll() async {
-        guard !isSyncing else { return }
+        if isSyncing {
+            needsFollowUpSync = true
+            return
+        }
         isSyncing = true
         defer { isSyncing = false }
+        repeat {
+            needsFollowUpSync = false
+            await syncOnce()
+        } while needsFollowUpSync
+    }
+
+    private func syncOnce() async {
         _ = await runSafely { try await self.syncCustomExercises() }
         _ = await runSafely { try await self.syncWorkoutPlanGroups() }
         _ = await runSafely { try await self.syncWorkoutPlans() }

@@ -6,7 +6,7 @@ struct TeamCheckinHistoryView: View {
 
     let team: TeamDTO
 
-    @State private var displayedMonth = Calendar.currentMondayFirst.startOfDay(for: .now)
+    @State private var displayedMonth = Self.initialDisplayedMonth
     @State private var selectedDate = Calendar.currentMondayFirst.startOfDay(for: .now)
     @State private var members: [TeamMemberDTO] = []
     @State private var loadedMonths: [Date: TeamCheckinHistoryMonthData] = [:]
@@ -21,11 +21,21 @@ struct TeamCheckinHistoryView: View {
         formatter.dateFormat = "HH:mm"
         return formatter
     }()
+    private static var initialDisplayedMonth: Date {
+        let calendar = Calendar.currentMondayFirst
+        let today = calendar.startOfDay(for: .now)
+        let components = calendar.dateComponents([.year, .month], from: today)
+        return calendar.date(from: components).map { calendar.startOfDay(for: $0) } ?? today
+    }
+
+    private var displayedMonthStart: Date {
+        monthStart(for: displayedMonth)
+    }
 
     private var month: CalendarHistoryMonthSnapshot<TeamCheckinHistoryRow> {
         TeamCheckinHistoryModels.monthSnapshot(
-            monthStart: displayedMonth,
-            cachedMonth: loadedMonths[displayedMonth],
+            monthStart: displayedMonthStart,
+            cachedMonth: loadedMonths[displayedMonthStart],
             memberName: displayName(for:),
             calendar: calendar
         )
@@ -40,6 +50,14 @@ struct TeamCheckinHistoryView: View {
         )
     }
 
+    private var teamCreatedDate: Date? {
+        team.createdAt.map { calendar.startOfDay(for: $0) }
+    }
+
+    private var teamCreatedMonthStart: Date? {
+        teamCreatedDate.map(monthStart(for:))
+    }
+
     var body: some View {
         CalendarHistoryScaffold(
             displayedMonth: $displayedMonth,
@@ -48,6 +66,7 @@ struct TeamCheckinHistoryView: View {
             month: month,
             archiveGroups: archiveGroups,
             calendar: calendar,
+            minimumSelectableDate: teamCreatedDate,
             monthSummaryText: { month in
                 month.rowCount == 0
                 ? "本月没有 Team 训练"
@@ -72,7 +91,7 @@ struct TeamCheckinHistoryView: View {
         )
         .paperToolbar(title: "历史训练", onBack: { dismiss() })
         .overlay(alignment: .top) {
-            if loadingMonths.contains(displayedMonth) {
+            if loadingMonths.contains(displayedMonthStart) {
                 ProgressView()
                     .padding(10)
                     .background(Theme.Color.surface, in: Capsule())
@@ -81,14 +100,14 @@ struct TeamCheckinHistoryView: View {
             }
         }
         .refreshable {
-            await load(month: displayedMonth, force: true)
+            await load(month: displayedMonthStart, force: true)
         }
         .sheet(item: $openedCheckin) { checkin in
             TeamCheckinDetailSheet(checkin: checkin, memberName: displayName(for: checkin.userId))
         }
         .task {
             await loadMembersIfNeeded()
-            await load(month: displayedMonth)
+            await load(month: displayedMonthStart)
         }
         .alert("出错了", isPresented: .constant(error != nil)) {
             Button("好") { error = nil }
@@ -100,12 +119,14 @@ struct TeamCheckinHistoryView: View {
         do {
             members = try await teamService.members(of: team.id)
         } catch {
+            guard !error.isCancellationError else { return }
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
 
     private func load(month rawMonth: Date, force: Bool = false) async {
         let month = monthStart(for: rawMonth)
+        if let teamCreatedMonthStart, month < teamCreatedMonthStart { return }
         guard force || loadedMonths[month] == nil else { return }
         guard !loadingMonths.contains(month) else { return }
         loadingMonths.insert(month)
@@ -118,11 +139,13 @@ struct TeamCheckinHistoryView: View {
                 reactions: feed.reactions
             )
         } catch {
+            guard !error.isCancellationError else { return }
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
 
     private func selectedDateAfterPickingMonth(_ monthStart: Date) -> Date {
+        let monthStart = self.monthStart(for: monthStart)
         if calendar.isDate(monthStart, equalTo: .now, toGranularity: .month) {
             return calendar.startOfDay(for: .now)
         }
@@ -211,6 +234,7 @@ struct TeamCheckinHistoryView: View {
 
 struct TeamCheckinDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedDetent: PresentationDetent = .large
 
     let checkin: TeamCheckinDTO
     let memberName: String
@@ -245,7 +269,7 @@ struct TeamCheckinDetailSheet: View {
         }
         .background(Theme.Color.bg.ignoresSafeArea())
         .presentationBackground(Theme.Color.bg)
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium, .large], selection: $selectedDetent)
         .presentationDragIndicator(.visible)
     }
 

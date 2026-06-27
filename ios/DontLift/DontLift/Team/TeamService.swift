@@ -161,6 +161,8 @@ final class TeamService {
             let checkins = try await send(intent)
             removePending(intent, userId: userId)
             return .shared(count: checkins.count)
+        } catch where error.isCancellationError {
+            return .cancelled
         } catch where shouldQueueShareRetry(error) {
             enqueue(intent, userId: userId)
             return .queued
@@ -178,6 +180,8 @@ final class TeamService {
                 .map(\.teamId)
             guard !enabledTeamIds.isEmpty else { return .privateOnly }
             return await shareOrQueue(draft: draft, teamIds: enabledTeamIds, userId: userId)
+        } catch where error.isCancellationError {
+            return .cancelled
         } catch APIError.transport {
             let cachedTeamIds = cachedAutoShareTeamIds(userId: userId)
             guard !cachedTeamIds.isEmpty else { return .privateOnly }
@@ -204,6 +208,8 @@ final class TeamService {
                 _ = try await send(readyIntent)
                 removePending(intent, userId: userId)
                 removePending(readyIntent, userId: userId)
+            } catch where error.isCancellationError {
+                return
             } catch where shouldQueueShareRetry(error) {
                 replacePending(intent, with: readyIntent, userId: userId)
             } catch {
@@ -277,6 +283,7 @@ final class TeamService {
     }
 
     private func shouldQueueShareRetry(_ error: Error) -> Bool {
+        if error.isCancellationError { return false }
         if case APIError.transport = error { return true }
         if case APIError.http(let status, let body) = error,
            status == 404,
@@ -315,7 +322,13 @@ enum TeamShareResult: Equatable {
     case privateOnly
     case shared(count: Int)
     case queued
+    case cancelled
     case failed(String)
+
+    var shouldRequestSync: Bool {
+        if case .queued = self { return true }
+        return false
+    }
 }
 
 private struct PendingCheckinShare: Codable, Identifiable, Equatable {

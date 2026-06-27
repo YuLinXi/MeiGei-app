@@ -536,6 +536,7 @@ enum SetField { case weight, reps }
 /// 训练进行中页（旧 WorkoutLoggingView 升级为新视觉，符号名保留以避免破坏 HistoryViews 等引用）。
 struct WorkoutLoggingView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(SyncEngine.self) private var syncEngine
     @Environment(TeamService.self) private var teamService
     @Environment(SessionStore.self) private var session
     @Environment(RestTimerController.self) private var restTimer
@@ -1569,7 +1570,9 @@ struct WorkoutLoggingView: View {
     }
 
     private func autoShareCompletedWorkout(_ draft: TeamShareDraft) async {
-        let result = await teamService.autoShareOrQueue(draft: draft, userId: session.currentUserId)
+        let userId = session.currentUserId
+        let result = await teamService.autoShareOrQueue(draft: draft, userId: userId)
+        requestTeamShareSyncIfNeeded(result: result, userId: userId)
         switch result {
         case .privateOnly:
             break
@@ -1579,9 +1582,17 @@ struct WorkoutLoggingView: View {
                                style: .success)
         case .queued:
             globalMessage.show("Team 自动分享已排队，同步成功后重试", style: .warning)
+        case .cancelled:
+            break
         case .failed:
             globalMessage.show("Team 自动分享失败，可稍后重试", style: .error)
         }
+    }
+
+    private func requestTeamShareSyncIfNeeded(result: TeamShareResult, userId: UUID?) {
+        guard let userId else { return }
+        guard result.shouldRequestSync || !teamService.pendingShareWorkoutIds(userId: userId).isEmpty else { return }
+        Task { await syncEngine.syncAll() }
     }
 
     private func detectPersonalRecordsFromFallbackHistory() -> [PersonalRecord] {

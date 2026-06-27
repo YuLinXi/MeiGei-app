@@ -31,6 +31,7 @@ struct TeamShareDraft: Identifiable, Codable, Hashable {
 struct TeamShareSheet: View {
     let draft: TeamShareDraft
 
+    @Environment(SyncEngine.self) private var syncEngine
     @Environment(TeamService.self) private var teamService
     @Environment(SessionStore.self) private var session
     @Environment(\.dismiss) private var dismiss
@@ -158,7 +159,10 @@ struct TeamShareSheet: View {
         isLoadingTeams = true
         defer { isLoadingTeams = false }
         do { try await teamService.loadMyTeams() }
-        catch { message = "Team 列表加载失败，这次可先保持仅自己可见。" }
+        catch {
+            guard !error.isCancellationError else { return }
+            message = "Team 列表加载失败，这次可先保持仅自己可见。"
+        }
     }
 
     private func submit() async {
@@ -172,8 +176,11 @@ struct TeamShareSheet: View {
         case .shared:
             dismiss()
         case .queued:
-            message = "网络不可用，已记录分享请求；同步成功后会自动重试。"
+            message = "已记录分享请求；同步成功后会自动重试。"
+            Task { await syncEngine.syncAll() }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { dismiss() }
+        case .cancelled:
+            break
         case .failed:
             message = "分享失败，请确认 Team 状态后重试。"
         }

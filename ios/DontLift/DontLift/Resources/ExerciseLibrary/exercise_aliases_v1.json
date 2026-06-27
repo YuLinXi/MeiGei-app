@@ -130,12 +130,14 @@
       "targetCode": "MACHINE_LEG_PRESS",
       "targetName": "器械倒蹬机",
       "legacyCodes": [
-        "MACHINE_LEG_PRESS"
+        "MACHINE_LEG_PRESS",
+        "LEG_PRESS"
       ],
       "legacyNames": [
         "器械倒蹬",
         "器械倒蹬(版本2)",
-        "器械倒蹬机"
+        "器械倒蹬机",
+        "腿举"
       ],
       "requiresNameMatch": false
     },
@@ -301,17 +303,20 @@
     {
       "targetCode": "CABLE_SINGLE_ARM_PULLDOWN",
       "targetName": "单臂绳索下拉",
-      "legacyCodes": [],
+      "legacyCodes": [
+        "SINGLE_ARM_LAT_PULLDOWN"
+      ],
       "legacyNames": [
         "龙门架单边下拉练胸",
         "单臂绳索下拉下压",
-        "单臂绳索下拉"
+        "单臂绳索下拉",
+        "单臂高位下拉"
       ],
       "requiresNameMatch": false
     },
     {
       "targetCode": "DB_UPRIGHT_ROW",
-      "targetName": "哑铃直立划船",
+      "targetName": "哑铃提拉",
       "legacyCodes": [],
       "legacyNames": [
         "站姿哑铃划船",
@@ -330,12 +335,15 @@
       "requiresNameMatch": false
     },
     {
-      "targetCode": "SINGLE_ARM_PREACHER_CURL",
-      "targetName": "单臂牧师凳弯举",
-      "legacyCodes": [],
+      "targetCode": "DB_PREACHER_CURL",
+      "targetName": "牧师凳哑铃弯举",
+      "legacyCodes": [
+        "SINGLE_ARM_PREACHER_CURL"
+      ],
       "legacyNames": [
         "坐姿单手牧师凳弯举",
-        "单臂牧师凳弯举"
+        "单臂牧师凳弯举",
+        "牧师凳哑铃弯举"
       ],
       "requiresNameMatch": false
     },
@@ -544,6 +552,40 @@
       ],
       "legacyNames": [
         "碎颅者"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "BB_HIGH_PULL",
+      "targetName": "杠铃提拉",
+      "legacyCodes": [
+        "UPRIGHT_ROW"
+      ],
+      "legacyNames": [
+        "杠铃直立划船",
+        "杠铃直立提拉"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "BB_PREACHER_CURL",
+      "targetName": "牧师凳杠铃弯举",
+      "legacyCodes": [
+        "PREACHER_CURL"
+      ],
+      "legacyNames": [
+        "牧师凳弯举",
+        "牧师凳杠铃弯举"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "EZ_BAR_PREACHER_CURL",
+      "targetName": "牧师凳 EZ 杠弯举",
+      "legacyCodes": [],
+      "legacyNames": [
+        "牧师凳EZ杠弯举",
+        "牧师凳 EZ 杠弯举"
       ],
       "requiresNameMatch": false
     }

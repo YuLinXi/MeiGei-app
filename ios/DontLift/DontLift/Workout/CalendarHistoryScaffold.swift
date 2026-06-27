@@ -65,6 +65,7 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
     let month: CalendarHistoryMonthSnapshot<Row>
     let archiveGroups: [CalendarHistoryYearArchiveGroup]
     let calendar: Calendar
+    var minimumSelectableDate: Date? = nil
     let monthSummaryText: (CalendarHistoryMonthSnapshot<Row>) -> String
     let selectedSummaryText: (CalendarHistoryDaySummary<Row>?) -> String
     let emptySelectedDayText: String
@@ -85,6 +86,16 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
     private var showTodayButton: Bool {
         !calendar.isDate(selectedDate, inSameDayAs: .now)
             || !calendar.isDate(displayedMonth, equalTo: .now, toGranularity: .month)
+    }
+    private var minimumDay: Date? {
+        minimumSelectableDate.map { calendar.startOfDay(for: $0) }
+    }
+    private var minimumMonthStart: Date? {
+        minimumDay.map(monthStart(for:))
+    }
+    private var canGoPreviousMonth: Bool {
+        guard let minimumMonthStart else { return true }
+        return monthStart(for: displayedMonth) > minimumMonthStart
     }
 
     var body: some View {
@@ -127,18 +138,11 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
         let bottomPadding: CGFloat = 10
         let headerEstimate: CGFloat = compact ? 96 : 112
         let rowCount = selectedSummary?.rows.count ?? 0
-        let drawerRows = rowCount == 0 ? 0 : min(rowCount, compact ? 1 : 2)
-        let drawerHeight: CGFloat
-        switch drawerRows {
-        case 0:
-            drawerHeight = compact ? 112 : 124
-        case 1:
-            drawerHeight = compact ? 128 : 142
-        default:
-            drawerHeight = compact ? 172 : 188
-        }
+        let maxDrawerRows = compact ? 3 : 4
+        let drawerRows = rowCount == 0 ? 0 : min(rowCount, maxDrawerRows)
+        let drawerHeight = drawerFrameHeight(visibleRows: drawerRows, compact: compact)
+        let reservedDrawerHeight = drawerFrameHeight(visibleRows: maxDrawerRows, compact: compact)
 
-        let reservedDrawerHeight: CGFloat = compact ? 128 : 188
         let calendarAvailable = size.height
             - topPadding
             - bottomPadding
@@ -158,6 +162,16 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
         )
     }
 
+    private func drawerFrameHeight(visibleRows: Int, compact: Bool) -> CGFloat {
+        guard visibleRows > 0 else { return compact ? 112 : 124 }
+        let rowHeight: CGFloat = 56
+        let rowSpacing: CGFloat = 8
+        let headerHeight: CGFloat = compact ? 40 : 42
+        let cardPadding = Theme.Spacing.md * 2
+        let rowsHeight = CGFloat(visibleRows) * rowHeight + CGFloat(max(visibleRows - 1, 0)) * rowSpacing
+        return cardPadding + headerHeight + Theme.Spacing.sm + rowsHeight
+    }
+
     private var monthHeader: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(eyebrow).eyebrowStyle()
@@ -175,6 +189,8 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
                 Spacer(minLength: 0)
                 HStack(spacing: 8) {
                     CircleIconButton(systemName: "chevron.left", size: 34, action: { shiftMonth(-1) })
+                        .disabled(!canGoPreviousMonth)
+                        .opacity(canGoPreviousMonth ? 1 : 0.35)
                         .accessibilityLabel("上个月")
                     CircleIconButton(systemName: "chevron.right", size: 34, action: { shiftMonth(1) })
                         .accessibilityLabel("下个月")
@@ -234,7 +250,6 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
 
     private func selectedDayDrawer(maxRows: Int) -> some View {
         let rows = selectedSummary?.rows ?? []
-        let hiddenCount = max(rows.count - maxRows, 0)
         return VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -249,14 +264,6 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
                 }
                 Spacer(minLength: Theme.Spacing.sm)
                 HStack(spacing: 6) {
-                    if hiddenCount > 0 {
-                        Text("+\(hiddenCount)")
-                            .font(Theme.Font.mono(size: 10, weight: .bold))
-                            .foregroundStyle(Theme.Color.accent)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Theme.Color.accentSoft, in: Capsule())
-                    }
                     ForEach(selectedSummary.map(selectedBadges) ?? []) { badge in
                         HStack(spacing: 4) {
                             if let systemName = badge.systemName {
@@ -275,14 +282,7 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
             }
 
             if !rows.isEmpty {
-                VStack(spacing: 8) {
-                    ForEach(Array(rows.prefix(maxRows))) { row in
-                        Button { onRowTap(row) } label: {
-                            rowContent(row, true)
-                        }
-                        .buttonStyle(PressableButtonStyle())
-                    }
-                }
+                selectedDayRows(rows, maxRows: maxRows)
             } else {
                 Text(emptySelectedDayText)
                     .font(Theme.Font.body(size: 13))
@@ -295,11 +295,36 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
         .paperShadow(.lg, cornerRadius: Theme.Radius.lg)
     }
 
+    @ViewBuilder
+    private func selectedDayRows(_ rows: [Row], maxRows: Int) -> some View {
+        if rows.count > maxRows {
+            ScrollView {
+                selectedDayRowButtons(rows)
+            }
+            .scrollIndicators(.hidden)
+        } else {
+            selectedDayRowButtons(rows)
+        }
+    }
+
+    private func selectedDayRowButtons(_ rows: [Row]) -> some View {
+        VStack(spacing: 8) {
+            ForEach(rows) { row in
+                Button { onRowTap(row) } label: {
+                    rowContent(row, true)
+                }
+                .buttonStyle(PressableButtonStyle())
+            }
+        }
+    }
+
     private func dayCell(_ day: CalendarHistoryDayCell<Row>, height: CGFloat) -> some View {
         let selected = calendar.isDate(day.date, inSameDayAs: selectedDate)
         let trained = day.summary != nil
         let compact = height < 54
+        let selectable = isSelectable(day.date)
         return Button {
+            guard selectable else { return }
             Theme.Haptics.selection()
             selectedDate = day.date
             if !calendar.isDate(day.date, equalTo: displayedMonth, toGranularity: .month) {
@@ -338,15 +363,19 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
             )
         }
         .buttonStyle(PressableButtonStyle())
+        .disabled(!selectable)
+        .opacity(selectable ? 1 : 0.45)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel(for: day))
     }
 
     private func shiftMonth(_ delta: Int) {
         guard let next = calendar.date(byAdding: .month, value: delta, to: displayedMonth) else { return }
-        displayedMonth = monthStart(for: next)
+        let nextMonth = clampedMonthStart(for: next)
+        guard nextMonth != monthStart(for: displayedMonth) || delta > 0 else { return }
+        displayedMonth = nextMonth
         if !calendar.isDate(selectedDate, equalTo: displayedMonth, toGranularity: .month) {
-            selectedDate = displayedMonth
+            selectedDate = clampedSelectableDate(displayedMonth)
         }
         onMonthChange(displayedMonth)
     }
@@ -354,15 +383,15 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
     private func jumpToToday() {
         Theme.Haptics.selection()
         let today = calendar.startOfDay(for: .now)
-        selectedDate = today
-        displayedMonth = monthStart(for: today)
+        selectedDate = clampedSelectableDate(today)
+        displayedMonth = monthStart(for: selectedDate)
         onMonthChange(displayedMonth)
     }
 
     private func applyPickedMonth(_ pickedMonth: Date) {
         Theme.Haptics.selection()
-        displayedMonth = monthStart(for: pickedMonth)
-        selectedDate = selectedDateAfterPickingMonth(displayedMonth)
+        displayedMonth = clampedMonthStart(for: pickedMonth)
+        selectedDate = clampedSelectableDate(selectedDateAfterPickingMonth(displayedMonth))
         onMonthChange(displayedMonth)
     }
 
@@ -371,7 +400,25 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
         return calendar.date(from: comps).map { calendar.startOfDay(for: $0) } ?? calendar.startOfDay(for: date)
     }
 
+    private func clampedMonthStart(for date: Date) -> Date {
+        let month = monthStart(for: date)
+        guard let minimumMonthStart, month < minimumMonthStart else { return month }
+        return minimumMonthStart
+    }
+
+    private func clampedSelectableDate(_ date: Date) -> Date {
+        let day = calendar.startOfDay(for: date)
+        guard let minimumDay, day < minimumDay else { return day }
+        return minimumDay
+    }
+
+    private func isSelectable(_ date: Date) -> Bool {
+        guard let minimumDay else { return true }
+        return calendar.startOfDay(for: date) >= minimumDay
+    }
+
     private func dayTextColor(_ day: CalendarHistoryDayCell<Row>, selected: Bool) -> Color {
+        if !isSelectable(day.date) { return Theme.Color.muted.opacity(0.45) }
         if selected { return Theme.Color.bg }
         if !day.isInDisplayedMonth { return Theme.Color.muted.opacity(0.55) }
         if day.summary != nil { return Theme.Color.fg }
