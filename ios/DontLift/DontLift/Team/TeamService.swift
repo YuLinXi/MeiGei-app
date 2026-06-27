@@ -114,6 +114,11 @@ final class TeamService {
                            query: [URLQueryItem(name: "date", value: Self.dateOnly(date))])
     }
 
+    func checkinHistory(teamId: UUID, month: Date) async throws -> TeamCheckinFeedDTO {
+        try await api.send("GET", "/teams/\(teamId)/checkins/history",
+                           query: [URLQueryItem(name: "month", value: Self.monthOnly(month))])
+    }
+
     func reactions(checkinId: UUID) async throws -> [CheckinReactionDTO] {
         try await api.send("GET", "/checkins/\(checkinId)/reactions")
     }
@@ -222,6 +227,16 @@ final class TeamService {
     }()
 
     static func dateOnly(_ date: Date) -> String { dateOnlyFormatter.string(from: date) }
+
+    private static let monthOnlyFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM"
+        return f
+    }()
+
+    static func monthOnly(_ date: Date) -> String { monthOnlyFormatter.string(from: date) }
 
     private func send(_ intent: PendingCheckinShare) async throws -> [TeamCheckinDTO] {
         let body = CheckInRequest(workoutId: intent.workoutId,

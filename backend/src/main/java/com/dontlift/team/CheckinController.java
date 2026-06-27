@@ -1,5 +1,6 @@
 package com.dontlift.team;
 
+import com.dontlift.common.web.AppException;
 import com.dontlift.security.SecurityUtils;
 import com.dontlift.team.dto.TeamRequests.CheckIn;
 import com.dontlift.team.dto.TeamRequests.React;
@@ -18,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.UUID;
 
@@ -53,6 +56,15 @@ public class CheckinController {
             @PathVariable UUID teamId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return checkinService.listCheckinFeed(SecurityUtils.currentUserId(), teamId, date);
+    }
+
+    @GetMapping("/teams/{teamId}/checkins/history")
+    public TeamCheckinFeed listCheckinHistory(@PathVariable UUID teamId, @RequestParam String month) {
+        try {
+            return checkinService.listCheckinHistory(SecurityUtils.currentUserId(), teamId, YearMonth.parse(month));
+        } catch (DateTimeParseException e) {
+            throw AppException.badRequest("month 必须为 yyyy-MM");
+        }
     }
 
     @PostMapping("/checkins/{checkinId}/reactions")

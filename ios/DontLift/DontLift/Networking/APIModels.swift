@@ -243,10 +243,14 @@ struct TeamCheckinDTO: Decodable, Identifiable, Hashable {
     var summary: String
     var createdAt: Date?
 
+    var decodedSummary: CheckinSummary? {
+        guard let data = summary.data(using: .utf8) else { return nil }
+        return try? JSONCoding.decoder.decode(CheckinSummary.self, from: data)
+    }
+
     /// 解析嵌套快照；坏数据时给空摘要兜底。
     var parsedSummary: CheckinSummary {
-        guard let data = summary.data(using: .utf8),
-              let s = try? JSONCoding.decoder.decode(CheckinSummary.self, from: data) else {
+        guard let s = decodedSummary else {
             return CheckinSummary(title: nil, startedAt: nil, endedAt: nil,
                                   exerciseCount: 0, totalSets: 0, totalVolumeKg: 0, exercises: [])
         }

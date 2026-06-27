@@ -627,6 +627,8 @@ struct TeamDetailView: View {
     @State private var confirmingAutoShareEnable = false
     @State private var pendingWithdrawCheckin: TeamCheckinDTO?
     @State private var confirmingWithdraw = false
+    @State private var showingHistory = false
+    @State private var openedCheckin: TeamCheckinDTO?
 
     private enum ConfirmKind: Identifiable { case leave, dissolve; var id: Int { hashValue } }
 
@@ -644,6 +646,7 @@ struct TeamDetailView: View {
                         }
                         headerCard
                         autoSharePreferenceCard
+                        historyEntry
 
                         Text("今日动态").eyebrowStyle()
                         if checkins.isEmpty {
@@ -658,7 +661,8 @@ struct TeamDetailView: View {
                                         myUserId: session.currentUserId,
                                         canWithdraw: session.currentUserId.map { $0 == c.userId } ?? false,
                                         onReact: { emoji in await react(checkinId: c.id, emoji: emoji) },
-                                        onWithdraw: { presentWithdrawConfirmation(c) }
+                                        onWithdraw: { presentWithdrawConfirmation(c) },
+                                        onOpen: { openedCheckin = c }
                                     )
                                 }
                             }
@@ -712,6 +716,10 @@ struct TeamDetailView: View {
             }
         )
         .navigationDestination(isPresented: $showingPlans) { TeamPlansView(team: team) }
+        .navigationDestination(isPresented: $showingHistory) { TeamCheckinHistoryView(team: team) }
+        .sheet(item: $openedCheckin) { checkin in
+            TeamCheckinDetailSheet(checkin: checkin, memberName: displayName(for: checkin.userId))
+        }
         .overlay(alignment: .top) { failureToast }
         .onAppear { prepareOwnerTakeoverNotice() }
         .task { await reload() }
@@ -839,6 +847,31 @@ struct TeamDetailView: View {
             }
         }
         .cardStyle()
+    }
+
+    private var historyEntry: some View {
+        Button { showingHistory = true } label: {
+            HStack(spacing: 9) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("历史训练")
+                        .font(Theme.Font.body(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg)
+                    Text("按月回看 Team 已分享训练")
+                        .font(Theme.Font.body(size: 12))
+                        .foregroundStyle(Theme.Color.fg2)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
     }
 
     // monogram 头像栈：me 在前高亮，−7px 重叠，超 5 折叠 +N。
@@ -1271,6 +1304,7 @@ struct FeedItemCard: View {
     let canWithdraw: Bool
     let onReact: (String) async -> Void
     let onWithdraw: () -> Void
+    let onOpen: () -> Void
 
     @State private var busy = false
 
@@ -1321,6 +1355,22 @@ struct FeedItemCard: View {
                     .foregroundStyle(Theme.Color.muted)
             }
             Spacer()
+            Button {
+                onOpen()
+            } label: {
+                HStack(spacing: 4) {
+                    Text("详情")
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                }
+                .font(Theme.Font.body(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg2)
+                .padding(.horizontal, 9)
+                .frame(height: 28)
+                .background(Theme.Color.bg, in: Capsule())
+                .overlay(Capsule().stroke(Theme.Color.border, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
             if canWithdraw {
                 Button {
                     onWithdraw()

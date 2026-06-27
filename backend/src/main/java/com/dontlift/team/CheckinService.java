@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -98,6 +99,18 @@ public class CheckinService {
 
     public TeamCheckinFeed listCheckinFeed(UUID userId, UUID teamId, LocalDate date) {
         List<TeamCheckin> checkins = listCheckins(userId, teamId, date);
+        return feedFor(checkins);
+    }
+
+    public TeamCheckinFeed listCheckinHistory(UUID userId, UUID teamId, YearMonth month) {
+        teamService.requireMember(teamId, userId);
+        LocalDate startDate = month.atDay(1);
+        LocalDate endDate = month.plusMonths(1).atDay(1);
+        List<TeamCheckin> checkins = checkinMapper.findByTeamAndDateRange(teamId, startDate, endDate);
+        return feedFor(checkins);
+    }
+
+    private TeamCheckinFeed feedFor(List<TeamCheckin> checkins) {
         if (checkins.isEmpty()) {
             return new TeamCheckinFeed(checkins, List.of());
         }

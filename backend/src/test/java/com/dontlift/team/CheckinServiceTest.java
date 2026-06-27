@@ -15,6 +15,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 
@@ -118,10 +120,65 @@ class CheckinServiceTest {
         verify(checkinMapper).deleteByTeamUserWorkout(teamId, userId, workoutId);
     }
 
+    @Test
+    void listCheckinHistory_requiresMemberAndReturnsMonthlyFeed() {
+        TeamCheckin newer = checkin(UUID.randomUUID(), LocalDate.parse("2026-06-24"), "2026-06-24T12:00:00Z");
+        TeamCheckin older = checkin(UUID.randomUUID(), LocalDate.parse("2026-06-01"), "2026-06-01T12:00:00Z");
+        when(checkinMapper.findByTeamAndDateRange(
+                teamId, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-07-01")))
+                .thenReturn(List.of(newer, older));
+        when(reactionMapper.findByCheckins(List.of(newer.getId(), older.getId()))).thenReturn(List.of());
+
+        var feed = service.listCheckinHistory(userId, teamId, YearMonth.parse("2026-06"));
+
+        assertThat(feed.checkins()).containsExactly(newer, older);
+        assertThat(feed.reactions()).isEmpty();
+        verify(teamService).requireMember(teamId, userId);
+        verify(checkinMapper).findByTeamAndDateRange(
+                teamId, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-07-01"));
+    }
+
+    @Test
+    void listCheckinHistory_rejectsNonMemberBeforeQueryingCheckins() {
+        when(teamService.requireMember(teamId, userId)).thenThrow(AppException.forbidden("非该 Team 成员"));
+
+        assertThatThrownBy(() -> service.listCheckinHistory(userId, teamId, YearMonth.parse("2026-06")))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("非该 Team 成员");
+
+        verify(checkinMapper, never()).findByTeamAndDateRange(any(), any(), any());
+        verify(reactionMapper, never()).findByCheckins(any());
+    }
+
+    @Test
+    void listCheckinHistory_returnsEmptyFeedWithoutReactionQuery() {
+        when(checkinMapper.findByTeamAndDateRange(
+                teamId, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-07-01")))
+                .thenReturn(List.of());
+
+        var feed = service.listCheckinHistory(userId, teamId, YearMonth.parse("2026-06"));
+
+        assertThat(feed.checkins()).isEmpty();
+        assertThat(feed.reactions()).isEmpty();
+        verify(reactionMapper, never()).findByCheckins(any());
+    }
+
     private void givenShareableWorkout() {
         Workout workout = new Workout();
         workout.setId(workoutId);
         workout.setUserId(userId);
         when(workoutMapper.findByIdIncludingDeleted(workoutId)).thenReturn(workout);
+    }
+
+    private TeamCheckin checkin(UUID id, LocalDate date, String createdAt) {
+        TeamCheckin checkin = new TeamCheckin();
+        checkin.setId(id);
+        checkin.setTeamId(teamId);
+        checkin.setUserId(userId);
+        checkin.setWorkoutId(UUID.randomUUID());
+        checkin.setCheckinDate(date);
+        checkin.setSummary("{}");
+        checkin.setCreatedAt(OffsetDateTime.parse(createdAt));
+        return checkin;
     }
 }
