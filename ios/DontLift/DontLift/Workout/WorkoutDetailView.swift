@@ -296,6 +296,7 @@ private struct ExerciseLogCard: View {
     let exercise: WorkoutExercise
     /// 该动作本次的 PR 重量（非 nil 时，等于此重量的首个组标 ▲ PR）。
     var prMaxWeight: Double?
+    @State private var showingFullNote = false
 
     private var sortedSets: [WorkoutSet] {
         exercise.displaySortedSets
@@ -328,6 +329,10 @@ private struct ExerciseLogCard: View {
         guard let pr = prMaxWeight else { return nil }
         return sortedSets.first(where: { $0.weightKg == pr })?.setIndex
     }
+    private var noteText: String? {
+        let trimmed = exercise.note?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -342,6 +347,19 @@ private struct ExerciseLogCard: View {
             }
             .padding(.horizontal, 15)
             .padding(.top, 12).padding(.bottom, 10)
+
+            if let noteText {
+                Button {
+                    showingFullNote = true
+                } label: {
+                    notePreview(noteText)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 15)
+                .padding(.bottom, 10)
+                .accessibilityLabel("查看动作备注")
+                .accessibilityHint(noteText)
+            }
 
             Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.horizontal, 15)
 
@@ -362,6 +380,71 @@ private struct ExerciseLogCard: View {
                 .stroke(Theme.Color.border, lineWidth: 1)
         )
         .paperShadow(.sm, cornerRadius: Theme.Radius.lg)
+        .sheet(isPresented: $showingFullNote) {
+            if let noteText {
+                ExerciseFullNoteSheet(exerciseName: exercise.displayExerciseName, note: noteText)
+            }
+        }
+    }
+
+    private func notePreview(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "note.text")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg2)
+                .padding(.top, 2)
+            Text(text)
+                .font(Theme.Font.body(size: 13, weight: .medium))
+                .foregroundStyle(Theme.Color.fg2)
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .multilineTextAlignment(.leading)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 9)
+        .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Theme.Color.border, lineWidth: 1)
+        )
+    }
+}
+
+private struct ExerciseFullNoteSheet: View {
+    let exerciseName: String
+    let note: String
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PaperSheetTitleHeader(title: "动作备注", background: Theme.Color.surface)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(exerciseName)
+                        .font(Theme.Font.l2)
+                        .foregroundStyle(Theme.Color.fg)
+                        .lineLimit(2)
+
+                    Text(note)
+                        .font(Theme.Font.body(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.Color.fg2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                .stroke(Theme.Color.border, lineWidth: 1)
+                        )
+                }
+                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.top, Theme.Spacing.lg)
+                .padding(.bottom, Theme.Spacing.xl)
+            }
+        }
+        .background(Theme.Color.surface.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
 

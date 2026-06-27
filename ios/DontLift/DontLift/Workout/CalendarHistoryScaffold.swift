@@ -482,12 +482,7 @@ private struct CalendarHistoryMonthArchiveSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PaperSheetHeader(
-                title: "选择月份",
-                cancelTitle: "完成",
-                background: Theme.Color.bg,
-                onCancel: { dismiss() }
-            )
+            PaperSheetTitleHeader(title: "选择月份", background: Theme.Color.bg)
             ScrollViewReader { proxy in
                 ZStack(alignment: .trailing) {
                     ScrollView {

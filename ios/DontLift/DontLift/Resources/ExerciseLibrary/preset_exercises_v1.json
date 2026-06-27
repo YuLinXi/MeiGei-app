@@ -1203,7 +1203,7 @@
     },
     {
       "code": "DB_OVERHEAD_PRESS",
-      "name": "哑铃推肩",
+      "name": "坐姿哑铃推肩",
       "category": "肩",
       "subcategory": "前束",
       "equipmentType": "哑铃",
@@ -3062,6 +3062,662 @@
       "source": "preset-v1",
       "order": 180,
       "note": "保留，覆盖线上自定义旧名称"
+    },
+    {
+      "code": "MACHINE_DECLINE_CHEST_PRESS",
+      "name": "下斜器械推胸",
+      "category": "胸",
+      "subcategory": "中下胸",
+      "equipmentType": "器械",
+      "primaryRegions": [
+        "chest"
+      ],
+      "secondaryRegions": [
+        "deltFront",
+        "triceps"
+      ],
+      "note": "扩展新增，补齐下斜器械推胸",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 181
+    },
+    {
+      "code": "DECLINE_HAMMER_CHEST_PRESS",
+      "name": "下斜悍马机推胸",
+      "category": "胸",
+      "subcategory": "中下胸",
+      "equipmentType": "悍马机",
+      "primaryRegions": [
+        "chest"
+      ],
+      "secondaryRegions": [
+        "deltFront",
+        "triceps"
+      ],
+      "note": "扩展新增，补齐下斜悍马机推胸",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 182
+    },
+    {
+      "code": "NEUTRAL_GRIP_PULL_UP",
+      "name": "对握引体向上",
+      "category": "背",
+      "subcategory": null,
+      "equipmentType": "自重",
+      "primaryRegions": [
+        "lats"
+      ],
+      "secondaryRegions": [
+        "biceps",
+        "deltRear"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 183
+    },
+    {
+      "code": "SINGLE_ARM_CABLE_ROW",
+      "name": "单臂绳索划船",
+      "category": "背",
+      "subcategory": null,
+      "equipmentType": "绳索",
+      "primaryRegions": [
+        "lats",
+        "rhomboids"
+      ],
+      "secondaryRegions": [
+        "biceps",
+        "deltRear"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 184
+    },
+    {
+      "code": "CHEST_SUPPORTED_T_BAR_ROW",
+      "name": "胸托 T 杠划船",
+      "category": "背",
+      "subcategory": null,
+      "equipmentType": "T杠",
+      "primaryRegions": [
+        "lats",
+        "rhomboids"
+      ],
+      "secondaryRegions": [
+        "biceps",
+        "deltRear"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 185
+    },
+    {
+      "code": "CHEST_SUPPORTED_MACHINE_ROW",
+      "name": "胸托器械划船",
+      "category": "背",
+      "subcategory": null,
+      "equipmentType": "器械",
+      "primaryRegions": [
+        "lats",
+        "rhomboids"
+      ],
+      "secondaryRegions": [
+        "biceps",
+        "deltRear"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 186
+    },
+    {
+      "code": "MEADOWS_ROW",
+      "name": "梅多斯划船",
+      "category": "背",
+      "subcategory": null,
+      "equipmentType": "杠铃",
+      "primaryRegions": [
+        "lats",
+        "rhomboids"
+      ],
+      "secondaryRegions": [
+        "biceps",
+        "deltRear"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 187
+    },
+    {
+      "code": "SEAL_ROW",
+      "name": "海豹划船",
+      "category": "背",
+      "subcategory": null,
+      "equipmentType": "杠铃",
+      "primaryRegions": [
+        "lats",
+        "rhomboids"
+      ],
+      "secondaryRegions": [
+        "biceps",
+        "deltRear"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 188
+    },
+    {
+      "code": "MACHINE_PULLOVER",
+      "name": "器械上拉",
+      "category": "背",
+      "subcategory": null,
+      "equipmentType": "器械",
+      "primaryRegions": [
+        "lats"
+      ],
+      "secondaryRegions": [
+        "chest",
+        "triceps"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 189
+    },
+    {
+      "code": "LANDMINE_ROW",
+      "name": "地雷杆划船",
+      "category": "背",
+      "subcategory": null,
+      "equipmentType": "杠铃",
+      "primaryRegions": [
+        "lats",
+        "rhomboids"
+      ],
+      "secondaryRegions": [
+        "biceps",
+        "deltRear"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 190
+    },
+    {
+      "code": "SEATED_DB_LATERAL_RAISE",
+      "name": "坐姿哑铃侧平举",
+      "category": "肩",
+      "subcategory": "中束",
+      "equipmentType": "哑铃",
+      "primaryRegions": [
+        "deltSide"
+      ],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 191
+    },
+    {
+      "code": "INCLINE_DB_LATERAL_RAISE",
+      "name": "上斜哑铃侧平举",
+      "category": "肩",
+      "subcategory": "中束",
+      "equipmentType": "哑铃",
+      "primaryRegions": [
+        "deltSide"
+      ],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 192
+    },
+    {
+      "code": "SINGLE_ARM_DB_LATERAL_RAISE",
+      "name": "单臂哑铃侧平举",
+      "category": "肩",
+      "subcategory": "中束",
+      "equipmentType": "哑铃",
+      "primaryRegions": [
+        "deltSide"
+      ],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 193
+    },
+    {
+      "code": "STANDING_DB_SHOULDER_PRESS",
+      "name": "站姿哑铃推肩",
+      "category": "肩",
+      "subcategory": "前束",
+      "equipmentType": "哑铃",
+      "primaryRegions": [
+        "deltFront"
+      ],
+      "secondaryRegions": [
+        "triceps",
+        "deltSide"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 194
+    },
+    {
+      "code": "INCLINE_DB_REAR_DELT_FLY",
+      "name": "上斜哑铃后束飞鸟",
+      "category": "肩",
+      "subcategory": "后束",
+      "equipmentType": "哑铃",
+      "primaryRegions": [
+        "deltRear"
+      ],
+      "secondaryRegions": [
+        "traps",
+        "rhomboids"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 195
+    },
+    {
+      "code": "SINGLE_ARM_CABLE_CURL",
+      "name": "单臂绳索弯举",
+      "category": "手臂",
+      "subcategory": null,
+      "equipmentType": "绳索",
+      "primaryRegions": [
+        "biceps"
+      ],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 196
+    },
+    {
+      "code": "SMITH_LUNGE",
+      "name": "史密斯箭步蹲",
+      "category": "腿",
+      "subcategory": null,
+      "equipmentType": "史密斯",
+      "primaryRegions": [
+        "quads",
+        "glutes"
+      ],
+      "secondaryRegions": [
+        "adductors",
+        "hams"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 197
+    },
+    {
+      "code": "SMITH_BULGARIAN_SPLIT_SQUAT",
+      "name": "史密斯保加利亚分腿蹲",
+      "category": "腿",
+      "subcategory": null,
+      "equipmentType": "史密斯",
+      "primaryRegions": [
+        "quads",
+        "glutes"
+      ],
+      "secondaryRegions": [
+        "adductors",
+        "hams"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 198
+    },
+    {
+      "code": "SMITH_HIP_THRUST",
+      "name": "史密斯臀推",
+      "category": "臀",
+      "subcategory": null,
+      "equipmentType": "史密斯",
+      "primaryRegions": [
+        "glutes"
+      ],
+      "secondaryRegions": [
+        "hams"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 199
+    },
+    {
+      "code": "KB_DEADLIFT",
+      "name": "壶铃硬拉",
+      "category": "臀",
+      "subcategory": null,
+      "equipmentType": "壶铃",
+      "primaryRegions": [
+        "glutes",
+        "hams"
+      ],
+      "secondaryRegions": [
+        "lowerBack"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 200
+    },
+    {
+      "code": "CLAMSHELL",
+      "name": "蚌式开合",
+      "category": "臀",
+      "subcategory": null,
+      "equipmentType": "自重",
+      "primaryRegions": [
+        "gluteMed"
+      ],
+      "secondaryRegions": [
+        "glutes"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 201
+    },
+    {
+      "code": "FROG_PUMP",
+      "name": "青蛙泵",
+      "category": "臀",
+      "subcategory": null,
+      "equipmentType": "自重",
+      "primaryRegions": [
+        "glutes"
+      ],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 202
+    },
+    {
+      "code": "MACHINE_CRUNCH",
+      "name": "器械卷腹",
+      "category": "核心",
+      "subcategory": null,
+      "equipmentType": "器械",
+      "primaryRegions": [
+        "abs"
+      ],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 203
+    },
+    {
+      "code": "WEIGHTED_CRUNCH",
+      "name": "负重卷腹",
+      "category": "核心",
+      "subcategory": null,
+      "equipmentType": "其他",
+      "primaryRegions": [
+        "abs"
+      ],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 204
+    },
+    {
+      "code": "BARBELL_POWER_CLEAN",
+      "name": "杠铃高翻",
+      "category": "功能性",
+      "subcategory": "爆发奥举",
+      "equipmentType": "杠铃",
+      "primaryRegions": [
+        "traps",
+        "glutes",
+        "hams"
+      ],
+      "secondaryRegions": [
+        "lowerBack",
+        "quads",
+        "forearms"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 205
+    },
+    {
+      "code": "BARBELL_CLEAN_AND_JERK",
+      "name": "杠铃挺举",
+      "category": "功能性",
+      "subcategory": "爆发奥举",
+      "equipmentType": "杠铃",
+      "primaryRegions": [
+        "glutes",
+        "quads",
+        "deltFront"
+      ],
+      "secondaryRegions": [
+        "hams",
+        "traps",
+        "triceps"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 206
+    },
+    {
+      "code": "BARBELL_SNATCH",
+      "name": "杠铃抓举",
+      "category": "功能性",
+      "subcategory": "爆发奥举",
+      "equipmentType": "杠铃",
+      "primaryRegions": [
+        "glutes",
+        "hams",
+        "traps",
+        "deltFront"
+      ],
+      "secondaryRegions": [
+        "lowerBack",
+        "quads"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 207
+    },
+    {
+      "code": "MED_BALL_SLAM",
+      "name": "药球砸地",
+      "category": "功能性",
+      "subcategory": "爆发奥举",
+      "equipmentType": "其他",
+      "primaryRegions": [
+        "abs",
+        "lats",
+        "deltFront"
+      ],
+      "secondaryRegions": [
+        "glutes",
+        "quads"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 208
+    },
+    {
+      "code": "BAND_CHEST_SHOULDER_STRETCH",
+      "name": "弹力带拉伸胸肩",
+      "category": "热身拉伸",
+      "subcategory": "动态热身",
+      "equipmentType": "弹力带",
+      "primaryRegions": [],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 209
+    },
+    {
+      "code": "SCAPULAR_PUSH_UP",
+      "name": "肩胛俯卧撑",
+      "category": "热身拉伸",
+      "subcategory": "动态热身",
+      "equipmentType": "自重",
+      "primaryRegions": [],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 210
+    },
+    {
+      "code": "BAND_FACE_PULL",
+      "name": "弹力带面拉",
+      "category": "热身拉伸",
+      "subcategory": "动态热身",
+      "equipmentType": "弹力带",
+      "primaryRegions": [],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 211
+    },
+    {
+      "code": "HIP_FLEXOR_STRETCH",
+      "name": "髋屈肌拉伸",
+      "category": "热身拉伸",
+      "subcategory": "静态拉伸",
+      "equipmentType": "自重",
+      "primaryRegions": [],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 212
+    },
+    {
+      "code": "HAMSTRING_STRETCH",
+      "name": "腘绳肌拉伸",
+      "category": "热身拉伸",
+      "subcategory": "静态拉伸",
+      "equipmentType": "自重",
+      "primaryRegions": [],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 213
+    },
+    {
+      "code": "QUAD_STRETCH",
+      "name": "股四头肌拉伸",
+      "category": "热身拉伸",
+      "subcategory": "静态拉伸",
+      "equipmentType": "自重",
+      "primaryRegions": [],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 214
+    },
+    {
+      "code": "CALF_STRETCH",
+      "name": "小腿拉伸",
+      "category": "热身拉伸",
+      "subcategory": "静态拉伸",
+      "equipmentType": "自重",
+      "primaryRegions": [],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 215
+    },
+    {
+      "code": "HIP_90_90",
+      "name": "90/90 髋活动",
+      "category": "热身拉伸",
+      "subcategory": "动态热身",
+      "equipmentType": "自重",
+      "primaryRegions": [],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 216
+    },
+    {
+      "code": "WORLDS_GREATEST_STRETCH",
+      "name": "世界最伟大拉伸",
+      "category": "热身拉伸",
+      "subcategory": "动态热身",
+      "equipmentType": "自重",
+      "primaryRegions": [],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 217
+    },
+    {
+      "code": "FOAM_ROLL_QUAD",
+      "name": "泡沫轴股四头肌放松",
+      "category": "热身拉伸",
+      "subcategory": "泡沫轴放松",
+      "equipmentType": "其他",
+      "primaryRegions": [],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 218
+    },
+    {
+      "code": "FOAM_ROLL_GLUTES",
+      "name": "泡沫轴臀部放松",
+      "category": "热身拉伸",
+      "subcategory": "泡沫轴放松",
+      "equipmentType": "其他",
+      "primaryRegions": [],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 219
+    },
+    {
+      "code": "FOAM_ROLL_LATS",
+      "name": "泡沫轴背阔肌放松",
+      "category": "热身拉伸",
+      "subcategory": "泡沫轴放松",
+      "equipmentType": "其他",
+      "primaryRegions": [],
+      "secondaryRegions": [],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 220
     }
   ]
 }

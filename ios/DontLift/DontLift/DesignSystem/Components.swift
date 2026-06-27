@@ -464,6 +464,35 @@ struct CircleAddMenu: View {
 
 // MARK: - Sheet 顶部栏
 
+/// 底部 sheet 无操作标题栏：仅居中标题，不展示取消/完成按钮。
+/// 用于只读详情、浏览型选择器等不需要显式确认的弹层；关闭依赖系统下滑。
+struct PaperSheetTitleHeader: View {
+    let title: String
+    var topPadding: CGFloat = 16
+    var bottomPadding: CGFloat = 12
+    var background: Color = Theme.Color.surface
+    var showsDivider: Bool = true
+
+    var body: some View {
+        Text(title)
+            .font(Theme.Font.display(size: 21, weight: .heavy))
+            .foregroundStyle(Theme.Color.fg)
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .frame(maxWidth: .infinity)
+            .frame(height: PaperSheetHeaderActionButton.height)
+            .padding(.horizontal, 18)
+            .padding(.top, topPadding)
+            .padding(.bottom, bottomPadding)
+            .background(background)
+            .overlay(alignment: .bottom) {
+                if showsDivider {
+                    Rectangle().fill(Theme.Color.border).frame(height: 1)
+                }
+            }
+    }
+}
+
 /// 底部 sheet 顶部栏：左取消 / 中标题 / 右确认，动作按钮统一为 44pt 胶囊触控区。
 /// 用于替代系统 toolbar 文本按钮，避免不同 sheet 间字号、背景和点击反馈漂移。
 struct PaperSheetHeader: View {

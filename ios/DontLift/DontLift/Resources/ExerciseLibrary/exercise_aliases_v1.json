@@ -265,14 +265,15 @@
     },
     {
       "targetCode": "DB_OVERHEAD_PRESS",
-      "targetName": "哑铃推肩",
+      "targetName": "坐姿哑铃推肩",
       "legacyCodes": [
         "DB_OVERHEAD_PRESS",
         "DB_SHOULDER_PRESS"
       ],
       "legacyNames": [
         "哑铃推肩",
-        "哑铃肩推"
+        "哑铃肩推",
+        "坐姿哑铃推肩"
       ],
       "requiresNameMatch": false
     },

@@ -233,7 +233,6 @@ struct TeamCheckinHistoryView: View {
 }
 
 struct TeamCheckinDetailSheet: View {
-    @Environment(\.dismiss) private var dismiss
     @State private var selectedDetent: PresentationDetent = .large
 
     let checkin: TeamCheckinDTO
@@ -249,12 +248,7 @@ struct TeamCheckinDetailSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PaperSheetHeader(
-                title: "训练详情",
-                cancelTitle: "完成",
-                background: Theme.Color.bg,
-                onCancel: { dismiss() }
-            )
+            PaperSheetTitleHeader(title: "训练详情", background: Theme.Color.bg)
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     header

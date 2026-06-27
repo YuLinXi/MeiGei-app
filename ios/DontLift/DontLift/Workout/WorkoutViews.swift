@@ -599,12 +599,31 @@ struct WorkoutLoggingView: View {
     @GestureState private var fabDrag: CGSize = .zero
     /// 显式动作排序面板。
     @State private var showingOrderEditor = false
+    /// 当前正在编辑备注的动作 localId；nil 表示备注编辑 sheet 关闭。
+    @State private var noteEditingExerciseId: UUID?
+    /// 动作备注编辑草稿；仅点击「完成」或「清空备注」时写回模型。
+    @State private var noteDraft: String = ""
 
     private static let continuedRestDuration: TimeInterval = 30
+    private static let exerciseNoteLimit = 200
 
     /// 是否允许编辑内容（勾选完成 / 改重量次数 / 加删动作）：仅进行中会话可编辑；
     /// 已完成训练一律只读，产品逻辑不支持二次编辑。
     private var canEdit: Bool { workout.isActive }
+
+    private var noteEditingExercise: WorkoutExercise? {
+        guard let id = noteEditingExerciseId else { return nil }
+        return workout.exercises.first { $0.localId == id }
+    }
+
+    private var noteEditorBinding: Binding<Bool> {
+        Binding(
+            get: { noteEditingExerciseId != nil },
+            set: { isPresented in
+                if !isPresented { dismissNoteEditor() }
+            }
+        )
+    }
 
     private var completedSetCount: Int {
         workout.exercises.flatMap(\.sets).filter(\.completed).count
@@ -893,6 +912,18 @@ struct WorkoutLoggingView: View {
                                      items: workoutOrderItems,
                                      onCommit: applyWorkoutExerciseOrder)
         }
+        .sheet(isPresented: noteEditorBinding) {
+            if let ex = noteEditingExercise {
+                ExerciseNoteEditorSheet(
+                    exerciseName: ex.displayExerciseName,
+                    note: $noteDraft,
+                    limit: Self.exerciseNoteLimit,
+                    onCancel: dismissNoteEditor,
+                    onClear: clearExerciseNote,
+                    onSave: saveExerciseNote
+                )
+            }
+        }
         .onAppear {
             consumeRestCompletionIfNeeded()
         }
@@ -1073,6 +1104,9 @@ struct WorkoutLoggingView: View {
                                   prepareForPresentation()
                                   menuExerciseId = opening ? ex.localId : nil
                               },
+                              onEditNote: {
+                                  beginNoteEditing(for: ex)
+                              },
                               onMoreSet: { set in
                                   // 打开该组「更多操作」菜单：先收键盘（避免菜单被遮、且防删除聚焦组后 focused 悬空），
                                   // 与动作级 ⋯ 菜单互斥。
@@ -1233,6 +1267,23 @@ struct WorkoutLoggingView: View {
             .padding(16)
             Rectangle().fill(Theme.Color.border).frame(height: 1)
             Button {
+                beginNoteEditing(for: ex)
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text(ex.note?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? "编辑备注" : "添加备注")
+                        .font(Theme.Font.l2)
+                    Spacer()
+                }
+                .foregroundStyle(Theme.Color.fg)
+                .padding(.horizontal, 16).padding(.vertical, 14)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(ex.note?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? "编辑动作备注" : "添加动作备注")
+            .accessibilityHint("为\(ex.displayExerciseName)记录本次训练备注")
+            Rectangle().fill(Theme.Color.border).frame(height: 1)
+            Button {
                 menuExerciseId = nil
                 dismissRestDurationEditor()
                 delete(ex)
@@ -1390,6 +1441,38 @@ struct WorkoutLoggingView: View {
         for (idx, ex) in sorted.enumerated() { ex.orderIndex = idx }
         touch()
         Theme.Haptics.selection()
+    }
+
+    private func beginNoteEditing(for ex: WorkoutExercise) {
+        prepareForPresentation()
+        noteDraft = String((ex.note ?? "").prefix(Self.exerciseNoteLimit))
+        noteEditingExerciseId = ex.localId
+    }
+
+    private func dismissNoteEditor() {
+        noteEditingExerciseId = nil
+        noteDraft = ""
+    }
+
+    private func saveExerciseNote() {
+        guard let ex = noteEditingExercise else {
+            dismissNoteEditor()
+            return
+        }
+        let trimmed = noteDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        ex.note = trimmed.isEmpty ? nil : String(trimmed.prefix(Self.exerciseNoteLimit))
+        touch()
+        dismissNoteEditor()
+    }
+
+    private func clearExerciseNote() {
+        guard let ex = noteEditingExercise else {
+            dismissNoteEditor()
+            return
+        }
+        ex.note = nil
+        touch()
+        dismissNoteEditor()
     }
 
     private func beginRestDurationEditing(for ex: WorkoutExercise, current: Int, isCustom: Bool) {
@@ -1903,6 +1986,88 @@ private struct RestMenuSizeKey: PreferenceKey {
     }
 }
 
+private struct ExerciseNoteEditorSheet: View {
+    let exerciseName: String
+    @Binding var note: String
+    let limit: Int
+    let onCancel: () -> Void
+    let onClear: () -> Void
+    let onSave: () -> Void
+
+    private var limitedNote: Binding<String> {
+        Binding(
+            get: { note },
+            set: { newValue in
+                note = String(newValue.prefix(limit))
+            }
+        )
+    }
+
+    private var hasDraftText: Bool {
+        !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PaperSheetHeader(
+                title: "动作备注",
+                cancelTitle: "取消",
+                confirmTitle: "完成",
+                background: Theme.Color.surface,
+                onCancel: onCancel,
+                onConfirm: onSave
+            )
+            VStack(alignment: .leading, spacing: 14) {
+                Text(exerciseName)
+                    .font(Theme.Font.l2)
+                    .foregroundStyle(Theme.Color.fg)
+                    .lineLimit(2)
+
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: limitedNote)
+                        .font(Theme.Font.body(size: 16, weight: .medium))
+                        .foregroundStyle(Theme.Color.fg)
+                        .scrollContentBackground(.hidden)
+                        .padding(10)
+                        .frame(minHeight: 180)
+                        .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                .stroke(Theme.Color.border2, lineWidth: 1)
+                        )
+                        .accessibilityLabel("动作备注输入框")
+                    if note.isEmpty {
+                        Text("记录这次动作的感觉、注意点或下次提醒…")
+                            .font(Theme.Font.body(size: 16, weight: .medium))
+                            .foregroundStyle(Theme.Color.muted)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 18)
+                            .allowsHitTesting(false)
+                    }
+                }
+
+                HStack {
+                    Text("\(note.count)/\(limit)")
+                        .font(Theme.Font.mono(size: 12, weight: .medium))
+                        .foregroundStyle(note.count >= limit ? Theme.Color.fg2 : Theme.Color.muted)
+                    Spacer()
+                    Button("清空备注", action: onClear)
+                        .font(Theme.Font.body(size: 14, weight: .bold))
+                        .foregroundStyle(hasDraftText ? Theme.Color.fg2 : Theme.Color.muted)
+                        .disabled(!hasDraftText)
+                        .accessibilityHint("清空并保存为空备注")
+                }
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.top, Theme.Spacing.lg)
+            Spacer(minLength: 0)
+        }
+        .background(Theme.Color.surface.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
 private struct ExerciseBlock: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var exercise: WorkoutExercise
@@ -1924,6 +2089,7 @@ private struct ExerciseBlock: View {
     var onFocus: (FocusedCell) -> Void = { _ in }
     var onToggleExpand: () -> Void = {}
     var onMoreTap: () -> Void = {}
+    var onEditNote: () -> Void = {}
     /// 点击某组的「更多操作」⋯：由父视图打开该组的菜单浮层。
     var onMoreSet: (WorkoutSet) -> Void = { _ in }
     let onChange: () -> Void
@@ -1962,11 +2128,20 @@ private struct ExerciseBlock: View {
         if doneCount == 0 { return "未开始 · 计划 \(sortedSets.count) 组" }
         return "\(doneCount)/\(sortedSets.count) 组"
     }
+    private var noteText: String? {
+        let trimmed = exercise.note?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             head
             if isExpanded {
+                if let noteText {
+                    noteStrip(noteText)
+                        .padding(.horizontal, 15)
+                        .padding(.bottom, 10)
+                }
                 Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.horizontal, 15)
                 VStack(spacing: 0) {
                     ForEach(sortedSets) { set in
@@ -2026,6 +2201,12 @@ private struct ExerciseBlock: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.Color.muted)
             } else {
+                if noteText != nil {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.fg2)
+                        .accessibilityHidden(true)
+                }
                 Text(summaryText).font(Theme.Font.l4).foregroundStyle(Theme.Color.muted).lineLimit(1)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 13, weight: .semibold))
@@ -2036,6 +2217,44 @@ private struct ExerciseBlock: View {
         .frame(minHeight: isExpanded ? 48 : 50)
         .contentShape(Rectangle())
         .onTapGesture { onToggleExpand() }
+    }
+
+    @ViewBuilder
+    private func noteStrip(_ text: String) -> some View {
+        if readOnly {
+            noteStripContent(text)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("动作备注，\(text)")
+        } else {
+            Button(action: onEditNote) {
+                noteStripContent(text)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("编辑动作备注")
+            .accessibilityHint(text)
+        }
+    }
+
+    private func noteStripContent(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "note.text")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg2)
+                .padding(.top, 2)
+            Text(text)
+                .font(Theme.Font.body(size: 13, weight: .medium))
+                .foregroundStyle(Theme.Color.fg2)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 9)
+        .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Theme.Color.border, lineWidth: 1)
+        )
     }
 
     private var moreButton: some View {
