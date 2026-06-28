@@ -34,4 +34,18 @@ public final class TeamRequests {
 
     public record React(@NotBlank String emoji) {
     }
+
+    public record SharePlan(
+            @NotNull UUID sourcePlanId,
+            String planNameSnapshot,
+            String items
+    ) {
+    }
+
+    public record SharePlanEvent(
+            @NotBlank String eventType,
+            UUID workoutId,
+            LocalDate eventDate
+    ) {
+    }
 }

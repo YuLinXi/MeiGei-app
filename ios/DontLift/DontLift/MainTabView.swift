@@ -10,14 +10,14 @@ struct MainTabView: View {
     @Environment(PlanWritebackCenter.self) private var planWriteback
     @Environment(TeamShareCenter.self) private var teamShare
     @Environment(TeamService.self) private var teamService
+    @Environment(SyncEngine.self) private var syncEngine
     @Environment(SessionStore.self) private var session
     @Environment(WorkoutHistoryStore.self) private var historyStore
+    @Environment(WorkoutPresentationCenter.self) private var workoutPresentation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// 全局进行中会话（LIVE 悬浮胶囊来源）：未删除且未结束 = isActive。
     @State private var activeSession: Workout?
-    /// 全局胶囊点击 → push 进行中记录页（活跃会话必为 isActive，无需 finished 分流）。
-    @State private var openedSession: Workout?
     @State private var activeRootSheet: RootSheet?
     @State private var presentedRootSheet: RootSheet?
     @State private var selectedTab: MainTab = .workout
@@ -115,18 +115,6 @@ struct MainTabView: View {
             }
             .toolbarBackground(Theme.Color.bg, for: .navigationBar)
             .toolbarColorScheme(.light, for: .navigationBar)
-            // 全局 LIVE 悬浮胶囊：有进行中会话时浮于 TabView 之上、各 Tab 通用；
-            // 挂在 NavigationStack 内 → push 进 Live 记录页时被全屏页自然盖住。
-            .overlay {
-                if let active = activeSession {
-                    LiveSessionCapsule(title: active.title ?? "训练",
-                                       timerStartedAt: active.timerStartedAt) {
-                        openedSession = active
-                    }
-                }
-            }
-            // 全局胶囊点击 → 绑定式导航进 Live 记录页（与各 Tab 内部的 openedSession 各自独立）。
-            .navigationDestination(item: $openedSession) { WorkoutLoggingView(workout: $0) }
         }
         .tint(Theme.Color.accent)
         .onAppear { refreshActiveSession() }
@@ -142,8 +130,16 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .dontliftSyncCompleted)) { _ in
             refreshActiveSession()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .dontliftActiveWorkoutChanged)) { _ in
+            refreshActiveSession()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .dontliftWorkoutSyncSucceeded)) { _ in
             Task { await retryReadyPendingShares() }
+        }
+        // 全局训练中悬浮窗/训练浮层：挂在 NavigationStack 之外，push 子页面上也可见；
+        // 展开和收起都不改变当前 Tab 或导航层级。
+        .overlay {
+            WorkoutLiveOverlayContainer(activeSession: activeSession)
         }
         // 休息全屏弹窗：挂在全局 NavigationStack 之上的 overlay，层级高于 push 页与 Tab Bar；
         // 纯 .opacity 渐隐、无位移。
@@ -180,6 +176,16 @@ struct MainTabView: View {
         .onChange(of: planWriteback.receipt != nil) { _, _ in presentNextRootSheetIfNeeded() }
         .onChange(of: prCelebration.records != nil) { _, _ in presentNextRootSheetIfNeeded() }
         .onChange(of: teamShare.draft != nil) { _, _ in presentNextRootSheetIfNeeded() }
+        .task(id: session.currentUserId) {
+            if let userId = session.currentUserId {
+                let hasPendingShare = !teamService.pendingShareWorkoutIds(userId: userId).isEmpty
+                let hasPendingPlanEvent = teamService.hasPendingPlanShareEvents(userId: userId)
+                if hasPendingShare || hasPendingPlanEvent {
+                    await syncEngine.syncAll()
+                }
+            }
+            await retryReadyPendingShares()
+        }
     }
 
     private func presentNextRootSheetIfNeeded() {
@@ -216,12 +222,15 @@ struct MainTabView: View {
 
     private func refreshActiveSession() {
         activeSession = WorkoutSession.activeSession(in: modelContext)
+        workoutPresentation.reconcile(activeWorkout: activeSession)
     }
 
     private func retryReadyPendingShares() async {
         guard let userId = session.currentUserId else { return }
         let pendingIds = teamService.pendingShareWorkoutIds(userId: userId)
-        guard !pendingIds.isEmpty else { return }
+        let pendingEventWorkoutIds = teamService.pendingPlanShareEventWorkoutIds(userId: userId)
+        let hasPendingEvents = teamService.hasPendingPlanShareEvents(userId: userId)
+        guard !pendingIds.isEmpty || hasPendingEvents else { return }
         let workouts = (try? modelContext.fetch(FetchDescriptor<Workout>())) ?? []
         let syncedDrafts = Dictionary(uniqueKeysWithValues: workouts.compactMap { workout -> (UUID, TeamShareDraft)? in
             guard pendingIds.contains(workout.localId),
@@ -231,7 +240,19 @@ struct MainTabView: View {
             }
             return (workout.localId, TeamShareDraft(workout: workout))
         })
-        guard !syncedDrafts.isEmpty else { return }
-        await teamService.retryPendingShares(userId: userId, syncedDrafts: syncedDrafts)
+        if !syncedDrafts.isEmpty {
+            await teamService.retryPendingShares(userId: userId, syncedDrafts: syncedDrafts)
+        }
+        if hasPendingEvents {
+            let syncedWorkoutIds = Set(workouts.compactMap { workout -> UUID? in
+                guard workout.deletedAt == nil,
+                      workout.syncStatus == .synced,
+                      (pendingEventWorkoutIds.isEmpty || pendingEventWorkoutIds.contains(workout.localId)) else {
+                    return nil
+                }
+                return workout.localId
+            })
+            await teamService.retryPendingPlanShareEvents(userId: userId, syncedWorkoutIds: syncedWorkoutIds)
+        }
     }
 }

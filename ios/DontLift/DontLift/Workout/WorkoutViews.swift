@@ -8,10 +8,11 @@ struct WorkoutListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(RestTimerController.self) private var restTimer
     @Environment(WorkoutHistoryStore.self) private var historyStore
+    @Environment(WorkoutPresentationCenter.self) private var workoutPresentation
     @Query(filter: #Predicate<WorkoutPlan> { $0.deletedAt == nil },
            sort: \WorkoutPlan.updatedAt, order: .reverse)
     private var plans: [WorkoutPlan]
-    /// 导航打开的会话（点横幅继续 / 新建后进入 Live 记录界面）。
+    /// 导航打开的已完成训练详情。
     @State private var openedSession: Workout?
     /// 单一活跃会话守卫：存在进行中会话时暂存「继续 / 丢弃」冲突态与待新建闭包。
     /// `showConflict` 仅驱动弹窗显隐，与数据分离——避免弹窗淡出关闭时清空 `conflict` 导致动作回调读到 nil。
@@ -34,6 +35,7 @@ struct WorkoutListView: View {
     }
     /// 本周已完成训练（按 startedAt 落入本周）的次数。
     private var weeklyDoneCount: Int { stats.sessionCount }
+    private var ctaTitle: String { "开始训练" }
     private static let weekdayFormatter: DateFormatter = {
         let fmt = DateFormatter()
         fmt.locale = Locale(identifier: "zh_CN")
@@ -69,8 +71,7 @@ struct WorkoutListView: View {
             WorkoutPerformanceMonitor.event("home.appear")
             historyStore.ensureLoaded(reason: .manual)
         }
-        // 已完成训练 / 进行中会话 → 经 openedSession 绑定式导航到对应页面。
-        .navigationDestination(item: $openedSession) { workoutDestination($0) }
+        .navigationDestination(item: $openedSession) { WorkoutDetailView(workout: $0) }
         .navigationDestination(isPresented: $showHistoryCalendar) {
             WorkoutCalendarView()
         }
@@ -83,7 +84,7 @@ struct WorkoutListView: View {
             confirmTitle: "丢弃并开始新训练",
             secondaryTitle: "继续训练",
             onSecondary: {
-                if let existing = conflict { openedSession = existing }
+                if let existing = conflict { workoutPresentation.present(existing) }
                 clearConflict()
             },
             showCancel: false,
@@ -129,16 +130,6 @@ struct WorkoutListView: View {
         }
         // 关闭系统下滑入场动画（仅在开关时生效）；改由 DeleteConfirmCover 内部 scrim/卡片淡入。
         .transaction(value: pendingDelete != nil) { $0.disablesAnimations = true }
-    }
-
-    /// 导航目的地分流：已完成训练进只读日志详情，进行中会话进 Live 记录界面。
-    @ViewBuilder
-    private func workoutDestination(_ w: Workout) -> some View {
-        if w.isFinished {
-            WorkoutDetailView(workout: w)
-        } else {
-            WorkoutLoggingView(workout: w)
-        }
     }
 
     // MARK: Header（设计图 .nav：大标题）
@@ -314,33 +305,13 @@ struct WorkoutListView: View {
 
     // MARK: 悬浮 CTA
 
-    /// 首页「进行中」计划：与「计划」页共用 `WorkoutPlan.active` 判定，供 CTA 智能单键上浮。
-    private var activePlan: WorkoutPlan? {
-        if let id = historyStore.home.activePlanId,
-           let plan = plans.first(where: { $0.localId == id }) {
-            return plan
-        }
-        if let recent = plans.first(where: { historyStore.home.recentPlanIds.contains($0.localId) }) {
-            return recent
-        }
-        return plans.first
-    }
-
-    /// CTA 文案：存在进行中计划 → 「从「X」开始」；否则按本周是否已训练给空白训练文案。
-    private func ctaTitle(_ plan: WorkoutPlan?) -> String {
-        if let plan { return "从「\(plan.name)」开始" }
-        return weeklyDoneCount == 0 ? "开始第 1 次训练" : "开始今日训练"
-    }
-
     private var startCTA: some View {
-        // 智能单键：有进行中计划从该计划预填，否则空白训练；无长按、无备选菜单。
-        let plan = activePlan
-        return Button {
-            if let plan { start(from: plan) } else { startBlank() }
+        Button {
+            startBlank()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "play.fill")
-                Text(ctaTitle(plan))
+                Text(ctaTitle)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
@@ -380,7 +351,8 @@ struct WorkoutListView: View {
         modelContext.insert(w)
         try? modelContext.save()
         historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
-        openedSession = w
+        NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
+        workoutPresentation.present(w)
     }
 
     private func startBlank() {
@@ -430,7 +402,11 @@ struct WorkoutListView: View {
 
     private func openWorkout(_ id: UUID) {
         if let workout = fetchWorkout(id) {
-            openedSession = workout
+            if workout.isFinished {
+                openedSession = workout
+            } else {
+                workoutPresentation.present(workout)
+            }
         }
     }
 }
@@ -548,6 +524,8 @@ struct WorkoutLoggingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var workout: Workout
+    let onMinimize: (() -> Void)?
+    let onCloseFinished: (() -> Void)?
     @State private var pickingExercise = false
     /// 结束二次确认弹窗。
     @State private var confirmingFinish = false
@@ -603,13 +581,28 @@ struct WorkoutLoggingView: View {
     @State private var noteEditingExerciseId: UUID?
     /// 动作备注编辑草稿；仅点击「完成」或「清空备注」时写回模型。
     @State private var noteDraft: String = ""
+    /// 已完成的无计划训练可沉淀为模板；保存一次后隐藏入口。
+    @State private var showingSaveAsPlan = false
+    @State private var savedAsPlan = false
 
     private static let continuedRestDuration: TimeInterval = 30
     private static let exerciseNoteLimit = 200
 
+    init(workout: Workout,
+         onMinimize: (() -> Void)? = nil,
+         onCloseFinished: (() -> Void)? = nil) {
+        self.workout = workout
+        self.onMinimize = onMinimize
+        self.onCloseFinished = onCloseFinished
+    }
+
     /// 是否允许编辑内容（勾选完成 / 改重量次数 / 加删动作）：仅进行中会话可编辑；
     /// 已完成训练一律只读，产品逻辑不支持二次编辑。
     private var canEdit: Bool { workout.isActive }
+
+    private var usesGlobalPresentation: Bool {
+        onMinimize != nil || onCloseFinished != nil
+    }
 
     private var noteEditingExercise: WorkoutExercise? {
         guard let id = noteEditingExerciseId else { return nil }
@@ -637,6 +630,10 @@ struct WorkoutLoggingView: View {
     /// 未勾选完成的组数（结束训练强确认据此变文案）。
     private var remainingSetCount: Int {
         workout.exercises.flatMap(\.sets).filter { !$0.completed }.count
+    }
+
+    private var shouldOfferSaveAsPlan: Bool {
+        workout.canOfferSaveAsPlanTemplate(alreadySaved: savedAsPlan)
     }
 
     /// 结束确认弹窗标题：有未完成组时强警示，否则常规。
@@ -731,6 +728,9 @@ struct WorkoutLoggingView: View {
                                        onStart: { startTimerIfNeeded() },
                                        onFinish: presentFinishConfirmation)
                         triadStats
+                        if shouldOfferSaveAsPlan {
+                            saveAsPlanCard
+                        }
                         exerciseSectionHeader
                         exerciseList
                         Color.clear.frame(height: 80)
@@ -820,11 +820,10 @@ struct WorkoutLoggingView: View {
         }
         // 键盘升降统一用近临界阻尼弹簧：面板下滑 + inset 收起 + 上方内容回流 + FAB 共用一条曲线，贴近 iOS 原生键盘的平滑。
         .animation(.spring(response: 0.45, dampingFraction: 0.92), value: focused == nil)
-        // 子页统一导航栏：仅圆形返回键（双环处理收口在 paperToolbar）。
-        .paperToolbar(title: workout.isActive ? "训练进行中" : (workout.title ?? "训练"), onBack: {
-            prepareForPresentation()
-            dismiss()
-        }) {
+        // 子页统一导航栏：全局训练浮层使用专用收起按钮，普通历史页保留返回语义。
+        .paperToolbar(title: workout.isActive ? "训练进行中" : (workout.title ?? "训练")) {
+            toolbarLeading
+        } trailing: {
             if workout.isActive {
                 CircleIconMenu(systemName: "ellipsis",
                                items: loggingMenuItems,
@@ -912,6 +911,12 @@ struct WorkoutLoggingView: View {
                                      items: workoutOrderItems,
                                      onCommit: applyWorkoutExerciseOrder)
         }
+        .sheet(isPresented: $showingSaveAsPlan) {
+            SaveWorkoutAsPlanSheet(workout: workout) { plan in
+                savedAsPlan = true
+                globalMessage.show("已保存为「\(plan.name)」", style: .success)
+            }
+        }
         .sheet(isPresented: noteEditorBinding) {
             if let ex = noteEditingExercise {
                 ExerciseNoteEditorSheet(
@@ -927,9 +932,65 @@ struct WorkoutLoggingView: View {
         .onAppear {
             consumeRestCompletionIfNeeded()
         }
+        .onDisappear {
+            NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
+        }
         .onChange(of: restTimer.completionEvent?.id) { _, _ in
             consumeRestCompletionIfNeeded()
         }
+    }
+
+    @ViewBuilder private var toolbarLeading: some View {
+        if workout.isActive, let onMinimize {
+            WorkoutMinimizeButton {
+                prepareForPresentation()
+                onMinimize()
+            }
+        } else {
+            CircleIconButton(systemName: fallbackLeadingIcon) {
+                prepareForPresentation()
+                if workout.isActive, let onMinimize {
+                    onMinimize()
+                } else if workout.isFinished, let onCloseFinished {
+                    onCloseFinished()
+                } else {
+                    dismiss()
+                }
+            }
+        }
+    }
+
+    private var fallbackLeadingIcon: String {
+        if workout.isActive { return "chevron.down" }
+        if usesGlobalPresentation { return "xmark" }
+        return "chevron.left"
+    }
+
+    private var saveAsPlanCard: some View {
+        Button { showingSaveAsPlan = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "doc.badge.plus")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Theme.Color.accent)
+                    .frame(width: 38, height: 38)
+                    .background(Theme.Color.accentSoft, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("保存为计划模板")
+                        .font(Theme.Font.body(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg)
+                    Text("\(workout.exercises.count) 个动作 · 用本次完成数据生成")
+                        .font(Theme.Font.mono(size: 11))
+                        .foregroundStyle(Theme.Color.muted)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: 组级「更多操作」菜单 + 删除
@@ -1586,6 +1647,7 @@ struct WorkoutLoggingView: View {
         Task { await healthKit.saveStrengthWorkout(start: startedAt, end: endedAt) }
         applyAdaptiveWriteback()  // 自适应模式：实绩 upsert 回写来源计划（design.md D4）
         recomputeDerived()
+        NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
     }
 
     private func discardWorkout() {
@@ -1593,7 +1655,12 @@ struct WorkoutLoggingView: View {
         restTimer.stop()
         WorkoutSession.discard(workout, in: modelContext)
         historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
-        dismiss()
+        NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
+        if usesGlobalPresentation {
+            onCloseFinished?()
+        } else {
+            dismiss()
+        }
     }
 
     /// 清理未打勾的预填残组（落值方案 D6）：删除 `completed=false` 的组，
@@ -1650,6 +1717,7 @@ struct WorkoutLoggingView: View {
         Task { @MainActor in
             await autoShareCompletedWorkout(draft)
         }
+        recordTeamPlanCompletionIfNeeded()
     }
 
     private func autoShareCompletedWorkout(_ draft: TeamShareDraft) async {
@@ -1661,14 +1729,14 @@ struct WorkoutLoggingView: View {
             break
         case .shared(let count):
             guard count > 0 else { return }
-            globalMessage.show(count == 1 ? "已自动分享到 1 个 Team" : "已自动分享到 \(count) 个 Team",
+            globalMessage.show(count == 1 ? "已自动分享到 Team" : "已自动分享到 \(count) 个 Team",
                                style: .success)
         case .queued:
-            globalMessage.show("Team 自动分享已排队，同步成功后重试", style: .warning)
+            globalMessage.show("同步后自动分享", style: .info)
         case .cancelled:
             break
         case .failed:
-            globalMessage.show("Team 自动分享失败，可稍后重试", style: .error)
+            globalMessage.show("自动分享失败", style: .error)
         }
     }
 
@@ -1676,6 +1744,21 @@ struct WorkoutLoggingView: View {
         guard let userId else { return }
         guard result.shouldRequestSync || !teamService.pendingShareWorkoutIds(userId: userId).isEmpty else { return }
         Task { await syncEngine.syncAll() }
+    }
+
+    private func recordTeamPlanCompletionIfNeeded() {
+        guard let versionId = workout.sourceShareVersionId else { return }
+        let userId = session.currentUserId
+        Task { @MainActor in
+            await teamService.recordPlanShareEventOrQueue(versionId: versionId,
+                                                          eventType: "complete",
+                                                          workoutId: workout.localId,
+                                                          eventDate: workout.endedAt ?? .now,
+                                                          userId: userId)
+            if let userId, teamService.hasPendingPlanShareEvents(userId: userId) {
+                await syncEngine.syncAll()
+            }
+        }
     }
 
     private func detectPersonalRecordsFromFallbackHistory() -> [PersonalRecord] {
@@ -1828,6 +1911,182 @@ struct WorkoutLoggingView: View {
         ex.sets.append(newSet)
         touch()
         focus(.weight(newSet.localId))
+    }
+}
+
+private struct SaveWorkoutAsPlanSheet: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @Query(filter: #Predicate<WorkoutPlanGroup> { $0.deletedAt == nil },
+           sort: \WorkoutPlanGroup.sortOrder)
+    private var groups: [WorkoutPlanGroup]
+
+    let workout: Workout
+    let onSaved: (WorkoutPlan) -> Void
+
+    @State private var name: String
+    @State private var mode: WorkoutPlanMode = .adaptive
+    @State private var groupId: UUID?
+    @State private var error: String?
+
+    init(workout: Workout, onSaved: @escaping (WorkoutPlan) -> Void) {
+        self.workout = workout
+        self.onSaved = onSaved
+        let title = workout.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        _name = State(initialValue: title.isEmpty || title == "训练" ? "训练模板" : title)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PaperSheetHeader(
+                title: "保存为计划",
+                cancelTitle: "取消",
+                confirmTitle: "保存",
+                confirmEnabled: canSave,
+                showsHandle: true,
+                background: Theme.Color.bg,
+                onCancel: { dismiss() },
+                onConfirm: save
+            )
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                    TextField("", text: $name, prompt: Text("计划名称").foregroundColor(Theme.Color.muted))
+                        .font(Theme.Font.display(size: 24, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg)
+                        .padding(Theme.Spacing.md)
+                        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
+
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        Text("计划模式").eyebrowStyle()
+                        modeOption(.adaptive)
+                        modeOption(.strict)
+                    }
+
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        Text("分组").eyebrowStyle()
+                        groupOption(title: "未分组", groupId: nil)
+                        ForEach(groups, id: \.localId) { group in
+                            groupOption(title: group.name, groupId: group.localId)
+                        }
+                    }
+
+                    templateSummary
+
+                    if let error {
+                        Text(error)
+                            .font(Theme.Font.body(size: 12))
+                            .foregroundStyle(Theme.Color.danger)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(Theme.Spacing.lg)
+            }
+        }
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .presentationBackground(Theme.Color.bg)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.hidden)
+    }
+
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !templateItems.isEmpty
+    }
+
+    private var templateSummary: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("\(templateItems.count) 个动作")
+                .font(Theme.Font.body(size: 15, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+            Text(templateItems.prefix(3).map(\.displayExerciseName).joined(separator: "、"))
+                .font(Theme.Font.mono(size: 11))
+                .foregroundStyle(Theme.Color.muted)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+
+    @ViewBuilder private func modeOption(_ candidate: WorkoutPlanMode) -> some View {
+        let selected = mode == candidate
+        Button { mode = candidate } label: {
+            HStack(alignment: .top, spacing: Theme.Spacing.md) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.muted)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(candidate.title)
+                        .font(Theme.Font.body(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg)
+                    Text(candidate == .adaptive ? "完成后继续按实绩更新计划" : "开始时复制当前模板,完成后不回写")
+                        .font(Theme.Font.body(size: 12))
+                        .foregroundStyle(Theme.Color.muted)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func groupOption(title: String, groupId candidate: UUID?) -> some View {
+        let selected = groupId == candidate
+        return Button {
+            groupId = candidate
+            Theme.Haptics.selection()
+        } label: {
+            HStack(spacing: Theme.Spacing.md) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.muted)
+                    .frame(width: 24)
+                Image(systemName: candidate == nil ? "tray" : "folder")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .frame(width: 22)
+                Text(title)
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("分组 \(title)")
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    private var templateItems: [PlanItem] {
+        workout.planTemplateItems()
+    }
+
+    private func save() {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let items = templateItems
+        guard !trimmed.isEmpty else { return }
+        guard !items.isEmpty else {
+            error = "本次训练没有可生成模板的正式组。"
+            return
+        }
+        let plan = WorkoutPlan(name: trimmed,
+                               items: items,
+                               mode: mode,
+                               groupId: groupId,
+                               sortOrder: nextSortOrder(in: groupId))
+        modelContext.insert(plan)
+        try? modelContext.save()
+        onSaved(plan)
+        dismiss()
+    }
+
+    private func nextSortOrder(in groupId: UUID?) -> Int {
+        let plans = (try? modelContext.fetch(FetchDescriptor<WorkoutPlan>())) ?? []
+        return (plans
+            .filter { $0.deletedAt == nil && $0.groupId == groupId }
+            .map(\.sortOrder)
+            .max() ?? -1) + 1
     }
 }
 
@@ -2348,6 +2607,13 @@ private struct SetRow: View {
     private var isEditing: Bool { focusedField != nil }
     /// 弱强调（次序号/勾选框）：编辑中或待办。
     private var emphasized: Bool { isEditing || isTodo }
+    private var completionAnimation: Animation { .easeOut(duration: 0.18) }
+    private var completedFill: SwiftUI.Color {
+        readOnly ? Theme.Color.accent.opacity(0.46) : Theme.Color.accent
+    }
+    private var completedShadow: SwiftUI.Color {
+        Theme.Color.accent.opacity(readOnly ? 0.14 : 0.28)
+    }
 
     var body: some View {
         // 原型 grid：[20 序号][重量窄][× ][次数窄][方形完成勾][弹性留白][⋯ 更多]。
@@ -2369,6 +2635,7 @@ private struct SetRow: View {
         }
         .padding(.horizontal, 15)
         .padding(.vertical, 5)
+        .animation(completionAnimation, value: set.completed)
     }
 
     /// 序号徽章：可点击切换组类型（只读态退化为静态文本）。热身组显「热」（朱砂红文字，无底色）。
@@ -2429,14 +2696,14 @@ private struct SetRow: View {
     }
 
     private func valueCellBackground(focused: Bool) -> SwiftUI.Color {
-        if set.completed { return Theme.Color.accent }
+        if set.completed { return completedFill }
         if focused { return Theme.Color.accentSoft }
         if isEditing { return Theme.Color.surface }
         return Theme.Color.bg
     }
 
     private func valueCellBorder(focused: Bool) -> SwiftUI.Color {
-        if set.completed { return Theme.Color.accent }
+        if set.completed { return completedFill }
         if focused { return Theme.Color.accent }
         return Theme.Color.border
     }
@@ -2453,8 +2720,11 @@ private struct SetRow: View {
     /// 完成按钮：圆角方形复选框。完成=朱砂红实心白勾；未完成=淡勾引导用户勾选。
     private var checkButton: some View {
         Button {
+            Theme.Haptics.impact(.light)
             let willComplete = !set.completed
-            set.completed = willComplete
+            withAnimation(completionAnimation) {
+                set.completed = willComplete
+            }
             onChange()
             if willComplete {
                 onComplete()
@@ -2465,8 +2735,8 @@ private struct SetRow: View {
             let shape = RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
             ZStack {
                 if set.completed {
-                    shape.fill(Theme.Color.accent)
-                        .shadow(color: Theme.Color.accent.opacity(0.28), radius: 5, y: 2)
+                    shape.fill(completedFill)
+                        .shadow(color: completedShadow, radius: 5, y: 2)
                     Image(systemName: "checkmark").font(.system(size: 13, weight: .bold))
                         .foregroundStyle(.white)
                 } else {
@@ -2479,7 +2749,8 @@ private struct SetRow: View {
             }
             .frame(width: 36, height: 36)   // 与重量/次数输入框等高
         }
-        .buttonStyle(.plain).disabled(readOnly)
+        .buttonStyle(.plain)
+        .allowsHitTesting(!readOnly)
         .frame(width: 36)
         .padding(.leading, 4)   // 与次数框多留一点间距（HStack spacing 8 + 4 = 12）
         .accessibilityLabel(set.completed ? "\(rowName)已完成" : "标记\(rowName)完成")

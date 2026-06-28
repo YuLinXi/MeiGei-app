@@ -7,10 +7,14 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
 public interface TeamMapper extends BaseMapper<Team> {
+
+    @Select("SELECT * FROM team WHERE id = #{teamId}")
+    Team findByIdIncludingDeleted(@Param("teamId") UUID teamId);
 
     @Select("SELECT * FROM team WHERE invite_code = #{code} AND deleted_at IS NULL")
     Team findByInviteCode(@Param("code") String code);
@@ -22,6 +26,23 @@ public interface TeamMapper extends BaseMapper<Team> {
     /** 账号删除：物理硬删已确认无其他成员的空 Team。 */
     @Delete("DELETE FROM team WHERE id = #{teamId}")
     int hardDeleteById(@Param("teamId") UUID teamId);
+
+    @Update("""
+            UPDATE team
+            SET name = #{name},
+                owner_user_id = #{ownerUserId},
+                invite_code = #{inviteCode},
+                created_at = #{createdAt},
+                deleted_at = NULL,
+                updated_at = now(),
+                version = version + 1
+            WHERE id = #{teamId}
+            """)
+    int restoreDevTeam(@Param("teamId") UUID teamId,
+                       @Param("name") String name,
+                       @Param("ownerUserId") UUID ownerUserId,
+                       @Param("inviteCode") String inviteCode,
+                       @Param("createdAt") OffsetDateTime createdAt);
 
     @Update("""
             UPDATE team

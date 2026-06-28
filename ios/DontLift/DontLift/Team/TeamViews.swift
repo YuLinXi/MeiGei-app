@@ -253,7 +253,7 @@ struct TeamListView: View {
                      desc: "给队友的打卡点 🔥 💪 表情反应，看见彼此坚持。")
             valueRow(icon: "arrow.triangle.branch",
                      title: "共享计划",
-                     desc: "一键复制队友发布的训练计划，直接开练。")
+                     desc: "复制队友分享的训练计划，或直接开练。")
         }
     }
 
@@ -666,19 +666,6 @@ struct TeamDetailView: View {
                 }
                 .refreshable { await reload() }
             }
-
-            // ⋯ action sheet
-            if showActionSheet {
-                actionSheetOverlay
-                    .transition(.opacity)
-                    .zIndex(2)
-            }
-            // 二次确认弹窗
-            if let kind = confirmKind {
-                confirmDialogOverlay(kind)
-                    .transition(.opacity)
-                    .zIndex(3)
-            }
         }
         // 子页统一导航栏：圆形返回 + ⋯（展开时 active/rotated 高亮，切换自定义 action sheet）。
         .paperToolbar(title: team.name, onBack: { dismiss() }) {
@@ -686,6 +673,16 @@ struct TeamDetailView: View {
                 withAnimation(.easeOut(duration: 0.18)) { showActionSheet = true }
             }
         }
+        .fullScreenCover(isPresented: $showActionSheet) {
+            actionSheetOverlay
+                .presentationBackground(.clear)
+        }
+        .transaction(value: showActionSheet) { $0.disablesAnimations = true }
+        .fullScreenCover(item: $confirmKind) { kind in
+            confirmDialogOverlay(kind)
+                .presentationBackground(.clear)
+        }
+        .transaction(value: confirmKind) { $0.disablesAnimations = true }
         .paperConfirmDialog(
             isPresented: $confirmingAutoShareEnable,
             title: "开启自动分享?",
@@ -962,9 +959,10 @@ struct TeamDetailView: View {
                     .overlay(alignment: .bottom) { Rectangle().fill(Theme.Color.border).frame(height: 1) }
 
                     Button {
-                        withAnimation(.easeOut(duration: 0.18)) {
-                            showActionSheet = false
-                            confirmKind = isOwner ? .dissolve : .leave
+                        let next = isOwner ? ConfirmKind.dissolve : .leave
+                        withAnimation(.easeOut(duration: 0.18)) { showActionSheet = false }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            confirmKind = next
                         }
                     } label: {
                         Text(isOwner ? "解散 Team" : "退出 Team")
@@ -1070,17 +1068,16 @@ struct TeamDetailView: View {
                     dissolveConfirmField.padding(.top, 15)
                 }
 
-                HStack(spacing: 9) {
+                HStack(spacing: Theme.Spacing.md) {
                     Button { closeConfirm() } label: {
                         Text("取消")
-                            .font(Theme.Font.body(size: 15, weight: .bold))
-                            .foregroundStyle(Theme.Color.fg2)
+                            .font(Theme.Font.l2)
+                            .foregroundStyle(Theme.Color.fg)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 11)
-                            .background(Theme.Color.surface, in: Capsule())
-                            .overlay(Capsule().stroke(Theme.Color.border2, lineWidth: 1))
+                            .frame(height: 50)
+                            .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .disabled(actionBusy)
 
                     Button { Task { await performConfirmedAction(kind) } } label: {
@@ -1089,24 +1086,23 @@ struct TeamDetailView: View {
                                 .opacity(actionBusy ? 0 : 1)
                             if actionBusy { ProgressView().tint(.white) }
                         }
-                        .font(Theme.Font.body(size: 15, weight: .bold))
+                        .font(Theme.Font.l2)
                         .foregroundStyle(dangerEnabled(kind) ? .white : Theme.Color.muted)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background(dangerEnabled(kind) ? Theme.Color.accent : Theme.Color.surface2, in: Capsule())
-                        .shadow(color: dangerEnabled(kind) ? Theme.Color.accent.opacity(0.4) : .clear, radius: 8, x: 0, y: 4)
+                        .frame(height: 50)
+                        .background(dangerEnabled(kind) ? Theme.Color.accent : Theme.Color.surface2,
+                                    in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .disabled(!dangerEnabled(kind) || actionBusy)
                 }
-                .padding(.top, 17)
+                .padding(.top, Theme.Spacing.lg)
             }
-            .padding(.horizontal, 18).padding(.top, 20).padding(.bottom, 16)
+            .padding(Theme.Spacing.lg)
             .frame(maxWidth: .infinity)
             .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
-            .paperShadow(.lg, cornerRadius: Theme.Radius.lg)
-            .padding(.horizontal, 22)
+            .shadow(color: Theme.Color.fg.opacity(0.18), radius: 32, x: 0, y: 12)
+            .padding(.horizontal, 40)
         }
     }
 
@@ -1288,6 +1284,7 @@ struct TeamDetailView: View {
             teamService.pendingActionToast = kind == .dissolve
                 ? "已解散「\(team.name)」"
                 : "已退出「\(team.name)」"
+            confirmKind = nil
             dismiss()
         } catch {
             guard !error.isCancellationError else { return }
@@ -1524,30 +1521,56 @@ struct ReactionRow: View {
 // MARK: - Team 计划浏览（保留功能，theme 微调）
 
 struct TeamPlansView: View {
+    @Environment(\.modelContext) private var modelContext
     @Environment(TeamService.self) private var teamService
     @Environment(SyncEngine.self) private var syncEngine
+    @Environment(SessionStore.self) private var session
+    @Environment(RestTimerController.self) private var restTimer
+    @Environment(WorkoutHistoryStore.self) private var historyStore
+    @Environment(WorkoutPresentationCenter.self) private var workoutPresentation
     @Environment(\.dismiss) private var dismiss
 
     let team: TeamDTO
-    @State private var plans: [ServerPlanDTO] = []
+    @State private var shares: [TeamPlanShareCardDTO] = []
     @State private var error: String?
     @State private var toast: String?
     @State private var forking: UUID?
+    @State private var conflict: Workout?
+    @State private var pendingBuild: (() -> Workout)?
+    @State private var pendingStartCard: TeamPlanShareCardDTO?
+    @State private var selectedShare: TeamPlanShareCardDTO?
+    @State private var deletingShare: TeamPlanShareCardDTO?
+    @State private var deletingShareId: UUID?
+    @State private var showConflict = false
     @State private var isReloading = false
+
+    private var ownShares: [TeamPlanShareCardDTO] {
+        shares.filter(isOwnShare)
+    }
+
+    private var memberShares: [TeamPlanShareCardDTO] {
+        shares.filter { !isOwnShare($0) }
+    }
 
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                    if plans.isEmpty {
-                        Text("还没有成员发布计划")
+                    privacyNote
+                    if isReloading && shares.isEmpty {
+                        ProgressView()
+                            .tint(Theme.Color.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, Theme.Spacing.lg)
+                    } else if shares.isEmpty {
+                        Text("还没有成员分享计划")
                             .font(Theme.Font.body(size: 13))
                             .foregroundStyle(Theme.Color.muted)
                             .padding(.top, Theme.Spacing.lg)
-                    }
-                    ForEach(plans) { p in
-                        planRow(p)
+                    } else {
+                        planSection(title: "我分享的计划", items: ownShares)
+                        planSection(title: "成员分享计划", items: memberShares)
                     }
                     Color.clear.frame(height: 32)
                 }
@@ -1557,6 +1580,17 @@ struct TeamPlansView: View {
         }
         // 子页统一导航栏：纸感圆形返回钮（取代系统蓝色箭头）。
         .paperToolbar(title: "Team 计划", onBack: { dismiss() })
+        .navigationDestination(item: $selectedShare) { share in
+            TeamPlanShareDetailView(
+                share: share,
+                isOwnShare: isOwnShare(share),
+                isForking: forking == share.versionId,
+                isDeleting: deletingShareId == share.shareId,
+                onStart: { start(share) },
+                onFork: { Task { await fork(share) } },
+                onDelete: { deletingShare = share }
+            )
+        }
         .task { await reload() }
         .refreshable { await reload() }
         .overlay(alignment: .bottom) {
@@ -1573,65 +1607,288 @@ struct TeamPlansView: View {
         .alert("出错了", isPresented: .constant(error != nil)) {
             Button("好") { error = nil }
         } message: { Text(error ?? "") }
+        .paperConfirmDialog(
+            isPresented: $showConflict,
+            title: "已有进行中的训练",
+            message: "同一时间只能有一个进行中的训练。继续既有训练，或丢弃后开始新的。",
+            confirmTitle: "丢弃并开始新训练",
+            secondaryTitle: "继续训练",
+            onSecondary: {
+                if let existing = conflict { workoutPresentation.present(existing) }
+                clearConflict()
+            },
+            showCancel: false,
+            onConfirm: {
+                if let existing = conflict {
+                    WorkoutSession.discard(existing, in: modelContext)
+                    restTimer.stop()
+                    if let build = pendingBuild, let card = pendingStartCard {
+                        commit(build, source: card)
+                    }
+                }
+                clearConflict()
+            }
+        )
+        .paperConfirmDialog(
+            isPresented: Binding(
+                get: { deletingShare != nil },
+                set: { if !$0 { deletingShare = nil } }
+            ),
+            title: "取消分享?",
+            message: deletingShare.map { "取消分享「\($0.planNameSnapshot)」后，Team 成员将不再从列表看到它；已复制的计划不受影响。" } ?? "",
+            confirmTitle: "取消分享",
+            onConfirm: {
+                if let share = deletingShare {
+                    Task { await deleteShare(share) }
+                }
+                deletingShare = nil
+            }
+        )
     }
 
-    private func planRow(_ p: ServerPlanDTO) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(p.name)
-                    .font(Theme.Font.body(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg)
-                Text("\(p.itemCount) 个动作 · \(p.exercisePreviewText)")
-                    .font(Theme.Font.mono(size: 11))
-                    .foregroundStyle(Theme.Color.muted)
-                    .lineLimit(1)
-                if p.hasUnstartableItems {
-                    Text("包含无法识别的动作，请更新 App 或联系发布者修复")
-                        .font(Theme.Font.body(size: 12))
-                        .foregroundStyle(Theme.Color.danger)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer()
-            Button { Task { await fork(p) } } label: {
-                if forking == p.id {
-                    ProgressView().tint(Theme.Color.accent)
-                } else {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.branch").font(.system(size: 11, weight: .bold))
-                        Text("复制")
-                    }
-                    .font(Theme.Font.body(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.Color.accent)
-                    .padding(.horizontal, 14)
-                    .frame(height: 32)
-                    .overlay(Capsule().stroke(Theme.Color.accent, lineWidth: 1.5))
-                }
-            }
-            .buttonStyle(.plain)
-            .disabled(forking != nil)
+    private var privacyNote: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "lock.shield")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.Color.accent)
+                .frame(width: 20)
+            Text("只统计完成次数，不公开训练详情。是否出现在 Team 动态，仍取决于自动分享或本次分享。")
+                .font(Theme.Font.body(size: 12))
+                .foregroundStyle(Theme.Color.fg2)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
+    }
+
+    @ViewBuilder
+    private func planSection(title: String, items: [TeamPlanShareCardDTO]) -> some View {
+        if !items.isEmpty {
+            Text(title)
+                .font(Theme.Font.mono(size: 10, weight: .bold))
+                .foregroundStyle(Theme.Color.muted)
+                .textCase(.uppercase)
+                .padding(.top, Theme.Spacing.xs)
+            ForEach(items) { share in
+                planRow(share)
+            }
+        }
+    }
+
+    private func planRow(_ p: TeamPlanShareCardDTO) -> some View {
+        let own = isOwnShare(p)
+        let rowBusy = forking != nil || deletingShareId != nil
+        let canUse = !p.hasUnstartableItems && !rowBusy
+        return VStack(alignment: .leading, spacing: 10) {
+            Button { selectedShare = p } label: {
+                HStack(alignment: .center, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(p.planNameSnapshot)
+                                .font(Theme.Font.body(size: 15, weight: .semibold))
+                                .foregroundStyle(Theme.Color.fg)
+                            Text("\(updatedText(for: p)) · \(ownerName(for: p))")
+                                .font(Theme.Font.mono(size: 10, weight: .bold))
+                                .foregroundStyle(Theme.Color.muted)
+                            Text("\(p.itemCount) 个动作 · \(p.exercisePreviewText)")
+                                .font(Theme.Font.mono(size: 11))
+                                .foregroundStyle(Theme.Color.muted)
+                                .lineLimit(1)
+                            if p.hasUnstartableItems {
+                                Text("包含无法识别的动作，请更新 App 或联系分享者修复")
+                                    .font(Theme.Font.body(size: 12))
+                                    .foregroundStyle(Theme.Color.danger)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+
+                        HStack(spacing: 8) {
+                            Label("\(p.displayCopyCount) 人复制", systemImage: "arrow.triangle.branch")
+                            Label("总共 \(p.displayCompletionCount) 次完成", systemImage: "checkmark.circle")
+                        }
+                        .font(Theme.Font.mono(size: 10, weight: .bold))
+                        .foregroundStyle(Theme.Color.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.9)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.Color.muted)
+                        .frame(width: 24, alignment: .trailing)
+                }
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: 10) {
+                Button { start(p) } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "play.fill").font(.system(size: 11, weight: .bold))
+                        Text("开始训练")
+                    }
+                    .font(Theme.Font.body(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 36)
+                    .background(canUse ? Theme.Color.accent : Theme.Color.muted.opacity(0.35),
+                                in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
+                    .opacity(canUse ? 1 : 0.72)
+                }
+                .buttonStyle(.plain)
+                .disabled(!canUse)
+
+                if !own {
+                    Button { Task { await fork(p) } } label: {
+                        if forking == p.versionId {
+                            ProgressView().tint(Theme.Color.accent)
+                                .frame(width: 86, height: 36)
+                        } else {
+                            HStack(spacing: 5) {
+                                Image(systemName: "doc.on.doc").font(.system(size: 12, weight: .bold))
+                                Text("复制")
+                            }
+                            .font(Theme.Font.body(size: 13, weight: .bold))
+                            .foregroundStyle(canUse ? Theme.Color.accent : Theme.Color.muted)
+                            .frame(width: 86, height: 36)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                                    .stroke(canUse ? Theme.Color.accent : Theme.Color.border, lineWidth: 1.3)
+                            )
+                            .opacity(canUse ? 1 : 0.72)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canUse)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+
+    private func isOwnShare(_ p: TeamPlanShareCardDTO) -> Bool {
+        session.currentUserId.map { $0 == p.ownerUserId } ?? false
+    }
+
+    private func ownerName(for p: TeamPlanShareCardDTO) -> String {
+        let name = p.ownerName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let name, !name.isEmpty { return name }
+        return isOwnShare(p) ? "我" : "队友"
+    }
+
+    private func updatedText(for p: TeamPlanShareCardDTO) -> String {
+        guard let date = p.createdAt else { return "上次更新未知" }
+        return "上次更新 \(date.formatted(.relative(presentation: .named)))"
     }
 
     private func reload() async {
         guard !isReloading else { return }
         isReloading = true
         defer { isReloading = false }
-        do { plans = try await teamService.plans(of: team.id) }
+        do { shares = try await teamService.planShares(of: team.id) }
         catch {
             guard !error.isCancellationError else { return }
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
 
-    private func fork(_ p: ServerPlanDTO) async {
-        forking = p.id; defer { forking = nil }
+    private func start(_ p: TeamPlanShareCardDTO) {
+        let items = p.decodedItems
+        let brokenItems = PlanItem.unstartableItems(in: items)
+        guard brokenItems.isEmpty else {
+            error = PlanItem.unstartableMessage(for: brokenItems)
+            return
+        }
+        let build = { buildWorkout(from: p) }
+        if let existing = WorkoutSession.activeSession(in: modelContext) {
+            pendingBuild = build
+            pendingStartCard = p
+            conflict = existing
+            showConflict = true
+        } else {
+            commit(build, source: p)
+        }
+    }
+
+    private func buildWorkout(from share: TeamPlanShareCardDTO) -> Workout {
+        let w = Workout(planId: nil,
+                        sourceShareId: share.shareId,
+                        sourceShareVersionId: share.versionId,
+                        sourcePlanNameSnapshot: share.planNameSnapshot,
+                        title: share.planNameSnapshot)
+        let orderedItems = share.decodedItems.sorted { $0.orderIndex < $1.orderIndex }
+        for (i, item) in orderedItems.enumerated() {
+            let ex = WorkoutExercise(builtinExerciseCode: item.builtinExerciseCode,
+                                     customExerciseId: item.customExerciseId,
+                                     exerciseName: item.displayExerciseName,
+                                     primaryMuscle: item.resolvedPrimaryMuscle,
+                                     orderIndex: i,
+                                     planItemId: item.itemId)
+            ex.sets = PlanPrefill.sets(for: item, mode: .adaptive, lookup: historyStore.planLookup)
+            w.exercises.append(ex)
+        }
+        return w
+    }
+
+    private func commit(_ build: () -> Workout, source share: TeamPlanShareCardDTO) {
+        let workout = build()
+        modelContext.insert(workout)
+        try? modelContext.save()
+        historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
+        NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
+        workoutPresentation.present(workout)
+        Task {
+            await teamService.recordPlanShareEventOrQueue(versionId: share.versionId,
+                                                          eventType: "direct_start",
+                                                          workoutId: workout.localId,
+                                                          eventDate: .now,
+                                                          userId: session.currentUserId)
+            if let userId = session.currentUserId,
+               teamService.hasPendingPlanShareEvents(userId: userId) {
+                await syncEngine.syncAll()
+            }
+            await reload()
+        }
+    }
+
+    private func clearConflict() {
+        conflict = nil
+        pendingBuild = nil
+        pendingStartCard = nil
+    }
+
+    private func fork(_ p: TeamPlanShareCardDTO) async {
+        guard !p.hasUnstartableItems else {
+            error = PlanItem.unstartableMessage(for: PlanItem.unstartableItems(in: p.decodedItems))
+            return
+        }
+        forking = p.versionId; defer { forking = nil }
         do {
-            try await teamService.fork(planId: p.id)
+            try await teamService.forkShareVersion(p.versionId)
             await syncEngine.syncAll()
+            await reload()
             await showToast("已复制到「计划」")
+        } catch {
+            guard !error.isCancellationError else { return }
+            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    private func deleteShare(_ p: TeamPlanShareCardDTO) async {
+        guard isOwnShare(p) else {
+            error = "只能取消自己分享的计划"
+            return
+        }
+        deletingShareId = p.shareId
+        defer { deletingShareId = nil }
+        do {
+            try await teamService.deletePlanShare(p.shareId, in: p.teamId)
+            shares.removeAll { $0.shareId == p.shareId }
+            if selectedShare?.shareId == p.shareId {
+                selectedShare = nil
+            }
+            await reload()
+            await showToast("已取消分享")
         } catch {
             guard !error.isCancellationError else { return }
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -1642,5 +1899,194 @@ struct TeamPlansView: View {
         withAnimation { toast = msg }
         try? await Task.sleep(for: .seconds(2))
         withAnimation { toast = nil }
+    }
+}
+
+private struct TeamPlanShareDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let share: TeamPlanShareCardDTO
+    let isOwnShare: Bool
+    let isForking: Bool
+    let isDeleting: Bool
+    let onStart: () -> Void
+    let onFork: () -> Void
+    let onDelete: () -> Void
+
+    private var orderedItems: [PlanItem] {
+        share.decodedItems.sorted { $0.orderIndex < $1.orderIndex }
+    }
+
+    private var canUse: Bool {
+        !share.hasUnstartableItems && !isForking && !isDeleting
+    }
+
+    var body: some View {
+        ZStack {
+            Theme.Color.bg.ignoresSafeArea()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    headerCard
+                    Text("训练动作")
+                        .font(Theme.Font.mono(size: 10, weight: .bold))
+                        .foregroundStyle(Theme.Color.muted)
+                        .textCase(.uppercase)
+                    ForEach(Array(orderedItems.enumerated()), id: \.element.itemId) { index, item in
+                        itemRow(item, index: index + 1)
+                    }
+                    Color.clear.frame(height: 96)
+                }
+                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.top, Theme.Spacing.md)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+        .paperToolbar(title: "计划详情", onBack: { dismiss() }) {
+            if isOwnShare {
+                CircleIconMenu(systemName: "ellipsis",
+                               items: detailMenuItems,
+                               accessibilityLabel: "计划操作")
+                    .disabled(isDeleting)
+            }
+        }
+    }
+
+    private var detailMenuItems: [PaperMenuItem] {
+        [
+            PaperMenuItem(title: "取消分享",
+                          systemImage: "trash",
+                          role: .destructive,
+                          isEnabled: !isDeleting) {
+                onDelete()
+            }
+        ]
+    }
+
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(share.planNameSnapshot)
+                .font(Theme.Font.display(size: 24, weight: .heavy))
+                .foregroundStyle(Theme.Color.fg)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("\(updatedText) · \(ownerName)")
+                .font(Theme.Font.mono(size: 11, weight: .bold))
+                .foregroundStyle(Theme.Color.muted)
+            HStack(spacing: 8) {
+                Label("\(share.displayCopyCount) 人复制", systemImage: "arrow.triangle.branch")
+                Label("总共 \(share.displayCompletionCount) 次完成", systemImage: "checkmark.circle")
+            }
+            .font(Theme.Font.mono(size: 10, weight: .bold))
+            .foregroundStyle(Theme.Color.muted)
+            if share.hasUnstartableItems {
+                Text("包含无法识别的动作，请更新 App 或联系分享者修复")
+                    .font(Theme.Font.body(size: 12))
+                    .foregroundStyle(Theme.Color.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+
+    private func itemRow(_ item: PlanItem, index: Int) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text("\(index)")
+                .font(Theme.Font.mono(size: 12, weight: .bold))
+                .foregroundStyle(Theme.Color.muted)
+                .frame(width: 22, height: 22)
+                .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.displayExerciseName)
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg)
+                Text(itemPrescription(item))
+                    .font(Theme.Font.mono(size: 11, weight: .bold))
+                    .foregroundStyle(Theme.Color.muted)
+                if let meta = itemMeta(item) {
+                    Text(meta)
+                        .font(Theme.Font.mono(size: 10))
+                        .foregroundStyle(Theme.Color.muted)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+
+    private var footer: some View {
+        VStack(spacing: 10) {
+            Button(action: onStart) {
+                HStack(spacing: 7) {
+                    Image(systemName: "play.fill").font(.system(size: 12, weight: .bold))
+                    Text("开始训练")
+                }
+                .font(Theme.Font.body(size: 15, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(canUse ? Theme.Color.accent : Theme.Color.muted.opacity(0.35),
+                            in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                .opacity(canUse ? 1 : 0.72)
+            }
+            .buttonStyle(.plain)
+            .disabled(!canUse)
+
+            if !isOwnShare {
+                Button(action: onFork) {
+                    HStack(spacing: 7) {
+                        if isForking {
+                            ProgressView().tint(Theme.Color.accent)
+                        } else {
+                            Image(systemName: "doc.on.doc").font(.system(size: 13, weight: .bold))
+                            Text("复制到我的计划")
+                        }
+                    }
+                    .font(Theme.Font.body(size: 14, weight: .bold))
+                    .foregroundStyle(canUse ? Theme.Color.accent : Theme.Color.muted)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(canUse ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
+                    .opacity(canUse ? 1 : 0.72)
+                }
+                .buttonStyle(.plain)
+                .disabled(!canUse)
+            }
+        }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+        .background(Theme.Color.bg.opacity(0.96))
+        .overlay(alignment: .top) { Rectangle().fill(Theme.Color.border).frame(height: 1) }
+    }
+
+    private var ownerName: String {
+        let name = share.ownerName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let name, !name.isEmpty { return name }
+        return isOwnShare ? "我" : "队友"
+    }
+
+    private var updatedText: String {
+        guard let date = share.createdAt else { return "上次更新未知" }
+        return "上次更新 \(date.formatted(.relative(presentation: .named)))"
+    }
+
+    private func itemPrescription(_ item: PlanItem) -> String {
+        let sets = max(1, item.suggestedSets ?? PlanDefaults.suggestedSets)
+        if let reps = item.suggestedReps {
+            return "\(sets) 组 × \(reps) 次"
+        }
+        return "\(sets) 组"
+    }
+
+    private func itemMeta(_ item: PlanItem) -> String? {
+        [item.resolvedPrimaryMuscle, item.resolvedEquipmentType]
+            .compactMap { value in
+                let text = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+                return text?.isEmpty == false ? text : nil
+            }
+            .joined(separator: " · ")
+            .nilIfEmpty
     }
 }

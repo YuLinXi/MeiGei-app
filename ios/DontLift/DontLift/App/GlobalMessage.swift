@@ -62,6 +62,7 @@ final class GlobalMessageCenter {
 
 struct GlobalMessageOverlay: View {
     @Environment(GlobalMessageCenter.self) private var center
+    @Environment(SyncProgressCenter.self) private var syncProgress
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -70,7 +71,7 @@ struct GlobalMessageOverlay: View {
                 if let message = center.current {
                     GlobalMessageBanner(message: message)
                         .frame(maxWidth: bannerWidth(in: proxy.size.width))
-                        .padding(.top, 8)
+                        .padding(.top, syncProgress.isVisible ? 52 : 8)
                         .transition(transition)
                 }
             }

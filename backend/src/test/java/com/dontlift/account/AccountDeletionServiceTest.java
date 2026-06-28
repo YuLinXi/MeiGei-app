@@ -15,6 +15,8 @@ import com.dontlift.team.mapper.CheckinReactionMapper;
 import com.dontlift.team.mapper.TeamCheckinMapper;
 import com.dontlift.team.mapper.TeamMapper;
 import com.dontlift.team.mapper.TeamMemberMapper;
+import com.dontlift.team.mapper.TeamPlanShareEventMapper;
+import com.dontlift.team.mapper.TeamPlanShareMapper;
 import com.dontlift.workout.mapper.CustomExerciseMapper;
 import com.dontlift.workout.mapper.WorkoutMapper;
 import com.dontlift.workout.mapper.WorkoutPlanGroupMapper;
@@ -54,6 +56,8 @@ class AccountDeletionServiceTest {
     @Mock TeamMemberMapper teamMemberMapper;
     @Mock TeamCheckinMapper teamCheckinMapper;
     @Mock CheckinReactionMapper checkinReactionMapper;
+    @Mock TeamPlanShareMapper teamPlanShareMapper;
+    @Mock TeamPlanShareEventMapper teamPlanShareEventMapper;
     @Mock AppleClientSecretFactory clientSecretFactory;
     @Mock AppleTokenClient appleTokenClient;
 
@@ -68,12 +72,15 @@ class AccountDeletionServiceTest {
 
         service.deleteSelf(userId);
 
-        InOrder order = inOrder(checkinReactionMapper, teamCheckinMapper, teamMapper, teamMemberMapper,
+        InOrder order = inOrder(checkinReactionMapper, teamCheckinMapper, teamPlanShareEventMapper,
+                teamPlanShareMapper, teamMapper, teamMemberMapper,
                 workoutMapper, workoutPlanMapper, workoutPlanGroupMapper, customExerciseMapper,
                 deviceTokenMapper, idempotencyKeyMapper, userIdentityMapper, appUserMapper);
         // Team 个人维度：只删本人 reaction/checkin/member，不删除 owner 名下其他成员历史
         order.verify(checkinReactionMapper).deleteByUser(userId);
         order.verify(teamCheckinMapper).deleteByUser(userId);
+        order.verify(teamPlanShareEventMapper).deleteByUser(userId);
+        order.verify(teamPlanShareMapper).deleteByUser(userId);
         order.verify(teamMapper).findOwnedTeamsIncludingDeleted(userId);
         order.verify(teamMemberMapper).deleteByUser(userId);
         // 自身训练数据
@@ -102,6 +109,7 @@ class AccountDeletionServiceTest {
 
         verify(appUserMapper, never()).hardDeleteById(userId);
         verifyNoInteractions(checkinReactionMapper, teamCheckinMapper, teamMemberMapper, teamMapper,
+                teamPlanShareEventMapper, teamPlanShareMapper,
                 workoutMapper, workoutPlanMapper, workoutPlanGroupMapper, customExerciseMapper,
                 deviceTokenMapper, idempotencyKeyMapper);
     }
@@ -162,7 +170,11 @@ class AccountDeletionServiceTest {
         verify(teamMapper).transferOwner(team.getId(), userId, replacement.getUserId());
         verify(teamMemberMapper).updateRole(team.getId(), replacement.getUserId(), "owner");
         verify(teamMemberMapper).deleteByUser(userId);
+        verify(teamPlanShareEventMapper).deleteByUser(userId);
+        verify(teamPlanShareMapper).deleteByUser(userId);
         verify(teamCheckinMapper, never()).deleteByTeam(team.getId());
+        verify(teamPlanShareEventMapper, never()).deleteByTeam(team.getId());
+        verify(teamPlanShareMapper, never()).deleteByTeam(team.getId());
         verify(teamMapper, never()).hardDeleteById(team.getId());
     }
 
@@ -176,6 +188,8 @@ class AccountDeletionServiceTest {
         service.deleteSelf(userId);
 
         verify(teamCheckinMapper).deleteByTeam(team.getId());
+        verify(teamPlanShareEventMapper).deleteByTeam(team.getId());
+        verify(teamPlanShareMapper).deleteByTeam(team.getId());
         verify(teamMemberMapper).deleteByTeam(team.getId());
         verify(teamMapper).hardDeleteById(team.getId());
         verify(teamMapper, never()).transferOwner(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
@@ -191,6 +205,8 @@ class AccountDeletionServiceTest {
         service.deleteSelf(userId);
 
         verify(teamCheckinMapper).deleteByTeam(team.getId());
+        verify(teamPlanShareEventMapper).deleteByTeam(team.getId());
+        verify(teamPlanShareMapper).deleteByTeam(team.getId());
         verify(teamMemberMapper).deleteByTeam(team.getId());
         verify(teamMapper).hardDeleteById(team.getId());
         verify(teamMemberMapper, never()).findOldestOtherMember(team.getId(), userId);

@@ -178,8 +178,8 @@ struct ExerciseTaxonomyTests {
 
     /// V1 收敛为单一预置库，不再把 1000+ 导入动作全量展示。
     @Test func libraryScale() {
-        #expect(BuiltinExercise.starter.count >= 170)
-        #expect(BuiltinExercise.starter.count <= 200)
+        #expect(BuiltinExercise.starter.count >= 200)
+        #expect(BuiltinExercise.starter.count <= 260)
     }
 
     @Test func removedExercisesAreNotPresetSelectable() {
@@ -215,7 +215,7 @@ struct ExerciseTaxonomyTests {
         #expect(names.contains("悍马机卧推"))
         #expect(names.contains("悍马机推胸"))
         #expect(names.contains("器械倒蹬机"))
-        #expect(names.contains("腿举"))
+        #expect(ExerciseLibrary.resolve(code: "LEG_PRESS", name: "腿举")?.name == "器械倒蹬机")
     }
 
     @Test func planItemDisplaysStandardNameForLegacyReference() {

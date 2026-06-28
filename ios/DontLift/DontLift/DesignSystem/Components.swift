@@ -307,9 +307,9 @@ struct CircleIconMenu: View {
 
 /// 子页（push/sheet 二级及以上）纸感导航栏内容：左返回 / 中标题 / 右操作三槽位，
 /// 标题统一 `Theme.Font.l2`；iOS 26 双环处理集中收口在此。Tab 根页大标题范式不走此容器。
-struct PaperToolbarContent<Trailing: View>: ToolbarContent {
+struct PaperToolbarContent<Leading: View, Trailing: View>: ToolbarContent {
     let title: String
-    let onBack: () -> Void
+    @ViewBuilder let leading: () -> Leading
     @ViewBuilder let trailing: () -> Trailing
 
     @ToolbarContentBuilder
@@ -318,7 +318,7 @@ struct PaperToolbarContent<Trailing: View>: ToolbarContent {
         // 用 sharedBackgroundVisibility(.hidden) 关掉系统背景，仅保留我们的圆。
         if #available(iOS 26.0, *) {
             ToolbarItem(placement: .topBarLeading) {
-                CircleIconButton(systemName: "chevron.left", action: onBack)
+                leading()
             }
             .sharedBackgroundVisibility(.hidden)
             if !title.isEmpty {
@@ -328,7 +328,7 @@ struct PaperToolbarContent<Trailing: View>: ToolbarContent {
                 .sharedBackgroundVisibility(.hidden)
         } else {
             ToolbarItem(placement: .topBarLeading) {
-                CircleIconButton(systemName: "chevron.left", action: onBack)
+                leading()
             }
             if !title.isEmpty {
                 ToolbarItem(placement: .principal) { titleText }
@@ -346,10 +346,10 @@ struct PaperToolbarContent<Trailing: View>: ToolbarContent {
 }
 
 extension View {
-    /// 子页统一导航栏：传入标题、返回回调与可选右侧操作（`CircleIconButton` 或 `CircleIconMenu`）。
-    func paperToolbar<Trailing: View>(
+    /// 子页统一导航栏：可自定义左侧控件，右侧操作一般为 `CircleIconButton` 或 `CircleIconMenu`。
+    func paperToolbar<Leading: View, Trailing: View>(
         title: String = "",
-        onBack: @escaping () -> Void,
+        @ViewBuilder leading: @escaping () -> Leading,
         @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() }
     ) -> some View {
         self
@@ -357,7 +357,23 @@ extension View {
             .navigationBarBackButtonHidden(true)
             // 隐藏系统返回钮会连带禁用左边缘侧滑返回手势；在此单一收口处恢复，全 push 子页通吃。
             .background(SwipeBackEnabler())
-            .toolbar { PaperToolbarContent(title: title, onBack: onBack, trailing: trailing) }
+            .toolbar {
+                PaperToolbarContent(title: title, leading: leading, trailing: trailing)
+            }
+    }
+
+    /// 子页统一导航栏：传入标题、返回回调与可选右侧操作（`CircleIconButton` 或 `CircleIconMenu`）。
+    func paperToolbar<Trailing: View>(
+        title: String = "",
+        leadingSystemName: String = "chevron.left",
+        onBack: @escaping () -> Void,
+        @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() }
+    ) -> some View {
+        paperToolbar(title: title) {
+            CircleIconButton(systemName: leadingSystemName, action: onBack)
+        } trailing: {
+            trailing()
+        }
     }
 }
 
@@ -500,6 +516,7 @@ struct PaperSheetHeader: View {
     var cancelTitle: String? = "取消"
     var confirmTitle: String? = nil
     var confirmEnabled: Bool = true
+    var showsHandle: Bool = false
     var topPadding: CGFloat = 16
     var bottomPadding: CGFloat = 12
     var background: Color = Theme.Color.surface
@@ -507,41 +524,58 @@ struct PaperSheetHeader: View {
     var onConfirm: (() -> Void)?
 
     var body: some View {
-        ZStack {
-            Text(title)
-                .font(Theme.Font.body(size: 17, weight: .bold))
-                .foregroundStyle(Theme.Color.fg)
-                .lineLimit(1)
-                .padding(.horizontal, 96)
+        VStack(spacing: 0) {
+            if showsHandle {
+                PaperSheetHandle()
+            }
 
-            HStack {
-                if let cancelTitle, let onCancel {
-                    PaperSheetHeaderActionButton(title: cancelTitle, role: .cancel, action: onCancel)
-                } else {
-                    PaperSheetHeaderActionButton.placeholder
-                }
+            ZStack {
+                Text(title)
+                    .font(Theme.Font.body(size: 17, weight: .bold))
+                    .foregroundStyle(Theme.Color.fg)
+                    .lineLimit(1)
+                    .padding(.horizontal, 96)
 
-                Spacer(minLength: 0)
+                HStack {
+                    if let cancelTitle, let onCancel {
+                        PaperSheetHeaderActionButton(title: cancelTitle, role: .cancel, action: onCancel)
+                    } else {
+                        PaperSheetHeaderActionButton.placeholder
+                    }
 
-                if let confirmTitle, let onConfirm {
-                    PaperSheetHeaderActionButton(
-                        title: confirmTitle,
-                        role: .confirm,
-                        enabled: confirmEnabled,
-                        action: onConfirm
-                    )
-                } else {
-                    PaperSheetHeaderActionButton.placeholder
+                    Spacer(minLength: 0)
+
+                    if let confirmTitle, let onConfirm {
+                        PaperSheetHeaderActionButton(
+                            title: confirmTitle,
+                            role: .confirm,
+                            enabled: confirmEnabled,
+                            action: onConfirm
+                        )
+                    } else {
+                        PaperSheetHeaderActionButton.placeholder
+                    }
                 }
             }
+            .padding(.horizontal, 18)
+            .padding(.top, showsHandle ? 0 : topPadding)
+            .padding(.bottom, bottomPadding)
         }
-        .padding(.horizontal, 18)
-        .padding(.top, topPadding)
-        .padding(.bottom, bottomPadding)
         .background(background)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.border).frame(height: 1)
         }
+    }
+}
+
+struct PaperSheetHandle: View {
+    var body: some View {
+        Capsule()
+            .fill(Theme.Color.border2)
+            .frame(width: 38, height: 5)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
+            .frame(maxWidth: .infinity)
     }
 }
 
@@ -708,11 +742,13 @@ struct PaperConfirmDialog: View {
         .onAppear { withAnimation(anim) { shown = true } }
     }
 
-    /// 先淡出，动画结束后再移除 cover 并执行后续动作（确认）。
+    /// 先淡出，再执行动作，最后移除 cover。
+    /// 动作必须先于 `isPresented = false`，否则 optional 绑定会先清空待确认对象。
     private func close(_ action: @escaping () -> Void) {
         withAnimation(anim) { shown = false } completion: {
-            isPresented = false
-            action()
+            PaperConfirmDialogLifecycle.confirm(action: action) {
+                isPresented = false
+            }
         }
     }
 
@@ -783,5 +819,12 @@ struct PaperConfirmDialog: View {
                 .frame(maxWidth: .infinity).frame(height: 50)
                 .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         }.buttonStyle(PressableButtonStyle())
+    }
+}
+
+enum PaperConfirmDialogLifecycle {
+    static func confirm(action: () -> Void, dismiss: () -> Void) {
+        action()
+        dismiss()
     }
 }

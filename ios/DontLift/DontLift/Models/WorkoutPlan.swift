@@ -131,6 +131,8 @@ final class WorkoutPlan: Syncable {
     var modeRaw: String = WorkoutPlanMode.adaptive.rawValue
     /// Fork 来源软指针；原模板增删不影响副本。
     var forkedFrom: UUID?
+    /// 来源 Team 分享版本；再次 fork 新版本时生成新的独立计划，不做后续同步。
+    var forkedFromShareVersionId: UUID?
     /// 发布到的 Team；nil 表示私有。
     var sharedToTeamId: UUID?
     /// 所属计划分组；nil 表示未分组。
@@ -144,6 +146,7 @@ final class WorkoutPlan: Syncable {
         items: [PlanItem] = [],
         mode: WorkoutPlanMode = .adaptive,
         forkedFrom: UUID? = nil,
+        forkedFromShareVersionId: UUID? = nil,
         sharedToTeamId: UUID? = nil,
         groupId: UUID? = nil,
         sortOrder: Int = 0,
@@ -159,6 +162,7 @@ final class WorkoutPlan: Syncable {
         self.items = items
         self.modeRaw = mode.rawValue
         self.forkedFrom = forkedFrom
+        self.forkedFromShareVersionId = forkedFromShareVersionId
         self.sharedToTeamId = sharedToTeamId
         self.groupId = groupId
         self.sortOrder = sortOrder

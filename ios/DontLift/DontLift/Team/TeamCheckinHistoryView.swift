@@ -233,8 +233,6 @@ struct TeamCheckinHistoryView: View {
 }
 
 struct TeamCheckinDetailSheet: View {
-    @State private var selectedDetent: PresentationDetent = .large
-
     let checkin: TeamCheckinDTO
     let memberName: String
 
@@ -263,7 +261,7 @@ struct TeamCheckinDetailSheet: View {
         }
         .background(Theme.Color.bg.ignoresSafeArea())
         .presentationBackground(Theme.Color.bg)
-        .presentationDetents([.medium, .large], selection: $selectedDetent)
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
 

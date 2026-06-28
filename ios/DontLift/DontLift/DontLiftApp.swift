@@ -16,6 +16,8 @@ struct DontLiftApp: App {
     @State private var planWriteback = PlanWritebackCenter()
     @State private var teamShare = TeamShareCenter()
     @State private var globalMessage = GlobalMessageCenter()
+    @State private var syncProgress = SyncProgressCenter()
+    @State private var workoutPresentation = WorkoutPresentationCenter()
 
     init() {
         let container = AppModelContainer.make()
@@ -35,6 +37,7 @@ struct DontLiftApp: App {
         WindowGroup {
             ZStack {
                 RootView()
+                GlobalSyncProgressOverlay()
                 GlobalMessageOverlay()
             }
                 .environment(session)
@@ -47,6 +50,8 @@ struct DontLiftApp: App {
                 .environment(planWriteback)
                 .environment(teamShare)
                 .environment(globalMessage)
+                .environment(syncProgress)
+                .environment(workoutPresentation)
                 .preferredColorScheme(.light)
                 .task(id: session.isLoggedIn) {
                     if session.isLoggedIn { await healthKit.requestAuthorization() }

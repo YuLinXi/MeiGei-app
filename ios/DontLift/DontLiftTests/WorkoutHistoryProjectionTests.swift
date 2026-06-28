@@ -172,10 +172,11 @@ struct WorkoutHistoryProjectionTests {
             points: points,
             pr: nil
         )
+        let chartPoints = Array(snapshot.points.suffix(120))
 
-        #expect(snapshot.chartPoints.count == 120)
-        #expect(snapshot.chartPoints.first?.weight == 40)
-        #expect(snapshot.chartPoints.last?.weight == 159)
+        #expect(chartPoints.count == 120)
+        #expect(chartPoints.first?.maxWeightKg == 40)
+        #expect(chartPoints.last?.maxWeightKg == 159)
     }
 
     @Test func ensureLoadedSkipsCleanSnapshotAndDirtyScheduleRebuilds() async throws {

@@ -133,6 +133,7 @@ struct WorkoutPlanDTO: Codable {
     /// 计划模式 raw（"strict"/"adaptive"）。解码缺失时兜底 `adaptive`，兼容旧后端/旧数据。
     var mode: String?
     var forkedFrom: UUID?
+    var forkedFromShareVersionId: UUID?
     var sharedToTeamId: UUID?
     var groupId: UUID?
     /// 解码缺失时客户端兜底 0，兼容旧后端/旧数据。
@@ -149,6 +150,9 @@ struct WorkoutDTO: Codable {
     var id: UUID
     var userId: UUID?
     var planId: UUID?
+    var sourceShareId: UUID?
+    var sourceShareVersionId: UUID?
+    var sourcePlanNameSnapshot: String?
     var title: String?
     var startedAt: Date?
     var endedAt: Date?
@@ -278,6 +282,7 @@ struct ServerPlanDTO: Decodable, Identifiable, Hashable {
     var name: String
     var items: String
     var forkedFrom: UUID?
+    var forkedFromShareVersionId: UUID?
     var sharedToTeamId: UUID?
 
     var decodedItems: [PlanItem] {
@@ -303,12 +308,92 @@ struct ServerPlanDTO: Decodable, Identifiable, Hashable {
     }
 }
 
+/// Team 计划页卡片：最新不可变分享版本 + 最小化反馈统计。
+struct TeamPlanShareCardDTO: Decodable, Identifiable, Hashable {
+    var shareId: UUID
+    var versionId: UUID
+    var teamId: UUID
+    var ownerUserId: UUID
+    var ownerName: String?
+    var sourcePlanId: UUID?
+    var title: String
+    var versionNumber: Int?
+    var planNameSnapshot: String
+    var mode: String?
+    var items: String
+    var createdAt: Date?
+    var copyCount: Int?
+    var completionCount: Int?
+    var adoptionCount: Int?
+    var weeklyCompletionCount: Int?
+
+    var id: UUID { shareId }
+    var displayCopyCount: Int { copyCount ?? adoptionCount ?? 0 }
+    var displayCompletionCount: Int { completionCount ?? weeklyCompletionCount ?? 0 }
+
+    var decodedItems: [PlanItem] {
+        guard let data = items.data(using: .utf8),
+              let arr = try? JSONCoding.decoder.decode([PlanItem].self, from: data) else { return [] }
+        return arr
+    }
+
+    var planMode: WorkoutPlanMode {
+        mode.flatMap(WorkoutPlanMode.init(rawValue:)) ?? .adaptive
+    }
+
+    var itemCount: Int { decodedItems.count }
+
+    var exercisePreviewText: String {
+        let names = decodedItems
+            .sorted { $0.orderIndex < $1.orderIndex }
+            .prefix(3)
+            .map(\.displayExerciseName)
+        return names.isEmpty ? "暂无动作" : names.joined(separator: "、")
+    }
+
+    var hasUnstartableItems: Bool {
+        !PlanItem.unstartableItems(in: decodedItems).isEmpty
+    }
+}
+
+struct TeamPlanShareVersionDTO: Decodable, Identifiable, Hashable {
+    var id: UUID
+    var shareId: UUID
+    var versionNumber: Int?
+    var planNameSnapshot: String
+    var mode: String?
+    var items: String
+    var createdAt: Date?
+}
+
+struct TeamPlanShareEventDTO: Decodable, Identifiable, Hashable {
+    var id: UUID
+    var teamId: UUID
+    var shareId: UUID
+    var versionId: UUID
+    var userId: UUID
+    var eventType: String
+    var workoutId: UUID?
+    var eventDate: String?
+    var createdAt: Date?
+}
+
 // MARK: - Team 请求体
 
 struct CreateTeamRequest: Encodable { let name: String }
 struct JoinTeamRequest: Encodable { let inviteCode: String }
 struct ReactRequest: Encodable { let emoji: String }
 struct UpdateTeamSharePreferenceRequest: Encodable { let autoShareWorkouts: Bool }
+struct SharePlanRequest: Encodable {
+    let sourcePlanId: UUID
+    let planNameSnapshot: String?
+    let items: String?
+}
+struct TeamPlanShareEventRequest: Encodable {
+    let eventType: String
+    let workoutId: UUID?
+    let eventDate: String?
+}
 
 struct CheckInRequest: Encodable {
     let workoutId: UUID

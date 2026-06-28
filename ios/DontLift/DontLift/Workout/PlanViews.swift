@@ -54,6 +54,7 @@ private func sortedPlans(_ plans: [WorkoutPlan]) -> [WorkoutPlan] {
 struct PlanListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(WorkoutHistoryStore.self) private var historyStore
+    @Environment(GlobalMessageCenter.self) private var globalMessage
     @Query(filter: #Predicate<WorkoutPlanGroup> { $0.deletedAt == nil },
            sort: \WorkoutPlanGroup.sortOrder)
     private var groups: [WorkoutPlanGroup]
@@ -182,7 +183,7 @@ struct PlanListView: View {
             ),
             title: "删除分组?",
             message: deletingGroup.map { "「\($0.name)」下的计划会保留，并移动到未分组。" } ?? "",
-            confirmTitle: "删除分组",
+            confirmTitle: "删除",
             onConfirm: {
                 if let group = deletingGroup { deleteGroup(group) }
                 deletingGroup = nil
@@ -417,12 +418,15 @@ struct PlanListView: View {
     }
 
     private func deleteGroup(_ group: WorkoutPlanGroup) {
+        let name = group.name
         for plan in plans where plan.groupId == group.localId {
             plan.groupId = nil
             plan.markDirty()
         }
         group.markDeleted()
         try? modelContext.save()
+        Theme.Haptics.notification(.warning)
+        globalMessage.show("已删除「\(name)」", style: .success)
     }
 
     private func applyGroupOrder(_ orderedIds: [UUID]) {
@@ -456,8 +460,12 @@ struct PlanDetailView: View {
     @Bindable var plan: WorkoutPlan
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(SyncEngine.self) private var syncEngine
+    @Environment(TeamService.self) private var teamService
     @Environment(RestTimerController.self) private var restTimer
+    @Environment(GlobalMessageCenter.self) private var globalMessage
     @Environment(WorkoutHistoryStore.self) private var historyStore
+    @Environment(WorkoutPresentationCenter.self) private var workoutPresentation
     @Query(filter: #Predicate<WorkoutPlanGroup> { $0.deletedAt == nil },
            sort: \WorkoutPlanGroup.sortOrder)
     private var planGroups: [WorkoutPlanGroup]
@@ -466,6 +474,7 @@ struct PlanDetailView: View {
     @State private var editingItem: PlanItem?
     @State private var editing = false
     @State private var movingGroup = false
+    @State private var sharingToTeam = false
     @State private var showingMode = false
     @State private var confirmingDelete = false
     @State private var decodeError: String?
@@ -476,12 +485,11 @@ struct PlanDetailView: View {
     @State private var swipe = SwipeRowCoordinator()
     /// 显式动作排序面板。
     @State private var showingOrderEditor = false
-    /// 单一活跃会话守卫：冲突态 + 待新建闭包 + 导航打开的会话。
+    /// 单一活跃会话守卫：冲突态 + 待新建闭包。
     @State private var conflict: Workout?
     @State private var pendingBuild: (() -> Workout)?
     /// 仅驱动冲突弹窗显隐，与数据分离——避免弹窗淡出关闭时清空 `conflict` 致动作回调读到 nil。
     @State private var showConflict = false
-    @State private var startedSession: Workout?
     /// 严格模式缺失必填预设时，阻止开始训练并展示原因。
     @State private var strictStartError: String?
 
@@ -606,6 +614,11 @@ struct PlanDetailView: View {
         .sheet(isPresented: $movingGroup) {
             PlanMoveGroupSheet(plan: plan, groups: sortedPlanGroups(planGroups))
         }
+        .sheet(isPresented: $sharingToTeam) {
+            PlanShareToTeamSheet(plan: plan) { team, result in
+                globalMessage.show(result.message(for: team), style: .success)
+            }
+        }
         .sheet(isPresented: $showingMode) {
             PlanModeSheet(plan: plan)
         }
@@ -614,7 +627,6 @@ struct PlanDetailView: View {
                                      items: planOrderItems,
                                      onCommit: applyPlanItemOrder)
         }
-        .navigationDestination(item: $startedSession) { WorkoutLoggingView(workout: $0) }
         // 训练冲突二次确认：统一为纸感弹窗。无独立取消按钮，点蒙层即取消；
         // 「丢弃并开始新训练」为主（红填充）、「继续训练」为次（描边）。
         .paperConfirmDialog(
@@ -624,7 +636,7 @@ struct PlanDetailView: View {
             confirmTitle: "丢弃并开始新训练",
             secondaryTitle: "继续训练",
             onSecondary: {
-                if let existing = conflict { startedSession = existing }
+                if let existing = conflict { workoutPresentation.present(existing) }
                 clearConflict()
             },
             showCancel: false,
@@ -665,6 +677,7 @@ struct PlanDetailView: View {
         [
             PaperMenuItem(title: "重命名计划", systemImage: "pencil") { editing = true },
             PaperMenuItem(title: "移动到分组", systemImage: "folder") { movingGroup = true },
+            PaperMenuItem(title: "分享到 Team", systemImage: "square.and.arrow.up") { sharingToTeam = true },
             PaperMenuItem(title: "删除计划", systemImage: "trash", role: .destructive) { confirmingDelete = true }
         ]
     }
@@ -1002,7 +1015,8 @@ struct PlanDetailView: View {
         modelContext.insert(w)
         try? modelContext.save()
         historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
-        startedSession = w
+        NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
+        workoutPresentation.present(w)
     }
 
     private func delete() {
@@ -1031,6 +1045,282 @@ struct PlanDetailView: View {
         plan.markDirty()
         try? modelContext.save()
         Theme.Haptics.selection()
+    }
+}
+
+private enum PlanShareToTeamResult {
+    case shared
+    case updated
+    case cancelled
+
+    func message(for team: TeamDTO) -> String {
+        switch self {
+        case .shared: return "已分享到 \(team.name)"
+        case .updated: return "已更新 \(team.name)"
+        case .cancelled: return "已取消分享"
+        }
+    }
+}
+
+private enum PlanShareToTeamAction {
+    case share(TeamDTO)
+    case update(TeamDTO)
+    case cancel(TeamDTO, TeamPlanShareCardDTO)
+
+    var team: TeamDTO {
+        switch self {
+        case .share(let team), .update(let team), .cancel(let team, _):
+            return team
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .share: return "分享计划?"
+        case .update: return "更新分享?"
+        case .cancel: return "取消分享?"
+        }
+    }
+
+    func message(planName: String) -> String {
+        switch self {
+        case .share(let team):
+            return "将「\(planName)」分享给「\(team.name)」。队友可复制或直接开始训练，训练重量不会公开。"
+        case .update(let team):
+            return "将用当前计划内容更新「\(team.name)」中的分享版本；已复制或已开始的训练不受影响。"
+        case .cancel(let team, _):
+            return "取消后，「\(team.name)」成员将不再从列表看到「\(planName)」；已复制的计划不受影响。"
+        }
+    }
+
+    var confirmTitle: String {
+        switch self {
+        case .share: return "分享"
+        case .update: return "更新"
+        case .cancel: return "取消分享"
+        }
+    }
+
+    var isDestructive: Bool {
+        if case .cancel = self { return true }
+        return false
+    }
+}
+
+private struct PlanShareToTeamSheet: View {
+    @Environment(TeamService.self) private var teamService
+    @Environment(SyncEngine.self) private var syncEngine
+    @Environment(SessionStore.self) private var session
+    @Environment(\.dismiss) private var dismiss
+
+    let plan: WorkoutPlan
+    let onChanged: (TeamDTO, PlanShareToTeamResult) -> Void
+
+    @State private var loading = false
+    @State private var workingTeamId: UUID?
+    @State private var existingShares: [UUID: TeamPlanShareCardDTO] = [:]
+    @State private var pendingAction: PlanShareToTeamAction?
+    @State private var error: String?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PaperSheetHeader(
+                title: "分享到 Team",
+                cancelTitle: "取消",
+                showsHandle: true,
+                background: Theme.Color.bg,
+                onCancel: { dismiss() }
+            )
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    summary
+                    if loading && teamService.teams.isEmpty {
+                        ProgressView()
+                            .tint(Theme.Color.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, Theme.Spacing.lg)
+                    } else if teamService.teams.isEmpty {
+                        Text("还没有 Team")
+                            .font(Theme.Font.body(size: 13))
+                            .foregroundStyle(Theme.Color.muted)
+                            .padding(.top, Theme.Spacing.lg)
+                    } else {
+                        ForEach(teamService.teams) { team in
+                            teamRow(team)
+                        }
+                    }
+                }
+                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.top, Theme.Spacing.md)
+                .padding(.bottom, Theme.Spacing.lg)
+            }
+            .background(Theme.Color.bg)
+        }
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .presentationBackground(Theme.Color.bg)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.hidden)
+        .task { await loadTeams() }
+        .alert("操作失败", isPresented: .constant(error != nil)) {
+            Button("好") { error = nil }
+        } message: { Text(error ?? "") }
+        .paperConfirmDialog(
+            isPresented: Binding(
+                get: { pendingAction != nil },
+                set: { if !$0 { pendingAction = nil } }
+            ),
+            title: pendingAction?.title ?? "",
+            message: pendingAction?.message(planName: plan.name) ?? "",
+            confirmTitle: pendingAction?.confirmTitle ?? "",
+            destructive: pendingAction?.isDestructive ?? false,
+            onConfirm: {
+                if let action = pendingAction {
+                    Task { await perform(action) }
+                }
+                pendingAction = nil
+            }
+        )
+    }
+
+    private var summary: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(plan.name)
+                .font(Theme.Font.body(size: 16, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+            Text("\(plan.items.count) 个动作 · 不包含重量 · 可更新")
+                .font(Theme.Font.mono(size: 11))
+                .foregroundStyle(Theme.Color.muted)
+            Text("队友可复制或直接开始训练；已分享的 Team 可取消分享。")
+                .font(Theme.Font.body(size: 12))
+                .foregroundStyle(Theme.Color.fg2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+
+    private func teamRow(_ team: TeamDTO) -> some View {
+        let existing = existingShares[team.id]
+        let busy = workingTeamId == team.id
+        return HStack(spacing: 12) {
+            Text(String(team.name.prefix(1)))
+                .font(Theme.Font.body(size: 13, weight: .bold))
+                .foregroundStyle(Theme.Color.accent)
+                .frame(width: 36, height: 36)
+                .background(Theme.Color.accentSoft, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(team.name)
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg)
+                Text(existing == nil ? "未分享 · 邀请码 \(team.inviteCode)" : "已分享 · 可更新")
+                    .font(Theme.Font.mono(size: 11))
+                    .foregroundStyle(Theme.Color.muted)
+            }
+            Spacer(minLength: 8)
+            if busy {
+                ProgressView().tint(Theme.Color.accent)
+            } else if let existing {
+                HStack(spacing: 8) {
+                    rowActionButton("更新") {
+                        pendingAction = .update(team)
+                    }
+                    rowActionButton("取消", destructive: true) {
+                        pendingAction = .cancel(team, existing)
+                    }
+                }
+            } else {
+                rowActionButton("分享") {
+                    pendingAction = .share(team)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+
+    private func rowActionButton(_ title: String,
+                                 destructive: Bool = false,
+                                 action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(Theme.Font.body(size: 13, weight: .bold))
+                .foregroundStyle(destructive ? Theme.Color.danger : Theme.Color.accent)
+                .frame(minWidth: 44)
+                .frame(height: 34)
+                .padding(.horizontal, 8)
+                .background((destructive ? Theme.Color.danger.opacity(0.08) : Theme.Color.accentSoft),
+                            in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                        .stroke(destructive ? Theme.Color.danger.opacity(0.22) : Theme.Color.accentSofter, lineWidth: 1)
+                )
+        }
+        .buttonStyle(PressableButtonStyle())
+        .disabled(workingTeamId != nil)
+    }
+
+    private func loadTeams() async {
+        guard !loading else { return }
+        loading = true
+        defer { loading = false }
+        do {
+            try await teamService.loadMyTeams()
+            try await reloadExistingShares()
+        }
+        catch {
+            guard !error.isCancellationError else { return }
+            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    private func reloadExistingShares() async throws {
+        var result: [UUID: TeamPlanShareCardDTO] = [:]
+        for team in teamService.teams {
+            let shares = try await teamService.planShares(of: team.id)
+            if let share = shares.first(where: isCurrentPlanShare) {
+                result[team.id] = share
+            }
+        }
+        existingShares = result
+    }
+
+    private func isCurrentPlanShare(_ share: TeamPlanShareCardDTO) -> Bool {
+        guard share.sourcePlanId == plan.localId else { return false }
+        guard let currentUserId = session.currentUserId else { return true }
+        return share.ownerUserId == currentUserId
+    }
+
+    private func perform(_ action: PlanShareToTeamAction) async {
+        let team = action.team
+        workingTeamId = team.id
+        defer { workingTeamId = nil }
+        do {
+            switch action {
+            case .share, .update:
+                try await share(to: team)
+            case .cancel(_, let share):
+                try await teamService.deletePlanShare(share.shareId, in: team.id)
+                existingShares.removeValue(forKey: team.id)
+                onChanged(team, .cancelled)
+            }
+            Task { await syncEngine.syncAll() }
+        } catch {
+            guard !error.isCancellationError else { return }
+            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    private func share(to team: TeamDTO) async throws {
+        let wasShared = existingShares[team.id] != nil
+        do {
+            let token = UUID().uuidString
+            try await teamService.share(plan: plan, to: team.id, idempotencyToken: token)
+            try await reloadExistingShares()
+            onChanged(team, wasShared ? .updated : .shared)
+        } catch {
+            throw error
+        }
     }
 }
 

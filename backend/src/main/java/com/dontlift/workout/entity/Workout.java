@@ -23,6 +23,12 @@ public class Workout extends BaseEntity implements UserOwned {
     /** 来源模板，软指针无 FK。 */
     private UUID planId;
 
+    private UUID sourceShareId;
+
+    private UUID sourceShareVersionId;
+
+    private String sourcePlanNameSnapshot;
+
     private String title;
 
     private OffsetDateTime startedAt;

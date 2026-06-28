@@ -14,6 +14,10 @@ final class Workout: Syncable {
 
     /// 来源计划模板（可空：徒手临时训练）。
     var planId: UUID?
+    /// 来源 Team 分享计划（软关联，不参与计划同步）。
+    var sourceShareId: UUID?
+    var sourceShareVersionId: UUID?
+    var sourcePlanNameSnapshot: String?
     var title: String?
     var startedAt: Date
     /// 计时起点（仅本地，不入同步信封）：nil = 计时未启动（会话已创建、浏览中）；
@@ -28,6 +32,9 @@ final class Workout: Syncable {
     init(
         localId: UUID = UUID(),
         planId: UUID? = nil,
+        sourceShareId: UUID? = nil,
+        sourceShareVersionId: UUID? = nil,
+        sourcePlanNameSnapshot: String? = nil,
         title: String? = nil,
         startedAt: Date = .now,
         timerStartedAt: Date? = nil,
@@ -43,6 +50,9 @@ final class Workout: Syncable {
         self.version = 0
         self.syncStatusRaw = SyncStatus.pendingCreate.rawValue
         self.planId = planId
+        self.sourceShareId = sourceShareId
+        self.sourceShareVersionId = sourceShareVersionId
+        self.sourcePlanNameSnapshot = sourcePlanNameSnapshot
         self.title = title
         self.startedAt = startedAt
         self.timerStartedAt = timerStartedAt

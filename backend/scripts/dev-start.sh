@@ -5,6 +5,7 @@
 #   - 设置 JDK 21
 #   - 注入 APP_DEV_TOKEN=true 便于本机免 Apple 登录
 #   - 默认绑定 0.0.0.0，允许同一局域网真机访问本机后端
+#   - 若后端端口已被占用，自动停止旧进程后重新启动
 #   - 前台运行 bootRun，Ctrl+C 仅停后端，PG 保持运行（要全停用 dev-stop.sh）
 
 # 防御：若被 sh / dash 误调用（无 BASH_VERSION），自动用 bash 重启自身
@@ -44,6 +45,43 @@ detect_lan_ip() {
   fi
 
   ifconfig 2>/dev/null | awk '/inet / && $2 !~ /^127\./ {print $2; exit}' || true
+}
+
+stop_existing_backend() {
+  local pids=""
+  pids="$(lsof -tiTCP:"$APP_PORT" -sTCP:LISTEN 2>/dev/null || true)"
+  if [ -z "$pids" ]; then
+    info "端口 $APP_PORT 未被占用"
+    return
+  fi
+
+  warn "端口 $APP_PORT 已被占用，自动停止旧后端进程：$pids"
+  kill $pids 2>/dev/null || true
+  for _ in {1..20}; do
+    if ! lsof -tiTCP:"$APP_PORT" -sTCP:LISTEN > /dev/null 2>&1; then
+      info "端口 $APP_PORT 已释放"
+      return
+    fi
+    sleep 0.2
+  done
+
+  local remain=""
+  remain="$(lsof -tiTCP:"$APP_PORT" -sTCP:LISTEN 2>/dev/null || true)"
+  if [ -n "$remain" ]; then
+    warn "旧进程未优雅退出，强制停止：$remain"
+    kill -9 $remain 2>/dev/null || true
+  fi
+
+  for _ in {1..20}; do
+    if ! lsof -tiTCP:"$APP_PORT" -sTCP:LISTEN > /dev/null 2>&1; then
+      info "端口 $APP_PORT 已释放"
+      return
+    fi
+    sleep 0.2
+  done
+
+  error "端口 $APP_PORT 仍未释放，请检查：lsof -nP -iTCP:$APP_PORT -sTCP:LISTEN"
+  exit 1
 }
 
 # ---- 切到 backend/ 根目录（脚本在 backend/scripts/ 下）----
@@ -89,11 +127,8 @@ if ! pg_isready -h localhost -p 5432 -q 2>/dev/null; then
 fi
 info "PostgreSQL 已就绪（localhost:5432）"
 
-# ---- 4. 校验端口未被占用 ----
-if lsof -ti:"$APP_PORT" > /dev/null 2>&1; then
-  error "端口 $APP_PORT 已被占用，先执行：./scripts/dev-stop.sh"
-  exit 1
-fi
+# ---- 4. 自动释放旧后端端口，允许重复执行脚本重启 ----
+stop_existing_backend
 
 # ---- 5. 启动 Spring Boot ----
 LAN_IP="$(detect_lan_ip)"
@@ -108,6 +143,7 @@ if [ -n "$LAN_IP" ]; then
 else
   warn "未能检测到局域网 IP；真机联调时可手动传 LAN_IP 给 scripts/ios-device-lan-dev.sh。"
 fi
+info "重复执行 ./scripts/dev-start.sh 会自动重启后端"
 info "Ctrl+C 停止后端（PG 保持运行；要全停执行 ./scripts/dev-stop.sh）"
 echo ""
 

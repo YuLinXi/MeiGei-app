@@ -1,6 +1,11 @@
 import Foundation
 import SwiftData
 
+extension Notification.Name {
+    /// 进行中训练会话可能发生变化；根层据此刷新全局训练中悬浮窗。
+    static let dontliftActiveWorkoutChanged = Notification.Name("dontlift.workout.active.changed")
+}
+
 /// 训练会话生命周期守卫（workout-session-lifecycle）。
 ///
 /// 保证同一时刻至多一个进行中会话（`isActive`）：所有「开始训练」入口经此统一处理，

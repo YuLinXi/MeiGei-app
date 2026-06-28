@@ -264,7 +264,9 @@ final class SyncEngine {
         let itemsJSON = (try? String(data: JSONCoding.encoder.encode(m.items), encoding: .utf8)) ?? "[]"
         return WorkoutPlanDTO(id: m.localId, userId: nil, name: m.name, items: itemsJSON,
                               mode: m.modeRaw,
-                              forkedFrom: m.forkedFrom, sharedToTeamId: m.sharedToTeamId,
+                              forkedFrom: m.forkedFrom,
+                              forkedFromShareVersionId: m.forkedFromShareVersionId,
+                              sharedToTeamId: m.sharedToTeamId,
                               groupId: m.groupId, sortOrder: m.sortOrder,
                               createdAt: nil, updatedAt: m.updatedAt, deletedAt: m.deletedAt, version: m.version)
     }
@@ -275,6 +277,7 @@ final class SyncEngine {
         // 解码缺失/未识别值兜底 adaptive（兼容旧后端、旧数据）。
         m.modeRaw = dto.mode.flatMap(WorkoutPlanMode.init(rawValue:))?.rawValue ?? WorkoutPlanMode.adaptive.rawValue
         m.forkedFrom = dto.forkedFrom
+        m.forkedFromShareVersionId = dto.forkedFromShareVersionId
         m.sharedToTeamId = dto.sharedToTeamId
         m.groupId = dto.groupId
         m.sortOrder = dto.sortOrder ?? 0
@@ -360,7 +363,11 @@ final class SyncEngine {
                                   setType: st.setTypeRaw)
                 })
         }
-        let w = WorkoutDTO(id: m.localId, userId: nil, planId: m.planId, title: m.title,
+        let w = WorkoutDTO(id: m.localId, userId: nil, planId: m.planId,
+                           sourceShareId: m.sourceShareId,
+                           sourceShareVersionId: m.sourceShareVersionId,
+                           sourcePlanNameSnapshot: m.sourcePlanNameSnapshot,
+                           title: m.title,
                            startedAt: m.startedAt, endedAt: m.endedAt, note: m.note,
                            createdAt: nil, updatedAt: m.updatedAt, deletedAt: m.deletedAt, version: m.version)
         return WorkoutTreeDTO(workout: w, exercises: nodes)
@@ -368,7 +375,11 @@ final class SyncEngine {
 
     private func applyServer(tree dto: WorkoutTreeDTO, to m: Workout) {
         let w = dto.workout
-        m.planId = w.planId; m.title = w.title
+        m.planId = w.planId
+        m.sourceShareId = w.sourceShareId
+        m.sourceShareVersionId = w.sourceShareVersionId
+        m.sourcePlanNameSnapshot = w.sourcePlanNameSnapshot
+        m.title = w.title
         if let s = w.startedAt { m.startedAt = s }
         m.endedAt = w.endedAt; m.note = w.note
         m.updatedAt = w.updatedAt; m.deletedAt = w.deletedAt

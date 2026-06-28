@@ -16,6 +16,8 @@ import com.dontlift.team.mapper.CheckinReactionMapper;
 import com.dontlift.team.mapper.TeamCheckinMapper;
 import com.dontlift.team.mapper.TeamMapper;
 import com.dontlift.team.mapper.TeamMemberMapper;
+import com.dontlift.team.mapper.TeamPlanShareEventMapper;
+import com.dontlift.team.mapper.TeamPlanShareMapper;
 import com.dontlift.workout.mapper.CustomExerciseMapper;
 import com.dontlift.workout.mapper.WorkoutMapper;
 import com.dontlift.workout.mapper.WorkoutPlanGroupMapper;
@@ -56,6 +58,8 @@ public class AccountDeletionService {
     private final TeamMemberMapper teamMemberMapper;
     private final TeamCheckinMapper teamCheckinMapper;
     private final CheckinReactionMapper checkinReactionMapper;
+    private final TeamPlanShareMapper teamPlanShareMapper;
+    private final TeamPlanShareEventMapper teamPlanShareEventMapper;
     private final AppleClientSecretFactory clientSecretFactory;
     private final AppleTokenClient appleTokenClient;
 
@@ -86,6 +90,8 @@ public class AccountDeletionService {
         //    不能删除 owner 名下 Team 的其他成员历史。
         checkinReactionMapper.deleteByUser(userId);
         teamCheckinMapper.deleteByUser(userId);
+        teamPlanShareEventMapper.deleteByUser(userId);
+        teamPlanShareMapper.deleteByUser(userId);
         transferOrDeleteOwnedTeams(userId);
         teamMemberMapper.deleteByUser(userId);
 
@@ -127,6 +133,8 @@ public class AccountDeletionService {
     }
 
     private void deleteOwnedTeamResidue(UUID teamId) {
+        teamPlanShareEventMapper.deleteByTeam(teamId);
+        teamPlanShareMapper.deleteByTeam(teamId);
         teamCheckinMapper.deleteByTeam(teamId);
         teamMemberMapper.deleteByTeam(teamId);
         teamMapper.hardDeleteById(teamId);

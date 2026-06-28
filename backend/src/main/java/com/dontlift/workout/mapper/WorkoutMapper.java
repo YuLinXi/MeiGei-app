@@ -37,4 +37,22 @@ public interface WorkoutMapper extends BaseMapper<Workout> {
 
     @Select("SELECT * FROM workout WHERE id = #{id}")
     Workout findByIdIncludingDeleted(@Param("id") UUID id);
+
+    @Update("""
+            UPDATE workout
+            SET user_id = #{workout.userId},
+                plan_id = #{workout.planId},
+                source_share_id = #{workout.sourceShareId},
+                source_share_version_id = #{workout.sourceShareVersionId},
+                source_plan_name_snapshot = #{workout.sourcePlanNameSnapshot},
+                title = #{workout.title},
+                started_at = #{workout.startedAt},
+                ended_at = #{workout.endedAt},
+                note = #{workout.note},
+                deleted_at = NULL,
+                updated_at = #{workout.updatedAt},
+                version = version + 1
+            WHERE id = #{workout.id}
+            """)
+    int restoreDevWorkout(@Param("workout") Workout workout);
 }

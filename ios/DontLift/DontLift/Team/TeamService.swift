@@ -10,12 +10,16 @@ final class TeamService {
     private static func pendingShareKey(userId: UUID) -> String {
         "dontlift.team.pendingCheckinShares.\(userId.uuidString)"
     }
+    private static func pendingPlanShareEventKey(userId: UUID) -> String {
+        "dontlift.team.pendingPlanShareEvents.\(userId.uuidString)"
+    }
     private static func autoShareCacheKey(userId: UUID) -> String {
         "dontlift.team.autoShareTeamIds.\(userId.uuidString)"
     }
     static func clearStoredShareState(userId: UUID) {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: pendingShareKey(userId: userId))
+        defaults.removeObject(forKey: pendingPlanShareEventKey(userId: userId))
         defaults.removeObject(forKey: autoShareCacheKey(userId: userId))
         defaults.removeObject(forKey: legacyPendingShareKey)
     }
@@ -85,21 +89,99 @@ final class TeamService {
         try await loadMyTeams()
     }
 
-    // MARK: - 计划模板：浏览 / 发布 / Fork
+    // MARK: - 计划模板：浏览 / 分享 / Fork / 反馈
 
     func plans(of teamId: UUID) async throws -> [ServerPlanDTO] {
         try await api.send("GET", "/teams/\(teamId)/plans")
     }
 
+    func planShares(of teamId: UUID) async throws -> [TeamPlanShareCardDTO] {
+        try await api.send("GET", "/teams/\(teamId)/plan-shares")
+    }
+
+    @discardableResult
+    func share(planId: UUID, to teamId: UUID, idempotencyToken: String? = nil) async throws -> TeamPlanShareVersionDTO {
+        let token = idempotencyToken ?? UUID().uuidString
+        return try await api.send("POST", "/teams/\(teamId)/plan-shares",
+                                  body: SharePlanRequest(sourcePlanId: planId,
+                                                         planNameSnapshot: nil,
+                                                         items: nil),
+                                  idempotencyKey: "team-plan-share-\(teamId.uuidString):\(planId.uuidString):\(token)")
+    }
+
+    @discardableResult
+    func share(plan: WorkoutPlan, to teamId: UUID, idempotencyToken: String? = nil) async throws -> TeamPlanShareVersionDTO {
+        let token = idempotencyToken ?? String(plan.updatedAt.timeIntervalSince1970)
+        return try await api.send("POST", "/teams/\(teamId)/plan-shares",
+                                  body: SharePlanRequest(sourcePlanId: plan.localId,
+                                                         planNameSnapshot: plan.name,
+                                                         items: Self.weightlessItemsJSON(from: plan)),
+                                  idempotencyKey: "team-plan-share-\(teamId.uuidString):\(plan.localId.uuidString):\(token)")
+    }
+
     func publish(planId: UUID, to teamId: UUID) async throws {
-        let _: ServerPlanDTO = try await api.send("POST", "/teams/\(teamId)/plans/\(planId)")
+        let _: TeamPlanShareVersionDTO = try await share(planId: planId, to: teamId)
+    }
+
+    func deletePlanShare(_ shareId: UUID, in teamId: UUID) async throws {
+        try await api.sendVoid("DELETE", "/teams/\(teamId)/plan-shares/\(shareId)",
+                               idempotencyKey: "team-plan-share-delete-\(shareId.uuidString):\(UUID().uuidString)")
     }
 
     /// Fork 队友模板为自己的副本（服务端复制 jsonb）。返回新副本 id；
     /// 调用方随后跑一次同步把副本拉回本地 SwiftData。
     @discardableResult
     func fork(planId: UUID) async throws -> ServerPlanDTO {
-        try await api.send("POST", "/teams/plans/\(planId)/fork")
+        try await api.send("POST", "/teams/plans/\(planId)/fork",
+                           idempotencyKey: "team-plan-fork-\(planId.uuidString)")
+    }
+
+    @discardableResult
+    func forkShareVersion(_ versionId: UUID) async throws -> ServerPlanDTO {
+        try await api.send("POST", "/teams/plan-share-versions/\(versionId)/fork",
+                           idempotencyKey: "team-plan-share-fork-\(versionId.uuidString)")
+    }
+
+    @discardableResult
+    func recordPlanShareEvent(versionId: UUID,
+                              eventType: String,
+                              workoutId: UUID? = nil,
+                              eventDate: Date? = nil,
+                              idempotencyKey: String? = nil) async throws -> TeamPlanShareEventDTO {
+        let eventDateText = eventDate.map(Self.dateOnly)
+        let key = idempotencyKey ?? Self.planShareEventIdempotencyKey(versionId: versionId,
+                                                                      eventType: eventType,
+                                                                      workoutId: workoutId,
+                                                                      eventDate: eventDateText)
+        return try await api.send("POST", "/teams/plan-share-versions/\(versionId)/events",
+                                  body: TeamPlanShareEventRequest(eventType: eventType,
+                                                                  workoutId: workoutId,
+                                                                  eventDate: eventDateText),
+                                  idempotencyKey: key)
+    }
+
+    func recordPlanShareEventOrQueue(versionId: UUID,
+                                     eventType: String,
+                                     workoutId: UUID? = nil,
+                                     eventDate: Date? = nil,
+                                     userId: UUID?) async {
+        guard let userId else { return }
+        let intent = PendingPlanShareEvent(versionId: versionId,
+                                           eventType: eventType,
+                                           workoutId: workoutId,
+                                           eventDate: eventDate.map(Self.dateOnly))
+        enqueue(intent, userId: userId)
+        do {
+            _ = try await send(intent)
+            removePending(intent, userId: userId)
+        } catch where error.isCancellationError {
+            return
+        } catch where shouldQueuePlanShareEventRetry(error) {
+            // 已在请求前落盘，保留待下轮同步后重试。
+        } catch {
+            // 反馈统计是低打扰能力，权限/参数错误不反复提示用户。
+            removePending(intent, userId: userId)
+        }
     }
 
     // MARK: - 打卡 / 表情回应
@@ -222,6 +304,34 @@ final class TeamService {
         Set(pendingShares(userId: userId).map(\.workoutId))
     }
 
+    func hasPendingPlanShareEvents(userId: UUID) -> Bool {
+        !pendingPlanShareEvents(userId: userId).isEmpty
+    }
+
+    func pendingPlanShareEventWorkoutIds(userId: UUID) -> Set<UUID> {
+        Set(pendingPlanShareEvents(userId: userId).compactMap(\.workoutId))
+    }
+
+    func retryPendingPlanShareEvents(userId: UUID, syncedWorkoutIds: Set<UUID>) async {
+        let intents = pendingPlanShareEvents(userId: userId)
+        guard !intents.isEmpty else { return }
+        for intent in intents {
+            if let workoutId = intent.workoutId, !syncedWorkoutIds.contains(workoutId) {
+                continue
+            }
+            do {
+                _ = try await send(intent)
+                removePending(intent, userId: userId)
+            } catch where error.isCancellationError {
+                return
+            } catch where shouldQueuePlanShareEventRetry(error) {
+                // 保留待下轮同步后重试。
+            } catch {
+                removePending(intent, userId: userId)
+            }
+        }
+    }
+
     // MARK: - 工具
 
     private static let dateOnlyFormatter: DateFormatter = {
@@ -244,6 +354,30 @@ final class TeamService {
 
     static func monthOnly(_ date: Date) -> String { monthOnlyFormatter.string(from: date) }
 
+    private static func planShareEventIdempotencyKey(versionId: UUID,
+                                                     eventType: String,
+                                                     workoutId: UUID?,
+                                                     eventDate: String?) -> String {
+        let identity = workoutId?.uuidString ?? eventDate ?? UUID().uuidString
+        return "team-plan-share-event-\(versionId.uuidString):\(eventType):\(identity)"
+    }
+
+    static func weightlessItemsJSON(from plan: WorkoutPlan) -> String {
+        let items = plan.items.map {
+            PlanItem(itemId: $0.itemId,
+                     builtinExerciseCode: $0.builtinExerciseCode,
+                     customExerciseId: $0.customExerciseId,
+                     exerciseName: $0.exerciseName,
+                     primaryMuscle: $0.primaryMuscle,
+                     equipmentType: $0.equipmentType,
+                     orderIndex: $0.orderIndex,
+                     suggestedSets: $0.suggestedSets,
+                     suggestedReps: $0.suggestedReps,
+                     suggestedWeightKg: nil)
+        }
+        return (try? String(data: JSONCoding.encoder.encode(items), encoding: .utf8)) ?? "[]"
+    }
+
     private func send(_ intent: PendingCheckinShare) async throws -> [TeamCheckinDTO] {
         let body = CheckInRequest(workoutId: intent.workoutId,
                                   checkinDate: intent.checkinDate,
@@ -251,6 +385,14 @@ final class TeamService {
                                   teamIds: intent.teamIds)
         return try await api.send("POST", "/checkins", body: body,
                                   idempotencyKey: intent.idempotencyKey)
+    }
+
+    private func send(_ intent: PendingPlanShareEvent) async throws -> TeamPlanShareEventDTO {
+        try await api.send("POST", "/teams/plan-share-versions/\(intent.versionId)/events",
+                           body: TeamPlanShareEventRequest(eventType: intent.eventType,
+                                                           workoutId: intent.workoutId,
+                                                           eventDate: intent.eventDate),
+                           idempotencyKey: intent.idempotencyKey)
     }
 
     private func pendingShares(userId: UUID) -> [PendingCheckinShare] {
@@ -282,6 +424,29 @@ final class TeamService {
         setPendingShares(items, userId: userId)
     }
 
+    private func pendingPlanShareEvents(userId: UUID) -> [PendingPlanShareEvent] {
+        guard let data = UserDefaults.standard.data(forKey: Self.pendingPlanShareEventKey(userId: userId)),
+              let decoded = try? JSONCoding.decoder.decode([PendingPlanShareEvent].self, from: data) else {
+            return []
+        }
+        return decoded
+    }
+
+    private func setPendingPlanShareEvents(_ items: [PendingPlanShareEvent], userId: UUID) {
+        let data = try? JSONCoding.encoder.encode(items)
+        UserDefaults.standard.set(data, forKey: Self.pendingPlanShareEventKey(userId: userId))
+    }
+
+    private func enqueue(_ intent: PendingPlanShareEvent, userId: UUID) {
+        var items = pendingPlanShareEvents(userId: userId).filter { $0.id != intent.id }
+        items.append(intent)
+        setPendingPlanShareEvents(items, userId: userId)
+    }
+
+    private func removePending(_ intent: PendingPlanShareEvent, userId: UUID) {
+        setPendingPlanShareEvents(pendingPlanShareEvents(userId: userId).filter { $0.id != intent.id }, userId: userId)
+    }
+
     private func shouldQueueShareRetry(_ error: Error) -> Bool {
         if error.isCancellationError { return false }
         if case APIError.transport = error { return true }
@@ -291,6 +456,10 @@ final class TeamService {
             return true
         }
         return false
+    }
+
+    private func shouldQueuePlanShareEventRetry(_ error: Error) -> Bool {
+        shouldQueueShareRetry(error)
     }
 
     private func cachedAutoShareTeamIds(userId: UUID) -> [UUID] {
@@ -357,6 +526,27 @@ private struct PendingCheckinShare: Codable, Identifiable, Equatable {
         workoutId == draft.workoutId
         && checkinDate == draft.checkinDate
         && summary == draft.summary
+    }
+}
+
+private struct PendingPlanShareEvent: Codable, Identifiable, Equatable {
+    var id: String
+    var versionId: UUID
+    var eventType: String
+    var workoutId: UUID?
+    var eventDate: String?
+
+    init(versionId: UUID, eventType: String, workoutId: UUID?, eventDate: String?) {
+        self.versionId = versionId
+        self.eventType = eventType
+        self.workoutId = workoutId
+        self.eventDate = eventDate
+        let identity = workoutId?.uuidString ?? eventDate ?? "no-date"
+        self.id = "\(versionId.uuidString):\(eventType):\(identity)"
+    }
+
+    var idempotencyKey: String {
+        "team-plan-share-event-\(id)"
     }
 }
 

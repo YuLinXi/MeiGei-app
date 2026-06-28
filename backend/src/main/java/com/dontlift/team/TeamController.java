@@ -1,11 +1,17 @@
 package com.dontlift.team;
 
+import com.dontlift.common.web.AppException;
 import com.dontlift.security.SecurityUtils;
 import com.dontlift.team.dto.TeamMemberView;
+import com.dontlift.team.dto.TeamPlanShareCard;
 import com.dontlift.team.dto.TeamRequests.CreateTeam;
 import com.dontlift.team.dto.TeamRequests.JoinTeam;
+import com.dontlift.team.dto.TeamRequests.SharePlan;
+import com.dontlift.team.dto.TeamRequests.SharePlanEvent;
 import com.dontlift.team.dto.TeamRequests.UpdateSharePreference;
 import com.dontlift.team.entity.Team;
+import com.dontlift.team.entity.TeamPlanShareEvent;
+import com.dontlift.team.entity.TeamPlanShareVersion;
 import com.dontlift.workout.entity.WorkoutPlan;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +21,9 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -76,13 +84,62 @@ public class TeamController {
         return teamPlanService.listTeamPlans(SecurityUtils.currentUserId(), teamId);
     }
 
+    @GetMapping("/{teamId}/plan-shares")
+    public List<TeamPlanShareCard> planShares(@PathVariable UUID teamId,
+                                              @RequestParam(required = false) String weekStart) {
+        return teamPlanService.listShareCards(SecurityUtils.currentUserId(), teamId);
+    }
+
+    @PostMapping("/{teamId}/plan-shares")
+    public TeamPlanShareVersion sharePlan(@PathVariable UUID teamId,
+                                          @RequestHeader("Idempotency-Key") String idempotencyKey,
+                                          @Valid @RequestBody SharePlan req) {
+        requireIdempotencyKey(idempotencyKey);
+        return teamPlanService.shareToTeam(SecurityUtils.currentUserId(), teamId, req);
+    }
+
+    @DeleteMapping("/{teamId}/plan-shares/{shareId}")
+    public void deletePlanShare(@PathVariable UUID teamId,
+                                @PathVariable UUID shareId,
+                                @RequestHeader("Idempotency-Key") String idempotencyKey) {
+        requireIdempotencyKey(idempotencyKey);
+        teamPlanService.deleteShare(SecurityUtils.currentUserId(), teamId, shareId);
+    }
+
     @PostMapping("/{teamId}/plans/{planId}")
-    public WorkoutPlan publish(@PathVariable UUID teamId, @PathVariable UUID planId) {
+    public WorkoutPlan publish(@PathVariable UUID teamId,
+                               @PathVariable UUID planId,
+                               @RequestHeader("Idempotency-Key") String idempotencyKey) {
+        requireIdempotencyKey(idempotencyKey);
         return teamPlanService.publishToTeam(SecurityUtils.currentUserId(), planId, teamId);
     }
 
     @PostMapping("/plans/{planId}/fork")
-    public WorkoutPlan fork(@PathVariable UUID planId) {
+    public WorkoutPlan fork(@PathVariable UUID planId,
+                            @RequestHeader("Idempotency-Key") String idempotencyKey) {
+        requireIdempotencyKey(idempotencyKey);
         return teamPlanService.fork(SecurityUtils.currentUserId(), planId);
+    }
+
+    @PostMapping("/plan-share-versions/{versionId}/fork")
+    public WorkoutPlan forkShareVersion(@PathVariable UUID versionId,
+                                        @RequestHeader("Idempotency-Key") String idempotencyKey) {
+        requireIdempotencyKey(idempotencyKey);
+        return teamPlanService.forkVersion(SecurityUtils.currentUserId(), versionId);
+    }
+
+    @PostMapping("/plan-share-versions/{versionId}/events")
+    public TeamPlanShareEvent recordShareEvent(@PathVariable UUID versionId,
+                                               @RequestHeader("Idempotency-Key") String idempotencyKey,
+                                               @Valid @RequestBody SharePlanEvent req) {
+        requireIdempotencyKey(idempotencyKey);
+        return teamPlanService.recordEvent(SecurityUtils.currentUserId(), versionId,
+                req.eventType(), req.workoutId(), req.eventDate());
+    }
+
+    private void requireIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw AppException.badRequest("缺少 Idempotency-Key");
+        }
     }
 }
