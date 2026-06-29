@@ -369,11 +369,12 @@
     },
     {
       "targetCode": "SHOULDER_WARMUP",
-      "targetName": "肩部热身",
+      "targetName": "肩部动态热身",
       "legacyCodes": [],
       "legacyNames": [
         "练肩热身",
-        "肩部热身"
+        "肩部热身",
+        "肩部动态热身"
       ],
       "requiresNameMatch": false
     },
@@ -587,6 +588,37 @@
       "legacyNames": [
         "牧师凳EZ杠弯举",
         "牧师凳 EZ 杠弯举"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "TRICEP_KICKBACK",
+      "targetName": "哑铃臂屈伸",
+      "legacyCodes": [],
+      "legacyNames": [
+        "哑铃臂屈伸后踢",
+        "哑铃三头后踢"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "SHOULDER_90_90_EXTERNAL_ROTATION",
+      "targetName": "招财猫",
+      "legacyCodes": [],
+      "legacyNames": [
+        "招财猫式肩外旋",
+        "肩背热身招财猫"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "BAND_SHOULDER_EXTERNAL_ROTATION",
+      "targetName": "弹力带肩外旋",
+      "legacyCodes": [],
+      "legacyNames": [
+        "肩关节外旋训练",
+        "肩外旋训练",
+        "弹力带肩关节外旋"
       ],
       "requiresNameMatch": false
     }

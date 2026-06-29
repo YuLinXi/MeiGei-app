@@ -1717,8 +1717,11 @@ struct TeamPlansView: View {
                         .foregroundStyle(Theme.Color.muted)
                         .frame(width: 24, alignment: .trailing)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 10) {
                 Button { start(p) } label: {

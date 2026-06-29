@@ -218,7 +218,7 @@ extension BuiltinExercise {
         .init(code: "CLOSE_GRIP_BENCH", name: "窄距卧推", category: "三头", equipmentType: "杠铃"),
         .init(code: "OVERHEAD_TRICEP_EXT", name: "哑铃过顶臂屈伸", category: "三头", equipmentType: "哑铃"),
         .init(code: "CABLE_OVERHEAD_EXT", name: "绳索过顶臂屈伸", category: "三头", equipmentType: "绳索"),
-        .init(code: "TRICEP_KICKBACK", name: "哑铃臂屈伸后踢", category: "三头", equipmentType: "哑铃"),
+        .init(code: "TRICEP_KICKBACK", name: "哑铃臂屈伸", category: "三头", equipmentType: "哑铃"),
         .init(code: "TRICEP_DIP", name: "双杠臂屈伸(三头)", category: "三头", equipmentType: "自重"),
         .init(code: "BENCH_DIP", name: "凳上臂屈伸", category: "三头", equipmentType: "自重"),
         .init(code: "MACHINE_TRICEP_EXT", name: "器械臂屈伸", category: "三头", equipmentType: "器械"),

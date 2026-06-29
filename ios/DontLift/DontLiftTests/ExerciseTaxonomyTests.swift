@@ -176,6 +176,33 @@ struct ExerciseTaxonomyTests {
         }
     }
 
+    @Test func tricepAndShoulderWarmupAdditions() {
+        let byCode = Dictionary(uniqueKeysWithValues: BuiltinExercise.starter.map { ($0.code, $0) })
+
+        #expect(byCode["TRICEP_KICKBACK"]?.name == "哑铃臂屈伸")
+        #expect(byCode["TRICEP_KICKBACK"]?.primaryRegions == [.triceps])
+
+        let singleArm = byCode["SINGLE_ARM_DB_TRICEP_EXT"]
+        #expect(singleArm?.name == "单臂哑铃臂屈伸")
+        #expect(singleArm?.category == "手臂")
+        #expect(singleArm?.equipmentType == "哑铃")
+        #expect(singleArm?.primaryRegions == [.triceps])
+
+        let beckoningCat = byCode["SHOULDER_90_90_EXTERNAL_ROTATION"]
+        #expect(beckoningCat?.name == "招财猫")
+        #expect(beckoningCat?.category == "热身拉伸")
+        #expect(beckoningCat?.subcategory == "动态热身")
+        #expect(beckoningCat?.equipmentType == "自重")
+        #expect(beckoningCat?.primaryRegions.isEmpty == true)
+
+        let bandExternalRotation = byCode["BAND_SHOULDER_EXTERNAL_ROTATION"]
+        #expect(bandExternalRotation?.name == "弹力带肩外旋")
+        #expect(bandExternalRotation?.category == "热身拉伸")
+        #expect(bandExternalRotation?.subcategory == "动态热身")
+        #expect(bandExternalRotation?.equipmentType == "弹力带")
+        #expect(bandExternalRotation?.primaryRegions.isEmpty == true)
+    }
+
     /// V1 收敛为单一预置库，不再把 1000+ 导入动作全量展示。
     @Test func libraryScale() {
         #expect(BuiltinExercise.starter.count >= 200)
@@ -198,6 +225,10 @@ struct ExerciseTaxonomyTests {
         #expect(ExerciseLibrary.resolve(code: "DB_ROTATING_CURL", name: "哑铃轮换弯举")?.name == "哑铃交替弯举")
         #expect(ExerciseLibrary.resolve(code: "FACE_PULL", name: "面拉")?.name == "绳索面拉")
         #expect(ExerciseLibrary.resolve(code: "MACHINE_ROW", name: "器械单臂划船")?.name == "单臂器械划船")
+        #expect(ExerciseLibrary.resolve(code: nil, name: "哑铃臂屈伸后踢")?.name == "哑铃臂屈伸")
+        #expect(ExerciseLibrary.resolve(code: nil, name: "肩关节外旋训练")?.name == "弹力带肩外旋")
+        #expect(ExerciseLibrary.resolve(code: nil, name: "招财猫式肩外旋")?.name == "招财猫")
+        #expect(ExerciseLibrary.resolve(code: "SHOULDER_WARMUP", name: "练肩热身")?.name == "肩部动态热身")
     }
 
     @Test func aliasSearchReturnsOnlyStandardExercise() {
@@ -206,6 +237,12 @@ struct ExerciseTaxonomyTests {
 
         let rotatingCurlMatches = BuiltinExercise.starter.filter { ExerciseSearch.matches($0, query: "哑铃轮换弯举") }
         #expect(rotatingCurlMatches.map(\.name) == ["哑铃交替弯举"])
+
+        let externalRotationMatches = BuiltinExercise.starter.filter { ExerciseSearch.matches($0, query: "肩关节外旋训练") }
+        #expect(externalRotationMatches.map(\.name) == ["弹力带肩外旋"])
+
+        let beckoningCatMatches = BuiltinExercise.starter.filter { ExerciseSearch.matches($0, query: "招财猫式肩外旋") }
+        #expect(beckoningCatMatches.map(\.name) == ["招财猫"])
     }
 
     @Test func independentExercisesAreNotMerged() {
