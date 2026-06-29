@@ -53,14 +53,14 @@ struct WorkoutRowSummary: Identifiable, Equatable, Hashable {
 
 struct HomeWorkoutSnapshot: Equatable {
     var currentWeekStats: WeeklyStats
-    var recent: [WorkoutRowSummary]
+    var weekWorkouts: [WorkoutRowSummary]
     var recentPlanIds: Set<UUID>
     var activePlanId: UUID?
     var prByWorkoutId: [UUID: PRBadge]
 
     static let empty = HomeWorkoutSnapshot(
         currentWeekStats: .empty,
-        recent: [],
+        weekWorkouts: [],
         recentPlanIds: [],
         activePlanId: nil,
         prByWorkoutId: [:]
@@ -546,9 +546,7 @@ final class WorkoutHistoryStore {
         }
 
         let now = Date.now
-        let startOfToday = Calendar.current.startOfDay(for: now)
-        let recentCutoff = Calendar.current.date(byAdding: .day, value: -2, to: startOfToday)
-            ?? now.addingTimeInterval(-3 * 86_400)
+        let weekBounds = WorkoutWeeklyStats.weekBounds(for: now, calendar: .currentMondayFirst)
         func rowSummary(for w: Workout) -> WorkoutRowSummary {
             let duration = w.endedAt.map { $0.timeIntervalSince(w.timerStartedAt ?? w.startedAt) }
             let volume = w.exercises.flatMap(\.sets).reduce(0.0) { acc, set in
@@ -566,8 +564,8 @@ final class WorkoutHistoryStore {
                 pr: prByWorkoutId[w.localId]
             )
         }
-        let recent = finishedDesc
-            .filter { $0.startedAt >= recentCutoff && $0.startedAt <= now }
+        let weekWorkouts = finishedDesc
+            .filter { $0.startedAt >= weekBounds.start && $0.startedAt < weekBounds.end }
             .map(rowSummary)
         let calendarDays = buildCalendarDays(
             from: finishedDesc,
@@ -583,8 +581,12 @@ final class WorkoutHistoryStore {
         let activePlanId = recentPlanIdsInOrder.first
 
         let home = HomeWorkoutSnapshot(
-            currentWeekStats: WorkoutWeeklyStats.compute(workouts: finishedDesc),
-            recent: Array(recent),
+            currentWeekStats: WorkoutWeeklyStats.compute(
+                workouts: finishedDesc,
+                reference: now,
+                calendar: .currentMondayFirst
+            ),
+            weekWorkouts: Array(weekWorkouts),
             recentPlanIds: recentPlanIds,
             activePlanId: activePlanId,
             prByWorkoutId: prByWorkoutId

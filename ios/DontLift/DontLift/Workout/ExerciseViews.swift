@@ -99,6 +99,8 @@ struct ExerciseLibraryView: View {
 
 /// 可复用动作库主体：不包含顶部标题、右上创建入口或导航外壳，可嵌入 Tab 或底部抽屉。
 private struct ExerciseLibraryContentView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(SyncEngine.self) private var syncEngine
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Query(sort: \CustomExercise.updatedAt, order: .reverse) private var custom: [CustomExercise]
 
@@ -109,6 +111,7 @@ private struct ExerciseLibraryContentView: View {
     @State private var expandedNode: String? = nil
     /// 器械轴：「all」或 `EquipmentType.rawValue`。
     @State private var equip: String = "all"
+    @State private var pendingDeleteCustom: CustomExercise?
     let mode: ExerciseLibraryContentMode
     let emptyHint: String
     let emptyPlainHint: String
@@ -196,6 +199,20 @@ private struct ExerciseLibraryContentView: View {
                 rightArea
             }
         }
+        .paperConfirmDialog(
+            isPresented: Binding(
+                get: { pendingDeleteCustom != nil },
+                set: { if !$0 { pendingDeleteCustom = nil } }
+            ),
+            title: "删除自定义动作?",
+            message: deleteConfirmMessage,
+            confirmTitle: "删除动作",
+            onConfirm: {
+                if let ex = pendingDeleteCustom {
+                    deleteCustom(ex)
+                }
+            }
+        )
     }
 
     private var searchBar: some View {
@@ -463,8 +480,7 @@ private struct ExerciseLibraryContentView: View {
                     .buttonStyle(.plain)
                     .modifier(RowCardSlice(first: first, last: last))
             } else {
-                customRow(ex, prWeights: prWeights)
-                    .modifier(RowCardSlice(first: first, last: last))
+                customBrowseRow(ex, first: first, last: last, prWeights: prWeights)
             }
         }
     }
@@ -494,6 +510,36 @@ private struct ExerciseLibraryContentView: View {
                             name: ex.name,
                             primaryMuscle: ex.primaryMuscle,
                             equipmentType: ex.equipmentType))
+    }
+
+    private var deleteConfirmMessage: String {
+        guard let ex = pendingDeleteCustom else { return "" }
+        return "将从动作库和后续选择器移除「\(ex.name)」。历史训练和已有计划会保留。"
+    }
+
+    private func requestDeleteCustom(_ ex: CustomExercise) {
+        Theme.Haptics.selection()
+        pendingDeleteCustom = ex
+    }
+
+    private func deleteCustom(_ ex: CustomExercise) {
+        ex.markDeleted()
+        try? modelContext.save()
+        Theme.Haptics.notification(.warning)
+        Task { await syncEngine.syncAll() }
+    }
+
+    private func customBrowseRow(_ ex: CustomExercise, first: Bool, last: Bool, prWeights: [String: Double]) -> some View {
+        customRow(ex, prWeights: prWeights)
+            .modifier(RowCardSlice(first: first, last: last))
+            .contentShape(Rectangle())
+            .onLongPressGesture(minimumDuration: 0.5) {
+                requestDeleteCustom(ex)
+            }
+            .accessibilityHint("长按删除自定义动作")
+            .accessibilityAction(named: "删除") {
+                requestDeleteCustom(ex)
+            }
     }
 
     private struct Segment { let title: String; let items: [BuiltinExercise] }
@@ -687,9 +733,7 @@ private struct ExerciseLibraryContentView: View {
 
 // MARK: - 自定义动作创建
 
-/// C 设计稿 Screen 12 · 方案 C「底部滚轮 Picker」。
-/// 表单极简两字段（主要肌群 + 器械），选择交由从底部升起的自绘滚轮承载：
-/// 点字段 → 滚轮升起 + scrim 压暗表单 → 滚动居中高亮（朱砂红选中带）→「完成」回填。
+/// 新建自定义动作：名称必填，部位与器械使用动作库同源标签。
 struct CustomExerciseEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -697,75 +741,51 @@ struct CustomExerciseEditorView: View {
     @State private var name = ""
     @State private var selectedMuscle: String? = nil
     @State private var selectedEquip: String? = nil
-
-    /// 当前升起的滚轮（nil = 收起，仅表单态）。
-    @State private var activeWheel: WheelKind? = nil
-    /// 滚轮当前居中项（滚动停止后回填的候选值）。
-    @State private var centeredValue: String? = nil
+    @State private var contentHeight: CGFloat = 520
 
     private var nameTrimmed: String { name.trimmingCharacters(in: .whitespaces) }
     private var canSave: Bool { !nameTrimmed.isEmpty }
+    private var sheetHeight: CGFloat { min(max(contentHeight, 360), 640) }
 
-    /// 滚轮升起/收起的统一动效曲线（设计稿规格）。
-    private var wheelAnimation: Animation { .timingCurve(0.32, 1, 0.36, 1, duration: 0.32) }
+    private let muscleOptions = ExerciseCategory.allCases.map(\.rawValue)
+    private let equipmentOptions = EquipmentType.allCases.map(\.rawValue)
+    private let tagColumns = [GridItem(.adaptive(minimum: 74), spacing: 8)]
 
     var body: some View {
-        // scrim 与滚轮用 overlay 承载（不参与表单 sheet 的基础布局，避免底对齐基准变化导致抖动）。
         formSheet
-            .overlay {
-                if activeWheel != nil {
-                    Theme.Color.fg.opacity(0.28)
-                        .ignoresSafeArea()
-                        .transition(.opacity)
-                        .onTapGesture { closeWheel(commit: false) }
-                }
-            }
-            .overlay(alignment: .bottom) {
-                if let kind = activeWheel {
-                    wheelSheet(kind)
-                        .transition(.move(edge: .bottom))
-                }
-            }
             .background(Theme.Color.surface)
-            .presentationDetents([.height(460)])
+            .presentationDetents([.height(sheetHeight)])
+            .presentationCornerRadius(26)
+            .presentationBackground(Theme.Color.surface)
             .presentationDragIndicator(.hidden)
-            // 二级滚轮打开时禁止下拉关闭表单 sheet。
-            .interactiveDismissDisabled(activeWheel != nil)
     }
 
-    // MARK: - 表单 sheet（grab + 头部 + 三字段 + 底部保存）
+    // MARK: - 表单 sheet
 
     private var formSheet: some View {
         VStack(spacing: 0) {
-            // grab handle
-            Capsule()
-                .fill(Theme.Color.border2)
-                .frame(width: 34, height: 4)
-                .padding(.top, Theme.Spacing.sm)
-                .padding(.bottom, Theme.Spacing.xs)
-
             PaperSheetHeader(
                 title: "新建动作",
-                cancelTitle: "取消",
-                topPadding: Theme.Spacing.lg,
-                bottomPadding: Theme.Spacing.md,
-                background: Theme.Color.surface,
-                onCancel: { dismiss() }
+                cancelTitle: nil,
+                showsHandle: true,
+                topPadding: 0,
+                bottomPadding: 10,
+                background: Theme.Color.surface
             )
 
-            // 字段区
-            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            VStack(alignment: .leading, spacing: 16) {
                 field("动作名称", required: true) {
-                    TextField("输入名称（必填）", text: $name).paperField()
+                    TextField("输入名称（必填）", text: $name)
+                        .paperField()
+                        .submitLabel(.done)
                 }
-                field("主要肌群") { pickerField(.muscle) }
-                field("器械") { pickerField(.equipment) }
+
+                tagSection(title: "部位", options: muscleOptions, selection: $selectedMuscle)
+                tagSection(title: "器械", options: equipmentOptions, selection: $selectedEquip)
             }
-            .padding(Theme.Spacing.md)
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.top, 14)
 
-            Spacer(minLength: 0)
-
-            // 底部保存
             Button { save() } label: {
                 Text("保存")
                     .font(Theme.Font.l1)
@@ -780,8 +800,15 @@ struct CustomExerciseEditorView: View {
             .opacity(canSave ? 1 : 0.38)
             .shadow(color: Theme.Color.accent.opacity(canSave ? 0.22 : 0), radius: 14, x: 0, y: 4)
             .padding(.horizontal, Theme.Spacing.md)
-            .padding(.top, Theme.Spacing.sm)
+            .padding(.top, 18)
             .padding(.bottom, Theme.Spacing.lg)
+        }
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { updateContentHeight(proxy.size.height) }
+                    .onChange(of: proxy.size.height) { _, height in updateContentHeight(height) }
+            }
         }
     }
 
@@ -802,154 +829,59 @@ struct CustomExerciseEditorView: View {
         }
     }
 
-    /// 收起态 Picker 行：空=placeholder 灰；编辑中=朱砂红边+浅红底；已选=墨黑值。
-    private func pickerField(_ kind: WheelKind) -> some View {
-        let value = kind == .muscle ? selectedMuscle : selectedEquip
-        let active = activeWheel == kind
-        return HStack {
-            Text(value ?? kind.placeholder)
-                .font(Theme.Font.l2)
-                .fontWeight(value == nil ? .regular : .semibold)
-                .foregroundStyle(value == nil ? Theme.Color.muted : Theme.Color.fg)
-            Spacer()
-            Image(systemName: "chevron.down")
+    private func tagSection(title: String, options: [String], selection: Binding<String?>) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(title)
                 .font(Theme.Font.l4)
-                .foregroundStyle(active ? Theme.Color.accent : Theme.Color.muted)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 11)
-        .background(active ? Theme.Color.accentSoft : Theme.Color.surface,
-                    in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                .stroke(active ? Theme.Color.accent : Theme.Color.border, lineWidth: 1)
-        )
-        .contentShape(Rectangle())
-        .onTapGesture { openWheel(kind) }
-    }
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.Color.fg2)
 
-    // MARK: - 滚轮弹层
-
-    private func wheelSheet(_ kind: WheelKind) -> some View {
-        VStack(spacing: 0) {
-            // 顶栏：标题 | 完成（取消路径 = 点 scrim）
-            PaperSheetHeader(
-                title: kind.title,
-                cancelTitle: nil,
-                confirmTitle: "完成",
-                topPadding: 14,
-                bottomPadding: 14,
-                background: Theme.Color.surface,
-                onConfirm: { closeWheel(commit: true) }
-            )
-
-            // 滚轮：选中带 + 自绘滚动列表
-            ZStack {
-                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                    .fill(Theme.Color.accentSoft)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                            .stroke(Theme.Color.accentSofter, lineWidth: 1)
-                    )
-                    .frame(height: 44)
-                    .padding(.horizontal, 14)
-                    .allowsHitTesting(false)
-                WheelPicker(options: kind.options, centered: $centeredValue)
+            LazyVGrid(columns: tagColumns, alignment: .leading, spacing: 8) {
+                ForEach(options, id: \.self) { option in
+                    tagButton(option, selected: selection.wrappedValue == option) {
+                        Theme.Haptics.selection()
+                        selection.wrappedValue = selection.wrappedValue == option ? nil : option
+                    }
+                }
             }
-            .frame(height: 220)
-            .padding(.bottom, Theme.Spacing.sm)
         }
-        .background(Theme.Color.surface)
-        .clipShape(UnevenRoundedRectangle(topLeadingRadius: Theme.Radius.lg,
-                                          topTrailingRadius: Theme.Radius.lg, style: .continuous))
-        .shadow(color: Theme.Color.fg.opacity(0.18), radius: 20, x: 0, y: -10)
     }
 
-    // MARK: - 滚轮开关
-
-    private func openWheel(_ kind: WheelKind) {
-        let current = kind == .muscle ? selectedMuscle : selectedEquip
-        centeredValue = current ?? kind.options.first   // 非动画：避免初始定位被动画化
-        Theme.Haptics.impact(.light)
-        withAnimation(wheelAnimation) { activeWheel = kind }
+    private func tagButton(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(Theme.Font.body(size: 13, weight: selected ? .bold : .semibold))
+                .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.fg2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .frame(maxWidth: .infinity)
+                .frame(height: 34)
+                .background(selected ? Theme.Color.accentSoft : Theme.Color.surface2,
+                            in: Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(selected ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1)
+                )
+        }
+        .buttonStyle(PressableButtonStyle())
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(selected ? .isSelected : AccessibilityTraits())
     }
 
-    /// 关闭滚轮。commit=true 时把居中项回填到对应字段。
-    private func closeWheel(commit: Bool) {
-        if commit, let kind = activeWheel {
-            switch kind {
-            case .muscle:    selectedMuscle = centeredValue
-            case .equipment: selectedEquip = centeredValue
-            }
-            Theme.Haptics.selection()
-        }
-        withAnimation(wheelAnimation) { activeWheel = nil }
+    private func updateContentHeight(_ height: CGFloat) {
+        let rounded = ceil(height)
+        guard abs(contentHeight - rounded) > 1 else { return }
+        contentHeight = rounded
     }
 
     private func save() {
-        // 设计稿：肌群/器械可空 → 落库补「未分类」。
         let ex = CustomExercise(name: nameTrimmed,
-                                primaryMuscle: selectedMuscle ?? "未分类",
-                                equipmentType: selectedEquip ?? "未分类")
+                                primaryMuscle: selectedMuscle,
+                                equipmentType: selectedEquip)
         modelContext.insert(ex)
         try? modelContext.save()
         Theme.Haptics.notification(.success)
         dismiss()
-    }
-}
-
-/// 滚轮字段种类（肌群 / 器械），与动作库筛选同一套枚举。
-private enum WheelKind: Equatable {
-    case muscle, equipment
-
-    var title: String { self == .muscle ? "主要肌群" : "器械" }
-    var placeholder: String { self == .muscle ? "选择肌群" : "选择器械" }
-    var options: [String] {
-        switch self {
-        case .muscle:    return ExerciseCategory.allCases.map(\.rawValue)
-        case .equipment: return EquipmentType.allCases.map(\.rawValue)
-        }
-    }
-}
-
-/// 自绘 iOS 风格滚轮（对齐 C 设计稿动效规格）：
-/// 行高 38 / 可视 5 行 / scroll-snap 吸附 / 居中行朱砂红加粗放大 1.06、相邻行渐隐。
-private struct WheelPicker: View {
-    let options: [String]
-    @Binding var centered: String?
-
-    private let itemH: CGFloat = 44
-    private let visibleH: CGFloat = 220   // 5 行
-
-    var body: some View {
-        let centerIdx = centered.flatMap { options.firstIndex(of: $0) }
-        ScrollViewReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 0) {
-                    ForEach(Array(options.enumerated()), id: \.element) { idx, opt in
-                        let dist = centerIdx.map { abs($0 - idx) }
-                        Text(opt)
-                            .font(Theme.Font.l2)
-                            .fontWeight(dist == 0 ? .bold : .medium)
-                            .foregroundStyle(dist == 0 ? Theme.Color.accent : Theme.Color.muted)
-                            .opacity(dist == 1 ? 0.7 : 1)
-                            .scaleEffect(dist == 0 ? 1.06 : 1)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: itemH)
-                            .id(opt)
-                            .animation(.easeOut(duration: 0.12), value: centerIdx)
-                    }
-                }
-                .scrollTargetLayout()
-            }
-            .frame(height: visibleH)
-            .contentMargins(.vertical, (visibleH - itemH) / 2, for: .scrollContent)
-            .scrollTargetBehavior(.viewAligned)
-            .scrollPosition(id: $centered, anchor: .center)
-            .onAppear {
-                if let c = centered { proxy.scrollTo(c, anchor: .center) }
-            }
-        }
     }
 }
 

@@ -185,6 +185,10 @@ struct WorkoutSetDTO: Codable {
     var reps: Int?
     var completed: Bool?
     var note: String?
+    /// 完成该组后启动休息时采用的预计秒数；旧后端/旧数据缺失时为 nil。
+    var plannedRestSeconds: Int?
+    /// 该组休息完成后的真实秒数；旧后端/旧数据缺失时为 nil。
+    var actualRestSeconds: Int?
     /// 组类型 raw（"working"/"warmup"）。解码缺失时由 SyncEngine 兜底 `working`，兼容旧后端/旧数据。
     var setType: String?
 }

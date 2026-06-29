@@ -56,8 +56,8 @@
 - [x] 6.2 [iOS] 运行 simulator build，确认新增模型、SwiftData 迁移和 Team/Workout UI 编译通过。
 - [x] 6.3 [iOS] 手工验证首页 CTA：有最近计划时仍创建无计划训练，计划详情页仍可明确从计划开始。
 - [x] 6.4 [iOS] 手工验证完成页：无计划训练可保存为计划，个人计划训练不重复提示，Team 分享计划直接开始后可保存为计划。
-- [ ] 6.5 [端到端] 验证 Team 闭环：分享到 Team → Team 计划页展示 → 直接开始 → 完成计入聚合但不出现在 Feed → 按次分享后出现在 Feed。
-- [ ] 6.6 [端到端] 验证 Fork 闭环：分享到 Team → Fork 到我的计划 → 作者再次分享新版本 → 旧 Fork 不更新 → 再 Fork 新版本生成新计划。
+- [x] 6.5 [端到端] 验证 Team 闭环：分享到 Team → Team 计划页展示 → 直接开始 → 完成计入聚合但不出现在 Feed → 按次分享后出现在 Feed。
+- [x] 6.6 [端到端] 验证 Fork 闭环：分享到 Team → Fork 到我的计划 → 作者再次分享新版本 → 旧 Fork 不更新 → 再 Fork 新版本生成新计划。
 - [x] 6.7 [OpenSpec] 运行 `openspec validate --all`，确认 proposal/design/spec/tasks 合法。
 
 ## 7. 本轮缺陷修复

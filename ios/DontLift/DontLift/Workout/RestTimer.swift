@@ -9,6 +9,8 @@ import UserNotifications
 extension Notification.Name {
     /// Live Activity 的「提前结束休息」App Intent 经 Darwin 通知跨进程送达后，转成本进程通知。
     static let dontliftRestEndedExternally = Notification.Name("dontlift.rest.endedExternally")
+    /// 前台收到休息结束本地通知时，由 PushManager 转发给 RestTimer 兜底收束倒计时。
+    static let dontliftRestNotificationPresented = Notification.Name("dontlift.rest.notificationPresented")
 }
 
 /// 3.7 组间休息计时器。
@@ -41,10 +43,15 @@ final class RestTimerController {
         didSet { UserDefaults.standard.set(hapticsEnabled, forKey: Self.hapticsKey) }
     }
 
-    /// 休息结束时是否在前台播放提醒音效（全屏弹窗底部「声音」开关控制），持久化到 UserDefaults，默认开。
-    /// 经 `AVAudioSession.playback` 播放，无视静音键（健身场景刚需）；后台到点的声音由本地通知承载。
+    /// 休息结束时是否播放提醒音：前台 App 内音效 + 后台/锁屏本地通知音，持久化到 UserDefaults，默认开。
+    /// 前台经 `AVAudioSession.playback` 播放，无视静音键；后台/锁屏交给系统通知播放。
     var soundEnabled: Bool {
-        didSet { UserDefaults.standard.set(soundEnabled, forKey: Self.soundKey) }
+        didSet {
+            UserDefaults.standard.set(soundEnabled, forKey: Self.soundKey)
+            guard oldValue != soundEnabled else { return }
+            if !soundEnabled { stopEndSound() }
+            rescheduleCurrentRestNotificationIfNeeded()
+        }
     }
 
     /// 本次休息结束时刻；nil 表示当前无计时。
@@ -76,6 +83,8 @@ final class RestTimerController {
     private var backgroundedDuringCurrentRest = false
     /// 提醒音效播放器（懒加载并预备，复用同一实例）。
     private var audioPlayer: AVAudioPlayer?
+    /// 提醒音播放后延迟释放 audio session 的任务；新一轮播放前必须取消旧任务。
+    private var audioSessionReleaseTask: Task<Void, Never>?
     private static let durationKey = "dontlift.rest.defaultDuration"
     private static let hapticsKey = "dontlift.rest.hapticsEnabled"
     private static let soundKey = "dontlift.rest.soundEnabled"
@@ -95,6 +104,7 @@ final class RestTimerController {
         hapticsEnabled = (UserDefaults.standard.object(forKey: Self.hapticsKey) as? Bool) ?? true
         soundEnabled = (UserDefaults.standard.object(forKey: Self.soundKey) as? Bool) ?? true
         observeExternalEnd()
+        observeForegroundRestNotification()
         observeAppBackground()
     }
 
@@ -122,6 +132,7 @@ final class RestTimerController {
         activeSetId = setId
         startedAt = now
         backgroundedDuringCurrentRest = false
+        prepareEndSound()
         scheduleNotification(after: secs)
         startTicker()
         startActivity(totalDuration: secs, endDate: end, label: label, nextSet: nextSet)
@@ -175,6 +186,13 @@ final class RestTimerController {
         }
     }
 
+    /// 前台本地通知到达时兜底收束休息；通知自身不发声，声音仍由 App 内播放器负责。
+    func handleForegroundRestNotification(now: Date = .now) {
+        tick = now
+        guard let endDate, endDate.timeIntervalSince(now) <= 0 else { return }
+        completeCurrentRest(now: now, playFeedback: true, endingActivity: false)
+    }
+
     @discardableResult
     func consumeCompletionEvent(matching setIds: Set<UUID>) -> CompletionEvent? {
         guard let event = completionEvent, setIds.contains(event.setId) else { return nil }
@@ -206,6 +224,8 @@ final class RestTimerController {
         activeSetId = nil
         startedAt = nil
         backgroundedDuringCurrentRest = false
+        audioSessionReleaseTask?.cancel()
+        audioSessionReleaseTask = nil
         // isExpanded 不在此清，交给根层 onChange(isRunning) 动画收起，保证渐隐。
         if endingActivity {
             endActivity()
@@ -232,6 +252,7 @@ final class RestTimerController {
     }
 
     private func completeCurrentRest(now: Date, playFeedback: Bool, endingActivity: Bool) {
+        guard endDate != nil else { return }
         recordCompletion(now: now)
         clear(endingActivity: endingActivity)
         if playFeedback {
@@ -255,11 +276,11 @@ final class RestTimerController {
     /// 前台播放一声休息结束提醒音：`AVAudioSession.playback` + duck，无视静音键、瞬时压低背景音乐。
     private func playEndSound() {
         guard soundEnabled else { return }
-        if audioPlayer == nil,
-           let url = Bundle.main.url(forResource: "rest_complete", withExtension: "caf") {
-            audioPlayer = try? AVAudioPlayer(contentsOf: url)
-            audioPlayer?.prepareToPlay()
-        }
+        audioSessionReleaseTask?.cancel()
+        audioSessionReleaseTask = nil
+        prepareEndSound()
+        audioPlayer?.volume = 1.0
+        audioPlayer?.prepareToPlay()
         guard let player = audioPlayer else { return }
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, options: [.duckOthers, .mixWithOthers])
@@ -268,9 +289,39 @@ final class RestTimerController {
         player.play()
         // 播完释放会话，让被 duck 的用户音乐恢复（不常驻激活）。
         let releaseAfter = player.duration + 0.3
-        Task { @MainActor in
+        audioSessionReleaseTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(releaseAfter))
+            guard !Task.isCancelled else { return }
+            self?.audioSessionReleaseTask = nil
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
+    }
+
+    /// 休息开始时预加载提示音，避免到点首次解码造成延迟。
+    private func prepareEndSound() {
+        if audioPlayer == nil,
+           let url = Bundle.main.url(forResource: "rest_complete", withExtension: "caf") {
+            audioPlayer = try? AVAudioPlayer(contentsOf: url)
+        }
+        audioPlayer?.volume = 1.0
+        audioPlayer?.prepareToPlay()
+    }
+
+    private func stopEndSound() {
+        audioSessionReleaseTask?.cancel()
+        audioSessionReleaseTask = nil
+        audioPlayer?.stop()
+        audioPlayer?.currentTime = 0
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    private func rescheduleCurrentRestNotificationIfNeeded() {
+        guard let endDate else { return }
+        let seconds = max(0, endDate.timeIntervalSinceNow)
+        if seconds > 0 {
+            scheduleNotification(after: seconds)
+        } else {
+            Self.clearRestNotifications(removePending: true, removeDelivered: false)
         }
     }
 
@@ -283,7 +334,9 @@ final class RestTimerController {
         content.body = contextLabel.map { "继续：\($0)" } ?? "开始下一组"
         // 后台/锁屏到点的提醒音由系统通知播放；前台音效由 AVAudioPlayer 播放同一份 caf。
         // 注意：通知声音仍服从静音键，静音下无声——突破静音需 Critical Alerts 特权（健身场景大概率被拒），不做。
-        content.sound = UNNotificationSound(named: UNNotificationSoundName(Self.notificationSoundName))
+        if soundEnabled {
+            content.sound = UNNotificationSound(named: UNNotificationSoundName(Self.notificationSoundName))
+        }
         content.interruptionLevel = .timeSensitive
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
         center.add(UNNotificationRequest(identifier: Self.notificationId, content: content, trigger: trigger))
@@ -361,6 +414,13 @@ final class RestTimerController {
         NotificationCenter.default.addObserver(
             forName: .dontliftRestEndedExternally, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.completeEarly() }
+        }
+    }
+
+    private func observeForegroundRestNotification() {
+        NotificationCenter.default.addObserver(
+            forName: .dontliftRestNotificationPresented, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.handleForegroundRestNotification() }
         }
     }
 

@@ -3,7 +3,7 @@ import SwiftData
 
 // MARK: - 训练首页（设计稿 01）
 
-/// 训练首页：本周 hero + 两宫格 + 最近训练列表 + 悬浮 CTA。
+/// 训练首页：本周 hero + 两宫格 + 本周训练列表 + 悬浮 CTA。
 struct WorkoutListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(RestTimerController.self) private var restTimer
@@ -52,7 +52,7 @@ struct WorkoutListView: View {
                     VStack(spacing: Theme.Spacing.lg) {
                         heroSection
                         statsGrid
-                        recentSection
+                        weekTrainingSection
                         Color.clear.frame(height: 80) // 给底部 CTA 留位
                     }
                     .padding(.horizontal, Theme.Spacing.lg)
@@ -63,9 +63,8 @@ struct WorkoutListView: View {
             }
             startCTA
         }
-        // 首页 Header 用自绘大标题（训练 + YU 头像，对齐设计图 .nav），隐藏系统导航栏。
-        // 工具栏左右上角入口均已移除：右上角原「搜索占位 + 加号菜单」、左上角「日历 / 训练历史」
-        // （历史模块已删，留待后续单独立项）。开始训练唯一收敛到底部悬浮 CTA。
+        // 首页 Header 用自绘大标题，隐藏系统导航栏。
+        // 历史日历入口下移到「本周训练」标题行，开始训练收敛到底部悬浮 CTA。
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             WorkoutPerformanceMonitor.event("home.appear")
@@ -142,8 +141,6 @@ struct WorkoutListView: View {
                 .tracking(-1.08)
                 .foregroundStyle(Theme.Color.fg)
             Spacer(minLength: 0)
-            CircleIconButton(systemName: "calendar", action: { showHistoryCalendar = true })
-                .accessibilityLabel("历史日历")
         }
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.top, 6)
@@ -219,25 +216,35 @@ struct WorkoutListView: View {
         Rectangle().fill(Theme.Color.border).frame(width: 1)
     }
 
-    // MARK: 最近训练
+    // MARK: 本周训练
 
-    private var recentSection: some View {
+    private var weekTrainingSection: some View {
         // 仅展示已完成训练，进行中会话由顶部横幅承载，不混入常规行。
-        let recent = historyStore.home.recent
+        let weekWorkouts = historyStore.home.weekWorkouts
         return VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            HStack {
-                Text("最近训练").eyebrowStyle()
+            HStack(spacing: 8) {
+                Text("本周训练")
+                    .font(Theme.Font.display(size: 18, weight: .heavy))
+                    .foregroundStyle(Theme.Color.fg)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                CircleIconButton(
+                    systemName: "calendar",
+                    size: 32,
+                    action: { showHistoryCalendar = true }
+                )
+                    .accessibilityLabel("历史日历")
                 Spacer()
             }
-            if recent.isEmpty {
-                Text("近 3 天还没有训练记录")
+            if weekWorkouts.isEmpty {
+                Text("本周还没有训练记录")
                     .font(Theme.Font.body(size: 13))
                     .foregroundStyle(Theme.Color.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, Theme.Spacing.md)
             } else {
                 SwipeDeleteList(
-                    data: recent,
+                    data: weekWorkouts,
                     id: \.id,
                     coordinator: swipe,
                     onTap: { openWorkout($0.id) },
@@ -245,12 +252,12 @@ struct WorkoutListView: View {
                         deleteRect = rect
                         pendingDelete = fetchWorkout(row.id)
                     }
-                ) { recentRow($0) }
+                ) { weekWorkoutRow($0) }
             }
         }
     }
 
-    private func recentRow(_ w: WorkoutRowSummary) -> some View {
+    private func weekWorkoutRow(_ w: WorkoutRowSummary) -> some View {
         let durationMin: Int? = w.durationSec.map { Int($0 / 60) }
         let pr = w.pr
         let durText = durationMin.map { "，\($0) 分钟" } ?? ""
@@ -411,7 +418,7 @@ struct WorkoutListView: View {
     }
 }
 
-// MARK: - 左滑删除容器（非 List 卡片列表用，首页「最近训练」）
+// MARK: - 左滑删除容器（非 List 卡片列表用，首页「本周训练」）
 
 /// 删除二次确认浮层：透明 fullScreenCover 内的暗 scrim（盖住 Tab Bar）+ 锚定在被删 Item
 /// 正下方的纸感卡片（单行删除文案，对齐计划页 ⋯ 菜单样式）。点击 scrim 即取消，不另设取消按钮。
@@ -547,8 +554,6 @@ struct WorkoutLoggingView: View {
     @State private var restEditingExerciseId: UUID?
     /// 自定义休息秒数输入缓冲（仅整数秒）。
     @State private var restEditBuffer: String = ""
-    /// 每个已完成组的真实休息秒数（仅会话内展示）。
-    @State private var actualRestBySet: [UUID: Int] = [:]
     /// 通过组级菜单追加休息时，该组已有的累计休息秒数；完成后用 base + 本段实际秒数写回。
     @State private var continuedRestBaseBySet: [UUID: Int] = [:]
     /// 当前打开 ⋯ 菜单的动作 localId（nil = 无）。顶层浮层据 anchor 定位、外部点击关闭。
@@ -1144,10 +1149,10 @@ struct WorkoutLoggingView: View {
         }
         return VStack(spacing: Theme.Spacing.md) {
             ForEach(sorted) { ex in
+                let fallbackRestSeconds = restByExercise[ex.localId] ?? Int(restTimer.defaultDuration)
                 ExerciseBlock(exercise: ex,
                               readOnly: !canEdit,
                               menuSetId: menuSetId,
-                              actualRestBySet: actualRestBySet,
                               isExpanded: activeId == ex.localId,
                               isMenuOpen: menuExerciseId == ex.localId,
                               focused: focused,
@@ -1179,7 +1184,13 @@ struct WorkoutLoggingView: View {
                                   if accordion == .auto { accordion = .expanded(ex.localId) }
                                   // 完成第一组即自动启动训练计时（幂等：已启动则不动）。
                                   startTimerIfNeeded()
-                                  let secs = restByExercise[ex.localId] ?? Int(restTimer.defaultDuration)
+                                  let secs = WorkoutRestPolicy.plannedRestSeconds(
+                                      completing: set,
+                                      in: ex,
+                                      fallbackSeconds: fallbackRestSeconds
+                                  )
+                                  set.plannedRestSeconds = secs
+                                  touch()
                                   if secs > 0 {
                                       recordActiveRestIfNeeded()
                                       continuedRestBaseBySet[set.localId] = nil
@@ -1580,12 +1591,12 @@ struct WorkoutLoggingView: View {
     }
 
     private func canContinueRest(for set: WorkoutSet) -> Bool {
-        canEdit && set.completed && actualRestBySet[set.localId] != nil && !restTimer.isRunning
+        canEdit && set.completed && set.actualRestSeconds != nil && !restTimer.isRunning
     }
 
     private func continueRest(for set: WorkoutSet) {
         guard canContinueRest(for: set),
-              let accumulated = actualRestBySet[set.localId] else { return }
+              let accumulated = set.actualRestSeconds else { return }
         prepareForPresentation()
         startTimerIfNeeded()
         continuedRestBaseBySet[set.localId] = accumulated
@@ -1599,8 +1610,11 @@ struct WorkoutLoggingView: View {
     }
 
     private func clearRestRecord(for setId: UUID) {
-        actualRestBySet[setId] = nil
         continuedRestBaseBySet[setId] = nil
+        guard let set = set(for: setId) else { return }
+        set.actualRestSeconds = nil
+        set.plannedRestSeconds = nil
+        touch()
     }
 
     private func recordActiveRestIfNeeded(now: Date = .now) {
@@ -1614,15 +1628,16 @@ struct WorkoutLoggingView: View {
 
     private func consumeRestCompletionIfNeeded() {
         guard let event = restTimer.consumeCompletionEvent(matching: workoutSetIds) else { return }
-        guard set(for: event.setId)?.completed == true else {
+        guard let set = set(for: event.setId), set.completed else {
             continuedRestBaseBySet[event.setId] = nil
             return
         }
-        if let base = continuedRestBaseBySet.removeValue(forKey: event.setId) {
-            actualRestBySet[event.setId] = base + event.elapsedSeconds
-        } else {
-            actualRestBySet[event.setId] = event.elapsedSeconds
-        }
+        set.actualRestSeconds = WorkoutRestPolicy.actualRestSecondsAfterCompletion(
+            elapsedSeconds: event.elapsedSeconds,
+            continuedBaseSeconds: continuedRestBaseBySet.removeValue(forKey: event.setId),
+            persistedActualRestSeconds: set.actualRestSeconds
+        )
+        touch()
     }
 
     /// 启动训练计时（幂等）：仅在尚未启动时落定 timerStartedAt。
@@ -2334,8 +2349,6 @@ private struct ExerciseBlock: View {
     var readOnly: Bool = false
     /// 当前打开「更多操作」菜单的组 localId（父视图持有，跨动作卡共享），用于派生每行 ⋯ 高亮。
     var menuSetId: UUID? = nil
-    /// 每个 set 的真实休息秒数（仅会话内展示）。
-    var actualRestBySet: [UUID: Int]
     /// 手风琴：是否展开 set 列表（false 时折叠为单行摘要）。
     var isExpanded: Bool = true
     /// ⋯ 组间休息菜单是否打开（菜单本体由父视图顶层浮层渲染）。
@@ -2569,7 +2582,7 @@ private struct ExerciseBlock: View {
 
     private func actualRestText(for set: WorkoutSet) -> String? {
         guard set.completed else { return nil }
-        guard let seconds = actualRestBySet[set.localId] else { return nil }
+        guard let seconds = set.actualRestSeconds else { return nil }
         return formatShortRest(seconds)
     }
 }

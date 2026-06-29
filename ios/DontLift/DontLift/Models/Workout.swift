@@ -131,6 +131,10 @@ final class WorkoutSet {
     var reps: Int?
     var completed: Bool
     var note: String?
+    /// 完成该组后启动休息时采用的预计秒数；nil 表示旧数据或尚未启动过休息。
+    var plannedRestSeconds: Int?
+    /// 该组休息完成后的真实秒数；nil 表示尚未产生休息回填。
+    var actualRestSeconds: Int?
     /// 组类型 raw（默认 "working"）。SwiftData 轻量迁移：存储属性声明带默认值，旧本地记录读出即 working。
     var setTypeRaw: String = WorkoutSetType.working.rawValue
 
@@ -143,6 +147,8 @@ final class WorkoutSet {
         reps: Int? = nil,
         completed: Bool = false,
         note: String? = nil,
+        plannedRestSeconds: Int? = nil,
+        actualRestSeconds: Int? = nil,
         setType: WorkoutSetType = .working
     ) {
         self.localId = localId
@@ -151,6 +157,8 @@ final class WorkoutSet {
         self.reps = reps
         self.completed = completed
         self.note = note
+        self.plannedRestSeconds = plannedRestSeconds
+        self.actualRestSeconds = actualRestSeconds
         self.setTypeRaw = setType.rawValue
     }
 }

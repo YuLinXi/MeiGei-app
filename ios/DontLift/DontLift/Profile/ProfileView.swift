@@ -375,6 +375,22 @@ struct ProfileView: View {
 
             rowDivider
 
+            // 声音开关：统一控制前台 App 内音效与后台/锁屏本地通知音。
+            HStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "speaker.wave.2").foregroundStyle(Theme.Color.fg2).frame(width: 24)
+                Text("声音")
+                    .font(Theme.Font.body(size: 14))
+                    .foregroundStyle(Theme.Color.fg)
+                Spacer()
+                Toggle("", isOn: restTimerSoundBinding)
+                    .labelsHidden()
+                    .tint(Theme.Color.accent)
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .frame(height: 48)
+
+            rowDivider
+
             // 通知（展示系统授权态 + 跳系统设置）
             HStack(spacing: Theme.Spacing.md) {
                 Image(systemName: "bell").foregroundStyle(Theme.Color.fg2).frame(width: 24)
@@ -407,6 +423,13 @@ struct ProfileView: View {
         Binding(
             get: { restTimer.hapticsEnabled },
             set: { restTimer.hapticsEnabled = $0 }
+        )
+    }
+
+    private var restTimerSoundBinding: Binding<Bool> {
+        Binding(
+            get: { restTimer.soundEnabled },
+            set: { restTimer.soundEnabled = $0 }
         )
     }
 

@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - 左滑删除列表（首页「最近训练」/ 计划详情「动作」共用）
+// MARK: - 左滑删除列表（首页「本周训练」/ 计划详情「动作」共用）
 
 /// 左滑展开的协调器：作为「同一时刻仅一张展开」的单一来源，并支撑「点击别处自动收回」。
 /// 由页面持有（`@State private var swipe = SwipeRowCoordinator()`），传入 `SwipeDeleteList`，
@@ -47,7 +47,7 @@ struct SwipeDeleteList<Data: RandomAccessCollection, ID: Hashable, Row: View>: V
     }
 }
 
-/// 首页「最近训练」是 ScrollView 内的卡片栈而非 List，无法用 `.swipeActions`，
+/// 首页「本周训练」是 ScrollView 内的卡片栈而非 List，无法用 `.swipeActions`，
 /// 故以轻量水平拖动手势实现左滑显露删除按钮；点击空白处收回，点击卡片走 onTap。
 /// 计划详情页的动作行复用同一交互（均经 `SwipeDeleteList` 装配）。
 /// 「同一时刻仅一张展开 + 点击别处收回」由 `openID` 单一来源协调：

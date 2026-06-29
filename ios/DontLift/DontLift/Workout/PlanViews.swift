@@ -524,7 +524,7 @@ struct PlanDetailView: View {
                     } else if orderedItems.isEmpty {
                         emptyExercisesCard
                     } else {
-                        // 与首页「最近训练」一致：每行独立卡片（带间距/描边/阴影）+ 统一左滑交互。
+                        // 与首页「本周训练」一致：每行独立卡片（带间距/描边/阴影）+ 统一左滑交互。
                         SwipeDeleteList(
                             data: orderedItems,
                             id: \.itemId,
@@ -564,7 +564,7 @@ struct PlanDetailView: View {
             confirmTitle: "删除计划",
             onConfirm: { delete() }
         )
-        // 删除动作二次确认：复用首页「最近训练」的透明浮层 + 锚定卡片，文案改「删除动作」。
+        // 删除动作二次确认：复用首页「本周训练」的透明浮层 + 锚定卡片，文案改「删除动作」。
         .fullScreenCover(isPresented: Binding(
             get: { pendingDeleteItem != nil },
             set: { if !$0 { pendingDeleteItem = nil } })) {
@@ -738,7 +738,7 @@ struct PlanDetailView: View {
         .padding(.horizontal, 2)
     }
 
-    // 动作行（独立卡片，与训练首页「最近训练」统一观感与左滑交互）。
+    // 动作行（独立卡片，与训练首页「本周训练」统一观感与左滑交互）。
     // 行外层卡片与左滑交互由 `SwipeDeleteList` 统一装配，此处只产出卡片内容。点击行或编辑图标进入建议参数编辑。
     private func planItemRow(_ item: PlanItem) -> some View {
         // 序号按当前顺序推出（动作数极少，firstIndex 开销可忽略）。

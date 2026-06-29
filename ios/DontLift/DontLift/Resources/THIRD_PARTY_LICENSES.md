@@ -30,3 +30,17 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## 组间休息结束提示音（Pixabay Sound Effect）
+
+本 App 的组间休息结束提示音基于 Pixabay Sound Effect
+**New Notification 057** by **Universfield**：
+
+- Source: https://pixabay.com/sound-effects/technology-new-notification-057-494255/
+- License: Pixabay Content License
+- License summary: https://pixabay.com/service/license-summary/
+- Downloaded: 2026-06-29
+- Modifications: converted to CAF for iOS app bundle use; no loudness normalization or soft compression applied.
+
+Pixabay Content License allows free use for commercial and non-commercial purposes without attribution,
+including modification, subject to the restrictions in the license terms.

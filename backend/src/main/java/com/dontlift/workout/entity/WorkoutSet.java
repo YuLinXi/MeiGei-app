@@ -28,6 +28,12 @@ public class WorkoutSet {
 
     private String note;
 
+    /** 完成该组后启动休息时采用的预计秒数；旧数据可为空。 */
+    private Integer plannedRestSeconds;
+
+    /** 该组休息完成后的真实秒数；旧数据可为空。 */
+    private Integer actualRestSeconds;
+
     /** 组类型（"working"/"warmup"）。WorkoutTree 内嵌实体，随 Jackson 自动序列化；DB 列默认 'working'。 */
     private String setType;
 }

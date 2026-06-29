@@ -3,7 +3,7 @@ import SwiftData
 
 // MARK: - 已完成训练详情（设计稿 Screen 2b · 训练日志）
 
-/// 从首页「最近训练」点入的二级只读页。
+/// 从首页「本周训练」点入的二级只读页。
 ///
 /// 不复用「记录中」的输入表单（`WorkoutLoggingView` 只读态），而是一份**训练账本**：
 /// 完成头卡（日期/时段/时长）→ 已完成口径三联数（时长 / 总组数 / 训练量）→ PR 高光条
@@ -125,7 +125,7 @@ struct WorkoutDetailView: View {
         .accessibilityLabel("\(workout.title ?? "训练")，\(rangeText)，已完成")
     }
 
-    /// 日期方块：日 + 「M月 · 周E」（沿用首页最近训练样式）。
+    /// 日期方块：日 + 「M月 · 周E」（沿用首页本周训练样式）。
     private func dateBlock(_ date: Date) -> some View {
         let cal = Calendar.current
         let day = cal.component(.day, from: date)

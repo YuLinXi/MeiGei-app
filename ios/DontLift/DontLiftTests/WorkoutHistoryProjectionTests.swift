@@ -48,25 +48,28 @@ struct WorkoutHistoryProjectionTests {
         let oldId = UUID()
         let firstId = UUID()
         let secondId = UUID()
-        let now = Date()
+        let weekBounds = WorkoutWeeklyStats.weekBounds(for: .now, calendar: .currentMondayFirst)
+        let oldStartedAt = weekBounds.start.addingTimeInterval(-86_400)
+        let firstStartedAt = weekBounds.start.addingTimeInterval(3_600)
+        let secondStartedAt = weekBounds.start.addingTimeInterval(7_200)
         let old = makeWorkout(
             id: oldId,
             planId: planId,
-            startedAt: now.addingTimeInterval(-4 * 86_400),
+            startedAt: oldStartedAt,
             code: "BB_BENCH_PRESS",
             weights: [50]
         )
         let first = makeWorkout(
             id: firstId,
             planId: planId,
-            startedAt: now.addingTimeInterval(-2 * 86_400),
+            startedAt: firstStartedAt,
             code: "BB_BENCH_PRESS",
             weights: [60, 62.5]
         )
         let second = makeWorkout(
             id: secondId,
             planId: planId,
-            startedAt: now.addingTimeInterval(-86_400),
+            startedAt: secondStartedAt,
             code: "BB_BENCH_PRESS",
             weights: [65, 70]
         )
@@ -78,9 +81,9 @@ struct WorkoutHistoryProjectionTests {
         let store = WorkoutHistoryStore(modelContext: context)
         await store.refresh(reason: .manual)
 
-        #expect(store.home.recent.count == 2)
-        #expect(store.home.recent.first?.id == secondId)
-        #expect(!store.home.recent.contains(where: { $0.id == oldId }))
+        #expect(store.home.weekWorkouts.count == 2)
+        #expect(store.home.weekWorkouts.first?.id == secondId)
+        #expect(!store.home.weekWorkouts.contains(where: { $0.id == oldId }))
         #expect(store.profile.totalWorkouts == 3)
         #expect(store.home.recentPlanIds.contains(planId))
         #expect(store.exercisePRs["BB_BENCH_PRESS"]?.weightKg == 70)
@@ -233,7 +236,8 @@ struct WorkoutHistoryProjectionTests {
         await store.refresh(reason: .manual)
 
         #expect(store.profile.totalWorkouts == count)
-        #expect(store.home.recent.count == 3)
+        #expect(!store.home.weekWorkouts.isEmpty)
+        #expect(store.home.weekWorkouts.count <= 7)
         #expect(!store.exercisePRs.isEmpty)
         #endif
     }
@@ -254,7 +258,8 @@ struct WorkoutHistoryProjectionTests {
         await store.refresh(reason: .manual)
 
         #expect(store.profile.totalWorkouts == count)
-        #expect(store.home.recent.count == 3)
+        #expect(!store.home.weekWorkouts.isEmpty)
+        #expect(store.home.weekWorkouts.count <= 7)
         #expect(store.home.prByWorkoutId.count <= 5_000)
         #expect(!store.exercisePRs.isEmpty)
         #endif
