@@ -599,6 +599,8 @@ struct WorkoutLoggingView: View {
     /// 已完成的无计划训练可沉淀为模板；保存一次后隐藏入口。
     @State private var showingSaveAsPlan = false
     @State private var savedAsPlan = false
+    @State private var showingPosterPreview = false
+    @State private var lastDetectedRecords: [PersonalRecord] = []
 
     private static let continuedRestDuration: TimeInterval = 30
     private static let exerciseNoteLimit = 200
@@ -742,6 +744,12 @@ struct WorkoutLoggingView: View {
                                        onStart: { startTimerIfNeeded() },
                                        onFinish: presentFinishConfirmation)
                         triadStats
+                        if workout.isFinished {
+                            WorkoutPosterShareButton {
+                                prepareForPresentation()
+                                showingPosterPreview = true
+                            }
+                        }
                         if shouldOfferSaveAsPlan {
                             saveAsPlanCard
                         }
@@ -924,6 +932,9 @@ struct WorkoutLoggingView: View {
             ExerciseOrderEditorSheet(title: "调整动作顺序",
                                      items: workoutOrderItems,
                                      onCommit: applyWorkoutExerciseOrder)
+        }
+        .sheet(isPresented: $showingPosterPreview) {
+            WorkoutPosterPreviewSheet(workout: workout, personalRecords: posterPersonalRecords)
         }
         .sheet(isPresented: $showingSaveAsPlan) {
             SaveWorkoutAsPlanSheet(workout: workout) { plan in
@@ -1763,6 +1774,7 @@ struct WorkoutLoggingView: View {
                 detectPersonalRecordsFromFallbackHistory()
             }
         }
+        lastDetectedRecords = prs
         if !prs.isEmpty {
             // 庆祝弹窗经 App 级 center 由 MainTabView 呈现：结束训练会触发导航把本页换成
             // 只读详情页，若挂本页 sheet 会随本页销毁而一闪即逝（详见 PRCelebrationCenter）。
@@ -1815,6 +1827,11 @@ struct WorkoutLoggingView: View {
                 await syncEngine.syncAll()
             }
         }
+    }
+
+    private var posterPersonalRecords: [PersonalRecord] {
+        if !lastDetectedRecords.isEmpty { return lastDetectedRecords }
+        return historyStore.workoutRecords[workout.localId] ?? []
     }
 
     private func detectPersonalRecordsFromFallbackHistory() -> [PersonalRecord] {

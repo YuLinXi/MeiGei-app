@@ -527,6 +527,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "别练了";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "别练了 读取你的体重等数据以更准确地计算训练与营养目标。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "别练了 将完成的力量训练写入「健康」App。";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "别练了 需要保存训练海报图片到你的相册。";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIAppFonts = "JetBrainsMono-Regular.ttf JetBrainsMono-Bold.ttf";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -567,6 +568,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "别练了";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "别练了 读取你的体重等数据以更准确地计算训练与营养目标。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "别练了 将完成的力量训练写入「健康」App。";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "别练了 需要保存训练海报图片到你的相册。";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIAppFonts = "JetBrainsMono-Regular.ttf JetBrainsMono-Bold.ttf";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

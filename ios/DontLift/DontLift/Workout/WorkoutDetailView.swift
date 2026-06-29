@@ -17,6 +17,7 @@ struct WorkoutDetailView: View {
 
     @State private var confirmingDelete = false
     @State private var fallbackRecords: [PersonalRecord]?
+    @State private var showingPosterPreview = false
 
     private static let weekdayFormatter: DateFormatter = {
         let fmt = DateFormatter()
@@ -83,7 +84,12 @@ struct WorkoutDetailView: View {
         }
         // 子页统一导航栏：返回 + ⋯ 删除（双环处理收口在 paperToolbar）。
         .paperToolbar(title: workout.title ?? "训练", onBack: { dismiss() }) {
-            CircleIconButton(systemName: "ellipsis", action: { confirmingDelete = true })
+            HStack(spacing: 8) {
+                CircleIconButton(systemName: "square.and.arrow.up", action: { showingPosterPreview = true })
+                    .accessibilityLabel("分享训练海报")
+                CircleIconButton(systemName: "ellipsis", action: { confirmingDelete = true })
+                    .accessibilityLabel("更多操作")
+            }
         }
         .paperConfirmDialog(
             isPresented: $confirmingDelete,
@@ -92,6 +98,9 @@ struct WorkoutDetailView: View {
             confirmTitle: "删除",
             onConfirm: { deleteWorkout() }
         )
+        .sheet(isPresented: $showingPosterPreview) {
+            WorkoutPosterPreviewSheet(workout: workout, personalRecords: personalRecords)
+        }
         .task(id: workout.localId) {
             WorkoutPerformanceMonitor.event("workout.detail.appear")
             if historyStore.workoutRecords[workout.localId] == nil {
