@@ -31,6 +31,14 @@ final class SyncEngine {
 
     func clearConflictNotices() { pendingConflictNotices = [] }
 
+    /// 轻量检查本地是否存在待同步项；回前台门控使用，避免无条件触发全量同步。
+    func hasPendingLocalChanges(excludingWorkoutId: UUID? = nil) -> Bool {
+        (try? hasPendingCustomExercises()) == true
+        || (try? hasPendingWorkoutPlanGroups()) == true
+        || (try? hasPendingWorkoutPlans()) == true
+        || (try? hasPendingWorkouts(excluding: excludingWorkoutId)) == true
+    }
+
     /// 串行同步全部域。单域失败不阻断其余域，失败项留待下次重试。
     func syncAll() async {
         if isSyncing {
@@ -46,10 +54,15 @@ final class SyncEngine {
     }
 
     private func syncOnce() async {
+        WorkoutPerformanceMonitor.event("syncAll.started")
         _ = await runSafely { try await self.syncCustomExercises() }
+        await Task.yield()
         _ = await runSafely { try await self.syncWorkoutPlanGroups() }
+        await Task.yield()
         _ = await runSafely { try await self.syncWorkoutPlans() }
+        await Task.yield()
         let workoutsSynced = await runSafely { try await self.syncWorkouts() }
+        await Task.yield()
         let saved: Bool
         do {
             try modelContext.save()
@@ -73,6 +86,78 @@ final class SyncEngine {
             // 失败项保持 pending，下次重试。
             return false
         }
+    }
+
+    private func hasPendingCustomExercises() throws -> Bool {
+        let pendingCreate = SyncStatus.pendingCreate.rawValue
+        let pendingUpdate = SyncStatus.pendingUpdate.rawValue
+        let pendingDelete = SyncStatus.pendingDelete.rawValue
+        var descriptor = FetchDescriptor<CustomExercise>(
+            predicate: #Predicate {
+                $0.syncStatusRaw == pendingCreate
+                || $0.syncStatusRaw == pendingUpdate
+                || $0.syncStatusRaw == pendingDelete
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try !modelContext.fetch(descriptor).isEmpty
+    }
+
+    private func hasPendingWorkoutPlanGroups() throws -> Bool {
+        let pendingCreate = SyncStatus.pendingCreate.rawValue
+        let pendingUpdate = SyncStatus.pendingUpdate.rawValue
+        let pendingDelete = SyncStatus.pendingDelete.rawValue
+        var descriptor = FetchDescriptor<WorkoutPlanGroup>(
+            predicate: #Predicate {
+                $0.syncStatusRaw == pendingCreate
+                || $0.syncStatusRaw == pendingUpdate
+                || $0.syncStatusRaw == pendingDelete
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try !modelContext.fetch(descriptor).isEmpty
+    }
+
+    private func hasPendingWorkoutPlans() throws -> Bool {
+        let pendingCreate = SyncStatus.pendingCreate.rawValue
+        let pendingUpdate = SyncStatus.pendingUpdate.rawValue
+        let pendingDelete = SyncStatus.pendingDelete.rawValue
+        var descriptor = FetchDescriptor<WorkoutPlan>(
+            predicate: #Predicate {
+                $0.syncStatusRaw == pendingCreate
+                || $0.syncStatusRaw == pendingUpdate
+                || $0.syncStatusRaw == pendingDelete
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try !modelContext.fetch(descriptor).isEmpty
+    }
+
+    private func hasPendingWorkouts(excluding workoutId: UUID?) throws -> Bool {
+        let pendingCreate = SyncStatus.pendingCreate.rawValue
+        let pendingUpdate = SyncStatus.pendingUpdate.rawValue
+        let pendingDelete = SyncStatus.pendingDelete.rawValue
+        var descriptor: FetchDescriptor<Workout>
+        if let workoutId {
+            descriptor = FetchDescriptor<Workout>(
+                predicate: #Predicate {
+                    ($0.syncStatusRaw == pendingCreate
+                     || $0.syncStatusRaw == pendingUpdate
+                     || $0.syncStatusRaw == pendingDelete)
+                    && $0.localId != workoutId
+                }
+            )
+        } else {
+            descriptor = FetchDescriptor<Workout>(
+                predicate: #Predicate {
+                    $0.syncStatusRaw == pendingCreate
+                    || $0.syncStatusRaw == pendingUpdate
+                    || $0.syncStatusRaw == pendingDelete
+                }
+            )
+        }
+        descriptor.fetchLimit = 1
+        return try !modelContext.fetch(descriptor).isEmpty
     }
 
     // MARK: - 通用 push / pull

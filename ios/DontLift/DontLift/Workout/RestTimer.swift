@@ -337,6 +337,8 @@ final class RestTimerController {
         if soundEnabled {
             content.sound = UNNotificationSound(named: UNNotificationSoundName(Self.notificationSoundName))
         }
+        // Time Sensitive 会让系统展示“即时通知”标签；该标签不能单独改文案或隐藏。
+        // 休息提醒选择保留更高投递优先级，如需去掉标签只能降级为普通通知。
         content.interruptionLevel = .timeSensitive
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
         center.add(UNNotificationRequest(identifier: Self.notificationId, content: content, trigger: trigger))
