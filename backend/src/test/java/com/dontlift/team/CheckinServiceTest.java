@@ -2,6 +2,7 @@ package com.dontlift.team;
 
 import com.dontlift.common.web.AppException;
 import com.dontlift.push.PushService;
+import com.dontlift.team.entity.CheckinReaction;
 import com.dontlift.team.entity.TeamCheckin;
 import com.dontlift.team.mapper.CheckinReactionMapper;
 import com.dontlift.team.mapper.TeamCheckinMapper;
@@ -121,6 +122,129 @@ class CheckinServiceTest {
     }
 
     @Test
+    void react_firstReactionFromTeammateSendsOnePush() {
+        UUID ownerId = UUID.randomUUID();
+        UUID reactorId = UUID.randomUUID();
+        UUID checkinId = UUID.randomUUID();
+        TeamCheckin checkin = checkinForReaction(checkinId, ownerId);
+        when(checkinMapper.selectById(checkinId)).thenReturn(checkin);
+        when(reactionMapper.findByCheckinAndUser(checkinId, reactorId)).thenReturn(null);
+        when(reactionMapper.insertReactionIfAbsent(any(CheckinReaction.class))).thenReturn(1);
+        when(reactionMapper.insertPushReceiptIfAbsent(
+                any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
+                .thenReturn(1);
+
+        CheckinReaction result = service.react(reactorId, checkinId, "fire");
+
+        assertThat(result.getCheckinId()).isEqualTo(checkinId);
+        assertThat(result.getUserId()).isEqualTo(reactorId);
+        assertThat(result.getEmoji()).isEqualTo("fire");
+        verify(teamService).requireMember(teamId, reactorId);
+        verify(reactionMapper).insertReactionIfAbsent(any(CheckinReaction.class));
+        verify(pushService).sendToUser(eq(ownerId), eq("新的表情回应"), eq("有人为你的训练点了表情"), any());
+    }
+
+    @Test
+    void react_switchingEmojiDoesNotSendDuplicatePushWhenReceiptExists() {
+        UUID ownerId = UUID.randomUUID();
+        UUID reactorId = UUID.randomUUID();
+        UUID checkinId = UUID.randomUUID();
+        TeamCheckin checkin = checkinForReaction(checkinId, ownerId);
+        CheckinReaction existing = reaction(checkinId, reactorId, "fire");
+        when(checkinMapper.selectById(checkinId)).thenReturn(checkin);
+        when(reactionMapper.findByCheckinAndUser(checkinId, reactorId)).thenReturn(existing);
+        when(reactionMapper.insertPushReceiptIfAbsent(
+                any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
+                .thenReturn(0);
+
+        CheckinReaction result = service.react(reactorId, checkinId, "muscle");
+
+        assertThat(result).isSameAs(existing);
+        assertThat(existing.getEmoji()).isEqualTo("muscle");
+        verify(reactionMapper).updateById(existing);
+        verify(pushService, never()).sendToUser(any(), any(), any(), any());
+    }
+
+    @Test
+    void react_sameEmojiCancelsWithoutPushReceipt() {
+        UUID ownerId = UUID.randomUUID();
+        UUID reactorId = UUID.randomUUID();
+        UUID checkinId = UUID.randomUUID();
+        TeamCheckin checkin = checkinForReaction(checkinId, ownerId);
+        CheckinReaction existing = reaction(checkinId, reactorId, "fire");
+        when(checkinMapper.selectById(checkinId)).thenReturn(checkin);
+        when(reactionMapper.findByCheckinAndUser(checkinId, reactorId)).thenReturn(existing);
+
+        CheckinReaction result = service.react(reactorId, checkinId, "fire");
+
+        assertThat(result).isNull();
+        verify(reactionMapper).deleteById(existing.getId());
+        verify(reactionMapper, never()).insertPushReceiptIfAbsent(
+                any(UUID.class), any(UUID.class), any(UUID.class), any(OffsetDateTime.class));
+        verify(pushService, never()).sendToUser(any(), any(), any(), any());
+    }
+
+    @Test
+    void react_relightingAfterCancelDoesNotSendDuplicatePushWhenReceiptExists() {
+        UUID ownerId = UUID.randomUUID();
+        UUID reactorId = UUID.randomUUID();
+        UUID checkinId = UUID.randomUUID();
+        TeamCheckin checkin = checkinForReaction(checkinId, ownerId);
+        when(checkinMapper.selectById(checkinId)).thenReturn(checkin);
+        when(reactionMapper.findByCheckinAndUser(checkinId, reactorId)).thenReturn(null);
+        when(reactionMapper.insertReactionIfAbsent(any(CheckinReaction.class))).thenReturn(1);
+        when(reactionMapper.insertPushReceiptIfAbsent(
+                any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
+                .thenReturn(0);
+
+        CheckinReaction result = service.react(reactorId, checkinId, "heart");
+
+        assertThat(result.getEmoji()).isEqualTo("heart");
+        verify(reactionMapper).insertReactionIfAbsent(any(CheckinReaction.class));
+        verify(pushService, never()).sendToUser(any(), any(), any(), any());
+    }
+
+    @Test
+    void react_selfReactionDoesNotCreatePushReceiptOrPush() {
+        UUID ownerId = UUID.randomUUID();
+        UUID checkinId = UUID.randomUUID();
+        TeamCheckin checkin = checkinForReaction(checkinId, ownerId);
+        when(checkinMapper.selectById(checkinId)).thenReturn(checkin);
+        when(reactionMapper.findByCheckinAndUser(checkinId, ownerId)).thenReturn(null);
+        when(reactionMapper.insertReactionIfAbsent(any(CheckinReaction.class))).thenReturn(1);
+
+        CheckinReaction result = service.react(ownerId, checkinId, "clap");
+
+        assertThat(result.getEmoji()).isEqualTo("clap");
+        verify(reactionMapper).insertReactionIfAbsent(any(CheckinReaction.class));
+        verify(reactionMapper, never()).insertPushReceiptIfAbsent(
+                any(UUID.class), any(UUID.class), any(UUID.class), any(OffsetDateTime.class));
+        verify(pushService, never()).sendToUser(any(), any(), any(), any());
+    }
+
+    @Test
+    void react_concurrentSameEmojiInsertReturnsExistingWithoutCancelling() {
+        UUID ownerId = UUID.randomUUID();
+        UUID reactorId = UUID.randomUUID();
+        UUID checkinId = UUID.randomUUID();
+        TeamCheckin checkin = checkinForReaction(checkinId, ownerId);
+        CheckinReaction concurrent = reaction(checkinId, reactorId, "fire");
+        when(checkinMapper.selectById(checkinId)).thenReturn(checkin);
+        when(reactionMapper.findByCheckinAndUser(checkinId, reactorId)).thenReturn(null, concurrent);
+        when(reactionMapper.insertReactionIfAbsent(any(CheckinReaction.class))).thenReturn(0);
+        when(reactionMapper.insertPushReceiptIfAbsent(
+                any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
+                .thenReturn(0);
+
+        CheckinReaction result = service.react(reactorId, checkinId, "fire");
+
+        assertThat(result).isSameAs(concurrent);
+        verify(reactionMapper, never()).deleteById(any(UUID.class));
+        verify(reactionMapper, never()).updateById(any(CheckinReaction.class));
+        verify(pushService, never()).sendToUser(any(), any(), any(), any());
+    }
+
+    @Test
     void listCheckinHistory_requiresMemberAndReturnsMonthlyFeed() {
         TeamCheckin newer = checkin(UUID.randomUUID(), LocalDate.parse("2026-06-24"), "2026-06-24T12:00:00Z");
         TeamCheckin older = checkin(UUID.randomUUID(), LocalDate.parse("2026-06-01"), "2026-06-01T12:00:00Z");
@@ -180,5 +304,28 @@ class CheckinServiceTest {
         checkin.setSummary("{}");
         checkin.setCreatedAt(OffsetDateTime.parse(createdAt));
         return checkin;
+    }
+
+    private TeamCheckin checkinForReaction(UUID id, UUID ownerId) {
+        TeamCheckin checkin = new TeamCheckin();
+        checkin.setId(id);
+        checkin.setTeamId(teamId);
+        checkin.setUserId(ownerId);
+        checkin.setWorkoutId(UUID.randomUUID());
+        checkin.setCheckinDate(today);
+        checkin.setSummary("{}");
+        checkin.setCreatedAt(OffsetDateTime.parse("2026-06-24T12:00:00Z"));
+        return checkin;
+    }
+
+    private CheckinReaction reaction(UUID checkinId, UUID reactorId, String emoji) {
+        CheckinReaction reaction = new CheckinReaction();
+        reaction.setId(UUID.randomUUID());
+        reaction.setCheckinId(checkinId);
+        reaction.setUserId(reactorId);
+        reaction.setEmoji(emoji);
+        reaction.setCreatedAt(OffsetDateTime.parse("2026-06-24T12:01:00Z"));
+        reaction.setUpdatedAt(OffsetDateTime.parse("2026-06-24T12:01:00Z"));
+        return reaction;
     }
 }

@@ -625,6 +625,7 @@ struct TeamDetailView: View {
     // ⋯ 操作菜单 → 二次确认 → 结果反馈 状态机
     @State private var showActionSheet = false
     @State private var confirmKind: ConfirmKind?
+    @State private var confirmOverlayShown = false
     @State private var dissolveInput = ""
     @State private var actionBusy = false
     @State private var actionFailed = false   // 详情页顶部红 toast（操作失败）
@@ -681,6 +682,7 @@ struct TeamDetailView: View {
         .fullScreenCover(item: $confirmKind) { kind in
             confirmDialogOverlay(kind)
                 .presentationBackground(.clear)
+                .onAppear { withAnimation(confirmDialogAnimation) { confirmOverlayShown = true } }
         }
         .transaction(value: confirmKind) { $0.disablesAnimations = true }
         .paperConfirmDialog(
@@ -1039,7 +1041,7 @@ struct TeamDetailView: View {
     @ViewBuilder
     private func confirmDialogOverlay(_ kind: ConfirmKind) -> some View {
         ZStack {
-            Color.black.opacity(0.34).ignoresSafeArea()
+            Color.black.opacity(confirmOverlayShown ? 0.34 : 0).ignoresSafeArea()
                 .onTapGesture { if !actionBusy { closeConfirm() } }
             VStack(spacing: 0) {
                 // 图标
@@ -1103,6 +1105,8 @@ struct TeamDetailView: View {
             .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
             .shadow(color: Theme.Color.fg.opacity(0.18), radius: 32, x: 0, y: 12)
             .padding(.horizontal, 40)
+            .scaleEffect(confirmOverlayShown ? 1 : 0.94)
+            .opacity(confirmOverlayShown ? 1 : 0)
         }
     }
 
@@ -1142,9 +1146,20 @@ struct TeamDetailView: View {
         kind == .leave ? true : dissolveMatches
     }
 
+    private var confirmDialogAnimation: Animation {
+        .easeInOut(duration: 0.25)
+    }
+
     private func closeConfirm() {
-        withAnimation(.easeOut(duration: 0.18)) { confirmKind = nil }
-        dissolveInput = ""
+        closeConfirm(after: nil)
+    }
+
+    private func closeConfirm(after action: (() -> Void)?) {
+        withAnimation(confirmDialogAnimation) { confirmOverlayShown = false } completion: {
+            confirmKind = nil
+            dissolveInput = ""
+            action?()
+        }
     }
 
     // MARK: 失败 toast（顶部红条，弹窗保留）
@@ -1284,8 +1299,7 @@ struct TeamDetailView: View {
             teamService.pendingActionToast = kind == .dissolve
                 ? "已解散「\(team.name)」"
                 : "已退出「\(team.name)」"
-            confirmKind = nil
-            dismiss()
+            closeConfirm(after: { dismiss() })
         } catch {
             guard !error.isCancellationError else { return }
             await flashFailureToast()

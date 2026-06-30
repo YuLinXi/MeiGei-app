@@ -38,11 +38,17 @@
 
 ### Requirement: 表情回应
 
-系统 SHALL 允许成员对 Team 内的训练打卡给予固定 4 个预设 emoji 之一的回应。emoji 集合 MUST 与当前客户端和后端协议保持一致：`fire`/🔥、`muscle`/💪、`heart`/❤️、`clap`/👏。系统 MUST NOT 提供文字评论、群聊或私信功能。
+系统 SHALL 允许成员对 Team 内的训练打卡给予固定 4 个预设 emoji 之一的回应。emoji 集合 MUST 与当前客户端和后端协议保持一致：`fire`/🔥、`muscle`/💪、`heart`/❤️、`clap`/👏。同一成员对同一条训练打卡最多触发一次 APNs 表情提醒；切换 emoji、取消后重新点亮或弱网重复请求 MUST NOT 重复推送。系统 MUST NOT 提供文字评论、群聊或私信功能。
 
 #### Scenario: 给队友打卡点表情
 - **WHEN** 成员对某条打卡选择一个 emoji 回应
 - **THEN** 该回应记录在此打卡上并对 Team 可见，被回应者收到 APNs 推送
+
+#### Scenario: 切换表情不重复推送
+- **WHEN** 成员已经对某条打卡点过表情并触发过 APNs 提醒
+- **AND** 该成员切换到另一个 emoji 或取消后重新点亮
+- **THEN** 系统更新该成员在该打卡上的回应状态
+- **AND** 被回应者不会再次收到该成员对同一打卡的表情提醒
 
 ### Requirement: 海报分享
 

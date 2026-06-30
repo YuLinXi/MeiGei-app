@@ -516,6 +516,15 @@ enum FocusedCell: Equatable {
 /// 组内可聚焦字段。
 enum SetField { case weight, reps }
 
+/// 组内输入框的视觉模式：inactive=未聚焦；replacePending=首键覆盖；appending=接续录入。
+private enum SetInputMode: Equatable {
+    case inactive
+    case replacePending
+    case appending
+
+    var isFocused: Bool { self != .inactive }
+}
+
 /// 训练进行中页（旧 WorkoutLoggingView 升级为新视觉，符号名保留以避免破坏 HistoryViews 等引用）。
 struct WorkoutLoggingView: View {
     @Environment(\.modelContext) private var modelContext
@@ -523,6 +532,7 @@ struct WorkoutLoggingView: View {
     @Environment(TeamService.self) private var teamService
     @Environment(SessionStore.self) private var session
     @Environment(RestTimerController.self) private var restTimer
+    @Environment(WorkoutLiveActivityController.self) private var workoutLiveActivity
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(PRCelebrationCenter.self) private var prCelebration
     @Environment(PlanWritebackCenter.self) private var planWriteback
@@ -568,8 +578,8 @@ struct WorkoutLoggingView: View {
     @State private var setRowFrames: [UUID: CGRect] = [:]
     /// 当前打开「更多操作」菜单的组 localId（nil = 无）。顶层浮层据 anchor 定位、外部点击关闭。
     @State private var menuSetId: UUID?
-    /// 待二次确认删除的组（nil = 无确认弹窗）。
-    @State private var confirmDeleteSet: WorkoutSet?
+    /// 待二次确认删除的动作（nil = 无确认弹窗）。
+    @State private var confirmDeleteExercise: WorkoutExercise?
     /// ScrollView 视口在 .global 坐标的 frame（顶边 = 可视区上界）。
     @State private var scrollViewport: CGRect = .zero
     /// 自研键盘顶边的 .global Y（0 = 键盘未显示/未测得）；作为可视区下界。
@@ -589,6 +599,8 @@ struct WorkoutLoggingView: View {
     /// 已完成的无计划训练可沉淀为模板；保存一次后隐藏入口。
     @State private var showingSaveAsPlan = false
     @State private var savedAsPlan = false
+    @State private var showingPosterPreview = false
+    @State private var lastDetectedRecords: [PersonalRecord] = []
 
     private static let continuedRestDuration: TimeInterval = 30
     private static let exerciseNoteLimit = 200
@@ -669,8 +681,7 @@ struct WorkoutLoggingView: View {
     private var loggingMenuItems: [PaperMenuItem] {
         [
             PaperMenuItem(title: "放弃此次训练", systemImage: "trash", role: .destructive) {
-                prepareForPresentation()
-                confirmingDiscard = true
+                presentDiscardConfirmation()
             }
         ]
     }
@@ -733,6 +744,12 @@ struct WorkoutLoggingView: View {
                                        onStart: { startTimerIfNeeded() },
                                        onFinish: presentFinishConfirmation)
                         triadStats
+                        if workout.isFinished {
+                            WorkoutPosterShareButton {
+                                prepareForPresentation()
+                                showingPosterPreview = true
+                            }
+                        }
                         if shouldOfferSaveAsPlan {
                             saveAsPlanCard
                         }
@@ -899,14 +916,14 @@ struct WorkoutLoggingView: View {
             confirmTitle: "放弃训练",
             onConfirm: { discardWorkout() }
         )
-        // 删除组二次确认（自定义纸感弹窗）。
+        // 删除动作二次确认；组删除保持直接删除。
         .paperConfirmDialog(
-            isPresented: Binding(get: { confirmDeleteSet != nil },
-                                 set: { if !$0 { confirmDeleteSet = nil } }),
-            title: "删除这一组?",
-            message: confirmDeleteSet.map { $0.setType == .warmup ? "该热身组将被移除。" : "第 \($0.setIndex + 1) 组将被移除，后续组号自动顺延。" } ?? "",
+            isPresented: Binding(get: { confirmDeleteExercise != nil },
+                                 set: { if !$0 { confirmDeleteExercise = nil } }),
+            title: "删除这个动作?",
+            message: confirmDeleteExercise.map { "「\($0.displayExerciseName)」及其所有组将被移除。" } ?? "",
             confirmTitle: "删除",
-            onConfirm: { [set = confirmDeleteSet] in if let set { deleteSet(set) } }
+            onConfirm: { [exercise = confirmDeleteExercise] in if let exercise { delete(exercise) } }
         )
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in addExercise(pick) }
@@ -915,6 +932,9 @@ struct WorkoutLoggingView: View {
             ExerciseOrderEditorSheet(title: "调整动作顺序",
                                      items: workoutOrderItems,
                                      onCommit: applyWorkoutExerciseOrder)
+        }
+        .sheet(isPresented: $showingPosterPreview) {
+            WorkoutPosterPreviewSheet(workout: workout, personalRecords: posterPersonalRecords)
         }
         .sheet(isPresented: $showingSaveAsPlan) {
             SaveWorkoutAsPlanSheet(workout: workout) { plan in
@@ -936,6 +956,7 @@ struct WorkoutLoggingView: View {
         }
         .onAppear {
             consumeRestCompletionIfNeeded()
+            workoutLiveActivity.syncWorkout(workout)
         }
         .onDisappear {
             NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
@@ -1023,7 +1044,7 @@ struct WorkoutLoggingView: View {
             Rectangle().fill(Theme.Color.border).frame(height: 1)
             setMenuItem(icon: "trash", title: "删除组", destructive: true) {
                 menuSetId = nil
-                confirmDeleteSet = set
+                deleteSet(set)
             }
         }
         .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
@@ -1157,6 +1178,7 @@ struct WorkoutLoggingView: View {
                               isMenuOpen: menuExerciseId == ex.localId,
                               focused: focused,
                               editingText: buffer,
+                              pendingReplace: pendingReplace,
                               onFocus: focus,
                               onToggleExpand: {
                                   prepareForPresentation()
@@ -1181,6 +1203,7 @@ struct WorkoutLoggingView: View {
                               },
                               onChange: touch,
                               onCompleteSet: { set in
+                                  if focused != nil { dismissKeypad() }
                                   if accordion == .auto { accordion = .expanded(ex.localId) }
                                   // 完成第一组即自动启动训练计时（幂等：已启动则不动）。
                                   startTimerIfNeeded()
@@ -1195,6 +1218,7 @@ struct WorkoutLoggingView: View {
                                       recordActiveRestIfNeeded()
                                       continuedRestBaseBySet[set.localId] = nil
                                       let nextSet = nextSetSummary
+                                      workoutLiveActivity.syncWorkout(workout)
                                       restTimer.start(duration: TimeInterval(secs),
                                                       label: nextSet?.exerciseName ?? ex.exerciseName,
                                                       nextSet: nextSet,
@@ -1356,9 +1380,7 @@ struct WorkoutLoggingView: View {
             .accessibilityHint("为\(ex.displayExerciseName)记录本次训练备注")
             Rectangle().fill(Theme.Color.border).frame(height: 1)
             Button {
-                menuExerciseId = nil
-                dismissRestDurationEditor()
-                delete(ex)
+                presentDeleteExerciseConfirmation(for: ex)
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "trash").font(.system(size: 15, weight: .semibold))
@@ -1474,34 +1496,63 @@ struct WorkoutLoggingView: View {
         menuSetId = nil
     }
 
-    /// 结束训练确认弹窗需要和键盘收起解耦：否则 `focused == nil` 的键盘弹簧动画会把
-    /// `fullScreenCover` 呈现卷进同一个布局事务，视觉上变成从底部上滑。
-    private func presentFinishConfirmation() {
-        let hadKeyboard = focused != nil
-        if hadKeyboard {
-            var cleanupTransaction = Transaction(animation: nil)
-            cleanupTransaction.disablesAnimations = true
-            withTransaction(cleanupTransaction) {
-                dismissKeypad()
-                dismissRestDurationEditor()
-                menuExerciseId = nil
-                menuSetId = nil
-            }
-            Task { @MainActor in
-                await Task.yield()
-                presentFinishConfirmationImmediately()
-            }
-        } else {
+    /// 训练页的纸感确认弹窗统一经此入口呈现：先无动画清理键盘/菜单，再到下一轮主线程事务打开
+    /// `fullScreenCover`，避免被键盘或菜单收起动画卷入系统下滑/上滑转场。
+    private func prepareForConfirmPresentation() {
+        var cleanupTransaction = Transaction(animation: nil)
+        cleanupTransaction.disablesAnimations = true
+        withTransaction(cleanupTransaction) {
             prepareForPresentation()
+        }
+    }
+
+    private func presentFinishConfirmation() {
+        prepareForConfirmPresentation()
+        Task { @MainActor in
+            await Task.yield()
             presentFinishConfirmationImmediately()
         }
     }
 
-    private func presentFinishConfirmationImmediately() {
+    private func presentDiscardConfirmation() {
+        prepareForConfirmPresentation()
+        Task { @MainActor in
+            await Task.yield()
+            presentDiscardConfirmationImmediately()
+        }
+    }
+
+    private func presentDeleteExerciseConfirmation(for exercise: WorkoutExercise) {
+        prepareForConfirmPresentation()
+        Task { @MainActor in
+            await Task.yield()
+            presentDeleteExerciseConfirmationImmediately(for: exercise)
+        }
+    }
+
+    private func presentConfirmWithoutSystemTransition(_ update: () -> Void) {
         var presentationTransaction = Transaction(animation: nil)
         presentationTransaction.disablesAnimations = true
         withTransaction(presentationTransaction) {
+            update()
+        }
+    }
+
+    private func presentFinishConfirmationImmediately() {
+        presentConfirmWithoutSystemTransition {
             confirmingFinish = true
+        }
+    }
+
+    private func presentDiscardConfirmationImmediately() {
+        presentConfirmWithoutSystemTransition {
+            confirmingDiscard = true
+        }
+    }
+
+    private func presentDeleteExerciseConfirmationImmediately(for exercise: WorkoutExercise) {
+        presentConfirmWithoutSystemTransition {
+            confirmDeleteExercise = exercise
         }
     }
 
@@ -1599,6 +1650,7 @@ struct WorkoutLoggingView: View {
               let accumulated = set.actualRestSeconds else { return }
         prepareForPresentation()
         startTimerIfNeeded()
+        workoutLiveActivity.syncWorkout(workout)
         continuedRestBaseBySet[set.localId] = accumulated
         let nextSet = nextSetSummary
         restTimer.start(duration: Self.continuedRestDuration,
@@ -1722,6 +1774,7 @@ struct WorkoutLoggingView: View {
                 detectPersonalRecordsFromFallbackHistory()
             }
         }
+        lastDetectedRecords = prs
         if !prs.isEmpty {
             // 庆祝弹窗经 App 级 center 由 MainTabView 呈现：结束训练会触发导航把本页换成
             // 只读详情页，若挂本页 sheet 会随本页销毁而一闪即逝（详见 PRCelebrationCenter）。
@@ -1776,6 +1829,11 @@ struct WorkoutLoggingView: View {
         }
     }
 
+    private var posterPersonalRecords: [PersonalRecord] {
+        if !lastDetectedRecords.isEmpty { return lastDetectedRecords }
+        return historyStore.workoutRecords[workout.localId] ?? []
+    }
+
     private func detectPersonalRecordsFromFallbackHistory() -> [PersonalRecord] {
         let startedAt = workout.startedAt
         let localId = workout.localId
@@ -1796,6 +1854,7 @@ struct WorkoutLoggingView: View {
     private func touch() {
         workout.markDirty()
         try? modelContext.save()
+        workoutLiveActivity.syncWorkout(workout)
     }
 
     // MARK: 自研键盘 · 焦点与编辑
@@ -2357,6 +2416,8 @@ private struct ExerciseBlock: View {
     var focused: FocusedCell? = nil
     /// 聚焦单元的编辑缓冲串（仅聚焦字段据此显示）。
     var editingText: String = ""
+    /// 聚焦已有值后，首个数字键是否将覆盖现值。
+    var pendingReplace: Bool = false
     /// 请求聚焦某单元。
     var onFocus: (FocusedCell) -> Void = { _ in }
     var onToggleExpand: () -> Void = {}
@@ -2424,6 +2485,7 @@ private struct ExerciseBlock: View {
                                readOnly: readOnly,
                                focusedField: focusedField(for: set),
                                editingText: editingText,
+                               pendingReplace: pendingReplace,
                                actualRestText: actualRestText(for: set),
                                isMenuOpen: menuSetId == set.localId,
                                onChange: onChange,
@@ -2599,6 +2661,8 @@ private struct SetRow: View {
     let focusedField: SetField?
     /// 聚焦字段的编辑缓冲串（含 "0." / "72." 中间态）。
     let editingText: String
+    /// 聚焦已有值后，首个数字键是否将覆盖现值。
+    let pendingReplace: Bool
     /// 该组真实休息用时文案；nil 表示尚未产生真实休息记录。
     let actualRestText: String?
     /// 本组「更多操作」菜单是否打开（⋯ 高亮 + 发布定位锚点，菜单本体由父视图顶层浮层渲染）。
@@ -2634,12 +2698,12 @@ private struct SetRow: View {
         HStack(spacing: 8) {
             badge
             valueCell(text: weightDisplay, placeholder: "kg", unit: "kg",
-                      focused: focusedField == .weight,
+                      inputMode: inputMode(for: .weight, text: weightDisplay),
                       label: "重量", value: set.weightKg.map { "\(formatKg($0)) 公斤" })
                 .onTapGesture { if !readOnly { onFocus(.weight) } }
             Text("×").font(Theme.Font.mono(size: 11)).foregroundStyle(Theme.Color.muted).frame(width: 12)
             valueCell(text: repsDisplay, placeholder: "次", unit: "次",
-                      focused: focusedField == .reps,
+                      inputMode: inputMode(for: .reps, text: repsDisplay),
                       label: "次数", value: set.reps.map { "\($0) 次" })
                 .onTapGesture { if !readOnly { onFocus(.reps) } }
             checkButton
@@ -2676,15 +2740,32 @@ private struct SetRow: View {
         focusedField == .reps ? editingText : (set.reps.map(String.init) ?? "")
     }
 
+    private func inputMode(for field: SetField, text: String) -> SetInputMode {
+        guard focusedField == field else { return .inactive }
+        return pendingReplace && !text.isEmpty ? .replacePending : .appending
+    }
+
     /// 重量/次数输入框：定宽收窄（让右侧腾出完成勾 + 更多操作），居中数字。
-    private func valueCell(text: String, placeholder: String, unit: String, focused: Bool,
+    private func valueCell(text: String, placeholder: String, unit: String, inputMode: SetInputMode,
                            label: String, value: String?) -> some View {
-        ZStack(alignment: .bottomTrailing) {
-            Text(text.isEmpty ? placeholder : text)
-                .font(Theme.Font.number(size: 15, weight: .bold))
-                .foregroundStyle(valueTextColor(isPlaceholder: text.isEmpty))
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+        let displayText = text.isEmpty ? placeholder : text
+
+        return ZStack(alignment: .bottomTrailing) {
+            HStack(spacing: 2) {
+                Text(displayText)
+                    .font(Theme.Font.number(size: 15, weight: .bold))
+                    .foregroundStyle(valueTextColor(isPlaceholder: text.isEmpty))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, inputMode == .replacePending ? 3 : 0)
+                    .padding(.vertical, inputMode == .replacePending ? 1 : 0)
+                    .background(selectionHighlight(for: inputMode),
+                                in: RoundedRectangle(cornerRadius: 3, style: .continuous))
+                inputCursor(for: inputMode)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             if !text.isEmpty {
                 Text(unit)
                     .font(Theme.Font.mono(size: 8, weight: .bold))
@@ -2694,31 +2775,76 @@ private struct SetRow: View {
             }
         }
         .frame(width: 64, height: 36)
-            .background(valueCellBackground(focused: focused),
-                        in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                    .stroke(valueCellBorder(focused: focused),
-                            lineWidth: focused ? 1.5 : 1)
-            )
-            .contentShape(Rectangle())
-            .accessibilityElement()
-            .accessibilityLabel("\(rowName) \(label)")
-            .accessibilityValue(value ?? "未填写")
-            .accessibilityAddTraits(.isButton)
+        .background(valueCellBackground, in: shape)
+        .overlay(
+            shape.stroke(valueCellBorder(inputMode: inputMode),
+                         lineWidth: valueCellBorderWidth(inputMode: inputMode))
+        )
+        .shadow(color: valueCellShadow(inputMode: inputMode),
+                radius: valueCellShadowRadius(inputMode: inputMode),
+                x: 0,
+                y: valueCellShadowY(inputMode: inputMode))
+        .contentShape(Rectangle())
+        .accessibilityElement()
+        .accessibilityLabel("\(rowName) \(label)")
+        .accessibilityValue(value ?? "未填写")
+        .accessibilityHint(valueCellAccessibilityHint(inputMode: inputMode))
+        .accessibilityAddTraits(.isButton)
     }
 
-    private func valueCellBackground(focused: Bool) -> SwiftUI.Color {
+    private var valueCellBackground: SwiftUI.Color {
         if set.completed { return completedFill }
-        if focused { return Theme.Color.accentSoft }
-        if isEditing { return Theme.Color.surface }
-        return Theme.Color.bg
+        return Theme.Color.surface
     }
 
-    private func valueCellBorder(focused: Bool) -> SwiftUI.Color {
-        if set.completed { return completedFill }
-        if focused { return Theme.Color.accent }
+    private func valueCellBorder(inputMode: SetInputMode) -> SwiftUI.Color {
+        if set.completed { return inputMode.isFocused ? .white.opacity(0.95) : completedFill }
+        if inputMode.isFocused { return Theme.Color.accent }
         return Theme.Color.border
+    }
+
+    private func valueCellBorderWidth(inputMode: SetInputMode) -> CGFloat {
+        if set.completed && inputMode.isFocused { return 2.2 }
+        return inputMode.isFocused ? 1.7 : 1
+    }
+
+    private func valueCellShadow(inputMode: SetInputMode) -> SwiftUI.Color {
+        guard set.completed && inputMode.isFocused else { return .clear }
+        return Theme.Color.fg.opacity(0.20)
+    }
+
+    private func valueCellShadowRadius(inputMode: SetInputMode) -> CGFloat {
+        return set.completed && inputMode.isFocused ? 8 : 0
+    }
+
+    private func valueCellShadowY(inputMode: SetInputMode) -> CGFloat {
+        return set.completed && inputMode.isFocused ? 3 : 0
+    }
+
+    private func selectionHighlight(for inputMode: SetInputMode) -> SwiftUI.Color {
+        guard inputMode == .replacePending else { return .clear }
+        return set.completed ? .white.opacity(0.24) : Theme.Color.accentSofter
+    }
+
+    @ViewBuilder
+    private func inputCursor(for inputMode: SetInputMode) -> some View {
+        if inputMode == .appending {
+            RoundedRectangle(cornerRadius: 0.75, style: .continuous)
+                .fill(set.completed ? .white.opacity(0.95) : Theme.Color.accent)
+                .frame(width: 1.5, height: 16)
+        }
+    }
+
+    private func valueCellAccessibilityHint(inputMode: SetInputMode) -> String {
+        if readOnly { return "只读" }
+        switch inputMode {
+        case .inactive:
+            return "点按开始输入"
+        case .replacePending:
+            return "下一个数字将覆盖当前值"
+        case .appending:
+            return "继续在当前值后输入"
+        }
     }
 
     private func valueTextColor(isPlaceholder: Bool) -> SwiftUI.Color {
@@ -2753,7 +2879,7 @@ private struct SetRow: View {
                     Image(systemName: "checkmark").font(.system(size: 13, weight: .bold))
                         .foregroundStyle(.white)
                 } else {
-                    shape.fill(Theme.Color.bg)
+                    shape.fill(Theme.Color.surface)
                     shape.stroke(Theme.Color.border, lineWidth: 1.5)
                     // 未完成态显示淡勾，引导用户勾选完成。
                     Image(systemName: "checkmark").font(.system(size: 13, weight: .bold))

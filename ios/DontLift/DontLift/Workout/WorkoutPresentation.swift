@@ -43,7 +43,8 @@ struct WorkoutLiveOverlayContainer: View {
         ZStack {
             if let workout = capsuleWorkout, !presentation.isExpanded {
                 LiveSessionCapsule(title: workout.title ?? "训练",
-                                   timerStartedAt: workout.timerStartedAt) {
+                                   timerStartedAt: workout.timerStartedAt,
+                                   nextSetBrief: nextSetBrief(for: workout)) {
                     presentation.present(workout)
                 }
                 .transition(capsuleTransition)
@@ -62,6 +63,15 @@ struct WorkoutLiveOverlayContainer: View {
 
     private var animation: Animation {
         reduceMotion ? .easeOut(duration: 0.14) : .spring(response: 0.38, dampingFraction: 0.9)
+    }
+
+    private func nextSetBrief(for workout: Workout) -> String? {
+        for ex in workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }) {
+            if ex.sets.contains(where: { !$0.completed }) {
+                return ex.displayExerciseName
+            }
+        }
+        return nil
     }
 
     private var capsuleTransition: AnyTransition {

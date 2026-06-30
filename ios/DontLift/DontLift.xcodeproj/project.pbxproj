@@ -519,7 +519,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DontLift/DontLift.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+					CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -527,6 +527,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "别练了";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "别练了 读取你的体重等数据以更准确地计算训练与营养目标。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "别练了 将完成的力量训练写入「健康」App。";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "别练了 需要保存训练海报图片到你的相册。";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIAppFonts = "JetBrainsMono-Regular.ttf JetBrainsMono-Bold.ttf";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -559,7 +560,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DontLift/DontLift.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+					CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -567,6 +568,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "别练了";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "别练了 读取你的体重等数据以更准确地计算训练与营养目标。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "别练了 将完成的力量训练写入「健康」App。";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "别练了 需要保存训练海报图片到你的相册。";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIAppFonts = "JetBrainsMono-Regular.ttf JetBrainsMono-Bold.ttf";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -597,7 +599,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+					CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.4;
@@ -619,7 +621,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+					CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.4;
@@ -640,7 +642,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+					CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -660,7 +662,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+					CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -680,7 +682,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+					CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DontLiftWidgets/Info.plist;
@@ -708,7 +710,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+					CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DontLiftWidgets/Info.plist;

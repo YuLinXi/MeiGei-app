@@ -17,6 +17,7 @@ struct WorkoutDetailView: View {
 
     @State private var confirmingDelete = false
     @State private var fallbackRecords: [PersonalRecord]?
+    @State private var showingPosterPreview = false
 
     private static let weekdayFormatter: DateFormatter = {
         let fmt = DateFormatter()
@@ -81,9 +82,11 @@ struct WorkoutDetailView: View {
                 .padding(.top, Theme.Spacing.sm)
             }
         }
-        // 子页统一导航栏：返回 + ⋯ 删除（双环处理收口在 paperToolbar）。
+        // 子页统一导航栏：返回 + ⋯ 操作（双环处理收口在 paperToolbar）。
         .paperToolbar(title: workout.title ?? "训练", onBack: { dismiss() }) {
-            CircleIconButton(systemName: "ellipsis", action: { confirmingDelete = true })
+            CircleIconMenu(systemName: "ellipsis",
+                           items: detailMenuItems,
+                           accessibilityLabel: "训练更多操作")
         }
         .paperConfirmDialog(
             isPresented: $confirmingDelete,
@@ -92,6 +95,9 @@ struct WorkoutDetailView: View {
             confirmTitle: "删除",
             onConfirm: { deleteWorkout() }
         )
+        .sheet(isPresented: $showingPosterPreview) {
+            WorkoutPosterPreviewSheet(workout: workout, personalRecords: personalRecords)
+        }
         .task(id: workout.localId) {
             WorkoutPerformanceMonitor.event("workout.detail.appear")
             if historyStore.workoutRecords[workout.localId] == nil {
@@ -100,6 +106,17 @@ struct WorkoutDetailView: View {
                     : []
             }
         }
+    }
+
+    private var detailMenuItems: [PaperMenuItem] {
+        [
+            PaperMenuItem(title: "分享训练海报", systemImage: "square.and.arrow.up") {
+                showingPosterPreview = true
+            },
+            PaperMenuItem(title: "删除训练", systemImage: "trash", role: .destructive) {
+                confirmingDelete = true
+            }
+        ]
     }
 
     // MARK: 完成头卡（替换记录中 REC 计时条）

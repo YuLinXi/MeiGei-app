@@ -136,7 +136,8 @@ public class CheckinService {
 
     /**
      * 表情回应（单选·可取消）：一人一打卡仅一条。
-     * 再点同一个表情 = 取消（删除，返回 null，不推送）；点另一个 = 切换；未点过 = 新增。仅新增/切换时推送给打卡主人。
+     * 再点同一个表情 = 取消（删除，返回 null，不推送）；点另一个 = 切换；未点过 = 新增。
+     * 同一成员对同一打卡只在首次有效回应时推送一次，后续切换或重新点亮不再推送。
      */
     @Transactional
     public CheckinReaction react(UUID userId, UUID checkinId, String emoji) {
@@ -160,7 +161,20 @@ public class CheckinService {
             reaction.setEmoji(emoji);
             reaction.setCreatedAt(now);
             reaction.setUpdatedAt(now);
-            reactionMapper.insert(reaction);
+            if (reactionMapper.insertReactionIfAbsent(reaction) == 0) {
+                CheckinReaction concurrent = reactionMapper.findByCheckinAndUser(checkinId, userId);
+                if (concurrent == null) {
+                    throw AppException.conflict("表情回应状态已变化，请重试");
+                }
+                if (concurrent.getEmoji().equals(emoji)) {
+                    reaction = concurrent;
+                } else {
+                    concurrent.setEmoji(emoji);
+                    concurrent.setUpdatedAt(now);
+                    reactionMapper.updateById(concurrent);
+                    reaction = concurrent;
+                }
+            }
         } else if (existing.getEmoji().equals(emoji)) {
             // 再点同一个 → 取消：物理删除该条（uq_reaction 唯一约束允许重新点亮）
             reactionMapper.deleteById(existing.getId());
@@ -171,11 +185,18 @@ public class CheckinService {
             reactionMapper.updateById(existing);
             reaction = existing;
         }
-        if (!checkin.getUserId().equals(userId)) {
+        if (shouldSendReactionPush(checkin, userId, checkinId, now)) {
             pushService.sendToUser(checkin.getUserId(), "新的表情回应",
                     "有人为你的训练点了表情", Map.of("checkinId", checkinId.toString(), "emoji", emoji));
         }
         return reaction;
+    }
+
+    private boolean shouldSendReactionPush(TeamCheckin checkin, UUID reactorUserId, UUID checkinId, OffsetDateTime now) {
+        if (checkin.getUserId().equals(reactorUserId)) {
+            return false;
+        }
+        return reactionMapper.insertPushReceiptIfAbsent(Uuid7.generate(), checkinId, reactorUserId, now) == 1;
     }
 
     public List<CheckinReaction> listReactions(UUID userId, UUID checkinId) {

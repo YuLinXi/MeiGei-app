@@ -526,7 +526,7 @@ private struct ExerciseLibraryContentView: View {
         ex.markDeleted()
         try? modelContext.save()
         Theme.Haptics.notification(.warning)
-        Task { await syncEngine.syncAll() }
+        syncEngine.scheduleSyncAll()
     }
 
     private func customBrowseRow(_ ex: CustomExercise, first: Bool, last: Bool, prWeights: [String: Double]) -> some View {

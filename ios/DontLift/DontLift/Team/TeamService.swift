@@ -208,7 +208,9 @@ final class TeamService {
     /// 单选·可取消：服务端按 (checkin,user) 唯一切换；再点同一个表情时服务端删除并返回空 body，故用 sendVoid。
     /// 调用方点击后会回拉 reactions(checkinId:) 拿真实状态，无需解析返回。
     func react(checkinId: UUID, emoji: String) async throws {
-        try await api.sendVoid("POST", "/checkins/\(checkinId)/reactions", body: ReactRequest(emoji: emoji))
+        try await api.sendVoid("POST", "/checkins/\(checkinId)/reactions",
+                               body: ReactRequest(emoji: emoji),
+                               idempotencyKey: "checkin-reaction-\(checkinId.uuidString):\(emoji):\(UUID().uuidString)")
     }
 
     /// 训练完成后的显式分享：仅写入用户选择的 Team。空数组表示「仅自己可见」，不发请求。
