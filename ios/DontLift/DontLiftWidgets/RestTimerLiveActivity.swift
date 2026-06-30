@@ -3,56 +3,110 @@ import Foundation
 import SwiftUI
 import WidgetKit
 
-/// 组间休息 Live Activity：iPhone 锁屏卡片 + 灵动岛。
-/// Apple Watch Smart Stack 是平台条件能力：仅在系统版本、连接状态与 ActivityKit/WidgetKit 预算支持时自动转呈。
-/// 当前不引入 Watch 专用 `supplementalActivityFamilies` 小尺寸布局，Watch 缺席不得判定为休息提醒失败。
-/// 倒计时用 `Text(timerInterval:countsDown:)` 自走，无需推送更新即可在锁屏/后台持续刷新。
+/// 训练会话 Live Activity：iPhone 锁屏卡片 + 灵动岛。
+/// `workout` phase 显示训练正向计时，`rest` phase 显示组间休息倒计时。
 struct RestTimerLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RestActivityAttributes.self) { context in
-            LockScreenRestView(context: context)
+            LockScreenWorkoutActivityView(context: context)
                 .padding()
                 .activityBackgroundTint(Color.black.opacity(0.6))
                 .activitySystemActionForegroundColor(.primary)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    IslandBrandHeader()
+                    IslandBrandHeader(phase: context.state.phase)
                         .padding(.leading, 18)
                         .padding(.top, 8)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    countdown(to: context.state.endDate)
+                    phaseTimer(context: context)
                         .font(.title.bold().monospacedDigit())
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.trailing)
                         .frame(minWidth: 82, alignment: .trailing)
                         .padding(.trailing, 16)
                         .padding(.top, 6)
-                        .accessibilityLabel("休息倒计时")
+                        .accessibilityLabel(context.state.phase == .rest ? "休息倒计时" : "训练计时")
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    ExpandedRestDetail(state: context.state)
+                    if context.state.phase == .rest {
+                        ExpandedRestDetail(state: context.state)
+                    } else {
+                        ExpandedWorkoutDetail(context: context)
+                    }
                 }
             } compactLeading: {
                 IslandAppIcon(size: 18, cornerRadius: 5)
-                    .accessibilityLabel("组间休息")
+                    .accessibilityLabel(context.state.phase == .rest ? "组间休息" : "训练进行中")
             } compactTrailing: {
-                countdown(to: context.state.endDate)
-                    .font(.caption2.weight(.bold).monospacedDigit())
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: 46)
-                    .accessibilityLabel("休息倒计时")
+                CompactPhaseTimer(phase: context.state.phase, timer: phaseTimer(context: context))
+                    .accessibilityLabel(context.state.phase == .rest ? "休息倒计时" : "训练计时")
             } minimal: {
-                IslandAppIcon(size: 18, cornerRadius: 5)
-                    .accessibilityLabel("组间休息")
+                IslandAppPhaseIcon(phase: context.state.phase, size: 18)
+                    .accessibilityLabel(context.state.phase == .rest ? "组间休息" : "训练进行中")
             }
-            .keylineTint(.orange)
+            .keylineTint(brandAccent)
         }
     }
 
-    private func countdown(to end: Date) -> Text {
-        Text(timerInterval: Date.now...max(Date.now, end), countsDown: true)
+    private var brandAccent: Color {
+        Color(red: 0.89, green: 0.25, blue: 0.16)
+    }
+
+    private func phaseTimer(context: ActivityViewContext<RestActivityAttributes>) -> Text {
+        if context.state.phase == .rest, let end = context.state.restEndDate {
+            return Text(timerInterval: Date.now...max(Date.now, end), countsDown: true)
+        }
+        return Text(context.attributes.startedAt, style: .timer)
+    }
+}
+
+private let brandAccent = Color(red: 0.89, green: 0.25, blue: 0.16)
+
+private struct CompactPhaseTimer: View {
+    let phase: RestActivityAttributes.Phase
+    let timer: Text
+
+    var body: some View {
+        HStack(spacing: 2) {
+            IslandPhaseIcon(phase: phase, size: 11)
+            timer
+                .font(.caption2.weight(.bold).monospacedDigit())
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+        }
+        .frame(maxWidth: 64, alignment: .trailing)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct IslandPhaseIcon: View {
+    let phase: RestActivityAttributes.Phase
+    let size: CGFloat
+
+    var body: some View {
+        Image(systemName: phase == .rest ? "timer" : "record.circle.fill")
+            .font(.system(size: size * 0.78, weight: .black))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(brandAccent)
+            .frame(width: size, height: size)
+    }
+}
+
+private struct IslandAppPhaseIcon: View {
+    let phase: RestActivityAttributes.Phase
+    let size: CGFloat
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            IslandAppIcon(size: size, cornerRadius: 5)
+            IslandPhaseIcon(phase: phase, size: size * 0.52)
+                .background(.black, in: Circle())
+                .offset(x: 2, y: 2)
+        }
+        .frame(width: size, height: size)
     }
 }
 
@@ -70,13 +124,15 @@ private struct IslandAppIcon: View {
 }
 
 private struct IslandBrandHeader: View {
+    let phase: RestActivityAttributes.Phase
+
     var body: some View {
         HStack(spacing: 7) {
             IslandAppIcon(size: 22, cornerRadius: 6)
             VStack(alignment: .leading, spacing: 1) {
-                Text("REST")
+                Text(phase == .rest ? "REST" : "REC")
                     .font(.caption2.weight(.black).monospaced())
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(brandAccent)
                 Text("别练了")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.72))
@@ -85,7 +141,54 @@ private struct IslandBrandHeader: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("组间休息，别练了")
+        .accessibilityLabel(phase == .rest ? "组间休息，别练了" : "训练进行中，别练了")
+    }
+}
+
+private struct ExpandedWorkoutDetail: View {
+    let context: ActivityViewContext<RestActivityAttributes>
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(context.attributes.workoutTitle)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white.opacity(0.68))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                Text("训练进行中")
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(.white)
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    stat("\(context.state.completedSetCount)", label: "已完成组")
+                    stat("\(context.state.remainingExerciseCount)", label: "剩余动作")
+                }
+                if let next = context.state.nextSet {
+                    Text("下一组 · \(next.exerciseName) 第\(next.setIndex)组")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.68))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.76)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 7)
+        .padding(.bottom, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("训练进行中，已完成 \(context.state.completedSetCount) 组，剩余 \(context.state.remainingExerciseCount) 个动作")
+    }
+
+    private func stat(_ value: String, label: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(value)
+                .font(.title3.weight(.black).monospacedDigit())
+                .foregroundStyle(.white)
+            Text(label)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.white.opacity(0.62))
+        }
     }
 }
 
@@ -112,7 +215,7 @@ private struct ExpandedRestDetail: View {
                             .minimumScaleFactor(0.72)
                         Text("× \(loadSummary.reps)")
                             .font(.caption.weight(.black))
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(brandAccent)
                             .lineLimit(1)
                             .minimumScaleFactor(0.78)
                     }
@@ -120,16 +223,7 @@ private struct ExpandedRestDetail: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibilitySummary)
-            Spacer(minLength: 8)
-            Button(intent: EndRestIntent()) {
-                Text("结束")
-                    .font(.caption2.weight(.black))
-                    .frame(minWidth: 44, minHeight: 32)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
-            .foregroundStyle(.black)
-            .accessibilityLabel("结束休息")
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
         .padding(.top, 7)
@@ -144,13 +238,7 @@ private struct ExpandedRestDetail: View {
     }
 
     private var nextExerciseTitle: String {
-        if let next = state.nextSet {
-            return next.exerciseName
-        }
-        if let nextExercise = state.nextExercise {
-            return nextExercise
-        }
-        return "开始下一组"
+        state.nextSet?.exerciseName ?? "开始下一组"
     }
 
     private var loadSummary: (weight: String, reps: String)? {
@@ -172,31 +260,64 @@ private struct ExpandedRestDetail: View {
     }
 }
 
-private struct LockScreenRestView: View {
+private struct LockScreenWorkoutActivityView: View {
     let context: ActivityViewContext<RestActivityAttributes>
 
     var body: some View {
         HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 2) {
-                Label("组间休息", systemImage: "timer")
-                    .font(.caption).foregroundStyle(.secondary)
-                Text(timerInterval: Date.now...max(Date.now, context.state.endDate), countsDown: true)
-                    .font(.largeTitle.bold().monospacedDigit())
-                if let next = context.state.nextSet {
-                    Text("下一组：\(next.exerciseName) · \(next.setLabel) · \(next.weightText ?? "未填重量") · \(next.repsText ?? "未填次数")")
-                        .font(.caption)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 7) {
+                    IslandAppIcon(size: 22, cornerRadius: 6)
+                    Text(context.state.phase == .rest ? "组间休息" : "训练进行中")
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                } else if let next = context.state.nextExercise {
-                    Text("下一个：\(next)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    IslandPhaseIcon(phase: context.state.phase, size: 12)
+                }
+                .accessibilityElement(children: .combine)
+                phaseTimer
+                    .font(.largeTitle.bold().monospacedDigit())
+                if context.state.phase == .rest {
+                    restSubtitle
+                } else {
+                    workoutSubtitle
                 }
             }
             Spacer()
-            Button(intent: EndRestIntent()) {
-                Label("结束", systemImage: "forward.end.fill")
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
+        }
+    }
+
+    private var phaseTimer: Text {
+        if context.state.phase == .rest, let end = context.state.restEndDate {
+            return Text(timerInterval: Date.now...max(Date.now, end), countsDown: true)
+        }
+        return Text(context.attributes.startedAt, style: .timer)
+    }
+
+    @ViewBuilder private var workoutSubtitle: some View {
+        if let next = context.state.nextSet {
+            Text("已完成 \(context.state.completedSetCount) 组 · 剩余 \(context.state.remainingExerciseCount) 动作 · 下一组：\(next.exerciseName) 第\(next.setIndex)组")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        } else {
+            Text("已完成 \(context.state.completedSetCount) 组 · 剩余 \(context.state.remainingExerciseCount) 动作")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    @ViewBuilder private var restSubtitle: some View {
+        if let next = context.state.nextSet {
+            Text("下一组：\(next.exerciseName) · \(next.setLabel) · \(next.weightText ?? "未填重量") · \(next.repsText ?? "未填次数")")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        } else {
+            Text("开始下一组")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
     }
 }

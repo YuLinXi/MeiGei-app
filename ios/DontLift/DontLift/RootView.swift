@@ -10,6 +10,7 @@ struct RootView: View {
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(TeamService.self) private var teamService
     @Environment(RestTimerController.self) private var restTimer
+    @Environment(WorkoutLiveActivityController.self) private var workoutLiveActivity
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var lastBackgroundedAt: Date?
@@ -65,6 +66,7 @@ struct RootView: View {
 
     private func handleAppBecameActive() {
         restTimer.handleAppBecameActive()
+        workoutLiveActivity.reconcile(activeWorkout: WorkoutSession.activeSession(in: modelContext))
         RestTimerController.clearDeliveredRestNotification()
         historyStore.ensureLoaded(reason: .appLaunch)
         scheduleForegroundSyncIfNeeded()

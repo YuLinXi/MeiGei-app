@@ -14,6 +14,7 @@ struct MainTabView: View {
     @Environment(SessionStore.self) private var session
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(WorkoutPresentationCenter.self) private var workoutPresentation
+    @Environment(WorkoutLiveActivityController.self) private var workoutLiveActivity
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// 全局进行中会话（LIVE 悬浮胶囊来源）：未删除且未结束 = isActive。
@@ -223,6 +224,7 @@ struct MainTabView: View {
     private func refreshActiveSession() {
         activeSession = WorkoutSession.activeSession(in: modelContext)
         workoutPresentation.reconcile(activeWorkout: activeSession)
+        workoutLiveActivity.reconcile(activeWorkout: activeSession)
     }
 
     private func retryReadyPendingShares() async {

@@ -532,6 +532,7 @@ struct WorkoutLoggingView: View {
     @Environment(TeamService.self) private var teamService
     @Environment(SessionStore.self) private var session
     @Environment(RestTimerController.self) private var restTimer
+    @Environment(WorkoutLiveActivityController.self) private var workoutLiveActivity
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(PRCelebrationCenter.self) private var prCelebration
     @Environment(PlanWritebackCenter.self) private var planWriteback
@@ -577,8 +578,8 @@ struct WorkoutLoggingView: View {
     @State private var setRowFrames: [UUID: CGRect] = [:]
     /// 当前打开「更多操作」菜单的组 localId（nil = 无）。顶层浮层据 anchor 定位、外部点击关闭。
     @State private var menuSetId: UUID?
-    /// 待二次确认删除的组（nil = 无确认弹窗）。
-    @State private var confirmDeleteSet: WorkoutSet?
+    /// 待二次确认删除的动作（nil = 无确认弹窗）。
+    @State private var confirmDeleteExercise: WorkoutExercise?
     /// ScrollView 视口在 .global 坐标的 frame（顶边 = 可视区上界）。
     @State private var scrollViewport: CGRect = .zero
     /// 自研键盘顶边的 .global Y（0 = 键盘未显示/未测得）；作为可视区下界。
@@ -908,14 +909,14 @@ struct WorkoutLoggingView: View {
             confirmTitle: "放弃训练",
             onConfirm: { discardWorkout() }
         )
-        // 删除组二次确认（自定义纸感弹窗）。
+        // 删除动作二次确认；组删除保持直接删除。
         .paperConfirmDialog(
-            isPresented: Binding(get: { confirmDeleteSet != nil },
-                                 set: { if !$0 { confirmDeleteSet = nil } }),
-            title: "删除这一组?",
-            message: confirmDeleteSet.map { $0.setType == .warmup ? "该热身组将被移除。" : "第 \($0.setIndex + 1) 组将被移除，后续组号自动顺延。" } ?? "",
+            isPresented: Binding(get: { confirmDeleteExercise != nil },
+                                 set: { if !$0 { confirmDeleteExercise = nil } }),
+            title: "删除这个动作?",
+            message: confirmDeleteExercise.map { "「\($0.displayExerciseName)」及其所有组将被移除。" } ?? "",
             confirmTitle: "删除",
-            onConfirm: { [set = confirmDeleteSet] in if let set { deleteSet(set) } }
+            onConfirm: { [exercise = confirmDeleteExercise] in if let exercise { delete(exercise) } }
         )
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in addExercise(pick) }
@@ -945,6 +946,7 @@ struct WorkoutLoggingView: View {
         }
         .onAppear {
             consumeRestCompletionIfNeeded()
+            workoutLiveActivity.syncWorkout(workout)
         }
         .onDisappear {
             NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
@@ -1032,7 +1034,7 @@ struct WorkoutLoggingView: View {
             Rectangle().fill(Theme.Color.border).frame(height: 1)
             setMenuItem(icon: "trash", title: "删除组", destructive: true) {
                 menuSetId = nil
-                confirmDeleteSet = set
+                deleteSet(set)
             }
         }
         .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
@@ -1191,6 +1193,7 @@ struct WorkoutLoggingView: View {
                               },
                               onChange: touch,
                               onCompleteSet: { set in
+                                  if focused != nil { dismissKeypad() }
                                   if accordion == .auto { accordion = .expanded(ex.localId) }
                                   // 完成第一组即自动启动训练计时（幂等：已启动则不动）。
                                   startTimerIfNeeded()
@@ -1205,6 +1208,7 @@ struct WorkoutLoggingView: View {
                                       recordActiveRestIfNeeded()
                                       continuedRestBaseBySet[set.localId] = nil
                                       let nextSet = nextSetSummary
+                                      workoutLiveActivity.syncWorkout(workout)
                                       restTimer.start(duration: TimeInterval(secs),
                                                       label: nextSet?.exerciseName ?? ex.exerciseName,
                                                       nextSet: nextSet,
@@ -1368,7 +1372,7 @@ struct WorkoutLoggingView: View {
             Button {
                 menuExerciseId = nil
                 dismissRestDurationEditor()
-                delete(ex)
+                confirmDeleteExercise = ex
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "trash").font(.system(size: 15, weight: .semibold))
@@ -1609,6 +1613,7 @@ struct WorkoutLoggingView: View {
               let accumulated = set.actualRestSeconds else { return }
         prepareForPresentation()
         startTimerIfNeeded()
+        workoutLiveActivity.syncWorkout(workout)
         continuedRestBaseBySet[set.localId] = accumulated
         let nextSet = nextSetSummary
         restTimer.start(duration: Self.continuedRestDuration,
@@ -1806,6 +1811,7 @@ struct WorkoutLoggingView: View {
     private func touch() {
         workout.markDirty()
         try? modelContext.save()
+        workoutLiveActivity.syncWorkout(workout)
     }
 
     // MARK: 自研键盘 · 焦点与编辑

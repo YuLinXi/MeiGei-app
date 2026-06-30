@@ -10,7 +10,8 @@ struct DontLiftApp: App {
     @State private var syncEngine: SyncEngine
     @State private var historyStore: WorkoutHistoryStore
     @State private var teamService = TeamService()
-    @State private var restTimer = RestTimerController()
+    @State private var restTimer: RestTimerController
+    @State private var workoutLiveActivity: WorkoutLiveActivityController
     @State private var healthKit = HealthKitManager()
     @State private var prCelebration = PRCelebrationCenter()
     @State private var planWriteback = PlanWritebackCenter()
@@ -26,9 +27,12 @@ struct DontLiftApp: App {
         ExerciseHistoryMerge.runIfNeeded(in: container.mainContext)
         let session = SessionStore(modelContext: container.mainContext)
         let historyStore = WorkoutHistoryStore(modelContext: container.mainContext)
+        let workoutLiveActivity = WorkoutLiveActivityController()
         _session = State(initialValue: session)
         _syncEngine = State(initialValue: SyncEngine(modelContext: container.mainContext))
         _historyStore = State(initialValue: historyStore)
+        _workoutLiveActivity = State(initialValue: workoutLiveActivity)
+        _restTimer = State(initialValue: RestTimerController(liveActivityController: workoutLiveActivity))
         PushManager.shared.isLoggedIn = { session.isLoggedIn }
         Theme.Font.verifyOrFallback()
     }
@@ -45,6 +49,7 @@ struct DontLiftApp: App {
                 .environment(historyStore)
                 .environment(teamService)
                 .environment(restTimer)
+                .environment(workoutLiveActivity)
                 .environment(healthKit)
                 .environment(prCelebration)
                 .environment(planWriteback)
