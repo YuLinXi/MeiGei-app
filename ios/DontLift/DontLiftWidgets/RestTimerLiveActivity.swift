@@ -223,7 +223,16 @@ private struct ExpandedRestDetail: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibilitySummary)
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
+            Button(intent: EndRestIntent()) {
+                Text("结束")
+                    .font(.caption2.weight(.black))
+                    .frame(minWidth: 44, minHeight: 32)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(brandAccent)
+            .foregroundStyle(.black)
+            .accessibilityLabel("结束休息")
         }
         .padding(.horizontal, 16)
         .padding(.top, 7)
@@ -283,6 +292,15 @@ private struct LockScreenWorkoutActivityView: View {
                 }
             }
             Spacer()
+            if context.state.phase == .rest {
+                Button(intent: EndRestIntent()) {
+                    Label("结束", systemImage: "forward.end.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(brandAccent)
+                .foregroundStyle(.black)
+                .accessibilityLabel("结束休息")
+            }
         }
     }
 

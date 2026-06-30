@@ -161,7 +161,20 @@ public class CheckinService {
             reaction.setEmoji(emoji);
             reaction.setCreatedAt(now);
             reaction.setUpdatedAt(now);
-            reactionMapper.insert(reaction);
+            if (reactionMapper.insertReactionIfAbsent(reaction) == 0) {
+                CheckinReaction concurrent = reactionMapper.findByCheckinAndUser(checkinId, userId);
+                if (concurrent == null) {
+                    throw AppException.conflict("表情回应状态已变化，请重试");
+                }
+                if (concurrent.getEmoji().equals(emoji)) {
+                    reaction = concurrent;
+                } else {
+                    concurrent.setEmoji(emoji);
+                    concurrent.setUpdatedAt(now);
+                    reactionMapper.updateById(concurrent);
+                    reaction = concurrent;
+                }
+            }
         } else if (existing.getEmoji().equals(emoji)) {
             // 再点同一个 → 取消：物理删除该条（uq_reaction 唯一约束允许重新点亮）
             reactionMapper.deleteById(existing.getId());

@@ -15,6 +15,8 @@ final class WorkoutLiveActivityController {
     private var currentAttributes: RestActivityAttributes?
     private var currentState: RestActivityAttributes.ContentState?
     private var restReturnTask: Task<Void, Never>?
+    private var activityOperationTask: Task<Void, Never>?
+    private var activityGeneration = 0
 
     var currentWorkoutId: UUID? { currentAttributes?.workoutId }
 
@@ -125,6 +127,9 @@ final class WorkoutLiveActivityController {
     func endWorkout() {
         restReturnTask?.cancel()
         restReturnTask = nil
+        activityGeneration += 1
+        activityOperationTask?.cancel()
+        activityOperationTask = nil
         currentAttributes = nil
         currentState = nil
         let known = activity
@@ -186,6 +191,23 @@ final class WorkoutLiveActivityController {
         currentAttributes = attributes
         currentState = state
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        let generation = activityGeneration
+        let previous = activityOperationTask
+        activityOperationTask = Task { [weak self, attributes, state, staleDate, previous, generation] in
+            await previous?.value
+            guard !Task.isCancelled else { return }
+            await self?.applyLatestActivityState(attributes: attributes,
+                                                state: state,
+                                                staleDate: staleDate,
+                                                generation: generation)
+        }
+    }
+
+    private func applyLatestActivityState(attributes: RestActivityAttributes,
+                                          state: RestActivityAttributes.ContentState,
+                                          staleDate: Date?,
+                                          generation: Int) async {
+        guard isLatestActivityOperation(attributes: attributes, state: state, generation: generation) else { return }
         let content = ActivityContent(state: state, staleDate: staleDate)
 
         if activity?.attributes.workoutId != attributes.workoutId {
@@ -195,21 +217,35 @@ final class WorkoutLiveActivityController {
         }
 
         if let activity, activity.attributes.workoutId == attributes.workoutId {
-            Task { await activity.update(content) }
+            await activity.update(content)
             return
         }
 
-        Task { [attributes, content] in
-            do {
-                let act = try Activity.request(attributes: attributes, content: content, pushType: nil)
-                await MainActor.run {
-                    self.activity = act
-                    Self.log.info("训练会话 Live Activity 已启动：\(act.id, privacy: .public)")
-                }
-            } catch {
-                Self.log.error("训练会话 Live Activity 启动失败：\(error.localizedDescription, privacy: .public)")
+        do {
+            let act = try Activity.request(attributes: attributes, content: content, pushType: nil)
+            guard isLatestActivityOperation(attributes: attributes, state: state, generation: generation) else {
+                await act.end(nil, dismissalPolicy: .immediate)
+                return
             }
+            activity = act
+            Self.log.info("训练会话 Live Activity 已启动：\(act.id, privacy: .public)")
+        } catch {
+            Self.log.error("训练会话 Live Activity 启动失败：\(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    private func isLatestActivityOperation(attributes: RestActivityAttributes,
+                                           state: RestActivityAttributes.ContentState,
+                                           generation: Int) -> Bool {
+        guard generation == activityGeneration,
+              let currentAttributes,
+              currentAttributes.workoutId == attributes.workoutId,
+              currentAttributes.workoutTitle == attributes.workoutTitle,
+              currentAttributes.startedAt == attributes.startedAt,
+              currentState == state else {
+            return false
+        }
+        return true
     }
 
     private func scheduleRestReturn(endDate: Date) {

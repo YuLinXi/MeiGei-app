@@ -41,8 +41,9 @@ struct DontLiftApp: App {
         WindowGroup {
             ZStack {
                 RootView()
-                GlobalSyncProgressOverlay()
-                GlobalMessageOverlay()
+                GlobalOverlayWindowHost()
+                    .frame(width: 0, height: 0)
+                    .accessibilityHidden(true)
             }
                 .environment(session)
                 .environment(syncEngine)

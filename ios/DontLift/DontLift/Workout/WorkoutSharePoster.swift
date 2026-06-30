@@ -88,21 +88,25 @@ struct WorkoutPosterData: Equatable {
 
     private static func exerciseLine(_ exercise: WorkoutExercise, index: Int) -> ExerciseLine {
         let statSets = exercise.displaySortedSets.filter { $0.completed && $0.countsForStats }
-        let top = topSet(in: statSets)
-        let topText: String
-        if let top {
-            var parts = ["\(formatKg(top.weightKg))kg"]
-            if let reps = top.reps { parts.append("× \(reps)") }
-            topText = parts.joined(separator: " ")
-        } else {
-            topText = "未记录重量"
-        }
         return ExerciseLine(id: "\(index)-\(exercise.localId.uuidString)",
                             name: exercise.displayExerciseName,
-                            topSetText: topText)
+                            topSetText: topSetText(in: statSets))
     }
 
-    private static func topSet(in sets: [WorkoutSet]) -> (weightKg: Double, reps: Int?)? {
+    private static func topSetText(in sets: [WorkoutSet]) -> String {
+        guard !sets.isEmpty else { return "已完成" }
+        if let weighted = topWeightedSet(in: sets) {
+            var parts = ["\(formatKg(weighted.weightKg))kg"]
+            if let reps = weighted.reps { parts.append("× \(reps)") }
+            return parts.joined(separator: " ")
+        }
+        if let reps = sets.compactMap(\.reps).max() {
+            return "\(reps) 次"
+        }
+        return "已完成 \(sets.count) 组"
+    }
+
+    private static func topWeightedSet(in sets: [WorkoutSet]) -> (weightKg: Double, reps: Int?)? {
         var best: (weightKg: Double, reps: Int?)?
         for set in sets {
             guard let weight = set.weightKg else { continue }
@@ -465,10 +469,27 @@ struct ActivityView: UIViewControllerRepresentable {
     let activityItems: [Any]
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        if let popover = controller.popoverPresentationController {
+            popover.sourceView = controller.view
+            popover.sourceRect = CGRect(x: controller.view.bounds.midX,
+                                        y: controller.view.bounds.midY,
+                                        width: 1,
+                                        height: 1)
+            popover.permittedArrowDirections = []
+        }
+        return controller
     }
 
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        if let popover = uiViewController.popoverPresentationController {
+            popover.sourceView = uiViewController.view
+            popover.sourceRect = CGRect(x: uiViewController.view.bounds.midX,
+                                        y: uiViewController.view.bounds.midY,
+                                        width: 1,
+                                        height: 1)
+        }
+    }
 }
 
 struct WorkoutPosterShareButton: View {

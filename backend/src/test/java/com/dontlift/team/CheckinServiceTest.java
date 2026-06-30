@@ -129,6 +129,7 @@ class CheckinServiceTest {
         TeamCheckin checkin = checkinForReaction(checkinId, ownerId);
         when(checkinMapper.selectById(checkinId)).thenReturn(checkin);
         when(reactionMapper.findByCheckinAndUser(checkinId, reactorId)).thenReturn(null);
+        when(reactionMapper.insertReactionIfAbsent(any(CheckinReaction.class))).thenReturn(1);
         when(reactionMapper.insertPushReceiptIfAbsent(
                 any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
                 .thenReturn(1);
@@ -139,7 +140,7 @@ class CheckinServiceTest {
         assertThat(result.getUserId()).isEqualTo(reactorId);
         assertThat(result.getEmoji()).isEqualTo("fire");
         verify(teamService).requireMember(teamId, reactorId);
-        verify(reactionMapper).insert(any(CheckinReaction.class));
+        verify(reactionMapper).insertReactionIfAbsent(any(CheckinReaction.class));
         verify(pushService).sendToUser(eq(ownerId), eq("新的表情回应"), eq("有人为你的训练点了表情"), any());
     }
 
@@ -191,6 +192,7 @@ class CheckinServiceTest {
         TeamCheckin checkin = checkinForReaction(checkinId, ownerId);
         when(checkinMapper.selectById(checkinId)).thenReturn(checkin);
         when(reactionMapper.findByCheckinAndUser(checkinId, reactorId)).thenReturn(null);
+        when(reactionMapper.insertReactionIfAbsent(any(CheckinReaction.class))).thenReturn(1);
         when(reactionMapper.insertPushReceiptIfAbsent(
                 any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
                 .thenReturn(0);
@@ -198,7 +200,7 @@ class CheckinServiceTest {
         CheckinReaction result = service.react(reactorId, checkinId, "heart");
 
         assertThat(result.getEmoji()).isEqualTo("heart");
-        verify(reactionMapper).insert(any(CheckinReaction.class));
+        verify(reactionMapper).insertReactionIfAbsent(any(CheckinReaction.class));
         verify(pushService, never()).sendToUser(any(), any(), any(), any());
     }
 
@@ -209,13 +211,36 @@ class CheckinServiceTest {
         TeamCheckin checkin = checkinForReaction(checkinId, ownerId);
         when(checkinMapper.selectById(checkinId)).thenReturn(checkin);
         when(reactionMapper.findByCheckinAndUser(checkinId, ownerId)).thenReturn(null);
+        when(reactionMapper.insertReactionIfAbsent(any(CheckinReaction.class))).thenReturn(1);
 
         CheckinReaction result = service.react(ownerId, checkinId, "clap");
 
         assertThat(result.getEmoji()).isEqualTo("clap");
-        verify(reactionMapper).insert(any(CheckinReaction.class));
+        verify(reactionMapper).insertReactionIfAbsent(any(CheckinReaction.class));
         verify(reactionMapper, never()).insertPushReceiptIfAbsent(
                 any(UUID.class), any(UUID.class), any(UUID.class), any(OffsetDateTime.class));
+        verify(pushService, never()).sendToUser(any(), any(), any(), any());
+    }
+
+    @Test
+    void react_concurrentSameEmojiInsertReturnsExistingWithoutCancelling() {
+        UUID ownerId = UUID.randomUUID();
+        UUID reactorId = UUID.randomUUID();
+        UUID checkinId = UUID.randomUUID();
+        TeamCheckin checkin = checkinForReaction(checkinId, ownerId);
+        CheckinReaction concurrent = reaction(checkinId, reactorId, "fire");
+        when(checkinMapper.selectById(checkinId)).thenReturn(checkin);
+        when(reactionMapper.findByCheckinAndUser(checkinId, reactorId)).thenReturn(null, concurrent);
+        when(reactionMapper.insertReactionIfAbsent(any(CheckinReaction.class))).thenReturn(0);
+        when(reactionMapper.insertPushReceiptIfAbsent(
+                any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
+                .thenReturn(0);
+
+        CheckinReaction result = service.react(reactorId, checkinId, "fire");
+
+        assertThat(result).isSameAs(concurrent);
+        verify(reactionMapper, never()).deleteById(any(UUID.class));
+        verify(reactionMapper, never()).updateById(any(CheckinReaction.class));
         verify(pushService, never()).sendToUser(any(), any(), any(), any());
     }
 

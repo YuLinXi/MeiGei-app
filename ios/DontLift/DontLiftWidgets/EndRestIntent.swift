@@ -10,8 +10,21 @@ struct EndRestIntent: LiveActivityIntent {
     static var description = IntentDescription("结束当前组间休息并进入下一组")
     static var openAppWhenRun: Bool = true
 
+    @MainActor
     func perform() async throws -> some IntentResult {
-        await MainActor.run { RestSignal.postEndRest() }
+        for activity in Activity<RestActivityAttributes>.activities where activity.content.state.phase == .rest {
+            let current = activity.content.state
+            let state = RestActivityAttributes.ContentState(
+                phase: .workout,
+                completedSetCount: current.completedSetCount,
+                remainingExerciseCount: current.remainingExerciseCount,
+                nextSet: current.nextSet,
+                restEndDate: nil,
+                restTotalDuration: nil
+            )
+            await activity.update(ActivityContent(state: state, staleDate: nil))
+        }
+        RestSignal.postEndRest()
         return .result()
     }
 }

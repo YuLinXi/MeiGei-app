@@ -17,6 +17,14 @@ public interface CheckinReactionMapper extends BaseMapper<CheckinReaction> {
     CheckinReaction findByCheckinAndUser(@Param("checkinId") UUID checkinId, @Param("userId") UUID userId);
 
     @Insert("""
+            INSERT INTO checkin_reaction (id, checkin_id, user_id, emoji, created_at, updated_at)
+            VALUES (#{reaction.id}, #{reaction.checkinId}, #{reaction.userId}, #{reaction.emoji},
+                    #{reaction.createdAt}, #{reaction.updatedAt})
+            ON CONFLICT (checkin_id, user_id) DO NOTHING
+            """)
+    int insertReactionIfAbsent(@Param("reaction") CheckinReaction reaction);
+
+    @Insert("""
             INSERT INTO checkin_reaction_push_receipt (id, checkin_id, user_id, created_at)
             VALUES (#{id}, #{checkinId}, #{userId}, #{createdAt})
             ON CONFLICT (checkin_id, user_id) DO NOTHING

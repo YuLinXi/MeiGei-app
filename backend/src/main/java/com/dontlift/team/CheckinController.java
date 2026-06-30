@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -68,12 +69,21 @@ public class CheckinController {
     }
 
     @PostMapping("/checkins/{checkinId}/reactions")
-    public CheckinReaction react(@PathVariable UUID checkinId, @Valid @RequestBody React req) {
+    public CheckinReaction react(@PathVariable UUID checkinId,
+                                 @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+                                 @Valid @RequestBody React req) {
+        requireIdempotencyKey(idempotencyKey);
         return checkinService.react(SecurityUtils.currentUserId(), checkinId, req.emoji());
     }
 
     @GetMapping("/checkins/{checkinId}/reactions")
     public List<CheckinReaction> listReactions(@PathVariable UUID checkinId) {
         return checkinService.listReactions(SecurityUtils.currentUserId(), checkinId);
+    }
+
+    private void requireIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw AppException.badRequest("缺少 Idempotency-Key");
+        }
     }
 }
