@@ -82,14 +82,11 @@ struct WorkoutDetailView: View {
                 .padding(.top, Theme.Spacing.sm)
             }
         }
-        // 子页统一导航栏：返回 + ⋯ 删除（双环处理收口在 paperToolbar）。
+        // 子页统一导航栏：返回 + ⋯ 操作（双环处理收口在 paperToolbar）。
         .paperToolbar(title: workout.title ?? "训练", onBack: { dismiss() }) {
-            HStack(spacing: 8) {
-                CircleIconButton(systemName: "square.and.arrow.up", action: { showingPosterPreview = true })
-                    .accessibilityLabel("分享训练海报")
-                CircleIconButton(systemName: "ellipsis", action: { confirmingDelete = true })
-                    .accessibilityLabel("更多操作")
-            }
+            CircleIconMenu(systemName: "ellipsis",
+                           items: detailMenuItems,
+                           accessibilityLabel: "训练更多操作")
         }
         .paperConfirmDialog(
             isPresented: $confirmingDelete,
@@ -109,6 +106,17 @@ struct WorkoutDetailView: View {
                     : []
             }
         }
+    }
+
+    private var detailMenuItems: [PaperMenuItem] {
+        [
+            PaperMenuItem(title: "分享训练海报", systemImage: "square.and.arrow.up") {
+                showingPosterPreview = true
+            },
+            PaperMenuItem(title: "删除训练", systemImage: "trash", role: .destructive) {
+                confirmingDelete = true
+            }
+        ]
     }
 
     // MARK: 完成头卡（替换记录中 REC 计时条）

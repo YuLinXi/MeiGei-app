@@ -2,25 +2,10 @@ import SwiftUI
 import UIKit
 import Photos
 
-enum WorkoutPosterStyle: String, CaseIterable, Identifiable {
-    case receipt
-    case social
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .receipt: return "训练收据"
-        case .social: return "视觉卡"
-        }
-    }
-}
-
 struct WorkoutPosterData: Equatable {
     struct ExerciseLine: Identifiable, Equatable {
         let id: String
         let name: String
-        let setText: String
         let topSetText: String
     }
 
@@ -32,11 +17,9 @@ struct WorkoutPosterData: Equatable {
 
     let title: String
     let dateText: String
-    let timeText: String
     let durationText: String
     let volumeText: String
     let setCountText: String
-    let repCountText: String
     let exerciseCountText: String
     let visibleExercises: [ExerciseLine]
     let hiddenExerciseCount: Int
@@ -49,16 +32,13 @@ struct WorkoutPosterData: Equatable {
         let totalVolume = statSets.reduce(0.0) { acc, set in
             acc + (set.weightKg ?? 0) * Double(set.reps ?? 0)
         }
-        let totalReps = statSets.reduce(0) { $0 + ($1.reps ?? 0) }
 
         self.title = Self.title(for: workout, exercises: exercises)
         self.dateText = Self.dateFormatter.string(from: workout.startedAt)
-        self.timeText = Self.timeText(start: workout.startedAt, end: workout.endedAt)
         self.durationText = Self.durationText(start: workout.timerStartedAt ?? workout.startedAt,
                                               end: workout.endedAt ?? workout.startedAt)
         self.volumeText = Self.volumeText(totalVolume)
         self.setCountText = "\(completedSets.count)"
-        self.repCountText = "\(totalReps)"
         self.exerciseCountText = "\(exercises.count)"
 
         let lines = exercises.enumerated().map { index, exercise in
@@ -80,13 +60,6 @@ struct WorkoutPosterData: Equatable {
         return formatter
     }()
 
-    private static let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        formatter.dateFormat = "HH:mm"
-        return formatter
-    }()
-
     private static func title(for workout: Workout, exercises: [WorkoutExercise]) -> String {
         if let title = trimmed(workout.title) { return title }
         if let title = trimmed(workout.sourcePlanNameSnapshot) { return title }
@@ -97,12 +70,6 @@ struct WorkoutPosterData: Equatable {
     private static func trimmed(_ value: String?) -> String? {
         let text = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return text.isEmpty ? nil : text
-    }
-
-    private static func timeText(start: Date, end: Date?) -> String {
-        let startText = timeFormatter.string(from: start)
-        guard let end else { return startText }
-        return "\(startText)-\(timeFormatter.string(from: end))"
     }
 
     private static func durationText(start: Date, end: Date) -> String {
@@ -120,9 +87,7 @@ struct WorkoutPosterData: Equatable {
     }
 
     private static func exerciseLine(_ exercise: WorkoutExercise, index: Int) -> ExerciseLine {
-        let completedSets = exercise.displaySortedSets.filter(\.completed)
-        let statSets = completedSets.filter(\.countsForStats)
-        let setText = "\(completedSets.count) 组"
+        let statSets = exercise.displaySortedSets.filter { $0.completed && $0.countsForStats }
         let top = topSet(in: statSets)
         let topText: String
         if let top {
@@ -134,7 +99,6 @@ struct WorkoutPosterData: Equatable {
         }
         return ExerciseLine(id: "\(index)-\(exercise.localId.uuidString)",
                             name: exercise.displayExerciseName,
-                            setText: setText,
                             topSetText: topText)
     }
 
@@ -158,54 +122,40 @@ struct WorkoutPosterPreviewSheet: View {
     let workout: Workout
     let personalRecords: [PersonalRecord]
 
-    @Environment(\.dismiss) private var dismiss
-    @State private var style: WorkoutPosterStyle = .receipt
+    @Environment(GlobalMessageCenter.self) private var globalMessage
     @State private var shareItem: WorkoutPosterShareItem?
     @State private var isSaving = false
-    @State private var message: String?
+    @State private var hasSavedPoster = false
 
     private var data: WorkoutPosterData {
         WorkoutPosterData(workout: workout, personalRecords: personalRecords)
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                ScrollView {
-                    VStack(spacing: 18) {
-                        Picker("海报风格", selection: $style) {
-                            ForEach(WorkoutPosterStyle.allCases) { style in
-                                Text(style.title).tag(style)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-
-                        posterPreview
-
-                        if let message {
-                            Text(message)
-                                .font(Theme.Font.body(size: 12, weight: .medium))
-                                .foregroundStyle(Theme.Color.fg2)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                    .padding(.horizontal, Theme.Spacing.lg)
-                    .padding(.top, Theme.Spacing.md)
-                    .padding(.bottom, 110)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 18) {
+                    posterPreview
                 }
+                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.top, posterPreviewTopPadding)
+                .padding(.bottom, posterPreviewBottomPadding)
+                .frame(maxWidth: .infinity)
+            }
 
-                actions
-            }
-            .background(Theme.Color.bg.ignoresSafeArea())
-            .paperToolbar(title: "分享海报", onBack: { dismiss() })
-            .sheet(item: $shareItem) { item in
-                ActivityView(activityItems: [item.image])
-            }
+            actions
+        }
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .presentationBackground(Theme.Color.bg)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .sheet(item: $shareItem) { item in
+            ActivityView(activityItems: [item.image])
         }
     }
 
     private var posterPreview: some View {
-        WorkoutPosterCanvas(data: data, style: style)
+        WorkoutPosterCanvas(data: data)
             .frame(maxWidth: 360)
             .aspectRatio(4.0 / 5.0, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
@@ -214,21 +164,29 @@ struct WorkoutPosterPreviewSheet: View {
             .accessibilityLabel("训练海报预览")
     }
 
+    private var posterPreviewTopPadding: CGFloat {
+        Theme.Spacing.xl + Theme.Spacing.lg
+    }
+
+    private var posterPreviewBottomPadding: CGFloat {
+        Theme.Spacing.lg
+    }
+
     private var actions: some View {
         HStack(spacing: 10) {
             Button {
                 Task { await savePoster() }
             } label: {
-                Label(isSaving ? "保存中" : "保存图片", systemImage: "square.and.arrow.down")
+                Label(saveButtonTitle, systemImage: saveButtonIcon)
                     .font(Theme.Font.body(size: 14, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg)
+                    .foregroundStyle(saveButtonForeground)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
-                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
+                    .background(saveButtonBackground, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).stroke(saveButtonBorder, lineWidth: 1))
             }
             .buttonStyle(PressableButtonStyle())
-            .disabled(isSaving)
+            .disabled(isSaving || hasSavedPoster)
 
             Button {
                 sharePoster()
@@ -249,26 +207,56 @@ struct WorkoutPosterPreviewSheet: View {
         .background(.ultraThinMaterial)
     }
 
+    private var saveButtonTitle: String {
+        if isSaving { return "保存中" }
+        if hasSavedPoster { return "已保存" }
+        return "保存图片"
+    }
+
+    private var saveButtonIcon: String {
+        hasSavedPoster ? "checkmark.circle" : "square.and.arrow.down"
+    }
+
+    private var saveButtonForeground: Color {
+        if isSaving { return Theme.Color.muted }
+        if hasSavedPoster { return Theme.Color.ok }
+        return Theme.Color.fg
+    }
+
+    private var saveButtonBackground: Color {
+        if isSaving { return Theme.Color.surface2.opacity(0.72) }
+        if hasSavedPoster { return Theme.Color.ok.opacity(0.10) }
+        return Theme.Color.surface
+    }
+
+    private var saveButtonBorder: Color {
+        hasSavedPoster ? Theme.Color.ok.opacity(0.22) : Theme.Color.border
+    }
+
     private func sharePoster() {
-        guard let image = WorkoutPosterImageRenderer.render(data: data, style: style) else {
-            message = "海报生成失败，请稍后重试。"
+        guard let image = WorkoutPosterImageRenderer.render(data: data) else {
+            globalMessage.show("海报生成失败，请稍后重试。", style: .error)
             return
         }
         shareItem = WorkoutPosterShareItem(image: image)
     }
 
     private func savePoster() async {
-        guard let image = WorkoutPosterImageRenderer.render(data: data, style: style) else {
-            message = "海报生成失败，请稍后重试。"
-            return
-        }
+        guard !isSaving, !hasSavedPoster else { return }
         isSaving = true
         defer { isSaving = false }
+
+        guard let image = WorkoutPosterImageRenderer.render(data: data) else {
+            globalMessage.show("海报生成失败，请稍后重试。", style: .error)
+            return
+        }
         do {
             try await WorkoutPosterPhotoSaver.save(image)
-            message = "已保存到相册。"
+            hasSavedPoster = true
+            globalMessage.show("已保存到相册", style: .success)
         } catch {
-            message = (error as? LocalizedError)?.errorDescription ?? "保存失败，请检查相册权限。"
+            let text = (error as? LocalizedError)?.errorDescription ?? "保存失败，请检查相册权限。"
+            globalMessage.show(text, style: .error)
         }
     }
 }
@@ -280,161 +268,17 @@ struct WorkoutPosterShareItem: Identifiable {
 
 struct WorkoutPosterCanvas: View {
     let data: WorkoutPosterData
-    let style: WorkoutPosterStyle
 
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height
-            switch style {
-            case .receipt:
-                WorkoutPosterReceiptView(data: data, width: width, height: height)
-            case .social:
-                WorkoutPosterSocialView(data: data, width: width, height: height)
-            }
+            WorkoutPosterVisualCardView(data: data, width: width, height: height)
         }
     }
 }
 
-private struct WorkoutPosterReceiptView: View {
-    let data: WorkoutPosterData
-    let width: CGFloat
-    let height: CGFloat
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("DON'T LIFT")
-                        .font(Theme.Font.mono(size: 10, weight: .bold))
-                        .foregroundStyle(Theme.Color.accent)
-                    Text(data.dateText)
-                        .font(Theme.Font.mono(size: 10, weight: .medium))
-                        .foregroundStyle(Theme.Color.muted)
-                }
-                Spacer()
-                weakBrandMark
-            }
-
-            Text(data.title)
-                .font(Theme.Font.display(size: 30, weight: .heavy))
-                .foregroundStyle(Theme.Color.fg)
-                .lineLimit(2)
-                .minimumScaleFactor(0.78)
-                .padding(.top, 24)
-
-            Text(data.timeText)
-                .font(Theme.Font.mono(size: 12, weight: .medium))
-                .foregroundStyle(Theme.Color.fg2)
-                .padding(.top, 6)
-
-            metricGrid
-                .padding(.top, 24)
-
-            Divider()
-                .background(Theme.Color.border)
-                .padding(.vertical, 18)
-
-            exerciseList
-
-            Spacer(minLength: 12)
-            footer
-        }
-        .padding(24)
-        .frame(width: width, height: height, alignment: .topLeading)
-        .background(Theme.Color.surface)
-    }
-
-    private var metricGrid: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                metric("时长", data.durationText)
-                metric("容量", data.volumeText)
-            }
-            HStack(spacing: 10) {
-                metric("组数", data.setCountText)
-                metric("次数", data.repCountText)
-            }
-        }
-    }
-
-    private func metric(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(Theme.Font.mono(size: 9, weight: .bold))
-                .foregroundStyle(Theme.Color.muted)
-            Text(value)
-                .font(Theme.Font.number(size: 23, weight: .bold))
-                .foregroundStyle(Theme.Color.fg)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
-    }
-
-    private var exerciseList: some View {
-        VStack(spacing: 9) {
-            ForEach(data.visibleExercises) { line in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(line.name)
-                            .font(Theme.Font.body(size: 13, weight: .bold))
-                            .foregroundStyle(Theme.Color.fg)
-                            .lineLimit(1)
-                        Text(line.topSetText)
-                            .font(Theme.Font.mono(size: 10, weight: .medium))
-                            .foregroundStyle(Theme.Color.fg2)
-                    }
-                    Spacer(minLength: 8)
-                    Text(line.setText)
-                        .font(Theme.Font.mono(size: 10, weight: .bold))
-                        .foregroundStyle(Theme.Color.muted)
-                }
-            }
-            if data.hiddenExerciseCount > 0 {
-                Text("另 \(data.hiddenExerciseCount) 个动作")
-                    .font(Theme.Font.mono(size: 10, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-
-    private var footer: some View {
-        HStack(spacing: 10) {
-            if data.prLines.isEmpty {
-                Text("\(data.exerciseCountText) 个动作已完成")
-                    .font(Theme.Font.mono(size: 10, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
-            } else {
-                Text("PR +\(data.prLines.count)")
-                    .font(Theme.Font.mono(size: 11, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
-            }
-            Spacer()
-            Text("别练了")
-                .font(Theme.Font.body(size: 11, weight: .bold))
-                .foregroundStyle(Theme.Color.fg2)
-        }
-    }
-
-    private var weakBrandMark: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Theme.Color.border2, lineWidth: 1)
-            Image(systemName: "qrcode")
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(Theme.Color.muted.opacity(0.45))
-        }
-        .frame(width: 42, height: 42)
-        .accessibilityHidden(true)
-    }
-}
-
-private struct WorkoutPosterSocialView: View {
+private struct WorkoutPosterVisualCardView: View {
     let data: WorkoutPosterData
     let width: CGFloat
     let height: CGFloat
@@ -457,7 +301,7 @@ private struct WorkoutPosterSocialView: View {
 
                 Spacer(minLength: 0)
 
-                Text("今天练完了")
+                Text("每一组都算数")
                     .font(Theme.Font.mono(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.accent)
 
@@ -469,9 +313,9 @@ private struct WorkoutPosterSocialView: View {
                     .padding(.top, 7)
 
                 HStack(spacing: 8) {
-                    socialMetric(data.durationText, "MIN")
-                    socialMetric(data.volumeText, "VOL")
-                    socialMetric(data.setCountText, "SETS")
+                    visualMetric(data.durationText, "时长")
+                    visualMetric(data.volumeText, "训练量")
+                    visualMetric(data.setCountText, "组数")
                 }
                 .padding(.top, 24)
 
@@ -497,7 +341,7 @@ private struct WorkoutPosterSocialView: View {
         .offset(x: width * 0.76)
     }
 
-    private func socialMetric(_ value: String, _ label: String) -> some View {
+    private func visualMetric(_ value: String, _ label: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(value)
                 .font(Theme.Font.number(size: 22, weight: .bold))
@@ -505,7 +349,7 @@ private struct WorkoutPosterSocialView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
             Text(label)
-                .font(Theme.Font.mono(size: 8.5, weight: .bold))
+                .font(Theme.Font.mono(size: 9.5, weight: .bold))
                 .foregroundStyle(paper.opacity(0.52))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -516,20 +360,20 @@ private struct WorkoutPosterSocialView: View {
             ForEach(data.visibleExercises) { line in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(line.name)
-                        .font(Theme.Font.body(size: 13, weight: .semibold))
+                        .font(Theme.Font.body(size: 14.5, weight: .semibold))
                         .foregroundStyle(paper)
                         .lineLimit(1)
                     Spacer(minLength: 8)
                     Text(line.topSetText)
-                        .font(Theme.Font.mono(size: 10, weight: .bold))
+                        .font(Theme.Font.mono(size: 11.5, weight: .bold))
                         .foregroundStyle(paper.opacity(0.72))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
             }
             if data.hiddenExerciseCount > 0 {
-                Text("+ \(data.hiddenExerciseCount) MORE")
-                    .font(Theme.Font.mono(size: 10, weight: .bold))
+                Text("另 \(data.hiddenExerciseCount) 个动作")
+                    .font(Theme.Font.mono(size: 11, weight: .bold))
                     .foregroundStyle(paper.opacity(0.54))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -549,8 +393,8 @@ private struct WorkoutPosterSocialView: View {
                         .lineLimit(1)
                 }
             } else {
-                Text("\(data.exerciseCountText) EXERCISES")
-                    .font(Theme.Font.mono(size: 10, weight: .bold))
+                Text("\(data.exerciseCountText) 个动作")
+                    .font(Theme.Font.mono(size: 11, weight: .bold))
                     .foregroundStyle(paper.opacity(0.64))
             }
             Spacer()
@@ -575,9 +419,9 @@ private struct WorkoutPosterSocialView: View {
 
 @MainActor
 enum WorkoutPosterImageRenderer {
-    static func render(data: WorkoutPosterData, style: WorkoutPosterStyle) -> UIImage? {
+    static func render(data: WorkoutPosterData) -> UIImage? {
         let renderer = ImageRenderer(
-            content: WorkoutPosterCanvas(data: data, style: style)
+            content: WorkoutPosterCanvas(data: data)
                 .frame(width: 360, height: 450)
         )
         renderer.scale = 3
