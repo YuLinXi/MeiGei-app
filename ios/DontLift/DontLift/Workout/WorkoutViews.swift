@@ -516,6 +516,15 @@ enum FocusedCell: Equatable {
 /// 组内可聚焦字段。
 enum SetField { case weight, reps }
 
+/// 组内输入框的视觉模式：inactive=未聚焦；replacePending=首键覆盖；appending=接续录入。
+private enum SetInputMode: Equatable {
+    case inactive
+    case replacePending
+    case appending
+
+    var isFocused: Bool { self != .inactive }
+}
+
 /// 训练进行中页（旧 WorkoutLoggingView 升级为新视觉，符号名保留以避免破坏 HistoryViews 等引用）。
 struct WorkoutLoggingView: View {
     @Environment(\.modelContext) private var modelContext
@@ -1157,6 +1166,7 @@ struct WorkoutLoggingView: View {
                               isMenuOpen: menuExerciseId == ex.localId,
                               focused: focused,
                               editingText: buffer,
+                              pendingReplace: pendingReplace,
                               onFocus: focus,
                               onToggleExpand: {
                                   prepareForPresentation()
@@ -2357,6 +2367,8 @@ private struct ExerciseBlock: View {
     var focused: FocusedCell? = nil
     /// 聚焦单元的编辑缓冲串（仅聚焦字段据此显示）。
     var editingText: String = ""
+    /// 聚焦已有值后，首个数字键是否将覆盖现值。
+    var pendingReplace: Bool = false
     /// 请求聚焦某单元。
     var onFocus: (FocusedCell) -> Void = { _ in }
     var onToggleExpand: () -> Void = {}
@@ -2424,6 +2436,7 @@ private struct ExerciseBlock: View {
                                readOnly: readOnly,
                                focusedField: focusedField(for: set),
                                editingText: editingText,
+                               pendingReplace: pendingReplace,
                                actualRestText: actualRestText(for: set),
                                isMenuOpen: menuSetId == set.localId,
                                onChange: onChange,
@@ -2599,6 +2612,8 @@ private struct SetRow: View {
     let focusedField: SetField?
     /// 聚焦字段的编辑缓冲串（含 "0." / "72." 中间态）。
     let editingText: String
+    /// 聚焦已有值后，首个数字键是否将覆盖现值。
+    let pendingReplace: Bool
     /// 该组真实休息用时文案；nil 表示尚未产生真实休息记录。
     let actualRestText: String?
     /// 本组「更多操作」菜单是否打开（⋯ 高亮 + 发布定位锚点，菜单本体由父视图顶层浮层渲染）。
@@ -2634,12 +2649,12 @@ private struct SetRow: View {
         HStack(spacing: 8) {
             badge
             valueCell(text: weightDisplay, placeholder: "kg", unit: "kg",
-                      focused: focusedField == .weight,
+                      inputMode: inputMode(for: .weight, text: weightDisplay),
                       label: "重量", value: set.weightKg.map { "\(formatKg($0)) 公斤" })
                 .onTapGesture { if !readOnly { onFocus(.weight) } }
             Text("×").font(Theme.Font.mono(size: 11)).foregroundStyle(Theme.Color.muted).frame(width: 12)
             valueCell(text: repsDisplay, placeholder: "次", unit: "次",
-                      focused: focusedField == .reps,
+                      inputMode: inputMode(for: .reps, text: repsDisplay),
                       label: "次数", value: set.reps.map { "\($0) 次" })
                 .onTapGesture { if !readOnly { onFocus(.reps) } }
             checkButton
@@ -2676,15 +2691,32 @@ private struct SetRow: View {
         focusedField == .reps ? editingText : (set.reps.map(String.init) ?? "")
     }
 
+    private func inputMode(for field: SetField, text: String) -> SetInputMode {
+        guard focusedField == field else { return .inactive }
+        return pendingReplace && !text.isEmpty ? .replacePending : .appending
+    }
+
     /// 重量/次数输入框：定宽收窄（让右侧腾出完成勾 + 更多操作），居中数字。
-    private func valueCell(text: String, placeholder: String, unit: String, focused: Bool,
+    private func valueCell(text: String, placeholder: String, unit: String, inputMode: SetInputMode,
                            label: String, value: String?) -> some View {
-        ZStack(alignment: .bottomTrailing) {
-            Text(text.isEmpty ? placeholder : text)
-                .font(Theme.Font.number(size: 15, weight: .bold))
-                .foregroundStyle(valueTextColor(isPlaceholder: text.isEmpty))
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+        let displayText = text.isEmpty ? placeholder : text
+
+        return ZStack(alignment: .bottomTrailing) {
+            HStack(spacing: 2) {
+                Text(displayText)
+                    .font(Theme.Font.number(size: 15, weight: .bold))
+                    .foregroundStyle(valueTextColor(isPlaceholder: text.isEmpty))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, inputMode == .replacePending ? 3 : 0)
+                    .padding(.vertical, inputMode == .replacePending ? 1 : 0)
+                    .background(selectionHighlight(for: inputMode),
+                                in: RoundedRectangle(cornerRadius: 3, style: .continuous))
+                inputCursor(for: inputMode)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             if !text.isEmpty {
                 Text(unit)
                     .font(Theme.Font.mono(size: 8, weight: .bold))
@@ -2694,31 +2726,76 @@ private struct SetRow: View {
             }
         }
         .frame(width: 64, height: 36)
-            .background(valueCellBackground(focused: focused),
-                        in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                    .stroke(valueCellBorder(focused: focused),
-                            lineWidth: focused ? 1.5 : 1)
-            )
-            .contentShape(Rectangle())
-            .accessibilityElement()
-            .accessibilityLabel("\(rowName) \(label)")
-            .accessibilityValue(value ?? "未填写")
-            .accessibilityAddTraits(.isButton)
+        .background(valueCellBackground, in: shape)
+        .overlay(
+            shape.stroke(valueCellBorder(inputMode: inputMode),
+                         lineWidth: valueCellBorderWidth(inputMode: inputMode))
+        )
+        .shadow(color: valueCellShadow(inputMode: inputMode),
+                radius: valueCellShadowRadius(inputMode: inputMode),
+                x: 0,
+                y: valueCellShadowY(inputMode: inputMode))
+        .contentShape(Rectangle())
+        .accessibilityElement()
+        .accessibilityLabel("\(rowName) \(label)")
+        .accessibilityValue(value ?? "未填写")
+        .accessibilityHint(valueCellAccessibilityHint(inputMode: inputMode))
+        .accessibilityAddTraits(.isButton)
     }
 
-    private func valueCellBackground(focused: Bool) -> SwiftUI.Color {
+    private var valueCellBackground: SwiftUI.Color {
         if set.completed { return completedFill }
-        if focused { return Theme.Color.accentSoft }
-        if isEditing { return Theme.Color.surface }
-        return Theme.Color.bg
+        return Theme.Color.surface
     }
 
-    private func valueCellBorder(focused: Bool) -> SwiftUI.Color {
-        if set.completed { return completedFill }
-        if focused { return Theme.Color.accent }
+    private func valueCellBorder(inputMode: SetInputMode) -> SwiftUI.Color {
+        if set.completed { return inputMode.isFocused ? .white.opacity(0.95) : completedFill }
+        if inputMode.isFocused { return Theme.Color.accent }
         return Theme.Color.border
+    }
+
+    private func valueCellBorderWidth(inputMode: SetInputMode) -> CGFloat {
+        if set.completed && inputMode.isFocused { return 2.2 }
+        return inputMode.isFocused ? 1.7 : 1
+    }
+
+    private func valueCellShadow(inputMode: SetInputMode) -> SwiftUI.Color {
+        guard set.completed && inputMode.isFocused else { return .clear }
+        return Theme.Color.fg.opacity(0.20)
+    }
+
+    private func valueCellShadowRadius(inputMode: SetInputMode) -> CGFloat {
+        return set.completed && inputMode.isFocused ? 8 : 0
+    }
+
+    private func valueCellShadowY(inputMode: SetInputMode) -> CGFloat {
+        return set.completed && inputMode.isFocused ? 3 : 0
+    }
+
+    private func selectionHighlight(for inputMode: SetInputMode) -> SwiftUI.Color {
+        guard inputMode == .replacePending else { return .clear }
+        return set.completed ? .white.opacity(0.24) : Theme.Color.accentSofter
+    }
+
+    @ViewBuilder
+    private func inputCursor(for inputMode: SetInputMode) -> some View {
+        if inputMode == .appending {
+            RoundedRectangle(cornerRadius: 0.75, style: .continuous)
+                .fill(set.completed ? .white.opacity(0.95) : Theme.Color.accent)
+                .frame(width: 1.5, height: 16)
+        }
+    }
+
+    private func valueCellAccessibilityHint(inputMode: SetInputMode) -> String {
+        if readOnly { return "只读" }
+        switch inputMode {
+        case .inactive:
+            return "点按开始输入"
+        case .replacePending:
+            return "下一个数字将覆盖当前值"
+        case .appending:
+            return "继续在当前值后输入"
+        }
     }
 
     private func valueTextColor(isPlaceholder: Bool) -> SwiftUI.Color {
@@ -2753,7 +2830,7 @@ private struct SetRow: View {
                     Image(systemName: "checkmark").font(.system(size: 13, weight: .bold))
                         .foregroundStyle(.white)
                 } else {
-                    shape.fill(Theme.Color.bg)
+                    shape.fill(Theme.Color.surface)
                     shape.stroke(Theme.Color.border, lineWidth: 1.5)
                     // 未完成态显示淡勾，引导用户勾选完成。
                     Image(systemName: "checkmark").font(.system(size: 13, weight: .bold))
