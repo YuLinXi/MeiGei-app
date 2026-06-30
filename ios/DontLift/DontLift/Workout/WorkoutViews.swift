@@ -679,8 +679,7 @@ struct WorkoutLoggingView: View {
     private var loggingMenuItems: [PaperMenuItem] {
         [
             PaperMenuItem(title: "放弃此次训练", systemImage: "trash", role: .destructive) {
-                prepareForPresentation()
-                confirmingDiscard = true
+                presentDiscardConfirmation()
             }
         ]
     }
@@ -1370,9 +1369,7 @@ struct WorkoutLoggingView: View {
             .accessibilityHint("为\(ex.displayExerciseName)记录本次训练备注")
             Rectangle().fill(Theme.Color.border).frame(height: 1)
             Button {
-                menuExerciseId = nil
-                dismissRestDurationEditor()
-                confirmDeleteExercise = ex
+                presentDeleteExerciseConfirmation(for: ex)
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "trash").font(.system(size: 15, weight: .semibold))
@@ -1488,34 +1485,63 @@ struct WorkoutLoggingView: View {
         menuSetId = nil
     }
 
-    /// 结束训练确认弹窗需要和键盘收起解耦：否则 `focused == nil` 的键盘弹簧动画会把
-    /// `fullScreenCover` 呈现卷进同一个布局事务，视觉上变成从底部上滑。
-    private func presentFinishConfirmation() {
-        let hadKeyboard = focused != nil
-        if hadKeyboard {
-            var cleanupTransaction = Transaction(animation: nil)
-            cleanupTransaction.disablesAnimations = true
-            withTransaction(cleanupTransaction) {
-                dismissKeypad()
-                dismissRestDurationEditor()
-                menuExerciseId = nil
-                menuSetId = nil
-            }
-            Task { @MainActor in
-                await Task.yield()
-                presentFinishConfirmationImmediately()
-            }
-        } else {
+    /// 训练页的纸感确认弹窗统一经此入口呈现：先无动画清理键盘/菜单，再到下一轮主线程事务打开
+    /// `fullScreenCover`，避免被键盘或菜单收起动画卷入系统下滑/上滑转场。
+    private func prepareForConfirmPresentation() {
+        var cleanupTransaction = Transaction(animation: nil)
+        cleanupTransaction.disablesAnimations = true
+        withTransaction(cleanupTransaction) {
             prepareForPresentation()
+        }
+    }
+
+    private func presentFinishConfirmation() {
+        prepareForConfirmPresentation()
+        Task { @MainActor in
+            await Task.yield()
             presentFinishConfirmationImmediately()
         }
     }
 
-    private func presentFinishConfirmationImmediately() {
+    private func presentDiscardConfirmation() {
+        prepareForConfirmPresentation()
+        Task { @MainActor in
+            await Task.yield()
+            presentDiscardConfirmationImmediately()
+        }
+    }
+
+    private func presentDeleteExerciseConfirmation(for exercise: WorkoutExercise) {
+        prepareForConfirmPresentation()
+        Task { @MainActor in
+            await Task.yield()
+            presentDeleteExerciseConfirmationImmediately(for: exercise)
+        }
+    }
+
+    private func presentConfirmWithoutSystemTransition(_ update: () -> Void) {
         var presentationTransaction = Transaction(animation: nil)
         presentationTransaction.disablesAnimations = true
         withTransaction(presentationTransaction) {
+            update()
+        }
+    }
+
+    private func presentFinishConfirmationImmediately() {
+        presentConfirmWithoutSystemTransition {
             confirmingFinish = true
+        }
+    }
+
+    private func presentDiscardConfirmationImmediately() {
+        presentConfirmWithoutSystemTransition {
+            confirmingDiscard = true
+        }
+    }
+
+    private func presentDeleteExerciseConfirmationImmediately(for exercise: WorkoutExercise) {
+        presentConfirmWithoutSystemTransition {
+            confirmDeleteExercise = exercise
         }
     }
 
