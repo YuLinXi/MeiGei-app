@@ -14,6 +14,8 @@ struct LiveSessionCapsule: View {
     let title: String
     /// 训练计时起点；nil 表示会话已创建但尚未开始计时。
     let timerStartedAt: Date?
+    /// 下一组动作简讯。
+    let nextSetBrief: String?
     /// 点击进入进行中页。
     var onTap: () -> Void
 
@@ -48,27 +50,30 @@ struct LiveSessionCapsule: View {
     // MARK: 视觉
 
     private var capsule: some View {
-        HStack(spacing: 8) {
-            VStack(spacing: 2) {
+        let brief = nextSetBriefText
+        return HStack(spacing: 6) {
+            VStack(alignment: brief == nil ? .center : .leading, spacing: 2) {
                 TimelineView(.periodic(from: .now, by: 1.0)) { ctx in
                     Text(formatElapsed(at: ctx.date))
                         .font(Theme.Font.number(size: 14, weight: .bold))
                         .foregroundStyle(Theme.Color.fg)
                         .monospacedDigit()
                 }
-                Text("进行中")
+                Text(brief ?? "进行中")
                     .font(Theme.Font.body(size: 10, weight: .semibold))
-                    .foregroundStyle(Theme.Color.accent)
+                    .foregroundStyle(brief == nil ? Theme.Color.accent : Theme.Color.fg2)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: brief == nil ? nil : 108, alignment: .leading)
             }
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(Theme.Color.muted)
         }
-        .padding(.leading, 13)
-        .padding(.trailing, 11)
-        .frame(minWidth: 88, minHeight: 46)
-        .fixedSize()
+        .padding(.leading, 11)
+        .padding(.trailing, 9)
+        .frame(minWidth: 76, minHeight: 42)
+        .fixedSize(horizontal: true, vertical: true)
         .background(Theme.Color.surface, in: Capsule())
         .overlay(Capsule().stroke(Theme.Color.border, lineWidth: 1))
         .shadow(color: SwiftUI.Color.black.opacity(0.14), radius: 12, x: 0, y: 6)
@@ -82,8 +87,22 @@ struct LiveSessionCapsule: View {
         })
         .contentShape(Capsule())
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("继续训练 \(title)，已进行 \(formatElapsed(at: .now))")
+        .accessibilityLabel(accessibilityText)
         .accessibilityAddTraits(.isButton)
+    }
+
+    private var nextSetBriefText: String? {
+        guard let value = nextSetBrief?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else { return nil }
+        return value
+    }
+
+    private var accessibilityText: String {
+        let elapsed = formatElapsed(at: .now)
+        if let nextSetBriefText {
+            return "继续训练 \(title)，已进行 \(elapsed)，下一组 \(nextSetBriefText)"
+        }
+        return "继续训练 \(title)，已进行 \(elapsed)"
     }
 
     private func formatElapsed(at date: Date) -> String {

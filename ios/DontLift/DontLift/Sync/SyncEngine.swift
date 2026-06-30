@@ -21,6 +21,7 @@ final class SyncEngine {
     private let api: APIClient
     private(set) var isSyncing = false
     private var needsFollowUpSync = false
+    private var scheduledSyncTask: Task<Void, Never>?
     /// 最近一次同步产生的「本地修改被覆盖」提示，供 UI 展示后清空。
     private(set) var pendingConflictNotices: [ConflictNotice] = []
 
@@ -30,6 +31,16 @@ final class SyncEngine {
     }
 
     func clearConflictNotices() { pendingConflictNotices = [] }
+
+    /// 延迟触发一轮全域同步；短时间内重复调用会合并为最后一次。
+    func scheduleSyncAll(after delay: TimeInterval = 2) {
+        scheduledSyncTask?.cancel()
+        scheduledSyncTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            await self?.syncAll()
+        }
+    }
 
     /// 轻量检查本地是否存在待同步项；回前台门控使用，避免无条件触发全量同步。
     func hasPendingLocalChanges(excludingWorkoutId: UUID? = nil) -> Bool {

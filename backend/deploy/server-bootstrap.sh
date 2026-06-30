@@ -36,6 +36,8 @@ $SUDO cp "$REPO_DIR/deploy/shared-infra/db/docker-compose.yml"   "$STACKS_DIR/db
 $SUDO cp -r "$REPO_DIR/deploy/shared-infra/db/init"              "$STACKS_DIR/db/"
 $SUDO cp "$REPO_DIR/deploy/shared-infra/edge/docker-compose.yml" "$STACKS_DIR/edge/"
 $SUDO cp "$REPO_DIR/deploy/shared-infra/edge/Caddyfile"          "$STACKS_DIR/edge/"
+$SUDO mkdir -p "$STACKS_DIR/edge/site"
+$SUDO cp -R "$REPO_DIR/deploy/shared-infra/edge/site/."          "$STACKS_DIR/edge/site/"
 
 # ── 4. 机密（幂等：优先复用已有，保证 DB 密码两边一致）──
 DB_ENV="$STACKS_DIR/db/.env"
