@@ -101,8 +101,7 @@ struct PlanListView: View {
     @State private var deletingGroup: WorkoutPlanGroup?
     @State private var showingGroupOrderEditor = false
     @State private var planOrderTarget: PlanOrderTarget?
-    @State private var collapsedSectionIds: Set<String> = []
-    @State private var knownSectionIds: Set<String> = []
+    @State private var expandedSectionId: String?
     /// 计划详情导航：用绑定式 navigationDestination(item:) 而非 NavigationLink(value:)。
     /// 本工程是「全局唯一 NavigationStack 包 TabView」，类型注册式 navigationDestination(for:)
     /// 从 TabView 子页注册不进外层 stack，value 链接点了不跳；绑定式不依赖类型注册，可靠跳转。
@@ -188,9 +187,9 @@ struct PlanListView: View {
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             WorkoutPerformanceMonitor.event("plan.list.appear")
-            syncDefaultCollapsedSections()
+            pruneExpandedSection()
         }
-        .onChange(of: sectionIds) { _, _ in syncDefaultCollapsedSections() }
+        .onChange(of: sectionIds) { _, _ in pruneExpandedSection() }
         .navigationDestination(item: $selectedPlan) { PlanDetailView(plan: $0) }
         .navigationDestination(item: $creatingPlanRoute) { route in
             PlanEditorView(plan: nil, initialGroupId: route.groupId)
@@ -409,25 +408,17 @@ struct PlanListView: View {
     }
 
     private func isSectionCollapsed(_ section: PlanGroupSection) -> Bool {
-        collapsedSectionIds.contains(section.id)
+        expandedSectionId != section.id
     }
 
-    private func syncDefaultCollapsedSections() {
-        let currentIds = Set(sectionIds)
-        let newIds = currentIds.subtracting(knownSectionIds)
-        let removedIds = knownSectionIds.subtracting(currentIds)
-        collapsedSectionIds.formUnion(newIds)
-        collapsedSectionIds.subtract(removedIds)
-        knownSectionIds = currentIds
+    private func pruneExpandedSection() {
+        guard let expandedSectionId, !sectionIds.contains(expandedSectionId) else { return }
+        self.expandedSectionId = nil
     }
 
     private func toggleSection(_ section: PlanGroupSection) {
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-            if collapsedSectionIds.contains(section.id) {
-                collapsedSectionIds.remove(section.id)
-            } else {
-                collapsedSectionIds.insert(section.id)
-            }
+            expandedSectionId = expandedSectionId == section.id ? nil : section.id
         }
         Theme.Haptics.selection()
     }

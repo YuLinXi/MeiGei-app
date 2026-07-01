@@ -8,20 +8,29 @@ import MuscleMap
 // 注：SDK 无独立背阔肌(lats)，映射到 upper-back（中上背）；性别由 sex 驱动男/女体型。
 // 对外 API 不变：primary / secondary / sex。
 
-struct MuscleMapView: View {
-    let primary: [MuscleRegion]
-    let secondary: [MuscleRegion]
-    var sex: BodySex = .male
+private enum MuscleMapRendering {
+    static let idleColor = Color(red: 0.866, green: 0.835, blue: 0.788)      // 身体/静默肌底色（米色）
+    static let lineColor = Color(red: 0.79, green: 0.76, blue: 0.70)          // 肌肉分块描边
+    static let secondaryColor = Color(red: 0.859, green: 0.585, blue: 0.510) // 协同肌浅朱砂
 
-    private static let idleColor = Color(red: 0.866, green: 0.835, blue: 0.788)      // 身体/静默肌底色（米色）
-    private static let lineColor = Color(red: 0.79, green: 0.76, blue: 0.70)          // 肌肉分块描边
-    private static let secondaryColor = Color(red: 0.859, green: 0.585, blue: 0.510) // 协同肌浅朱砂
+    /// 纸感极简配色：米色肌底 + 淡描边；头发设为底色以视觉隐藏。
+    static var style: BodyViewStyle {
+        BodyViewStyle(
+            defaultFillColor: idleColor,
+            strokeColor: lineColor,
+            strokeWidth: 0.5,
+            headColor: idleColor,
+            hairColor: idleColor
+        )
+    }
 
-    private var gender: BodyGender { sex == .female ? .female : .male }
+    static func gender(_ sex: BodySex) -> BodyGender {
+        sex == .female ? .female : .male
+    }
 
     /// MuscleRegion → MuscleMap.Muscle。SDK 无 lats，背阔肌落到 upper-back；三角肌前/后束统一
     /// 映射 deltoids，由正/背面天然区分（正面显前束、背面显后束）。
-    private func muscles(_ regions: [MuscleRegion]) -> [Muscle] {
+    static func muscles(_ regions: [MuscleRegion]) -> [Muscle] {
         regions.map { r in
             switch r {
             case .traps:      return .trapezius
@@ -48,22 +57,19 @@ struct MuscleMapView: View {
             }
         }
     }
+}
 
-    /// 纸感极简配色：米色肌底 + 淡描边；头发设为底色以视觉隐藏。
-    private var style: BodyViewStyle {
-        BodyViewStyle(
-            defaultFillColor: Self.idleColor,
-            strokeColor: Self.lineColor,
-            strokeWidth: 0.5,
-            headColor: Self.idleColor,
-            hairColor: Self.idleColor
-        )
-    }
+struct MuscleMapView: View {
+    let primary: [MuscleRegion]
+    let secondary: [MuscleRegion]
+    var sex: BodySex = .male
 
     private func face(_ side: BodySide) -> some View {
-        BodyView(gender: gender, side: side, style: style)
-            .highlight(muscles(secondary), color: Self.secondaryColor)
-            .highlight(muscles(primary), color: Theme.Color.accent)
+        BodyView(gender: MuscleMapRendering.gender(sex),
+                 side: side,
+                 style: MuscleMapRendering.style)
+            .highlight(MuscleMapRendering.muscles(secondary), color: MuscleMapRendering.secondaryColor)
+            .highlight(MuscleMapRendering.muscles(primary), color: Theme.Color.accent)
     }
 
     var body: some View {
@@ -85,7 +91,7 @@ struct MuscleMapView: View {
     private var legend: some View {
         HStack(spacing: Theme.Spacing.md) {
             legendItem(Theme.Color.accent, "主要部位")
-            legendItem(Self.secondaryColor, "次要部位")
+            legendItem(MuscleMapRendering.secondaryColor, "次要部位")
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
@@ -97,6 +103,28 @@ struct MuscleMapView: View {
     }
 }
 
+/// 动作列表专用肌群缩略图：单面、无图例、固定尺寸，用于快速识别主要训练部位。
+struct MuscleMapThumbnail: View {
+    let assetName: String
+    var size: CGFloat = 48
+
+    var body: some View {
+        ZStack {
+            Theme.Color.surface2
+            Image(assetName)
+                .resizable()
+                .scaledToFill()
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Theme.Color.border, lineWidth: 1)
+        )
+        .accessibilityHidden(true)
+    }
+}
+
 #if DEBUG
 #Preview("卧推 · 男") {
     MuscleMapView(primary: [.chest], secondary: [.deltFront, .triceps], sex: .male)
@@ -105,5 +133,14 @@ struct MuscleMapView: View {
 #Preview("引体 · 女") {
     MuscleMapView(primary: [.lats], secondary: [.biceps, .deltRear, .forearms], sex: .female)
         .padding()
+}
+#Preview("列表缩略图") {
+    HStack(spacing: 12) {
+        MuscleMapThumbnail(assetName: "muscleThumb_male_chest")
+        MuscleMapThumbnail(assetName: "muscleThumb_male_back_lats")
+        MuscleMapThumbnail(assetName: "muscleThumb_male_legs_quads")
+        MuscleMapThumbnail(assetName: "muscleThumb_male_glutes_glutes")
+    }
+    .padding()
 }
 #endif

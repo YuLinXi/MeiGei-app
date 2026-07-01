@@ -60,6 +60,38 @@ private enum ExerciseLibraryContentMode {
     case pick(onPick: (ExercisePick) -> Void)
 }
 
+private enum MuscleThumbnailAssetKey: String {
+    case chest
+    case shoulders
+    case shouldersFront = "shoulders_front"
+    case shouldersRear = "shoulders_rear"
+    case back
+    case backLats = "back_lats"
+    case backTraps = "back_traps"
+    case backRhomboids = "back_rhomboids"
+    case backLowerBack = "back_lowerBack"
+    case arms
+    case armsBiceps = "arms_biceps"
+    case armsTriceps = "arms_triceps"
+    case armsForearms = "arms_forearms"
+    case legs
+    case legsQuads = "legs_quads"
+    case legsHams = "legs_hams"
+    case legsAdductors = "legs_adductors"
+    case legsCalves = "legs_calves"
+    case glutes
+    case glutesGlutes = "glutes_glutes"
+    case glutesGluteMed = "glutes_gluteMed"
+    case core
+    case coreAbs = "core_abs"
+    case coreObliques = "core_obliques"
+    case neck
+
+    var assetName: String {
+        "muscleThumb_male_\(rawValue)"
+    }
+}
+
 /// 动作库 · Tab 根页：保留顶部标题与右上自定义动作创建入口。
 struct ExerciseLibraryView: View {
     @State private var showingCreate = false
@@ -112,9 +144,13 @@ private struct ExerciseLibraryContentView: View {
     /// 器械轴：「all」或 `EquipmentType.rawValue`。
     @State private var equip: String = "all"
     @State private var pendingDeleteCustom: CustomExercise?
+    @State private var visibleLibRowLimit = 60
     let mode: ExerciseLibraryContentMode
     let emptyHint: String
     let emptyPlainHint: String
+
+    private static let initialLibraryRowLimit = 60
+    private static let libraryRowPageSize = 50
 
     /// 器械 chip（全部 + EquipmentType）。
     private let equipChips: [LibraryChip] =
@@ -335,9 +371,14 @@ private struct ExerciseLibraryContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(selected ? Theme.Color.accentSoft : .clear,
                         in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .animation(nil, value: selected)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .transaction { transaction in
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
     }
 
     // MARK: 选中态判定
@@ -359,32 +400,64 @@ private struct ExerciseLibraryContentView: View {
 
     // MARK: 左栏交互（点哪级过滤到哪级 + 逐级手风琴）
 
-    private func selectAll() { selection = .all; expandedCat = nil; expandedNode = nil }
-    private func selectMine() { selection = .mine; expandedCat = nil; expandedNode = nil }
+    private func updateRailSelection(_ updates: () -> Void) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction, updates)
+    }
+
+    private func selectAll() {
+        updateRailSelection {
+            selection = .all
+            expandedCat = nil
+            expandedNode = nil
+        }
+    }
+
+    private func selectMine() {
+        updateRailSelection {
+            selection = .mine
+            expandedCat = nil
+            expandedNode = nil
+        }
+    }
+
     private func tapCategory(_ c: ExerciseCategory) {
-        selection = .category(c.rawValue)
-        expandedNode = nil
-        guard hasChildren(c) else { expandedCat = nil; return }
-        // 再次点击已展开的一级 → 收起；否则展开（并收起其他一级）
-        expandedCat = (expandedCat == c.rawValue) ? nil : c.rawValue
+        updateRailSelection {
+            selection = .category(c.rawValue)
+            expandedNode = nil
+            guard hasChildren(c) else { expandedCat = nil; return }
+            // 再次点击已展开的一级 → 收起；否则展开（并收起其他一级）
+            expandedCat = (expandedCat == c.rawValue) ? nil : c.rawValue
+        }
     }
+
     private func tapNode(_ c: ExerciseCategory, _ n: String, hasHeads: Bool) {
-        selection = .node(c.rawValue, n)
-        guard hasHeads else { expandedNode = nil; return }
-        // 再次点击已展开的二级 → 收起；否则展开（并收起其他二级）
-        expandedNode = (expandedNode == n) ? nil : n
+        updateRailSelection {
+            selection = .node(c.rawValue, n)
+            guard hasHeads else { expandedNode = nil; return }
+            // 再次点击已展开的二级 → 收起；否则展开（并收起其他二级）
+            expandedNode = (expandedNode == n) ? nil : n
+        }
     }
+
     private func selectNode(_ c: ExerciseCategory, _ n: String) {
-        selection = .node(c.rawValue, n)
+        updateRailSelection {
+            selection = .node(c.rawValue, n)
+        }
     }
+
     private func selectHead(_ c: ExerciseCategory, _ n: String, _ h: String) {
-        selection = .head(c.rawValue, n, h)
+        updateRailSelection {
+            selection = .head(c.rawValue, n, h)
+        }
     }
 
     // MARK: 右侧动作区（器械 chip + 按树层级分段，逐行懒加载 + 返回顶部）
 
     private var rightArea: some View {
         let prWeights = historyStore.exercisePRs.mapValues(\.weightKg)
+        let rowPage = libraryRowPage
         return ScrollViewReader { proxy in
             VStack(spacing: 0) {
                 // 置顶器械轴：固定在右侧顶部，不随动作列表滚动；重复点已激活 chip 也回顶
@@ -397,11 +470,14 @@ private struct ExerciseLibraryContentView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         Color.clear.frame(height: 0).id("LIB_TOP")
-                        if filteredBuiltin.isEmpty && filteredCustom.isEmpty {
+                        if rowPage.rows.isEmpty {
                             emptyState
                         } else {
-                            ForEach(Array(libRows.enumerated()), id: \.element.id) { idx, row in
+                            ForEach(Array(rowPage.rows.enumerated()), id: \.element.id) { idx, row in
                                 libRowView(row, prWeights: prWeights, isFirst: idx == 0)
+                            }
+                            if rowPage.hasMore {
+                                loadMoreLibraryRowsTrigger(totalExerciseCount: rowPage.totalExerciseCount)
                             }
                         }
                         Color.clear.frame(height: 40)
@@ -414,14 +490,18 @@ private struct ExerciseLibraryContentView: View {
             .onAppear { WorkoutPerformanceMonitor.event("exercise.library.appear") }
             .onChange(of: selection) { _, _ in
                 WorkoutPerformanceMonitor.event("exercise.library.filter")
+                resetLibraryPaging()
                 proxy.scrollTo("LIB_TOP", anchor: .top)
             }
             .onChange(of: equip) { _, _ in
                 WorkoutPerformanceMonitor.event("exercise.library.filter")
+                resetLibraryPaging()
                 proxy.scrollTo("LIB_TOP", anchor: .top)
             }
             .onChange(of: trimmedQuery) { _, _ in
                 WorkoutPerformanceMonitor.event("exercise.library.search")
+                resetLibraryPaging()
+                proxy.scrollTo("LIB_TOP", anchor: .top)
             }
         }
     }
@@ -430,6 +510,24 @@ private struct ExerciseLibraryContentView: View {
     private func scrollLibToTop(_ proxy: ScrollViewProxy) {
         Theme.Haptics.impact(.light)
         withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo("LIB_TOP", anchor: .top) }
+    }
+
+    private func resetLibraryPaging() {
+        visibleLibRowLimit = Self.initialLibraryRowLimit
+    }
+
+    @ViewBuilder
+    private func loadMoreLibraryRowsTrigger(totalExerciseCount: Int) -> some View {
+        Color.clear
+            .frame(height: 1)
+            .onAppear {
+                loadMoreLibraryRowsIfNeeded(totalExerciseCount: totalExerciseCount)
+            }
+    }
+
+    private func loadMoreLibraryRowsIfNeeded(totalExerciseCount: Int) {
+        guard shouldPageLibraryRows, visibleLibRowLimit < totalExerciseCount else { return }
+        visibleLibRowLimit = min(totalExerciseCount, visibleLibRowLimit + Self.libraryRowPageSize)
     }
 
     /// 扁平行模型：段头 / 内置行 / 自定义行（first/last 控制卡片切片圆角与分隔）。
@@ -446,23 +544,58 @@ private struct ExerciseLibraryContentView: View {
         }
     }
 
-    /// 把分段 + 自定义摊平成逐行（作为外层 LazyVStack 直接子视图 → 真·懒加载）。
-    private var libRows: [LibRow] {
+    private struct LibraryRowPage {
+        let rows: [LibRow]
+        let visibleExerciseCount: Int
+        let totalExerciseCount: Int
+
+        var hasMore: Bool { visibleExerciseCount < totalExerciseCount }
+    }
+
+    private var shouldPageLibraryRows: Bool {
+        isAll && !searching
+    }
+
+    private var libraryRowPage: LibraryRowPage {
+        makeLibraryRows(limit: shouldPageLibraryRows ? visibleLibRowLimit : nil)
+    }
+
+    /// 把分段 + 自定义摊平成逐行，并在「全部」页只构建当前可见批次。
+    private func makeLibraryRows(limit: Int?) -> LibraryRowPage {
         var rows: [LibRow] = []
+        var visibleExerciseCount = 0
+        var totalExerciseCount = 0
         let customs = filteredCustom
-        if !customs.isEmpty {
+        totalExerciseCount += customs.count
+        if !customs.isEmpty, let visibleCustoms = visibleItems(customs, limit: limit, currentCount: visibleExerciseCount) {
             rows.append(.header("自定义"))
-            for (i, ex) in customs.enumerated() {
-                rows.append(.custom(ex, i == 0, i == customs.count - 1))
+            for (i, ex) in visibleCustoms.enumerated() {
+                rows.append(.custom(ex, i == 0, i == visibleCustoms.count - 1))
             }
+            visibleExerciseCount += visibleCustoms.count
         }
         for seg in builtinSegments {
-            if !seg.title.isEmpty { rows.append(.header(seg.title)) }
-            for (i, ex) in seg.items.enumerated() {
-                rows.append(.builtin(ex, i == 0, i == seg.items.count - 1))
+            totalExerciseCount += seg.items.count
+            guard let visibleItems = visibleItems(seg.items, limit: limit, currentCount: visibleExerciseCount) else {
+                continue
             }
+            if !seg.title.isEmpty { rows.append(.header(seg.title)) }
+            for (i, ex) in visibleItems.enumerated() {
+                rows.append(.builtin(ex, i == 0, i == visibleItems.count - 1))
+            }
+            visibleExerciseCount += visibleItems.count
         }
-        return rows
+        return LibraryRowPage(rows: rows,
+                              visibleExerciseCount: visibleExerciseCount,
+                              totalExerciseCount: totalExerciseCount)
+    }
+
+    private func visibleItems<T>(_ items: [T], limit: Int?, currentCount: Int) -> [T]? {
+        guard !items.isEmpty else { return nil }
+        guard let limit else { return items }
+        let remaining = limit - currentCount
+        guard remaining > 0 else { return nil }
+        return Array(items.prefix(remaining))
     }
 
     @ViewBuilder
@@ -655,7 +788,7 @@ private struct ExerciseLibraryContentView: View {
         let sub = [muscle, ex.subcategory].compactMap { $0 }.joined(separator: " · ")
         let meta = sub.isEmpty ? "\(ex.category) · \(ex.equipmentType)" : "\(ex.category) · \(sub) · \(ex.equipmentType)"
         return HStack(spacing: 12) {
-            avatar(String(ex.name.prefix(1)))
+            builtinThumbnail(ex)
             VStack(alignment: .leading, spacing: 2) {
                 Text(ex.name)
                     .font(Theme.Font.body(size: 15, weight: .semibold))
@@ -672,6 +805,114 @@ private struct ExerciseLibraryContentView: View {
         .padding(.horizontal, 13)
         .padding(.vertical, 11)
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private func builtinThumbnail(_ ex: BuiltinExercise) -> some View {
+        if let assetName = thumbnailAssetName(for: ex) {
+            MuscleMapThumbnail(assetName: assetName,
+                               size: 48)
+        } else {
+            avatar(String(ex.name.prefix(1)), size: 48)
+        }
+    }
+
+    private func thumbnailAssetName(for ex: BuiltinExercise) -> String? {
+        guard !ex.primaryRegions.isEmpty,
+              let category = ExerciseCategory(rawValue: ex.category),
+              category.isAnatomical,
+              !category.regions.isEmpty else {
+            return nil
+        }
+        let categoryRegions = Set(category.regions)
+        let regions = ex.primaryRegions.filter { categoryRegions.contains($0) }
+        let key = thumbnailAssetKey(for: ex, category: category, regions: regions)
+        return key?.assetName
+    }
+
+    private func thumbnailAssetKey(for ex: BuiltinExercise,
+                                   category: ExerciseCategory,
+                                   regions: [MuscleRegion]) -> MuscleThumbnailAssetKey? {
+        guard !regions.isEmpty else { return fallbackThumbnailAssetKey(for: category) }
+        if let subcategory = ex.subcategory,
+           let region = ExerciseCategory.regionForSubcategory(subcategory),
+           regions.contains(region),
+           let key = thumbnailAssetKey(for: region, category: category) {
+            return key
+        }
+
+        for region in regions {
+            if let key = thumbnailAssetKey(for: region, category: category) {
+                return key
+            }
+        }
+        return fallbackThumbnailAssetKey(for: category)
+    }
+
+    private func thumbnailAssetKey(for region: MuscleRegion, category: ExerciseCategory) -> MuscleThumbnailAssetKey? {
+        switch category {
+        case .chest:
+            return .chest
+        case .shoulders:
+            switch region {
+            case .deltFront: return .shouldersFront
+            case .deltRear: return .shouldersRear
+            default: return .shoulders
+            }
+        case .back:
+            switch region {
+            case .lats: return .backLats
+            case .traps: return .backTraps
+            case .rhomboids: return .backRhomboids
+            case .lowerBack: return .backLowerBack
+            default: return .back
+            }
+        case .arms:
+            switch region {
+            case .biceps: return .armsBiceps
+            case .triceps: return .armsTriceps
+            case .forearms: return .armsForearms
+            default: return .arms
+            }
+        case .legs:
+            switch region {
+            case .quads: return .legsQuads
+            case .hams: return .legsHams
+            case .adductors: return .legsAdductors
+            case .calves: return .legsCalves
+            default: return .legs
+            }
+        case .glutes:
+            switch region {
+            case .glutes: return .glutesGlutes
+            case .gluteMed: return .glutesGluteMed
+            default: return .glutes
+            }
+        case .core:
+            switch region {
+            case .abs: return .coreAbs
+            case .obliques: return .coreObliques
+            default: return .core
+            }
+        case .neck:
+            return .neck
+        default:
+            return nil
+        }
+    }
+
+    private func fallbackThumbnailAssetKey(for category: ExerciseCategory) -> MuscleThumbnailAssetKey? {
+        switch category {
+        case .chest: return .chest
+        case .back: return .back
+        case .shoulders: return .shoulders
+        case .arms: return .arms
+        case .legs: return .legs
+        case .glutes: return .glutes
+        case .core: return .core
+        case .neck: return .neck
+        default: return nil
+        }
     }
 
     private func displayMuscleName(for ex: BuiltinExercise) -> String? {
@@ -702,13 +943,14 @@ private struct ExerciseLibraryContentView: View {
         .padding(.vertical, 11)
     }
 
-    private func avatar(_ ch: String) -> some View {
-        Text(ch)
-            .font(Theme.Font.body(size: 14, weight: .bold))
+    private func avatar(_ ch: String, size: CGFloat = 40) -> some View {
+        let radius: CGFloat = size > 40 ? 12 : 11
+        return Text(ch)
+            .font(Theme.Font.body(size: size > 40 ? 15 : 14, weight: .bold))
             .foregroundStyle(Theme.Color.fg2)
-            .frame(width: 40, height: 40)
-            .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
+            .frame(width: size, height: size)
+            .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
     }
 
     private func prPill(_ text: String) -> some View {
