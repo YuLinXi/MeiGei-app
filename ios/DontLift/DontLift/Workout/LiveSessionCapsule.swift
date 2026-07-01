@@ -56,22 +56,23 @@ struct LiveSessionCapsule: View {
                 TimelineView(.periodic(from: .now, by: 1.0)) { ctx in
                     Text(formatElapsed(at: ctx.date))
                         .font(Theme.Font.number(size: 14, weight: .bold))
-                        .foregroundStyle(Theme.Color.fg)
+                        .foregroundStyle(Theme.Color.accent)
                         .monospacedDigit()
                 }
                 Text(brief ?? "进行中")
                     .font(Theme.Font.body(size: 10, weight: .semibold))
-                    .foregroundStyle(brief == nil ? Theme.Color.accent : Theme.Color.fg2)
+                    .foregroundStyle(brief == nil ? Theme.Color.accent : Theme.Color.fg)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .frame(maxWidth: brief == nil ? nil : 108, alignment: .leading)
             }
             Image(systemName: "chevron.right")
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Theme.Color.muted)
+                .foregroundStyle(Theme.Color.fg2)
         }
-        .padding(.leading, 11)
-        .padding(.trailing, 9)
+        .padding(.leading, 14)
+        .padding(.trailing, 12)
+        .padding(.vertical, 5)
         .frame(minWidth: 76, minHeight: 42)
         .fixedSize(horizontal: true, vertical: true)
         .background(Theme.Color.surface, in: Capsule())
