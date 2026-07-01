@@ -21,8 +21,7 @@ struct WorkoutPosterData: Equatable {
     let volumeText: String
     let setCountText: String
     let exerciseCountText: String
-    let visibleExercises: [ExerciseLine]
-    let hiddenExerciseCount: Int
+    let exerciseLines: [ExerciseLine]
     let prLines: [PRLine]
 
     init(workout: Workout, personalRecords: [PersonalRecord] = []) {
@@ -44,8 +43,7 @@ struct WorkoutPosterData: Equatable {
         let lines = exercises.enumerated().map { index, exercise in
             Self.exerciseLine(exercise, index: index)
         }
-        self.visibleExercises = Array(lines.prefix(4))
-        self.hiddenExerciseCount = max(0, lines.count - visibleExercises.count)
+        self.exerciseLines = lines
         self.prLines = personalRecords.prefix(3).map {
             PRLine(id: $0.exerciseKey,
                    name: $0.exerciseName,
@@ -161,7 +159,7 @@ struct WorkoutPosterPreviewSheet: View {
     private var posterPreview: some View {
         WorkoutPosterCanvas(data: data)
             .frame(maxWidth: 360)
-            .aspectRatio(4.0 / 5.0, contentMode: .fit)
+            .aspectRatio(WorkoutPosterLayout.aspectRatio(for: data), contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
             .paperShadow(.md, cornerRadius: Theme.Radius.lg)
             .frame(maxWidth: .infinity)
@@ -294,20 +292,28 @@ private struct WorkoutPosterVisualCardView: View {
         ZStack(alignment: .topLeading) {
             ink
             accentBlock
+            rightRail
             VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text(data.dateText)
-                        .font(Theme.Font.mono(size: 10, weight: .bold))
-                        .foregroundStyle(paper.opacity(0.64))
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("别练了")
+                            .font(Theme.Font.body(size: 12, weight: .heavy))
+                            .foregroundStyle(paper)
+                        Text(data.dateText)
+                            .font(Theme.Font.mono(size: 10, weight: .bold))
+                            .foregroundStyle(paper.opacity(0.64))
+                    }
                     Spacer()
-                    weakBrandMark
                 }
 
                 Spacer(minLength: 0)
 
-                Text("每一组都算数")
+                Text("弱者在舒适区冬眠，强者在风雪中冬训。")
                     .font(Theme.Font.mono(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.accent)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.82)
+                    .frame(width: blackContentWidth, alignment: .leading)
 
                 Text(data.title)
                     .font(Theme.Font.display(size: 34, weight: .heavy))
@@ -325,10 +331,12 @@ private struct WorkoutPosterVisualCardView: View {
 
                 exerciseList
                     .padding(.top, 22)
+                    .frame(width: blackContentWidth, alignment: .leading)
 
                 Spacer(minLength: 0)
 
                 footer
+                    .frame(width: blackContentWidth, alignment: .leading)
             }
             .padding(24)
         }
@@ -339,10 +347,41 @@ private struct WorkoutPosterVisualCardView: View {
         VStack(spacing: 0) {
             Rectangle()
                 .fill(Theme.Color.accent)
-                .frame(width: width * 0.24, height: height)
+                .frame(width: railWidth, height: height)
         }
         .opacity(0.92)
-        .offset(x: width * 0.76)
+        .offset(x: width - railWidth)
+    }
+
+    private var rightRail: some View {
+        VStack(spacing: 0) {
+            rightRailQRCode
+                .padding(.top, 30)
+
+            Spacer(minLength: 28)
+
+            Text("DON'T LIFT")
+                .font(Theme.Font.mono(size: 14, weight: .heavy))
+                .foregroundStyle(paper.opacity(0.72))
+                .tracking(2.2)
+                .rotationEffect(.degrees(90))
+                .fixedSize()
+                .frame(width: railWidth, height: 132)
+
+            Spacer(minLength: 28)
+
+            Text("WORKOUT LOG")
+                .font(Theme.Font.mono(size: 8.5, weight: .bold))
+                .foregroundStyle(paper.opacity(0.38))
+                .tracking(1.3)
+                .rotationEffect(.degrees(90))
+                .fixedSize()
+                .frame(width: railWidth, height: 86)
+                .padding(.bottom, 30)
+        }
+        .frame(width: railWidth, height: height)
+        .offset(x: width - railWidth)
+        .accessibilityHidden(true)
     }
 
     private func visualMetric(_ value: String, _ label: String) -> some View {
@@ -360,28 +399,44 @@ private struct WorkoutPosterVisualCardView: View {
     }
 
     private var exerciseList: some View {
-        VStack(spacing: 8) {
-            ForEach(data.visibleExercises) { line in
+        VStack(spacing: exerciseRowSpacing) {
+            ForEach(data.exerciseLines) { line in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(line.name)
-                        .font(Theme.Font.body(size: 14.5, weight: .semibold))
+                        .font(Theme.Font.body(size: exerciseNameFontSize, weight: .semibold))
                         .foregroundStyle(paper)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.76)
                     Spacer(minLength: 8)
                     Text(line.topSetText)
-                        .font(Theme.Font.mono(size: 11.5, weight: .bold))
-                        .foregroundStyle(paper.opacity(0.72))
+                        .font(Theme.Font.mono(size: exerciseValueFontSize, weight: .bold))
+                        .foregroundStyle(paper.opacity(0.82))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                        .minimumScaleFactor(0.78)
+                        .layoutPriority(1)
                 }
             }
-            if data.hiddenExerciseCount > 0 {
-                Text("另 \(data.hiddenExerciseCount) 个动作")
-                    .font(Theme.Font.mono(size: 11, weight: .bold))
-                    .foregroundStyle(paper.opacity(0.54))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
         }
+    }
+
+    private var exerciseRowSpacing: CGFloat {
+        data.exerciseLines.count > 8 ? 6 : 8
+    }
+
+    private var exerciseNameFontSize: CGFloat {
+        data.exerciseLines.count > 8 ? 13.5 : 14.5
+    }
+
+    private var exerciseValueFontSize: CGFloat {
+        data.exerciseLines.count > 8 ? 13.5 : 14.5
+    }
+
+    private var blackContentWidth: CGFloat {
+        max(180, width - railWidth - 58)
+    }
+
+    private var railWidth: CGFloat {
+        width * 0.24
     }
 
     private var footer: some View {
@@ -402,13 +457,10 @@ private struct WorkoutPosterVisualCardView: View {
                     .foregroundStyle(paper.opacity(0.64))
             }
             Spacer()
-            Text("别练了")
-                .font(Theme.Font.body(size: 11, weight: .bold))
-                .foregroundStyle(paper.opacity(0.72))
         }
     }
 
-    private var weakBrandMark: some View {
+    private var rightRailQRCode: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(paper.opacity(0.24), lineWidth: 1)
@@ -421,12 +473,28 @@ private struct WorkoutPosterVisualCardView: View {
     }
 }
 
+private enum WorkoutPosterLayout {
+    private static let baseWidth: CGFloat = 360
+    private static let baseHeight: CGFloat = 450
+
+    static func size(for data: WorkoutPosterData) -> CGSize {
+        let extraExercises = max(0, data.exerciseLines.count - 4)
+        return CGSize(width: baseWidth, height: baseHeight + CGFloat(extraExercises * 28))
+    }
+
+    static func aspectRatio(for data: WorkoutPosterData) -> CGFloat {
+        let size = size(for: data)
+        return size.width / size.height
+    }
+}
+
 @MainActor
 enum WorkoutPosterImageRenderer {
     static func render(data: WorkoutPosterData) -> UIImage? {
+        let size = WorkoutPosterLayout.size(for: data)
         let renderer = ImageRenderer(
             content: WorkoutPosterCanvas(data: data)
-                .frame(width: 360, height: 450)
+                .frame(width: size.width, height: size.height)
         )
         renderer.scale = 3
         return renderer.uiImage

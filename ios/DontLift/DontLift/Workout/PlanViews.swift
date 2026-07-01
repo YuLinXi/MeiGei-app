@@ -50,9 +50,44 @@ private func sortedPlans(_ plans: [WorkoutPlan]) -> [WorkoutPlan] {
     }
 }
 
+private enum PlanListCardPosition {
+    case single
+    case first
+    case middle
+    case last
+}
+
+private extension View {
+    func planListAttachedCardStyle(
+        position: PlanListCardPosition = .single,
+        padding: EdgeInsets = EdgeInsets(top: Theme.Spacing.md,
+                                         leading: Theme.Spacing.md,
+                                         bottom: Theme.Spacing.md,
+                                         trailing: Theme.Spacing.md)
+    ) -> some View {
+        let radius = Theme.Radius.md
+        let shape = UnevenRoundedRectangle(
+            cornerRadii: .init(topLeading: position == .middle || position == .last ? 0 : radius,
+                               bottomLeading: position == .first || position == .middle ? 0 : radius,
+                               bottomTrailing: position == .first || position == .middle ? 0 : radius,
+                               topTrailing: position == .middle || position == .last ? 0 : radius),
+            style: .continuous
+        )
+        return self
+            .padding(padding)
+            .background(Theme.Color.surface, in: shape)
+            .overlay(shape.stroke(Theme.Color.border, lineWidth: 1))
+            .shadow(color: Theme.Color.fg.opacity(Theme.ShadowLevel.sm.opacity),
+                    radius: Theme.ShadowLevel.sm.radius,
+                    x: 0,
+                    y: Theme.ShadowLevel.sm.y)
+    }
+}
+
 /// 计划列表：按分组管理训练模板；所有计划使用同一标准卡片。
 struct PlanListView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(GlobalMessageCenter.self) private var globalMessage
     @Query(filter: #Predicate<WorkoutPlanGroup> { $0.deletedAt == nil },
@@ -66,8 +101,7 @@ struct PlanListView: View {
     @State private var deletingGroup: WorkoutPlanGroup?
     @State private var showingGroupOrderEditor = false
     @State private var planOrderTarget: PlanOrderTarget?
-    @State private var collapsedSectionIds: Set<String> = []
-    @State private var knownSectionIds: Set<String> = []
+    @State private var expandedSectionId: String?
     /// 计划详情导航：用绑定式 navigationDestination(item:) 而非 NavigationLink(value:)。
     /// 本工程是「全局唯一 NavigationStack 包 TabView」，类型注册式 navigationDestination(for:)
     /// 从 TabView 子页注册不进外层 stack，value 链接点了不跳；绑定式不依赖类型注册，可靠跳转。
@@ -117,19 +151,9 @@ struct PlanListView: View {
         historyStore.planUsage[plan.localId] ?? .empty
     }
 
-    private func behaviorSummary(for plan: WorkoutPlan, usage: PlanUsageSummary) -> String {
-        switch plan.mode {
-        case .strict:
-            "严格模式 · 完成后不回写"
-        case .adaptive:
-            usage.completedCount == 0 ? "自适应模式 · 完成后自动更新" : "自适应模式 · 依据上次实绩"
-        }
-    }
-
     private func usageSummary(for plan: WorkoutPlan) -> String {
         let usage = usage(for: plan)
-        let last = usage.lastTrainedAt.map { "上次 \($0.formatted(.relative(presentation: .named)))" } ?? "未开始"
-        return "\(last) · 累计 \(usage.completedCount) 次"
+        return "累计训练 \(usage.completedCount) 次"
     }
 
     var body: some View {
@@ -163,9 +187,9 @@ struct PlanListView: View {
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             WorkoutPerformanceMonitor.event("plan.list.appear")
-            syncDefaultCollapsedSections()
+            pruneExpandedSection()
         }
-        .onChange(of: sectionIds) { _, _ in syncDefaultCollapsedSections() }
+        .onChange(of: sectionIds) { _, _ in pruneExpandedSection() }
         .navigationDestination(item: $selectedPlan) { PlanDetailView(plan: $0) }
         .navigationDestination(item: $creatingPlanRoute) { route in
             PlanEditorView(plan: nil, initialGroupId: route.groupId)
@@ -250,16 +274,17 @@ struct PlanListView: View {
     @ViewBuilder
     private func sectionView(_ section: PlanGroupSection) -> some View {
         let collapsed = isSectionCollapsed(section)
-        VStack(alignment: .leading, spacing: collapsed ? 0 : Theme.Spacing.sm) {
+        VStack(alignment: .leading, spacing: 0) {
             sectionHeader(section, collapsed: collapsed)
+                .zIndex(1)
             if !collapsed {
-                VStack(spacing: Theme.Spacing.sm) {
+                VStack(spacing: 0) {
                     if section.plans.isEmpty {
-                        emptyGroupCard
+                        emptyGroupCard()
                     } else {
-                        ForEach(section.plans) { plan in
+                        ForEach(Array(section.plans.enumerated()), id: \.element.localId) { index, plan in
                             Button { selectedPlan = plan } label: {
-                                planCard(plan)
+                                planCard(plan, position: planCardPosition(index: index, count: section.plans.count))
                             }
                                 .buttonStyle(PressableButtonStyle())
                                 .accessibilityLabel("打开计划\(plan.name)")
@@ -268,7 +293,8 @@ struct PlanListView: View {
                     }
                 }
                 .padding(.top, Theme.Spacing.sm)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity)
+                .zIndex(0)
             }
         }
     }
@@ -327,15 +353,26 @@ struct PlanListView: View {
         .padding(.trailing, 6)
         .padding(.vertical, 8)
         .frame(minHeight: 60)
-        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .background(Theme.Color.surface, in: sectionHeaderShape(collapsed: collapsed))
         .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+            sectionHeaderShape(collapsed: collapsed)
                 .stroke(Theme.Color.border, lineWidth: 1)
         )
         .shadow(color: Theme.Color.fg.opacity(Theme.ShadowLevel.sm.opacity),
                 radius: Theme.ShadowLevel.sm.radius,
                 x: 0,
                 y: Theme.ShadowLevel.sm.y)
+    }
+
+    private func sectionHeaderShape(collapsed: Bool) -> UnevenRoundedRectangle {
+        let radius = Theme.Radius.md
+        return UnevenRoundedRectangle(
+            cornerRadii: .init(topLeading: radius,
+                               bottomLeading: radius,
+                               bottomTrailing: radius,
+                               topTrailing: radius),
+            style: .continuous
+        )
     }
 
     private func sectionSubtitle(_ section: PlanGroupSection, collapsed: Bool) -> String {
@@ -371,64 +408,51 @@ struct PlanListView: View {
     }
 
     private func isSectionCollapsed(_ section: PlanGroupSection) -> Bool {
-        collapsedSectionIds.contains(section.id)
+        expandedSectionId != section.id
     }
 
-    private func syncDefaultCollapsedSections() {
-        let currentIds = Set(sectionIds)
-        let newIds = currentIds.subtracting(knownSectionIds)
-        let removedIds = knownSectionIds.subtracting(currentIds)
-        collapsedSectionIds.formUnion(newIds)
-        collapsedSectionIds.subtract(removedIds)
-        knownSectionIds = currentIds
+    private func pruneExpandedSection() {
+        guard let expandedSectionId, !sectionIds.contains(expandedSectionId) else { return }
+        self.expandedSectionId = nil
     }
 
     private func toggleSection(_ section: PlanGroupSection) {
-        withAnimation(.easeInOut(duration: 0.18)) {
-            if collapsedSectionIds.contains(section.id) {
-                collapsedSectionIds.remove(section.id)
-            } else {
-                collapsedSectionIds.insert(section.id)
-            }
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+            expandedSectionId = expandedSectionId == section.id ? nil : section.id
         }
         Theme.Haptics.selection()
     }
 
-    private func planCard(_ plan: WorkoutPlan) -> some View {
+    private func planCardPosition(index: Int, count: Int) -> PlanListCardPosition {
+        if count <= 1 { return .single }
+        if index == 0 { return .first }
+        if index == count - 1 { return .last }
+        return .middle
+    }
+
+    private func planCard(_ plan: WorkoutPlan, position: PlanListCardPosition = .single) -> some View {
         let usage = usage(for: plan)
-        return HStack(alignment: .center, spacing: Theme.Spacing.sm) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
-                    Text(plan.name)
-                        .font(Theme.Font.body(size: 16, weight: .semibold))
-                        .foregroundStyle(Theme.Color.fg)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.9)
-                        .layoutPriority(1)
-                    modePill(plan.mode)
-                        .fixedSize()
-                }
-                HStack(spacing: Theme.Spacing.xs) {
+        return HStack(alignment: .center, spacing: Theme.Spacing.md) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(plan.name)
+                    .font(Theme.Font.body(size: 17, weight: .bold))
+                    .foregroundStyle(Theme.Color.fg)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .minimumScaleFactor(0.86)
+                    .layoutPriority(1)
+                HStack(spacing: 6) {
                     planMetricPill("\(plan.items.count) 个动作")
                     planMetricPill("\(plan.totalSuggestedSets) 组")
                 }
 
-                Text(behaviorSummary(for: plan, usage: usage))
-                    .font(Theme.Font.mono(size: 11, weight: .semibold))
-                    .foregroundStyle(plan.mode == .adaptive ? Theme.Color.accent : Theme.Color.muted)
-                    .lineLimit(1)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 6)
-                    .background(plan.mode == .adaptive ? Theme.Color.accentSoft : Theme.Color.surface2,
-                                in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-
                 HStack(spacing: Theme.Spacing.xs) {
                     Image(systemName: usage.completedCount == 0 ? "circle" : "clock.arrow.circlepath")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(Theme.Color.muted)
                         .frame(width: 14)
                     Text(usageSummary(for: plan))
-                        .font(Theme.Font.mono(size: 11))
+                        .font(Theme.Font.mono(size: 10.5))
                         .foregroundStyle(Theme.Color.muted)
                         .lineLimit(1)
                 }
@@ -436,27 +460,33 @@ struct PlanListView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Theme.Color.muted)
-                .frame(width: 24)
+                .frame(width: 28)
                 .frame(minHeight: 44)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .cardStyle()
+        .planListAttachedCardStyle(
+            position: position,
+            padding: EdgeInsets(top: 12,
+                                leading: Theme.Spacing.md,
+                                bottom: 12,
+                                trailing: Theme.Spacing.sm)
+        )
         .accessibilityElement(children: .combine)
     }
 
     private func planMetricPill(_ title: String) -> some View {
         Text(title)
-            .font(Theme.Font.mono(size: 11, weight: .semibold))
+            .font(Theme.Font.mono(size: 10.5, weight: .semibold))
             .foregroundStyle(Theme.Color.fg2)
             .lineLimit(1)
             .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.vertical, 4)
             .background(Theme.Color.surface2, in: Capsule())
     }
 
-    private var emptyGroupCard: some View {
+    private func emptyGroupCard() -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("这个分组还没有计划")
                 .font(Theme.Font.body(size: 15, weight: .semibold))
@@ -466,16 +496,7 @@ struct PlanListView: View {
                 .foregroundStyle(Theme.Color.fg2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .cardStyle()
-    }
-
-    private func modePill(_ mode: WorkoutPlanMode) -> some View {
-        Text(mode.title)
-            .font(Theme.Font.mono(size: 10, weight: .bold))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(Theme.Color.surface2, in: Capsule())
-            .foregroundStyle(mode == .adaptive ? Theme.Color.accent : Theme.Color.muted)
+        .planListAttachedCardStyle()
     }
 
     private var emptyMineCard: some View {
