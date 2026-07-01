@@ -68,7 +68,7 @@ struct LiveSessionCapsule: View {
             }
             Image(systemName: "chevron.right")
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Theme.Color.fg2)
+                .foregroundStyle(brief == nil ? Theme.Color.accent : Theme.Color.fg)
         }
         .padding(.leading, 14)
         .padding(.trailing, 12)
