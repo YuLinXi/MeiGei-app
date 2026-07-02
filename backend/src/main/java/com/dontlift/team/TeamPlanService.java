@@ -230,7 +230,7 @@ public class TeamPlanService {
         return event;
     }
 
-    /** 把 items jsonb 里的重量字段全部移除；解析失败时拒绝分享，避免隐私字段原样流出。 */
+    /** 把 items jsonb 里的重量字段递归移除；解析失败时拒绝分享，避免隐私字段原样流出。 */
     private String stripWeights(String itemsJson) {
         if (itemsJson == null || itemsJson.isBlank()) {
             return "[]";

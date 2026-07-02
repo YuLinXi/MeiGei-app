@@ -36,4 +36,10 @@ public class WorkoutSet {
 
     /** 组类型（"working"/"warmup"）。WorkoutTree 内嵌实体，随 Jackson 自动序列化；DB 列默认 'working'。 */
     private String setType;
+
+    /**
+     * 递减组分段 jsonb 字符串。普通组/热身组为空数组。
+     * 结构示例：[{segmentId, segmentIndex, weightKg, reps}]。
+     */
+    private String segments = "[]";
 }

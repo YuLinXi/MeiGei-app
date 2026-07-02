@@ -156,7 +156,7 @@ final class WorkoutLiveActivityController {
     }
 
     private func makeWorkoutState(for workout: Workout) -> RestActivityAttributes.ContentState {
-        let completed = workout.exercises.flatMap(\.sets).filter(\.completed).count
+        let completed = workout.exercises.flatMap(\.sets).filter(\.countsForStats).count
         let remainingExercises = workout.exercises.filter { ex in
             ex.sets.contains { !$0.completed }
         }.count
@@ -177,8 +177,8 @@ final class WorkoutLiveActivityController {
                 return RestActivityAttributes.NextSet(
                     exerciseName: ex.exerciseName,
                     setIndex: next.setIndex + 1,
-                    weightText: next.weightKg.map { "\(formatKg($0)) kg" },
-                    repsText: next.reps.map { "\($0) 次" }
+                    weightText: next.summaryWeightReps.weightKg.map { "\(formatKg($0)) kg" },
+                    repsText: next.summaryWeightReps.reps.map { "\($0) 次" }
                 )
             }
         }

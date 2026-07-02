@@ -73,6 +73,9 @@ class WorkoutSyncServiceTest {
         set.setSetType("working");
         set.setPlannedRestSeconds(120);
         set.setActualRestSeconds(137);
+        set.setSegments("""
+                [{"segmentId":"%s","segmentIndex":0,"weightKg":80,"reps":5}]
+                """.formatted(UUID.randomUUID()));
         when(workoutMapper.findByIdIncludingDeleted(workout.getId())).thenReturn(null);
 
         service.push(userId, List.of(new WorkoutTree(
@@ -86,6 +89,35 @@ class WorkoutSyncServiceTest {
         assertThat(inserted.getWorkoutExerciseId()).isEqualTo(exercise.getId());
         assertThat(inserted.getPlannedRestSeconds()).isEqualTo(120);
         assertThat(inserted.getActualRestSeconds()).isEqualTo(137);
+        assertThat(inserted.getSegments()).contains("\"weightKg\":80");
+    }
+
+    @Test
+    void push_normalizesNullWorkoutSetSegmentsWhenReplacingChildren() {
+        WorkoutSyncService service = new WorkoutSyncService(workoutMapper, exerciseMapper, setMapper, checkinService);
+        UUID userId = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.now();
+        Workout workout = workout(now);
+        WorkoutExercise exercise = new WorkoutExercise();
+        exercise.setId(UUID.randomUUID());
+        exercise.setExerciseName("杠铃卧推");
+        exercise.setOrderIndex(0);
+        WorkoutSet set = new WorkoutSet();
+        set.setId(UUID.randomUUID());
+        set.setSetIndex(0);
+        set.setCompleted(true);
+        set.setSetType("working");
+        set.setSegments(null);
+        when(workoutMapper.findByIdIncludingDeleted(workout.getId())).thenReturn(null);
+
+        service.push(userId, List.of(new WorkoutTree(
+                workout,
+                List.of(new WorkoutTree.ExerciseNode(exercise, List.of(set)))
+        )));
+
+        ArgumentCaptor<WorkoutSet> captor = ArgumentCaptor.forClass(WorkoutSet.class);
+        verify(setMapper).insert(captor.capture());
+        assertThat(captor.getValue().getSegments()).isEqualTo("[]");
     }
 
     private Workout workout(OffsetDateTime updatedAt) {

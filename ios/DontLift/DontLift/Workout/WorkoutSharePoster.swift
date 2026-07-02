@@ -29,7 +29,9 @@ struct WorkoutPosterData: Equatable {
         let completedSets = exercises.flatMap(\.sets).filter(\.completed)
         let statSets = completedSets.filter(\.countsForStats)
         let totalVolume = statSets.reduce(0.0) { acc, set in
-            acc + (set.weightKg ?? 0) * Double(set.reps ?? 0)
+            acc + set.statEntries.reduce(0.0) { entryAcc, entry in
+                entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+            }
         }
 
         self.title = Self.title(for: workout, exercises: exercises)
@@ -37,7 +39,7 @@ struct WorkoutPosterData: Equatable {
         self.durationText = Self.durationText(start: workout.timerStartedAt ?? workout.startedAt,
                                               end: workout.endedAt ?? workout.startedAt)
         self.volumeText = Self.volumeText(totalVolume)
-        self.setCountText = "\(completedSets.count)"
+        self.setCountText = "\(statSets.count)"
         self.exerciseCountText = "\(exercises.count)"
 
         let lines = exercises.enumerated().map { index, exercise in
@@ -96,24 +98,26 @@ struct WorkoutPosterData: Equatable {
         if let weighted = topWeightedSet(in: sets) {
             var parts = ["\(formatKg(weighted.weightKg))kg"]
             if let reps = weighted.reps { parts.append("× \(reps)") }
+            if weighted.extraSegmentCount > 0 { parts.append("+\(weighted.extraSegmentCount)段") }
             return parts.joined(separator: " ")
         }
-        if let reps = sets.compactMap(\.reps).max() {
+        if let reps = sets.flatMap(\.statEntries).compactMap(\.reps).max() {
             return "\(reps) 次"
         }
         return "已完成 \(sets.count) 组"
     }
 
-    private static func topWeightedSet(in sets: [WorkoutSet]) -> (weightKg: Double, reps: Int?)? {
-        var best: (weightKg: Double, reps: Int?)?
+    private static func topWeightedSet(in sets: [WorkoutSet]) -> (weightKg: Double, reps: Int?, extraSegmentCount: Int)? {
+        var best: (weightKg: Double, reps: Int?, extraSegmentCount: Int)?
         for set in sets {
-            guard let weight = set.weightKg else { continue }
+            guard let entry = set.topStatEntry, let weight = entry.weightKg else { continue }
+            let extraSegments = set.isDropSet ? max(0, set.effectiveSegments.count - 1) : 0
             if let current = best {
                 if weight > current.weightKg {
-                    best = (weight, set.reps)
+                    best = (weight, entry.reps, extraSegments)
                 }
             } else {
-                best = (weight, set.reps)
+                best = (weight, entry.reps, extraSegments)
             }
         }
         return best

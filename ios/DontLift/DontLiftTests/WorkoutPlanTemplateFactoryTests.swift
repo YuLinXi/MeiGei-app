@@ -38,6 +38,34 @@ struct WorkoutPlanTemplateFactoryTests {
         #expect(items[0].suggestedSets == 2)
         #expect(items[0].suggestedReps == 6)
         #expect(items[0].suggestedWeightKg == 82.5)
+        #expect(items[0].setPrescriptions?.count == 2)
+    }
+
+    @Test func planTemplateItemsPreserveCompletedDropSetPrescription() {
+        let workout = Workout(planId: nil, title: "胸推", endedAt: Date())
+        let exercise = WorkoutExercise(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0)
+        exercise.sets = [
+            WorkoutSet(
+                setIndex: 0,
+                completed: true,
+                setType: .drop,
+                segments: [
+                    WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8),
+                    WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6)
+                ]
+            )
+        ]
+        workout.exercises = [exercise]
+
+        let items = workout.planTemplateItems()
+
+        #expect(items.count == 1)
+        #expect(items[0].suggestedSets == 1)
+        #expect(items[0].suggestedWeightKg == 80)
+        #expect(items[0].suggestedReps == 8)
+        #expect(items[0].setPrescriptions?.first?.setType == .drop)
+        #expect(items[0].setPrescriptions?.first?.segments.map(\.weightKg) == [80, 60])
+        #expect(items[0].setPrescriptions?.first?.segments.map(\.reps) == [8, 6])
     }
 
     @Test func personalPlanWorkoutDoesNotOfferSaveAsTemplate() {

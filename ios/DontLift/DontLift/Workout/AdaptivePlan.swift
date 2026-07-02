@@ -23,7 +23,10 @@ extension PlanItem {
 enum PlanPrefill {
     /// 严格模式要求每个动作都有组数与次数；开始训练和切换模式都应复用同一校验。
     static func missingStrictRequiredItems(in items: [PlanItem]) -> [PlanItem] {
-        items.filter { ($0.suggestedSets ?? 0) <= 0 || $0.suggestedReps == nil }
+        items.filter {
+            if !$0.orderedSetPrescriptions.isEmpty { return false }
+            return ($0.suggestedSets ?? 0) <= 0 || $0.suggestedReps == nil
+        }
     }
 
     static func strictRequirementMessage(for missing: [PlanItem]) -> String {
@@ -33,27 +36,47 @@ enum PlanPrefill {
     /// 历史里某计划项「上次」已完成正式组的逐组 `(重量, 次数)`，按 setIndex 升序；无则空。
     /// 新数据优先用 `planItemId` 精确匹配，旧数据才退回无 `planItemId` 的 `historyKey` 匹配。
     static func lastCompletedSets(for item: PlanItem, in history: [Workout]) -> [(weightKg: Double?, reps: Int?)] {
+        lastCompletedSnapshots(for: item, in: history).map { ($0.weightKg, $0.reps) }
+    }
+
+    static func lastCompletedSnapshots(for item: PlanItem, in history: [Workout]) -> [SetSnapshot] {
         let exact = lastCompletedSets(in: history) { $0.planItemId == item.itemId }
         if !exact.isEmpty { return exact }
-        return lastCompletedSets(forHistoryKey: item.historyKey, in: history)
+        return lastCompletedSnapshots(forHistoryKey: item.historyKey, in: history)
     }
 
     static func lastCompletedSets(for item: PlanItem, in lookup: PlanHistoryLookup) -> [(weightKg: Double?, reps: Int?)] {
         lookup.latestSets(for: item).map { ($0.weightKg, $0.reps) }
     }
 
+    static func lastCompletedSnapshots(for item: PlanItem, in lookup: PlanHistoryLookup) -> [SetSnapshot] {
+        lookup.latestSets(for: item)
+    }
+
     /// 历史里某动作「上次」已完成正式组的逐组 `(重量, 次数)`，按 setIndex 升序；无则空。
     /// 仅匹配无 `planItemId` 的旧记录，避免重复同动作计划项互相串味。
     static func lastCompletedSets(forHistoryKey key: String, in history: [Workout]) -> [(weightKg: Double?, reps: Int?)] {
+        lastCompletedSnapshots(forHistoryKey: key, in: history).map { ($0.weightKg, $0.reps) }
+    }
+
+    static func lastCompletedSnapshots(forHistoryKey key: String, in history: [Workout]) -> [SetSnapshot] {
         lastCompletedSets(in: history) { $0.planItemId == nil && $0.historyKey == key }
     }
 
-    private static func lastCompletedSets(in history: [Workout], matching matches: (WorkoutExercise) -> Bool) -> [(weightKg: Double?, reps: Int?)] {
+    private static func lastCompletedSets(in history: [Workout], matching matches: (WorkoutExercise) -> Bool) -> [SetSnapshot] {
         let finished = history.filter { $0.isFinished }.sorted { $0.startedAt > $1.startedAt }
         for w in finished {
             for ex in w.exercises where matches(ex) {
                 let done = ex.sets.filter { $0.countsForStats }.sorted { $0.setIndex < $1.setIndex }
-                if !done.isEmpty { return done.map { ($0.weightKg, $0.reps) } }
+                if !done.isEmpty {
+                    return done.map {
+                        let summary = $0.summaryWeightReps
+                        return SetSnapshot(weightKg: summary.weightKg,
+                                           reps: summary.reps,
+                                           setTypeRaw: $0.setTypeRaw,
+                                           segments: $0.segments)
+                    }
+                }
             }
         }
         return []
@@ -85,43 +108,77 @@ enum PlanPrefill {
     /// 为一个计划项生成开始训练时的落值组。新建组一律 `completed=false`。
     static func sets(for item: PlanItem, mode: WorkoutPlanMode, history: [Workout]) -> [WorkoutSet] {
         if mode == .strict {
+            let prescriptions = item.orderedSetPrescriptions
+            if !prescriptions.isEmpty { return sets(from: prescriptions) }
             guard let count = item.suggestedSets, count > 0, item.suggestedReps != nil else { return [] }
-            return (0..<count).map {
-                WorkoutSet(setIndex: $0, weightKg: item.suggestedWeightKg, reps: item.suggestedReps)
-            }
+            return legacySets(for: item, count: count)
         }
 
         let last = (mode == .adaptive)
-            ? lastCompletedSets(for: item, in: history)
+            ? lastCompletedSnapshots(for: item, in: history)
             : []
-        // 自适应组数：计划 suggestedSets 优先；无 suggestedSets 时退回历史组数；再无则默认 4。
-        let count = max(1, item.suggestedSets ?? (last.isEmpty ? PlanDefaults.suggestedSets : last.count))
-        return (0..<count).map { idx in
-            if mode == .adaptive, idx < last.count {
-                // 自适应历史优先：用上次同序号 completed 实绩落值。
-                return WorkoutSet(setIndex: idx, weightKg: last[idx].weightKg, reps: last[idx].reps)
-            }
-            // 自适应超出历史的组 / 无历史：用计划预设落值（可能为 nil 即留空）。
-            return WorkoutSet(setIndex: idx, weightKg: item.suggestedWeightKg, reps: item.suggestedReps)
-        }
+        if !last.isEmpty { return sets(from: last) }
+        let prescriptions = item.orderedSetPrescriptions
+        if !prescriptions.isEmpty { return sets(from: prescriptions) }
+        let count = max(1, item.suggestedSets ?? PlanDefaults.suggestedSets)
+        return legacySets(for: item, count: count)
     }
 
     static func sets(for item: PlanItem, mode: WorkoutPlanMode, lookup: PlanHistoryLookup) -> [WorkoutSet] {
         if mode == .strict {
+            let prescriptions = item.orderedSetPrescriptions
+            if !prescriptions.isEmpty { return sets(from: prescriptions) }
             guard let count = item.suggestedSets, count > 0, item.suggestedReps != nil else { return [] }
-            return (0..<count).map {
-                WorkoutSet(setIndex: $0, weightKg: item.suggestedWeightKg, reps: item.suggestedReps)
-            }
+            return legacySets(for: item, count: count)
         }
 
-        let last = mode == .adaptive ? lastCompletedSets(for: item, in: lookup) : []
-        let count = max(1, item.suggestedSets ?? (last.isEmpty ? PlanDefaults.suggestedSets : last.count))
-        return (0..<count).map { idx in
-            if mode == .adaptive, idx < last.count {
-                return WorkoutSet(setIndex: idx, weightKg: last[idx].weightKg, reps: last[idx].reps)
-            }
-            return WorkoutSet(setIndex: idx, weightKg: item.suggestedWeightKg, reps: item.suggestedReps)
+        let last = mode == .adaptive ? lastCompletedSnapshots(for: item, in: lookup) : []
+        if !last.isEmpty { return sets(from: last) }
+        let prescriptions = item.orderedSetPrescriptions
+        if !prescriptions.isEmpty { return sets(from: prescriptions) }
+        let count = max(1, item.suggestedSets ?? PlanDefaults.suggestedSets)
+        return legacySets(for: item, count: count)
+    }
+
+    private static func legacySets(for item: PlanItem, count: Int) -> [WorkoutSet] {
+        (0..<count).map {
+            WorkoutSet(setIndex: $0, weightKg: item.suggestedWeightKg, reps: item.suggestedReps)
         }
+    }
+
+    private static func sets(from prescriptions: [PlanSetPrescription]) -> [WorkoutSet] {
+        prescriptions.enumerated().map { idx, prescription in
+            let type = prescription.setType
+            let segments = normalizedSegments(prescription.segments)
+            return WorkoutSet(setIndex: idx,
+                              weightKg: prescription.weightKg,
+                              reps: prescription.reps,
+                              setType: type,
+                              segments: type == .drop ? segments : [])
+        }
+    }
+
+    private static func sets(from snapshots: [SetSnapshot]) -> [WorkoutSet] {
+        snapshots.enumerated().map { idx, snapshot in
+            let type = WorkoutSetType(rawValue: snapshot.setTypeRaw) ?? .working
+            let segments = normalizedSegments(snapshot.segments)
+            return WorkoutSet(setIndex: idx,
+                              weightKg: snapshot.weightKg,
+                              reps: snapshot.reps,
+                              setType: type,
+                              segments: type == .drop ? segments : [])
+        }
+    }
+
+    private static func normalizedSegments(_ segments: [WorkoutSetSegment]) -> [WorkoutSetSegment] {
+        segments.sorted { $0.segmentIndex < $1.segmentIndex }
+            .enumerated()
+            .map { idx, segment in
+                WorkoutSetSegment(segmentId: segment.segmentId,
+                                  segmentIndex: idx,
+                                  weightKg: segment.weightKg,
+                                  reps: segment.reps)
+            }
     }
 }
 
@@ -173,26 +230,28 @@ struct PlanPrescriptionPreview {
         guard !sets.isEmpty else { return "缺少组数/次数" }
         let countText = "下次 \(sets.count) 组"
         guard let representative = representativeSet else { return countText }
+        let values = representative.summaryWeightReps
+        let dropText = sets.contains(where: \.isDropSet) ? " · 含递减组" : ""
 
-        switch (representative.weightKg, representative.reps) {
+        switch (values.weightKg, values.reps) {
         case let (.some(weight), .some(reps)):
-            return "\(countText) · \(formatKg(weight)) kg × \(reps)"
+            return "\(countText) · \(formatKg(weight)) kg × \(reps)\(dropText)"
         case let (.some(weight), .none):
-            return "\(countText) · \(formatKg(weight)) kg"
+            return "\(countText) · \(formatKg(weight)) kg\(dropText)"
         case let (.none, .some(reps)):
-            return "\(countText) × \(reps)"
+            return "\(countText) × \(reps)\(dropText)"
         case (.none, .none):
-            return countText
+            return "\(countText)\(dropText)"
         }
     }
 
     /// 用最重组作为摘要代表；无重量时取第一组有次数的组。
     private var representativeSet: WorkoutSet? {
-        let weighted = sets.filter { $0.weightKg != nil }
+        let weighted = sets.filter { $0.summaryWeightReps.weightKg != nil }
         if !weighted.isEmpty {
-            return weighted.max { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
+            return weighted.max { ($0.summaryWeightReps.weightKg ?? 0) < ($1.summaryWeightReps.weightKg ?? 0) }
         }
-        return sets.first { $0.reps != nil } ?? sets.first
+        return sets.first { $0.summaryWeightReps.reps != nil } ?? sets.first
     }
 
     static func make(for item: PlanItem, mode: WorkoutPlanMode, history: [Workout], planId: UUID? = nil) -> PlanPrescriptionPreview {
@@ -283,6 +342,7 @@ enum PlanWriteback {
         if let s = i.suggestedSets { parts.append("\(s) 组") }
         if let r = i.suggestedReps { parts.append("\(r) 次") }
         if let w = i.suggestedWeightKg { parts.append("\(formatKg(w)) kg") }
+        if i.orderedSetPrescriptions.contains(where: { $0.setType == .drop }) { parts.append("含递减组") }
         return parts.isEmpty ? "未设建议" : parts.joined(separator: " × ")
     }
 
@@ -296,21 +356,27 @@ enum PlanWriteback {
         for ex in workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }) {
             let working = ex.sets.filter { $0.countsForStats }     // completed 正式组
             guard !working.isEmpty else { continue }               // 本次没做/没完成 → 不回写该动作
-            // 顶组：最大重量那一组（nil 重量当 0）。
-            guard let top = working.max(by: { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }) else { continue }
+            // 顶组：最大重量统计 entry（递减组展开到 segment，nil 重量当 0）。
+            guard let top = working.flatMap(\.statEntries).max(by: { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }) else { continue }
             let setCount = working.count
 
             // 匹配：planItemId 精确优先；缺失/找不到时，仅在 historyKey 命中唯一项时 fallback。
             let matchIdx = matchIndex(for: ex, in: items)
+            let existingPrescriptions = matchIdx.map { items[$0].orderedSetPrescriptions } ?? []
+            let prescriptions = working.enumerated().map { idx, set in
+                prescription(from: set, orderIndex: idx, existing: existingPrescriptions.indices.contains(idx) ? existingPrescriptions[idx] : nil)
+            }
 
             if let idx = matchIdx {
                 let before = summary(items[idx])
+                let beforePrescriptions = items[idx].setPrescriptions
                 items[idx].suggestedSets = max(items[idx].suggestedSets ?? 0, setCount)  // 组数只增不减
                 items[idx].suggestedWeightKg = top.weightKg                              // 重量如实
                 items[idx].suggestedReps = top.reps                                      // 次数如实
+                items[idx].setPrescriptions = prescriptions
                 touchedItemIds.insert(items[idx].itemId)
                 let after = summary(items[idx])
-                if after != before {
+                if after != before || beforePrescriptions != items[idx].setPrescriptions {
                     diffs.append(ItemDiff(kind: .updated, exerciseName: ex.exerciseName,
                                           oldText: before, newText: after))
                 }
@@ -324,7 +390,8 @@ enum PlanWriteback {
                                        orderIndex: nextOrder,
                                        suggestedSets: setCount,
                                        suggestedReps: top.reps,
-                                       suggestedWeightKg: top.weightKg)
+                                       suggestedWeightKg: top.weightKg,
+                                       setPrescriptions: prescriptions)
                 nextOrder += 1
                 items.append(newItem)
                 diffs.append(ItemDiff(kind: .added, exerciseName: ex.exerciseName,
@@ -347,6 +414,30 @@ enum PlanWriteback {
         }
         let fallbackMatches = items.indices.filter { items[$0].historyKey == ex.historyKey }
         return fallbackMatches.count == 1 ? fallbackMatches[0] : nil
+    }
+
+    private static func prescription(from set: WorkoutSet, orderIndex: Int, existing: PlanSetPrescription? = nil) -> PlanSetPrescription {
+        if set.isDropSet {
+            let existingSegments = existing?.segments.sorted { $0.segmentIndex < $1.segmentIndex } ?? []
+            let segments = set.effectiveSegments.enumerated().map { idx, segment in
+                WorkoutSetSegment(segmentId: existingSegments.indices.contains(idx) ? existingSegments[idx].segmentId : segment.segmentId,
+                                  segmentIndex: idx,
+                                  weightKg: segment.weightKg,
+                                  reps: segment.reps)
+            }
+            let summary = set.summaryWeightReps
+            return PlanSetPrescription(prescriptionId: existing?.prescriptionId ?? UUID(),
+                                       setType: .drop,
+                                       orderIndex: orderIndex,
+                                       weightKg: summary.weightKg,
+                                       reps: summary.reps,
+                                       segments: segments)
+        }
+        return PlanSetPrescription(prescriptionId: existing?.prescriptionId ?? UUID(),
+                                   setType: set.setType,
+                                   orderIndex: orderIndex,
+                                   weightKg: set.weightKg,
+                                   reps: set.reps)
     }
 }
 

@@ -15,7 +15,8 @@ extension Workout {
             let sets = ex.sets
                 .filter(\.countsForStats)
                 .sorted { $0.setIndex < $1.setIndex }
-            guard let last = sets.last else { continue }
+            guard !sets.isEmpty else { continue }
+            let top = sets.flatMap(\.statEntries).max { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
             items.append(PlanItem(
                 builtinExerciseCode: ex.builtinExerciseCode,
                 customExerciseId: ex.customExerciseId,
@@ -23,10 +24,34 @@ extension Workout {
                 primaryMuscle: ex.primaryMuscle,
                 orderIndex: items.count,
                 suggestedSets: sets.count,
-                suggestedReps: last.reps,
-                suggestedWeightKg: last.weightKg
+                suggestedReps: top?.reps,
+                suggestedWeightKg: top?.weightKg,
+                setPrescriptions: sets.enumerated().map { idx, set in
+                    Self.planPrescription(from: set, orderIndex: idx)
+                }
             ))
         }
         return items
+    }
+
+    private static func planPrescription(from set: WorkoutSet, orderIndex: Int) -> PlanSetPrescription {
+        if set.isDropSet {
+            let segments = set.effectiveSegments.enumerated().map { idx, segment in
+                WorkoutSetSegment(segmentId: segment.segmentId,
+                                  segmentIndex: idx,
+                                  weightKg: segment.weightKg,
+                                  reps: segment.reps)
+            }
+            let summary = set.summaryWeightReps
+            return PlanSetPrescription(setType: .drop,
+                                       orderIndex: orderIndex,
+                                       weightKg: summary.weightKg,
+                                       reps: summary.reps,
+                                       segments: segments)
+        }
+        return PlanSetPrescription(setType: set.setType,
+                                   orderIndex: orderIndex,
+                                   weightKg: set.weightKg,
+                                   reps: set.reps)
     }
 }

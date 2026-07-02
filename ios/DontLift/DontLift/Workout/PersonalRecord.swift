@@ -46,7 +46,7 @@ func detectPersonalRecords(in workout: Workout, history: [Workout]) -> [Personal
     var bestByKey: [String: Double] = [:]
     for w in history {
         for ex in w.exercises {
-            guard let m = ex.sets.filter(\.countsForStats).compactMap(\.weightKg).max() else { continue }
+            guard let m = ex.sets.flatMap(\.statEntries).compactMap(\.weightKg).max() else { continue }
             bestByKey[ex.historyKey] = max(bestByKey[ex.historyKey] ?? m, m)
         }
     }
@@ -58,7 +58,7 @@ func detectPersonalRecords(in workout: Workout, priorBestByKey: [String: Double]
     var seen = Set<String>()
     var prs: [PersonalRecord] = []
     for ex in workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }) {
-        guard let sessionMax = ex.sets.filter(\.countsForStats).compactMap(\.weightKg).max() else { continue }
+        guard let sessionMax = ex.sets.flatMap(\.statEntries).compactMap(\.weightKg).max() else { continue }
         let key = ex.historyKey
         guard !seen.contains(key) else { continue }
         let prior = priorBestByKey[key]

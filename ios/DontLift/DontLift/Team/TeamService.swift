@@ -375,9 +375,28 @@ final class TeamService {
                      orderIndex: $0.orderIndex,
                      suggestedSets: $0.suggestedSets,
                      suggestedReps: $0.suggestedReps,
-                     suggestedWeightKg: nil)
+                     suggestedWeightKg: nil,
+                     setPrescriptions: weightlessPrescriptions($0.orderedSetPrescriptions))
         }
         return (try? String(data: JSONCoding.encoder.encode(items), encoding: .utf8)) ?? "[]"
+    }
+
+    private static func weightlessPrescriptions(_ prescriptions: [PlanSetPrescription]) -> [PlanSetPrescription]? {
+        guard !prescriptions.isEmpty else { return nil }
+        return prescriptions.map { prescription in
+            let segments = prescription.segments.map {
+                WorkoutSetSegment(segmentId: $0.segmentId,
+                                  segmentIndex: $0.segmentIndex,
+                                  weightKg: nil,
+                                  reps: $0.reps)
+            }
+            return PlanSetPrescription(prescriptionId: prescription.prescriptionId,
+                                       setType: prescription.setType,
+                                       orderIndex: prescription.orderIndex,
+                                       weightKg: nil,
+                                       reps: prescription.reps,
+                                       segments: segments)
+        }
     }
 
     private func send(_ intent: PendingCheckinShare) async throws -> [TeamCheckinDTO] {

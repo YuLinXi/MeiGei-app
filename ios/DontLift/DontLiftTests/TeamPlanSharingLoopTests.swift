@@ -45,6 +45,46 @@ struct TeamPlanSharingLoopTests {
         #expect(items[0].suggestedReps == 8)
     }
 
+    @Test func shareSnapshotStripsNestedDropSetPrescriptionWeights() throws {
+        let plan = WorkoutPlan(
+            name: "递减胸推",
+            items: [
+                PlanItem(
+                    builtinExerciseCode: "BB_BENCH_PRESS",
+                    exerciseName: "杠铃卧推",
+                    orderIndex: 0,
+                    suggestedSets: 1,
+                    suggestedReps: 8,
+                    suggestedWeightKg: 80,
+                    setPrescriptions: [
+                        PlanSetPrescription(
+                            setType: .drop,
+                            orderIndex: 0,
+                            weightKg: 80,
+                            reps: 8,
+                            segments: [
+                                WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8),
+                                WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6)
+                            ]
+                        )
+                    ]
+                )
+            ],
+            mode: .adaptive
+        )
+
+        let json = TeamService.weightlessItemsJSON(from: plan)
+        let items = try JSONCoding.decoder.decode([PlanItem].self, from: Data(json.utf8))
+
+        let prescription = try #require(items.first?.setPrescriptions?.first)
+        #expect(items.first?.suggestedWeightKg == nil)
+        #expect(prescription.setType == .drop)
+        #expect(prescription.weightKg == nil)
+        #expect(prescription.reps == 8)
+        #expect(prescription.segments.map(\.weightKg) == [nil, nil])
+        #expect(prescription.segments.map(\.reps) == [8, 6])
+    }
+
     @Test func teamPlanShareCardUsesTotalCompletionAndLegacyFallbackCounts() throws {
         let shareId = UUID()
         let versionId = UUID()
@@ -121,6 +161,34 @@ struct TeamPlanSharingLoopTests {
         #expect(workout.exercises.first?.planItemId == item.itemId)
         #expect(workout.exercises.first?.sets.count == 2)
         #expect(workout.exercises.first?.sets.allSatisfy { !$0.completed } == true)
+    }
+
+    @Test func checkinSummaryPreservesDropSetSegments() {
+        let workout = Workout(title: "胸推", startedAt: Date(), endedAt: Date())
+        let exercise = WorkoutExercise(builtinExerciseCode: "BB_BENCH_PRESS",
+                                       exerciseName: "杠铃卧推",
+                                       orderIndex: 0)
+        exercise.sets = [
+            WorkoutSet(
+                setIndex: 0,
+                completed: true,
+                setType: .drop,
+                segments: [
+                    WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8),
+                    WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6)
+                ]
+            )
+        ]
+        workout.exercises = [exercise]
+
+        let summary = CheckinSummary(workout: workout)
+        let set = summary.exercises.first?.sets.first
+
+        #expect(summary.totalSets == 1)
+        #expect(summary.totalVolumeKg == 80 * 8 + 60 * 6)
+        #expect(set?.setType == .drop)
+        #expect(set?.segments?.map(\.weightKg) == [80, 60])
+        #expect(set?.segments?.map(\.reps) == [8, 6])
     }
 
     @Test func completedTeamShareWorkoutCanBeSavedAsPlanTemplateOnce() {

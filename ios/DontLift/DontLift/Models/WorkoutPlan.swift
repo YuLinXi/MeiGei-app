@@ -34,6 +34,39 @@ enum PlanDefaults {
     static let suggestedReps = 10
 }
 
+/// 训练计划中的单组处方。普通组直接使用 `weightKg/reps`；递减组使用 `segments` 作为真相。
+struct PlanSetPrescription: Codable, Identifiable, Hashable {
+    var prescriptionId: UUID
+    var setTypeRaw: String
+    var orderIndex: Int
+    var weightKg: Double?
+    var reps: Int?
+    var segments: [WorkoutSetSegment]
+
+    var id: UUID { prescriptionId }
+
+    init(
+        prescriptionId: UUID = UUID(),
+        setType: WorkoutSetType = .working,
+        orderIndex: Int,
+        weightKg: Double? = nil,
+        reps: Int? = nil,
+        segments: [WorkoutSetSegment] = []
+    ) {
+        self.prescriptionId = prescriptionId
+        self.setTypeRaw = setType.rawValue
+        self.orderIndex = orderIndex
+        self.weightKg = weightKg
+        self.reps = reps
+        self.segments = segments
+    }
+
+    var setType: WorkoutSetType {
+        get { WorkoutSetType(rawValue: setTypeRaw) ?? .working }
+        set { setTypeRaw = newValue.rawValue }
+    }
+}
+
 /// 训练计划模板里的单个动作项。每项带稳定 `itemId`（design.md D5），
 /// 供编辑、Fork、diff 时定位。整体以 jsonb 文档随计划读写。
 struct PlanItem: Codable, Identifiable, Hashable {
@@ -48,6 +81,8 @@ struct PlanItem: Codable, Identifiable, Hashable {
     var suggestedSets: Int?
     var suggestedReps: Int?
     var suggestedWeightKg: Double?
+    /// 可选逐组处方；缺失时继续使用 `suggested*` 兼容旧计划。
+    var setPrescriptions: [PlanSetPrescription]?
 
     var id: UUID { itemId }
 
@@ -61,7 +96,8 @@ struct PlanItem: Codable, Identifiable, Hashable {
         orderIndex: Int,
         suggestedSets: Int? = nil,
         suggestedReps: Int? = nil,
-        suggestedWeightKg: Double? = nil
+        suggestedWeightKg: Double? = nil,
+        setPrescriptions: [PlanSetPrescription]? = nil
     ) {
         self.itemId = itemId
         self.builtinExerciseCode = builtinExerciseCode
@@ -73,6 +109,7 @@ struct PlanItem: Codable, Identifiable, Hashable {
         self.suggestedSets = suggestedSets
         self.suggestedReps = suggestedReps
         self.suggestedWeightKg = suggestedWeightKg
+        self.setPrescriptions = setPrescriptions
     }
 }
 
@@ -112,6 +149,10 @@ extension PlanItem {
             item.builtinExerciseCode ?? item.customExerciseId?.uuidString ?? item.itemId.uuidString
         }
         return "计划包含无法识别且缺少名称快照的动作：" + refs.joined(separator: "、") + "。请更新 App 或重新编辑该计划后再开始训练。"
+    }
+
+    var orderedSetPrescriptions: [PlanSetPrescription] {
+        (setPrescriptions ?? []).sorted { $0.orderIndex < $1.orderIndex }
     }
 }
 
@@ -179,7 +220,9 @@ extension WorkoutPlan {
     /// 模板内建议组数之和（各动作项 `suggestedSets` 累加，nil 视为 0）。
     /// 计划详情 statRow 与计划列表 featured 卡共用，避免两处算法漂移。
     var totalSuggestedSets: Int {
-        items.reduce(0) { $0 + ($1.suggestedSets ?? 0) }
+        items.reduce(0) { total, item in
+            total + (item.setPrescriptions?.count ?? item.suggestedSets ?? 0)
+        }
     }
 
     /// 「进行中」计划判定——首页开始 CTA 与「计划」页共用同一份逻辑，避免两处漂移。

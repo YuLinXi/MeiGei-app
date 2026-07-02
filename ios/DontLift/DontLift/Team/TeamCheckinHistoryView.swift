@@ -331,26 +331,7 @@ struct TeamCheckinDetailSheet: View {
                     } else {
                         VStack(spacing: 6) {
                             ForEach(Array(exercise.sets.enumerated()), id: \.offset) { index, set in
-                                HStack {
-                                    Text("#\(index + 1)")
-                                        .font(Theme.Font.mono(size: 11, weight: .bold))
-                                        .foregroundStyle(Theme.Color.muted)
-                                        .frame(width: 34, alignment: .leading)
-                                    Text(set.weightKg.map { formatKg($0) + " kg" } ?? "— kg")
-                                        .font(Theme.Font.mono(size: 12, weight: .semibold))
-                                        .foregroundStyle(Theme.Color.fg)
-                                    Text("×")
-                                        .font(Theme.Font.mono(size: 12, weight: .semibold))
-                                        .foregroundStyle(Theme.Color.muted)
-                                    Text(set.reps.map { "\($0) 次" } ?? "— 次")
-                                        .font(Theme.Font.mono(size: 12, weight: .semibold))
-                                        .foregroundStyle(Theme.Color.fg)
-                                    Spacer(minLength: 0)
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
+                                checkinSetRow(set, index: index)
                             }
                         }
                     }
@@ -358,6 +339,60 @@ struct TeamCheckinDetailSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .cardStyle()
             }
+        }
+    }
+
+    @ViewBuilder
+    private func checkinSetRow(_ set: CheckinSummary.SetSummary, index: Int) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("#\(index + 1)")
+                    .font(Theme.Font.mono(size: 11, weight: .bold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .frame(width: 34, alignment: .leading)
+                if set.setType == .drop {
+                    Text("递减组")
+                        .font(Theme.Font.body(size: 11, weight: .bold))
+                        .foregroundStyle(Theme.Color.accent)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Theme.Color.accentSofter, in: Capsule())
+                } else {
+                    setValueLine(weightKg: set.weightKg, reps: set.reps)
+                }
+                Spacer(minLength: 0)
+            }
+            if set.setType == .drop {
+                ForEach((set.segments ?? []).filter { $0.weightKg != nil || $0.reps != nil }) { segment in
+                    HStack {
+                        Text("段 \(segment.segmentIndex + 1)")
+                            .font(Theme.Font.mono(size: 10, weight: .semibold))
+                            .foregroundStyle(Theme.Color.muted)
+                            .frame(width: 34, alignment: .leading)
+                        setValueLine(weightKg: segment.weightKg, reps: segment.reps)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.leading, 34)
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
+    }
+
+    private func setValueLine(weightKg: Double?, reps: Int?) -> some View {
+        HStack(spacing: 6) {
+            Text(weightKg.map { formatKg($0) + " kg" } ?? "— kg")
+                .font(Theme.Font.mono(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg)
+            Text("×")
+                .font(Theme.Font.mono(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+            Text(reps.map { "\($0) 次" } ?? "— 次")
+                .font(Theme.Font.mono(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg)
         }
     }
 

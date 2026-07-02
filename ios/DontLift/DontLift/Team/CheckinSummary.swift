@@ -23,24 +23,39 @@ struct CheckinSummary: Codable, Hashable, Identifiable {
     struct SetSummary: Codable, Hashable {
         var weightKg: Double?
         var reps: Int?
+        var setTypeRaw: String?
+        var segments: [WorkoutSetSegment]?
+
+        var setType: WorkoutSetType {
+            setTypeRaw.flatMap(WorkoutSetType.init(rawValue:)) ?? .working
+        }
     }
 }
 
 extension CheckinSummary {
-    /// 由本地训练记录构建快照（仅取已完成的组参与容量统计，全部组进详情）。
+    /// 由本地训练记录构建快照（仅已完成正式组参与容量统计和逻辑组计数）。
     init(workout: Workout) {
         let exs = workout.exercises.sorted { $0.orderIndex < $1.orderIndex }
         var totalSets = 0
         var volume = 0.0
         let summaries: [ExerciseSummary] = exs.map { ex in
             let sets = ex.sets.sorted { $0.setIndex < $1.setIndex }
-            totalSets += sets.count
-            for s in sets where s.completed {
-                volume += (s.weightKg ?? 0) * Double(s.reps ?? 0)
+            let statSets = sets.filter(\.countsForStats)
+            totalSets += statSets.count
+            for s in statSets {
+                volume += s.statEntries.reduce(0.0) { acc, entry in
+                    acc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+                }
             }
             return ExerciseSummary(
                 name: ex.displayExerciseName,
-                sets: sets.map { SetSummary(weightKg: $0.weightKg, reps: $0.reps) })
+                sets: statSets.map {
+                    let summary = $0.summaryWeightReps
+                    return SetSummary(weightKg: summary.weightKg,
+                                      reps: summary.reps,
+                                      setTypeRaw: $0.setTypeRaw,
+                                      segments: $0.segments)
+                })
         }
         self.init(
             title: workout.title,

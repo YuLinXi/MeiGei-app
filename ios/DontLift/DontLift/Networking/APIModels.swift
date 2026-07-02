@@ -191,6 +191,8 @@ struct WorkoutSetDTO: Codable {
     var actualRestSeconds: Int?
     /// 组类型 raw（"working"/"warmup"）。解码缺失时由 SyncEngine 兜底 `working`，兼容旧后端/旧数据。
     var setType: String?
+    /// 递减组分段 JSON 字符串；旧后端/旧数据缺失时按空数组处理。
+    var segments: String?
 }
 
 struct WorkoutTreeDTO: Codable {
