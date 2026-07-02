@@ -113,12 +113,11 @@ final class WorkoutExercise {
     }
 }
 
-/// 组类型。当前仅 working/warmup；后续可 append dropset/failure 等，
+/// 组类型。当前仅 working/warmup；raw string 存储保持后续扩展空间。
 /// 统计判据为 `!= .warmup`，新增「正式类」case 无需改统计代码。
 enum WorkoutSetType: String, Codable, CaseIterable {
     case working   // 正式组
     case warmup    // 热身组
-    // 预留：case dropset / case failure ...
 }
 
 /// 一个动作下的单组记录（聚合子节点，不单独同步）。新增组可由调用方按当前训练上下文预填重量/次数；

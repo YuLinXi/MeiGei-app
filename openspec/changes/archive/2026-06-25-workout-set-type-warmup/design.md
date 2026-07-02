@@ -5,12 +5,11 @@
 只落两个 case，但用枚举承载，给未来留位。存储沿用项目既有的 `*Raw: String` 模式（同 `SyncStatus`/`syncStatusRaw`），避免 SwiftData 直接持久化枚举的兼容包袱。
 
 ```swift
-/// 组类型。当前仅 working/warmup；后续可 append dropset/failure 等，
+/// 组类型。当前仅 working/warmup；raw string 存储保持后续扩展空间。
 /// 统计判据为 `!= .warmup`，新增「正式类」case 无需改统计代码。
 enum WorkoutSetType: String, Codable, CaseIterable {
     case working   // 正式组
     case warmup    // 热身组
-    // 预留：case dropset / case failure ...
 }
 
 @Model final class WorkoutSet {
@@ -25,7 +24,7 @@ enum WorkoutSetType: String, Codable, CaseIterable {
 ```
 
 - **默认值 `"working"`**：新 `@Attribute` 给默认值，旧记录读出来即正式组 → **零迁移脚本**。
-- **未知值兜底 `.working`**：将来后端/旧端发来本端未识别的类型（如老客户端收到 `dropset`），按「正式组」处理而非崩溃 —— 与「统计判据 `!= .warmup`」一致，未知类型默认计入统计，安全保守。
+- **未知值兜底 `.working`**：将来后端/旧端发来本端未识别的类型时，按「正式组」处理而非崩溃 —— 与「统计判据 `!= .warmup`」一致，未知类型默认计入统计，安全保守。
 
 **为何不用 `isWarmup: Bool`**：用户明确要枚举形态以便扩展。布尔到三态以上要改类型/补列，枚举只 append case。
 
@@ -47,9 +46,9 @@ extension WorkoutSet { var countsForStats: Bool { setType != .warmup } }
 | 周总次数 repCount | `WorkoutWeeklyStats` | 只累加正式组 reps |
 | 历史强度曲线 | 详情页/历史曲线遍历 | 只取正式组点 |
 
-**为何写 `!= .warmup` 而非 `== .working`**：未来加 `dropset`/`failure`（都是真实训练努力，应计入训练量与组数）时，`!= .warmup` 自动把它们归入「正式类」，统计代码一行不改。这是用户选「枚举一步到位」的核心收益落点。
+**为何写 `!= .warmup` 而非 `== .working`**：未来增加其它正式类组类型时，`!= .warmup` 自动把它们归入「正式类」，统计代码一行不改。这是用户选「枚举一步到位」的核心收益落点。
 
-> 注意：递减组的轻重量段、力竭组本就不会破 PR，计入 PR 无副作用；而它们计入 volume/组数符合训练学。故「正式类」统一进统计是正确缺省。
+> 注意：其它正式类组类型计入 volume/组数符合训练学。故「正式类」统一进统计是正确缺省。
 
 ## 3. 录入交互：徽章 + ⋯ 菜单双入口
 
@@ -78,7 +77,7 @@ extension WorkoutSet { var countsForStats: Bool { setType != .warmup } }
 - 同一 `WorkoutExercise` 下，**热身组强制排在所有正式组之前**；正式组之间保持用户手动顺序。
 - 实现取向：渲染/落盘时按「热身优先」稳定排序（warmup 段在前、working 段在后，段内保持原相对次序），再据此派生徽章编号。`setIndex` 仍作底层稳定序，类型分段是其上的展示与编号规则。
 - 当某组从正式切为热身（或反向）时：重排到对应段尾、并重算正式组编号。
-- **为何只热身吸顶**：递减/力竭组在训练学里接在正式组之后/之中，将来引入时不应被吸顶——所以排序规则今天就只对 `warmup` 生效，不写成「非正式全部置底」。
+- **为何只热身吸顶**：其它正式类组类型在训练学里接在正式组之后/之中，将来引入时不应被吸顶——所以排序规则今天就只对 `warmup` 生效，不写成「非正式全部置底」。
 
 ## 5. 同步契约
 
