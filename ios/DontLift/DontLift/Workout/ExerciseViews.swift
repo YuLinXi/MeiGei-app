@@ -92,7 +92,7 @@ private enum MuscleThumbnailAssetKey: String {
     }
 }
 
-/// 动作库 · Tab 根页：保留顶部标题与右上自定义动作创建入口。
+/// 动作库 · Tab 根页：不展示顶部标题，仅保留右上自定义动作创建入口。
 struct ExerciseLibraryView: View {
     @State private var showingCreate = false
     @State private var selectedExercise: BuiltinExercise?
@@ -101,31 +101,27 @@ struct ExerciseLibraryView: View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
             VStack(spacing: 0) {
-                header
                 ExerciseLibraryContentView(
                     mode: .browse { selectedExercise = $0 },
-                    emptyHint: "试试其他关键词，或点右上 + 添加自定义动作。",
-                    emptyPlainHint: "切换部位，或点右上 + 添加自定义动作。"
+                    emptyHint: "试试其他关键词，或点右下 + 添加自定义动作。",
+                    emptyPlainHint: "切换部位，或点右下 + 添加自定义动作。"
                 )
             }
+        }
+        .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
+            floatingAddButton
         }
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingCreate) { CustomExerciseEditorView() }
         .navigationDestination(item: $selectedExercise) { ExerciseDetailView(exercise: $0) }
     }
 
-    private var header: some View {
-        HStack {
-            Text("动作库")
-                .font(Theme.Font.display(size: 36, weight: .heavy))
-                .tracking(-1.08)
-                .foregroundStyle(Theme.Color.fg)
-            Spacer(minLength: 0)
-            CircleAddButton(action: { showingCreate = true }, accessibilityLabel: "添加自定义动作")
-        }
-        .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.top, 6)
-        .padding(.bottom, 4)
+    private var floatingAddButton: some View {
+        CircleAddButton(action: { showingCreate = true }, accessibilityLabel: "添加自定义动作")
+            .frame(width: 48, height: 48)
+            .padding(.trailing, Theme.Spacing.lg)
+            .padding(.top, Theme.Spacing.sm)
+            .padding(.bottom, Theme.Spacing.md)
     }
 }
 
@@ -453,21 +449,14 @@ private struct ExerciseLibraryContentView: View {
         }
     }
 
-    // MARK: 右侧动作区（器械 chip + 按树层级分段，逐行懒加载 + 返回顶部）
+    // MARK: 右侧动作区（右侧器械快速筛选 + 按树层级分段，逐行懒加载 + 返回顶部）
 
     private var rightArea: some View {
         let prWeights = historyStore.exercisePRs.mapValues(\.weightKg)
         let rowPage = libraryRowPage
         return ScrollViewReader { proxy in
-            VStack(spacing: 0) {
-                // 置顶器械轴：固定在右侧顶部，不随动作列表滚动；重复点已激活 chip 也回顶
-                HorizontalChipPicker(items: equipChips, selection: $equip,
-                                     onReselect: { _ in scrollLibToTop(proxy) }) { $0.title }
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .padding(.top, 2)
-                    .padding(.bottom, 8)
-                Rectangle().fill(Theme.Color.border).frame(height: 1)
-                ScrollView {
+            ZStack(alignment: .trailing) {
+                ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         Color.clear.frame(height: 0).id("LIB_TOP")
                         if rowPage.rows.isEmpty {
@@ -482,9 +471,15 @@ private struct ExerciseLibraryContentView: View {
                         }
                         Color.clear.frame(height: 40)
                     }
-                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.leading, Theme.Spacing.md)
+                    .padding(.trailing, Theme.Spacing.xl + 20)
                     .padding(.top, 8)
                 }
+
+                equipmentQuickFilter(proxy)
+                    .padding(.trailing, 6)
+                    .padding(.top, 8)
+                    .frame(maxHeight: .infinity, alignment: .topTrailing)
             }
             // 左栏筛选切换 / 器械筛选切换 → 列表自动回顶
             .onAppear { WorkoutPerformanceMonitor.event("exercise.library.appear") }
@@ -503,6 +498,68 @@ private struct ExerciseLibraryContentView: View {
                 resetLibraryPaging()
                 proxy.scrollTo("LIB_TOP", anchor: .top)
             }
+        }
+    }
+
+    private func equipmentQuickFilter(_ proxy: ScrollViewProxy) -> some View {
+        VStack(spacing: 6) {
+            Button {
+                scrollLibToTop(proxy)
+            } label: {
+                Image(systemName: "arrow.up.to.line")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Theme.Color.accent)
+                    .frame(width: 28, height: 28)
+                    .background(Theme.Color.accentSoft, in: Circle())
+                    .overlay(Circle().stroke(Theme.Color.accentSofter, lineWidth: 1))
+            }
+            .buttonStyle(PressableButtonStyle())
+            .accessibilityLabel("回到顶部")
+
+            ForEach(equipChips) { chip in
+                equipmentQuickFilterButton(chip, proxy: proxy)
+            }
+        }
+    }
+
+    private func equipmentQuickFilterButton(_ chip: LibraryChip, proxy: ScrollViewProxy) -> some View {
+        let selected = equip == chip.id
+        return Button {
+            if selected {
+                scrollLibToTop(proxy)
+            } else {
+                Theme.Haptics.impact(.light)
+                equip = chip.id
+            }
+        } label: {
+            Text(equipmentQuickLabel(for: chip))
+                .font(Theme.Font.mono(size: 10, weight: .bold))
+                .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.muted)
+                .frame(width: 28, height: 26)
+                .background(selected ? Theme.Color.accentSoft : Theme.Color.surface, in: Capsule())
+                .overlay(Capsule().stroke(selected ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
+        }
+        .buttonStyle(PressableButtonStyle())
+        .accessibilityLabel("筛选\(chip.title)")
+        .accessibilityAddTraits(selected ? .isSelected : AccessibilityTraits())
+    }
+
+    private func equipmentQuickLabel(for chip: LibraryChip) -> String {
+        switch chip.id {
+        case "all": return "全"
+        case EquipmentType.barbell.rawValue: return "杠"
+        case EquipmentType.dumbbell.rawValue: return "哑"
+        case EquipmentType.kettlebell.rawValue: return "壶"
+        case EquipmentType.machine.rawValue: return "器"
+        case EquipmentType.smith.rawValue: return "史"
+        case EquipmentType.hammer.rawValue: return "悍"
+        case EquipmentType.tbar.rawValue: return "T"
+        case EquipmentType.cable.rawValue: return "绳"
+        case EquipmentType.band.rawValue: return "弹"
+        case EquipmentType.suspension.rawValue: return "悬"
+        case EquipmentType.bodyweight.rawValue: return "自"
+        case EquipmentType.other.rawValue: return "其"
+        default: return String(chip.title.prefix(1))
         }
     }
 
@@ -1145,345 +1202,6 @@ struct ExercisePickerView: View {
         .background(Theme.Color.bg.ignoresSafeArea())
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-    }
-}
-
-// MARK: - 动作选择器 Sheet（C 设计稿 Screen 9 · 计划/训练复用）
-
-/// 选择器分组：个人置顶，其后按大肌群（顺序对齐设计稿）。
-/// 既作分组键、ScrollView 定位锚点，也作右侧快捷索引项。
-private enum PickerGroup: Hashable {
-    case personal
-    case muscle(ExerciseCategory)
-
-    /// 分组与右侧索引顺序：个人 + 全部 ExerciseCategory 父级（枚举声明序）。
-    static let order: [PickerGroup] = [.personal] + ExerciseCategory.allCases.map { .muscle($0) }
-
-    /// 组头标题（朱砂红 mono）。
-    var title: String {
-        switch self {
-        case .personal: return "个人"
-        case .muscle(let m): return m.rawValue
-        }
-    }
-
-    /// 右侧快捷索引单字（个人 = ★，肌群取首字）。
-    var indexLabel: String {
-        switch self {
-        case .personal: return "★"
-        case .muscle(let m): return String(m.rawValue.prefix(1))
-        }
-    }
-}
-
-/// 选择器内部行数据（携带回传 payload）。
-private struct PickerRow: Identifiable {
-    let id: String
-    let name: String
-    let muscle: String?
-    let equipment: String?
-    let isCustom: Bool
-    let pick: ExercisePick
-}
-
-/// 组头在滚动坐标系中的 minY，用于推断「当前所在组」高亮右侧索引。
-private struct GroupOffsetKey: PreferenceKey {
-    static let defaultValue: [PickerGroup: CGFloat] = [:]
-    static func reduce(value: inout [PickerGroup: CGFloat], nextValue: () -> [PickerGroup: CGFloat]) {
-        value.merge(nextValue()) { _, new in new }
-    }
-}
-
-/// 右侧索引条总高度，用于把拖动 y 坐标映射到索引项。
-private struct IndexBarHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
-
-/// 动作选择器 Sheet：去掉下拉筛选，列表直接按大肌群分组；右侧 iOS 风格快捷索引一触定位；
-/// 实时搜索跨组过滤，空结果转「创建自定义」引导；点击行回传选中动作。
-private struct LegacyExercisePickerView: View {
-    @Query(sort: \CustomExercise.updatedAt, order: .reverse) private var custom: [CustomExercise]
-    @Environment(\.dismiss) private var dismiss
-    @State private var query = ""
-    @State private var showingCreate = false
-    @State private var currentGroup: PickerGroup = .personal
-    @State private var barHeight: CGFloat = 0
-    let onPick: (ExercisePick) -> Void
-
-    var body: some View {
-        let groups = buildGroups()
-        let ordered = PickerGroup.order.filter { groups[$0]?.isEmpty == false }
-        VStack(spacing: 0) {
-            header
-            searchBar
-            if ordered.isEmpty {
-                emptyState
-            } else {
-                listWithIndex(groups: groups, ordered: ordered)
-            }
-        }
-        .background(Theme.Color.surface.ignoresSafeArea())
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .sheet(isPresented: $showingCreate) { CustomExerciseEditorView() }
-    }
-
-    // MARK: 顶栏（取消 / 标题 / 占位对称）
-
-    private var header: some View {
-        PaperSheetHeader(
-            title: "选择动作",
-            cancelTitle: "取消",
-            topPadding: 24,
-            bottomPadding: 12,
-            background: Theme.Color.surface,
-            onCancel: { dismiss() }
-        )
-    }
-
-    // MARK: 搜索框（实时跨组过滤）
-
-    private var searchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(Theme.Color.muted)
-            TextField("", text: $query, prompt: Text("搜索动作…").foregroundColor(Theme.Color.muted))
-                .font(Theme.Font.body(size: 14))
-                .foregroundStyle(Theme.Color.fg)
-                .submitLabel(.search)
-                .autocorrectionDisabled()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-
-    // MARK: 分组列表 + 右侧快捷索引
-
-    private func listWithIndex(groups: [PickerGroup: [PickerRow]], ordered: [PickerGroup]) -> some View {
-        ScrollViewReader { proxy in
-            ZStack(alignment: .trailing) {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(ordered, id: \.self) { g in
-                            groupHeader(g)
-                            let rows = groups[g] ?? []
-                            ForEach(rows) { r in
-                                Button { onPick(r.pick); dismiss() } label: { row(r) }
-                                    .buttonStyle(PressableButtonStyle())
-                                if r.id != rows.last?.id { rowDivider }
-                            }
-                        }
-                        Color.clear.frame(height: 20)
-                    }
-                    .padding(.leading, 16)
-                    .padding(.trailing, 28)   // 让出右侧索引条
-                }
-                .coordinateSpace(name: "pickerList")
-                .onPreferenceChange(GroupOffsetKey.self) { updateCurrentGroup($0) }
-
-                indexBar(groups: groups, proxy: proxy)
-                    .padding(.trailing, 5)
-            }
-        }
-    }
-
-    private func groupHeader(_ g: PickerGroup) -> some View {
-        Text(g.title)
-            .font(Theme.Font.mono(size: 10, weight: .semibold))
-            .tracking(0.1 * 10)
-            .foregroundStyle(Theme.Color.accent)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 2)
-            .padding(.top, 9)
-            .padding(.bottom, 6)
-            .id(g)
-            .background(
-                GeometryReader { geo in
-                    Color.clear.preference(
-                        key: GroupOffsetKey.self,
-                        value: [g: geo.frame(in: .named("pickerList")).minY]
-                    )
-                }
-            )
-    }
-
-    private func row(_ r: PickerRow) -> some View {
-        HStack(spacing: 12) {
-            avatar(String(r.name.prefix(1)))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(r.name)
-                    .font(Theme.Font.body(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg)
-                if let meta = [r.muscle, r.equipment].compactMap({ $0 }).joined(separator: " · ").nilIfEmpty {
-                    Text(meta)
-                        .font(Theme.Font.body(size: 12))
-                        .foregroundStyle(Theme.Color.muted)
-                }
-            }
-            Spacer(minLength: 8)
-            if r.isCustom { personalTag }
-        }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 4)
-        .contentShape(Rectangle())
-    }
-
-    private func avatar(_ ch: String) -> some View {
-        Text(ch)
-            .font(Theme.Font.body(size: 12, weight: .bold))
-            .foregroundStyle(Theme.Color.fg2)
-            .frame(width: 38, height: 38)
-            .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
-    }
-
-    private var personalTag: some View {
-        Text("个人")
-            .font(Theme.Font.mono(size: 9, weight: .semibold))
-            .tracking(0.04 * 9)
-            .foregroundStyle(Theme.Color.accent)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1))
-    }
-
-    private var rowDivider: some View {
-        Rectangle()
-            .fill(Theme.Color.border.opacity(0.55))
-            .frame(height: 1)
-    }
-
-    /// 右侧 iOS 通讯录式索引条：点或上下拖动一触定位到对应肌群组头。
-    private func indexBar(groups: [PickerGroup: [PickerRow]], proxy: ScrollViewProxy) -> some View {
-        VStack(spacing: 4) {
-            ForEach(PickerGroup.order, id: \.self) { g in
-                let hasItems = (groups[g]?.isEmpty == false)
-                let isCurrent = (currentGroup == g)
-                Text(g.indexLabel)
-                    .font(.system(size: 10, weight: .heavy))
-                    .frame(width: 20, height: 20)
-                    .foregroundStyle(isCurrent ? Theme.Color.surface
-                                     : (hasItems ? Theme.Color.accent : Theme.Color.border2))
-                    .background(
-                        Circle().fill(isCurrent ? Theme.Color.accent : .clear)
-                    )
-            }
-        }
-        .background(
-            GeometryReader { geo in
-                Color.clear.preference(key: IndexBarHeightKey.self, value: geo.size.height)
-            }
-        )
-        .onPreferenceChange(IndexBarHeightKey.self) { barHeight = $0 }
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                .onChanged { value in jumpToIndex(at: value.location.y, groups: groups, proxy: proxy) }
-        )
-    }
-
-    // MARK: 空态（无匹配 → 创建自定义引导）
-
-    private var emptyState: some View {
-        VStack(spacing: Theme.Spacing.md) {
-            Spacer()
-            Text(query.isEmpty ? "暂无动作" : "无匹配动作")
-                .font(Theme.Font.display(size: 17, weight: .semibold))
-                .foregroundStyle(Theme.Color.fg)
-            Text(query.isEmpty ? "点击下方创建自定义动作"
-                 : "「\(query.trimmingCharacters(in: .whitespaces))」没有匹配，可创建为自定义动作")
-                .font(Theme.Font.body(size: 13))
-                .foregroundStyle(Theme.Color.muted)
-                .multilineTextAlignment(.center)
-            Button { showingCreate = true } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                    Text("创建自定义动作")
-                }
-                .font(Theme.Font.body(size: 14, weight: .semibold))
-                .foregroundStyle(Theme.Color.bg)
-                .padding(.horizontal, Theme.Spacing.lg)
-                .frame(height: 44)
-                .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                .paperShadow(.sm, cornerRadius: Theme.Radius.md)
-            }
-            .buttonStyle(PressableButtonStyle())
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(Theme.Spacing.lg)
-    }
-
-    // MARK: 数据与交互
-
-    /// 个人组（自定义动作恒置顶）+ 各大肌群（内置库）；query 非空时跨组过滤。
-    private func buildGroups() -> [PickerGroup: [PickerRow]] {
-        let q = query.trimmingCharacters(in: .whitespaces)
-        func match(_ name: String) -> Bool { q.isEmpty || name.localizedCaseInsensitiveContains(q) }
-        func match(_ ex: BuiltinExercise) -> Bool { q.isEmpty || ExerciseSearch.matches(ex, query: q) }
-
-        var dict: [PickerGroup: [PickerRow]] = [:]
-
-        let personal = custom
-            .filter { $0.deletedAt == nil && match($0.name) }
-            .map { ex in
-                PickerRow(id: "c-\(ex.localId.uuidString)", name: ex.name,
-                          muscle: ex.primaryMuscle, equipment: ex.equipmentType, isCustom: true,
-                          pick: ExercisePick(builtinCode: nil, customId: ex.localId,
-                                             name: ex.name, primaryMuscle: ex.primaryMuscle,
-                                             equipmentType: ex.equipmentType))
-            }
-        if !personal.isEmpty { dict[.personal] = personal }
-
-        for case let .muscle(m) in PickerGroup.order {
-            let rows = BuiltinExercise.starter
-                .filter { $0.category == m.rawValue && match($0) }
-                .map { ex in
-                    PickerRow(id: "b-\(ex.code)", name: ex.name,
-                              muscle: ex.category, equipment: ex.equipmentType, isCustom: false,
-                              pick: ExercisePick(builtinCode: ex.code, customId: nil,
-                                                 name: ex.name, primaryMuscle: ex.category,
-                                                 equipmentType: ex.equipmentType))
-                }
-            if !rows.isEmpty { dict[.muscle(m)] = rows }
-        }
-        return dict
-    }
-
-    /// 组头中最靠近顶部（已滚过顶）的组即「当前组」；都未滚过则取首个可见组。
-    private func updateCurrentGroup(_ offsets: [PickerGroup: CGFloat]) {
-        let threshold: CGFloat = 8
-        let passed = offsets.filter { $0.value <= threshold }
-        let target: PickerGroup?
-        if let top = passed.max(by: { $0.value < $1.value }) {
-            target = top.key
-        } else {
-            target = PickerGroup.order.first { offsets[$0] != nil }
-        }
-        if let target, target != currentGroup { currentGroup = target }
-    }
-
-    /// 把索引条上的触点 y 映射到对应肌群组头并滚动定位（点击与拖动共用）。
-    private func jumpToIndex(at y: CGFloat, groups: [PickerGroup: [PickerRow]], proxy: ScrollViewProxy) {
-        let items = PickerGroup.order
-        guard barHeight > 0 else { return }
-        let slice = barHeight / CGFloat(items.count)
-        let idx = min(items.count - 1, max(0, Int(y / slice)))
-        let g = items[idx]
-        // 置灰（无该肌群动作）的索引项不可定位。
-        guard groups[g]?.isEmpty == false else { return }
-        if g != currentGroup {
-            currentGroup = g
-            UISelectionFeedbackGenerator().selectionChanged()
-        }
-        // 拖动时即时跳转（不包动画），跟手手感对齐 iOS 通讯录 A–Z 索引。
-        proxy.scrollTo(g, anchor: .top)
     }
 }
 

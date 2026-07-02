@@ -127,6 +127,46 @@ class TeamPlanServiceTest {
     }
 
     @Test
+    void shareToTeam_stripsNestedDropSetPrescriptionWeights() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID teamId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        when(versionMapper.nextVersionNumber(any())).thenReturn(1);
+        SharePlan req = new SharePlan(planId, "递减计划", """
+                [{
+                  "itemId":"%s",
+                  "exerciseName":"卧推",
+                  "orderIndex":0,
+                  "suggestedSets":1,
+                  "suggestedReps":8,
+                  "suggestedWeightKg":90,
+                  "setPrescriptions":[{
+                    "prescriptionId":"%s",
+                    "setType":"drop",
+                    "orderIndex":0,
+                    "weightKg":90,
+                    "segments":[
+                      {"segmentId":"%s","segmentIndex":0,"weightKg":90,"reps":8},
+                      {"segmentId":"%s","segmentIndex":1,"weight":60,"reps":6}
+                    ]
+                  }]
+                }]
+                """.formatted(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()));
+
+        service.shareToTeam(userId, teamId, req);
+
+        ArgumentCaptor<TeamPlanShareVersion> versionCaptor = ArgumentCaptor.forClass(TeamPlanShareVersion.class);
+        verify(versionMapper).insert(versionCaptor.capture());
+        JsonNode item = objectMapper.readTree(versionCaptor.getValue().getItems()).get(0);
+        JsonNode prescription = item.get("setPrescriptions").get(0);
+        assertThat(item.has("suggestedWeightKg")).isFalse();
+        assertThat(prescription.has("weightKg")).isFalse();
+        assertThat(prescription.get("segments").get(0).has("weightKg")).isFalse();
+        assertThat(prescription.get("segments").get(1).has("weight")).isFalse();
+        assertThat(prescription.get("segments").get(0).get("reps").asInt()).isEqualTo(8);
+    }
+
+    @Test
     void shareToTeam_rejectsMalformedPlanItemsInsteadOfLeakingRawJson() {
         UUID userId = UUID.randomUUID();
         UUID teamId = UUID.randomUUID();

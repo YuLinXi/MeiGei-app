@@ -164,8 +164,13 @@ public class WorkoutSyncService {
             }
             for (WorkoutSet s : node.sets()) {
                 s.setWorkoutExerciseId(e.getId());
+                s.setSegments(normalizedSegments(s.getSegments()));
                 setMapper.insert(s);
             }
         }
+    }
+
+    private String normalizedSegments(String segments) {
+        return segments == null || segments.isBlank() ? "[]" : segments;
     }
 }

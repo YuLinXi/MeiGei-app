@@ -454,11 +454,13 @@ final class SyncEngine {
                                              orderIndex: ex.orderIndex, note: ex.note,
                                              planItemId: ex.planItemId),
                 sets: ex.sets.sorted { $0.setIndex < $1.setIndex }.map { st in
-                    WorkoutSetDTO(id: st.localId, workoutExerciseId: ex.localId, setIndex: st.setIndex,
-                                  weightKg: st.weightKg, reps: st.reps, completed: st.completed, note: st.note,
-                                  plannedRestSeconds: st.plannedRestSeconds,
-                                  actualRestSeconds: st.actualRestSeconds,
-                                  setType: st.setTypeRaw)
+                    if st.isDropSet { st.syncDropSummaryFromSegments() }
+                    return WorkoutSetDTO(id: st.localId, workoutExerciseId: ex.localId, setIndex: st.setIndex,
+                                         weightKg: st.weightKg, reps: st.reps, completed: st.completed, note: st.note,
+                                         plannedRestSeconds: st.plannedRestSeconds,
+                                         actualRestSeconds: st.actualRestSeconds,
+                                         setType: st.setTypeRaw,
+                                         segments: Self.encodeSegments(st.segments))
                 })
         }
         let w = WorkoutDTO(id: m.localId, userId: nil, planId: m.planId,
@@ -499,14 +501,34 @@ final class SyncEngine {
             ex.sets = node.sets.map {
                 // 解码缺失/未识别值兜底 working（兼容旧后端、旧数据、跨版本扩展类型）。
                 let type = $0.setType.flatMap(WorkoutSetType.init(rawValue:)) ?? .working
+                let segments = Self.decodeSegments($0.segments)
                 return WorkoutSet(localId: $0.id, setIndex: $0.setIndex, weightKg: $0.weightKg,
                                   reps: $0.reps, completed: $0.completed ?? false, note: $0.note,
                                   plannedRestSeconds: $0.plannedRestSeconds,
                                   actualRestSeconds: $0.actualRestSeconds,
-                                  setType: type)
+                                  setType: type,
+                                  segments: segments)
             }
             return ex
         }
+    }
+
+    private static func encodeSegments(_ segments: [WorkoutSetSegment]) -> String {
+        guard !segments.isEmpty,
+              let data = try? JSONCoding.encoder.encode(segments),
+              let json = String(data: data, encoding: .utf8) else {
+            return "[]"
+        }
+        return json
+    }
+
+    private static func decodeSegments(_ json: String?) -> [WorkoutSetSegment] {
+        guard let json,
+              let data = json.data(using: .utf8),
+              let segments = try? JSONCoding.decoder.decode([WorkoutSetSegment].self, from: data) else {
+            return []
+        }
+        return segments.sorted { $0.segmentIndex < $1.segmentIndex }
     }
 
     private func upsert(_ dto: WorkoutTreeDTO) {

@@ -29,7 +29,9 @@ struct WorkoutPosterData: Equatable {
         let completedSets = exercises.flatMap(\.sets).filter(\.completed)
         let statSets = completedSets.filter(\.countsForStats)
         let totalVolume = statSets.reduce(0.0) { acc, set in
-            acc + (set.weightKg ?? 0) * Double(set.reps ?? 0)
+            acc + set.statEntries.reduce(0.0) { entryAcc, entry in
+                entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+            }
         }
 
         self.title = Self.title(for: workout, exercises: exercises)
@@ -37,7 +39,7 @@ struct WorkoutPosterData: Equatable {
         self.durationText = Self.durationText(start: workout.timerStartedAt ?? workout.startedAt,
                                               end: workout.endedAt ?? workout.startedAt)
         self.volumeText = Self.volumeText(totalVolume)
-        self.setCountText = "\(completedSets.count)"
+        self.setCountText = "\(statSets.count)"
         self.exerciseCountText = "\(exercises.count)"
 
         let lines = exercises.enumerated().map { index, exercise in
@@ -72,10 +74,7 @@ struct WorkoutPosterData: Equatable {
 
     private static func durationText(start: Date, end: Date) -> String {
         let minutes = max(0, Int(end.timeIntervalSince(start) / 60))
-        if minutes >= 60 {
-            return "\(minutes / 60)h \(minutes % 60)m"
-        }
-        return "\(minutes)m"
+        return "\(minutes)"
     }
 
     private static func volumeText(_ value: Double) -> String {
@@ -94,26 +93,27 @@ struct WorkoutPosterData: Equatable {
     private static func topSetText(in sets: [WorkoutSet]) -> String {
         guard !sets.isEmpty else { return "已完成" }
         if let weighted = topWeightedSet(in: sets) {
-            var parts = ["\(formatKg(weighted.weightKg))kg"]
-            if let reps = weighted.reps { parts.append("× \(reps)") }
-            return parts.joined(separator: " ")
+            if let reps = weighted.reps {
+                return "\(formatKg(weighted.weightKg))kg × \(reps)次 · 共\(sets.count)组"
+            }
+            return "\(formatKg(weighted.weightKg))kg · 共\(sets.count)组"
         }
-        if let reps = sets.compactMap(\.reps).max() {
-            return "\(reps) 次"
+        if let reps = sets.flatMap(\.statEntries).compactMap(\.reps).max() {
+            return "\(reps)次 · 共\(sets.count)组"
         }
-        return "已完成 \(sets.count) 组"
+        return "共\(sets.count)组"
     }
 
     private static func topWeightedSet(in sets: [WorkoutSet]) -> (weightKg: Double, reps: Int?)? {
         var best: (weightKg: Double, reps: Int?)?
         for set in sets {
-            guard let weight = set.weightKg else { continue }
+            guard let entry = set.topStatEntry, let weight = entry.weightKg else { continue }
             if let current = best {
                 if weight > current.weightKg {
-                    best = (weight, set.reps)
+                    best = (weight, entry.reps)
                 }
             } else {
-                best = (weight, set.reps)
+                best = (weight, entry.reps)
             }
         }
         return best
@@ -323,8 +323,8 @@ private struct WorkoutPosterVisualCardView: View {
                     .padding(.top, 7)
 
                 HStack(spacing: 8) {
-                    visualMetric(data.durationText, "时长")
-                    visualMetric(data.volumeText, "训练量")
+                    visualMetric(data.durationText, "时长", unit: "min")
+                    visualMetric(data.volumeText, "训练量", unit: "kg")
                     visualMetric(data.setCountText, "组数")
                 }
                 .padding(.top, 24)
@@ -384,16 +384,24 @@ private struct WorkoutPosterVisualCardView: View {
         .accessibilityHidden(true)
     }
 
-    private func visualMetric(_ value: String, _ label: String) -> some View {
+    private func visualMetric(_ value: String, _ label: String, unit: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(value)
                 .font(Theme.Font.number(size: 22, weight: .bold))
                 .foregroundStyle(paper)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
-            Text(label)
-                .font(Theme.Font.mono(size: 9.5, weight: .bold))
-                .foregroundStyle(paper.opacity(0.52))
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(label)
+                    .font(Theme.Font.mono(size: 9.5, weight: .bold))
+                    .foregroundStyle(paper.opacity(0.52))
+                if let unit {
+                    Text("(\(unit))")
+                        .font(Theme.Font.mono(size: 7.2, weight: .bold))
+                        .foregroundStyle(paper.opacity(0.42))
+                }
+            }
+            .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -401,18 +409,19 @@ private struct WorkoutPosterVisualCardView: View {
     private var exerciseList: some View {
         VStack(spacing: exerciseRowSpacing) {
             ForEach(data.exerciseLines) { line in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text(line.name)
                         .font(Theme.Font.body(size: exerciseNameFontSize, weight: .semibold))
                         .foregroundStyle(paper)
                         .lineLimit(1)
                         .minimumScaleFactor(0.76)
-                    Spacer(minLength: 8)
+                        .frame(width: exerciseNameColumnWidth, alignment: .leading)
                     Text(line.topSetText)
                         .font(Theme.Font.mono(size: exerciseValueFontSize, weight: .bold))
                         .foregroundStyle(paper.opacity(0.82))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.78)
+                        .minimumScaleFactor(0.68)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .layoutPriority(1)
                 }
             }
@@ -428,7 +437,11 @@ private struct WorkoutPosterVisualCardView: View {
     }
 
     private var exerciseValueFontSize: CGFloat {
-        data.exerciseLines.count > 8 ? 13.5 : 14.5
+        data.exerciseLines.count > 8 ? 12.5 : 13.5
+    }
+
+    private var exerciseNameColumnWidth: CGFloat {
+        min(86, blackContentWidth * 0.38)
     }
 
     private var blackContentWidth: CGFloat {

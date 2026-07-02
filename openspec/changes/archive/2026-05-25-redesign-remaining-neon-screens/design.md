@@ -45,7 +45,7 @@
 
 ### D3：jsonb 计划详情解码策略
 
-- `WorkoutPlan.itemsJSON` 是字符串形式的 JSON 数组；`PlanDetailView` 解码到本地结构 `PlanItemView`（含 `itemId / exerciseRef / sets / reps / rpe / restSec / supersetWith`）。
+- `WorkoutPlan.itemsJSON` 是字符串形式的 JSON 数组；`PlanDetailView` 解码到本地结构 `PlanItemView`（含 `itemId / exerciseRef / sets / reps / rpe / restSec`）。
 - 解码失败时显示「计划数据损坏，请重建」占位卡（不静默 crash），用 `Theme.Color.danger` 文字。
 - **Why**：MyBatis 端写入的 jsonb 序列化稳定后，解码错误极少；占位卡兜底用户体验同时把问题暴露出来。
 

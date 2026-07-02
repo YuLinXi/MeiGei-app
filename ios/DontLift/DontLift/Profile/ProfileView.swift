@@ -49,7 +49,6 @@ struct ProfileView: View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
             VStack(spacing: 0) {
-                pageTitle
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                         header
@@ -66,7 +65,7 @@ struct ProfileView: View {
                 }
             }
         }
-        // 自绘大标题头（对齐其它 Tab 根页范式 A），隐藏系统导航栏。
+        // 我的页不展示顶部标题，隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
         .task {
             WorkoutPerformanceMonitor.event("profile.appear")
@@ -115,20 +114,6 @@ struct ProfileView: View {
     }
 
     // MARK: - Header
-
-    // 大标题头（对齐设计稿 .nav，与其它 Tab 根页一致）。
-    private var pageTitle: some View {
-        HStack {
-            Text("我的")
-                .font(Theme.Font.display(size: 36, weight: .heavy))
-                .tracking(-1.08)
-                .foregroundStyle(Theme.Color.fg)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.top, 6)
-        .padding(.bottom, 4)
-    }
 
     private var header: some View {
         let name = profile?.displayName ?? "已登录"

@@ -47,7 +47,7 @@ struct WorkoutDetailView: View {
         var out: [String: Double] = [:]
         let prKeys = Set(personalRecords.map(\.exerciseKey))
         for ex in sortedExercises where prKeys.contains(ex.historyKey) {
-            if let m = ex.sets.filter(\.countsForStats).compactMap(\.weightKg).max() { out[ex.historyKey] = m }
+            if let m = ex.sets.flatMap(\.statEntries).compactMap(\.weightKg).max() { out[ex.historyKey] = m }
         }
         return out
     }
@@ -56,14 +56,16 @@ struct WorkoutDetailView: View {
 
     /// 已完成组数（口径与首页/记录中三联数一致：完成勾选的组）。
     private var completedSetCount: Int {
-        workout.exercises.flatMap(\.sets).filter(\.completed).count
+        workout.exercises.flatMap(\.sets).filter(\.countsForStats).count
     }
 
     /// 训练量 kg·rep：完成组的 重量 × 次数 之和。
     private var totalVolume: Double {
         workout.exercises.flatMap(\.sets).reduce(0.0) { acc, s in
-            guard s.completed, s.countsForStats, let w = s.weightKg, let r = s.reps else { return acc }
-            return acc + w * Double(r)
+            guard s.countsForStats else { return acc }
+            return acc + s.statEntries.reduce(0.0) { entryAcc, entry in
+                entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+            }
         }
     }
 
@@ -332,10 +334,13 @@ private struct ExerciseLogCard: View {
     /// 卡头聚合：`N 组 · X.Xk`（N=完成组，容量=完成组的 重量×次数）。
     private var aggText: String {
         let done = sortedSets.filter(\.completed)
-        let count = done.isEmpty ? sortedSets.count : done.count
-        let vol = (done.isEmpty ? sortedSets : done).reduce(0.0) { acc, s in
-            guard s.countsForStats, let w = s.weightKg, let r = s.reps else { return acc }
-            return acc + w * Double(r)
+        let statSets = done.filter(\.countsForStats)
+        let count = statSets.isEmpty ? sortedSets.count : statSets.count
+        let vol = (statSets.isEmpty ? sortedSets : statSets).reduce(0.0) { acc, s in
+            guard s.countsForStats else { return acc }
+            return acc + s.statEntries.reduce(0.0) { entryAcc, entry in
+                entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+            }
         }
         let volText = vol >= 1000 ? String(format: "%.1fk", vol / 1000) : String(format: "%.0f", vol)
         return vol > 0 ? "\(count) 组 · \(volText)" : "\(count) 组"
@@ -344,7 +349,7 @@ private struct ExerciseLogCard: View {
     /// 命中 ▲ PR 的组下标（该动作命中 PR 时，重量等于 prMaxWeight 的首个组）。
     private var prSetIndex: Int? {
         guard let pr = prMaxWeight else { return nil }
-        return sortedSets.first(where: { $0.weightKg == pr })?.setIndex
+        return sortedSets.first(where: { $0.topStatEntry?.weightKg == pr })?.setIndex
     }
     private var noteText: String? {
         let trimmed = exercise.note?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -475,7 +480,10 @@ private struct LogSetRow: View {
 
     /// 缺值（未填重量/次数且未完成）视为略过组，整行降灰。
     private var isSkipped: Bool {
-        !set.completed && set.weightKg == nil && set.reps == nil
+        if set.isDropSet {
+            return !set.completed && set.effectiveSegments.isEmpty
+        }
+        return !set.completed && set.weightKg == nil && set.reps == nil
     }
 
     var body: some View {
@@ -487,6 +495,55 @@ private struct LogSetRow: View {
                 .background(set.setType == .warmup ? Theme.Color.accentSoft : Color.clear,
                             in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
 
+            valueContent
+
+            Spacer(minLength: 0)
+
+            if let actualRestText { restTag(actualRestText) }
+
+            if isPR { prTag }
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 7)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(a11yLabel)
+    }
+
+    @ViewBuilder
+    private var valueContent: some View {
+        if set.isDropSet {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Text("递减组")
+                        .font(Theme.Font.body(size: 11, weight: .bold))
+                        .foregroundStyle(Theme.Color.accent)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Theme.Color.accentSofter, in: Capsule())
+                }
+                ForEach(set.effectiveSegments) { segment in
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text(segment.weightKg.map(formatKg) ?? "—")
+                            .font(Theme.Font.number(size: 13, weight: .bold))
+                            .foregroundStyle(valueColor)
+                        Text("kg")
+                            .font(Theme.Font.mono(size: 9, weight: .medium))
+                            .foregroundStyle(Theme.Color.muted)
+                            .padding(.trailing, 4)
+                        Text("×")
+                            .font(Theme.Font.mono(size: 10))
+                            .foregroundStyle(Theme.Color.muted)
+                            .padding(.trailing, 4)
+                        Text(segment.reps.map(String.init) ?? "—")
+                            .font(Theme.Font.number(size: 13, weight: .bold))
+                            .foregroundStyle(valueColor)
+                        Text("次")
+                            .font(Theme.Font.mono(size: 9, weight: .medium))
+                            .foregroundStyle(Theme.Color.muted)
+                    }
+                }
+            }
+        } else {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(set.weightKg.map(formatKg) ?? "—")
                     .font(Theme.Font.number(size: 15, weight: .bold))
@@ -506,15 +563,7 @@ private struct LogSetRow: View {
                     .font(Theme.Font.mono(size: 9.5, weight: .medium))
                     .foregroundStyle(Theme.Color.muted)
             }
-
-            Spacer(minLength: 0)
-
-            if isPR { prTag }
         }
-        .padding(.horizontal, 15)
-        .padding(.vertical, 7)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(a11yLabel)
     }
 
     private var valueColor: Color {
@@ -534,10 +583,44 @@ private struct LogSetRow: View {
         .overlay(Capsule().stroke(Theme.Color.accent.opacity(0.18), lineWidth: 1))
     }
 
+    private var actualRestText: String? {
+        guard set.completed, let seconds = set.actualRestSeconds else { return nil }
+        return formatDetailRest(seconds)
+    }
+
+    private func restTag(_ text: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: "timer")
+                .font(.system(size: 8, weight: .bold))
+            Text(text)
+                .font(Theme.Font.mono(size: 9, weight: .bold))
+        }
+        .foregroundStyle(Theme.Color.muted)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(Theme.Color.bg, in: Capsule())
+        .overlay(Capsule().stroke(Theme.Color.border, lineWidth: 1))
+    }
+
     private var a11yLabel: String {
+        let rest = actualRestText.map { "，休息用时 \($0)" } ?? ""
+        if set.isDropSet {
+            let values = set.effectiveSegments.enumerated().map { idx, segment in
+                let w = segment.weightKg.map { "\(formatKg($0)) 公斤" } ?? "未记录重量"
+                let r = segment.reps.map { "\($0) 次" } ?? "未记录次数"
+                return "第 \(idx + 1) 段，\(w)，\(r)"
+            }.joined(separator: "，")
+            return "第 \(badgeText) 组，递减组，\(values)" + rest + (isPR ? "，新纪录" : "")
+        }
         let w = set.weightKg.map { "\(formatKg($0)) 公斤" } ?? "未记录重量"
         let r = set.reps.map { "\($0) 次" } ?? "未记录次数"
         let name = set.setType == .warmup ? "热身组" : "第 \(badgeText) 组"
-        return "\(name)，\(w)，\(r)" + (isPR ? "，新纪录" : "")
+        return "\(name)，\(w)，\(r)" + rest + (isPR ? "，新纪录" : "")
     }
+}
+
+private func formatDetailRest(_ seconds: Int) -> String {
+    let total = max(0, seconds)
+    if total < 60 { return "\(total)s" }
+    return String(format: "%d:%02d", total / 60, total % 60)
 }

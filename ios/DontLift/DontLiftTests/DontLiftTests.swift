@@ -42,6 +42,32 @@ struct WorkoutWeeklyStatsTests {
         #expect(s.volumeKg == expectedVolume)
     }
 
+    @Test func dropSetCountsAsOneSetAndExpandsVolume() {
+        let now = Date()
+        let w = Workout(startedAt: now, endedAt: now.addingTimeInterval(3600))
+        let ex = WorkoutExercise(exerciseName: "测试动作", orderIndex: 0)
+        ex.sets = [
+            WorkoutSet(
+                setIndex: 0,
+                completed: true,
+                setType: .drop,
+                segments: [
+                    WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8),
+                    WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6),
+                    WorkoutSetSegment(segmentIndex: 2)
+                ]
+            )
+        ]
+        w.exercises = [ex]
+
+        let s = WorkoutWeeklyStats.compute(workouts: [w], reference: now, calendar: mondayCalendar)
+
+        #expect(s.sessionCount == 1)
+        #expect(s.setCount == 1)
+        #expect(s.repCount == 14)
+        #expect(s.volumeKg == 80 * 8 + 60 * 6)
+    }
+
     @Test func unfinishedWorkoutCountsAsSession() {
         let now = Date()
         let w1 = makeWorkout(startedAt: now, endedAt: now.addingTimeInterval(1800), sets: [(50, 10)])
@@ -101,5 +127,31 @@ struct TeamMemberDTOTests {
         let member = try JSONCoding.decoder.decode(TeamMemberDTO.self, from: json)
 
         #expect(member.autoShareWorkouts == true)
+    }
+}
+
+@MainActor
+struct DropSetPRStatsTests {
+    @Test func dropSetTopSegmentCountsForPR() {
+        let workout = Workout(startedAt: Date(timeIntervalSince1970: 1000),
+                              endedAt: Date(timeIntervalSince1970: 4600))
+        let exercise = WorkoutExercise(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0)
+        exercise.sets = [
+            WorkoutSet(
+                setIndex: 0,
+                completed: true,
+                setType: .drop,
+                segments: [
+                    WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8),
+                    WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6)
+                ]
+            )
+        ]
+        workout.exercises = [exercise]
+
+        let pr = PRStats.latestPR(for: exercise.historyKey, in: [workout])
+
+        #expect(pr?.weightKg == 80)
+        #expect(pr?.reps == 8)
     }
 }

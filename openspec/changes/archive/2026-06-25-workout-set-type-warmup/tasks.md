@@ -1,6 +1,6 @@
 ## 1. 数据模型（iOS）
 
-- [x] 1.1 新增 `WorkoutSetType: String, Codable, CaseIterable { case working, warmup }`（含「预留 dropset/failure」注释）
+- [x] 1.1 新增 `WorkoutSetType: String, Codable, CaseIterable { case working, warmup }`
 - [x] 1.2 `WorkoutSet` 加 `var setTypeRaw: String`，默认 `"working"`；init 增形参（默认 `.working`）
 - [x] 1.3 `WorkoutSet` 加计算属性 `setType`（get 兜底 `.working` / set 写 raw）与 `var countsForStats: Bool { setType != .warmup }`
 - [x] 1.4 确认 SwiftData 轻量迁移：新属性带默认值，旧本地记录读出为 `working`（无需手写 migration plan）

@@ -113,12 +113,36 @@ final class WorkoutExercise {
     }
 }
 
-/// 组类型。当前仅 working/warmup；后续可 append dropset/failure 等，
+/// 组类型。`drop` 在 UI 中展示为「递减组」，内部只表示一个多段正式组，不校验重量方向。
 /// 统计判据为 `!= .warmup`，新增「正式类」case 无需改统计代码。
 enum WorkoutSetType: String, Codable, CaseIterable {
     case working   // 正式组
     case warmup    // 热身组
-    // 预留：case dropset / case failure ...
+    case drop      // 递减组（多段正式组）
+}
+
+/// 递减组内的单段重量/次数。segment 不是独立同步实体，随父级 `WorkoutSet` 一起保存。
+struct WorkoutSetSegment: Codable, Hashable, Identifiable {
+    var segmentId: UUID
+    var segmentIndex: Int
+    var weightKg: Double?
+    var reps: Int?
+
+    var id: UUID { segmentId }
+
+    init(segmentId: UUID = UUID(), segmentIndex: Int, weightKg: Double? = nil, reps: Int? = nil) {
+        self.segmentId = segmentId
+        self.segmentIndex = segmentIndex
+        self.weightKg = weightKg
+        self.reps = reps
+    }
+}
+
+struct WorkoutSetStatEntry: Equatable, Hashable {
+    var setId: UUID
+    var segmentId: UUID?
+    var weightKg: Double?
+    var reps: Int?
 }
 
 /// 一个动作下的单组记录（聚合子节点，不单独同步）。新增组可由调用方按当前训练上下文预填重量/次数；
@@ -137,6 +161,8 @@ final class WorkoutSet {
     var actualRestSeconds: Int?
     /// 组类型 raw（默认 "working"）。SwiftData 轻量迁移：存储属性声明带默认值，旧本地记录读出即 working。
     var setTypeRaw: String = WorkoutSetType.working.rawValue
+    /// 递减组分段。普通组/热身组保持空数组；SwiftData 轻量迁移时旧记录读出即空。
+    var segments: [WorkoutSetSegment] = []
 
     var exercise: WorkoutExercise?
 
@@ -149,7 +175,8 @@ final class WorkoutSet {
         note: String? = nil,
         plannedRestSeconds: Int? = nil,
         actualRestSeconds: Int? = nil,
-        setType: WorkoutSetType = .working
+        setType: WorkoutSetType = .working,
+        segments: [WorkoutSetSegment] = []
     ) {
         self.localId = localId
         self.setIndex = setIndex
@@ -160,6 +187,8 @@ final class WorkoutSet {
         self.plannedRestSeconds = plannedRestSeconds
         self.actualRestSeconds = actualRestSeconds
         self.setTypeRaw = setType.rawValue
+        self.segments = segments
+        syncDropSummaryFromSegments()
     }
 }
 
@@ -175,6 +204,107 @@ extension WorkoutSet {
     /// 「非 warmup」使将来新增的正式类组类型自动计入；「completed」保证落值后未打勾的
     /// 预填残组不污染训练量/PR（design.md D2）。纯「热身/正式」展示判断应直接用 `setType`。
     var countsForStats: Bool { setType != .warmup && completed }
+
+    var isDropSet: Bool { setType == .drop }
+
+    var sortedSegments: [WorkoutSetSegment] {
+        segments.sorted { $0.segmentIndex < $1.segmentIndex }
+    }
+
+    var effectiveSegments: [WorkoutSetSegment] {
+        sortedSegments.filter { $0.weightKg != nil || $0.reps != nil }
+    }
+
+    var statEntries: [WorkoutSetStatEntry] {
+        guard countsForStats else { return [] }
+        if isDropSet {
+            return effectiveSegments.map {
+                WorkoutSetStatEntry(setId: localId, segmentId: $0.segmentId, weightKg: $0.weightKg, reps: $0.reps)
+            }
+        }
+        return [WorkoutSetStatEntry(setId: localId, segmentId: nil, weightKg: weightKg, reps: reps)]
+    }
+
+    var topStatEntry: WorkoutSetStatEntry? {
+        statEntries.max { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
+    }
+
+    var summaryWeightReps: (weightKg: Double?, reps: Int?) {
+        if let top = topStatEntry { return (top.weightKg, top.reps) }
+        if isDropSet, let first = effectiveSegments.first { return (first.weightKg, first.reps) }
+        return (weightKg, reps)
+    }
+
+    var compactValueText: String {
+        if isDropSet {
+            let parts = effectiveSegments.map { segment in
+                let w = segment.weightKg.map(formatKg) ?? "—"
+                let r = segment.reps.map(String.init) ?? "—"
+                return "\(w)×\(r)"
+            }
+            if parts.isEmpty { return "递减组" }
+            if parts.count <= 2 { return parts.joined(separator: " / ") }
+            return "\(parts[0]) +\(parts.count - 1)组"
+        }
+        let w = weightKg.map(formatKg) ?? "—"
+        let r = reps.map(String.init) ?? "—"
+        return "\(w)×\(r)"
+    }
+
+    func syncDropSummaryFromSegments() {
+        guard isDropSet else { return }
+        let valid = effectiveSegments
+        if let top = valid.max(by: { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }) {
+            weightKg = top.weightKg
+            reps = top.reps
+        } else {
+            weightKg = nil
+            reps = nil
+        }
+    }
+
+    func configureAsDropSet(defaultWeight: Double?, defaultReps: Int?) {
+        setType = .drop
+        let first = WorkoutSetSegment(segmentIndex: 0, weightKg: defaultWeight, reps: defaultReps)
+        let second = WorkoutSetSegment(segmentIndex: 1)
+        segments = [first, second]
+        syncDropSummaryFromSegments()
+    }
+
+    func convertDropToWorkingUsingFirstSegment() {
+        let first = effectiveSegments.first
+        setType = .working
+        weightKg = first?.weightKg ?? weightKg
+        reps = first?.reps ?? reps
+        segments = []
+    }
+
+    func appendDropSegment(prefillFromLast: Bool = true) -> WorkoutSetSegment {
+        let next = (segments.map(\.segmentIndex).max() ?? -1) + 1
+        let previous = prefillFromLast ? effectiveSegments.last : nil
+        let segment = WorkoutSetSegment(segmentIndex: next,
+                                        weightKg: previous?.weightKg,
+                                        reps: previous?.reps)
+        segments.append(segment)
+        syncDropSummaryFromSegments()
+        return segment
+    }
+
+    func removeDropSegment(_ segmentId: UUID) {
+        segments.removeAll { $0.segmentId == segmentId }
+        for idx in segments.indices { segments[idx].segmentIndex = idx }
+        syncDropSummaryFromSegments()
+    }
+
+    func pruneEmptyDropSegments(keepAtLeastOne: Bool) {
+        guard isDropSet else { return }
+        segments.removeAll { $0.weightKg == nil && $0.reps == nil }
+        if keepAtLeastOne && segments.isEmpty {
+            segments = [WorkoutSetSegment(segmentIndex: 0)]
+        }
+        for idx in segments.indices { segments[idx].segmentIndex = idx }
+        syncDropSummaryFromSegments()
+    }
 }
 
 extension WorkoutExercise {
@@ -189,7 +319,7 @@ extension WorkoutExercise {
 
     /// 上一**正式**组重量（按 setIndex 取最后一个正式组），用于「加一组」预填源（热身组不作预填）。
     var lastWorkingWeight: Double? {
-        sets.filter { $0.setType != .warmup }.sorted { $0.setIndex < $1.setIndex }.last?.weightKg
+        sets.filter { $0.setType != .warmup }.sorted { $0.setIndex < $1.setIndex }.last?.summaryWeightReps.weightKg
     }
 
     /// 上一**正式**组的重量与次数，用于新增正式组时继承输入值（热身组不作预填源）。
@@ -197,7 +327,7 @@ extension WorkoutExercise {
         guard let last = sets.filter({ $0.setType != .warmup }).sorted(by: { $0.setIndex < $1.setIndex }).last else {
             return (nil, nil)
         }
-        return (last.weightKg, last.reps)
+        return last.summaryWeightReps
     }
 
     /// 切换某组 working ⇄ warmup，并重排到对应段尾（赋最大 setIndex+1）。仅改模型，保存由调用方负责。

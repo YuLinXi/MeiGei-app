@@ -28,10 +28,12 @@ enum WorkoutWeeklyStats {
                 // 训练量/总组数/总次数仅统计正式组（热身组不计入），口径同 PR/曲线。
                 for s in ex.sets where s.countsForStats {
                     stats.setCount += 1
-                    let kg = s.weightKg ?? 0
-                    let reps = s.reps ?? 0
-                    stats.volumeKg += kg * Double(reps)
-                    stats.repCount += reps
+                    for entry in s.statEntries {
+                        let kg = entry.weightKg ?? 0
+                        let reps = entry.reps ?? 0
+                        stats.volumeKg += kg * Double(reps)
+                        stats.repCount += reps
+                    }
                 }
             }
         }

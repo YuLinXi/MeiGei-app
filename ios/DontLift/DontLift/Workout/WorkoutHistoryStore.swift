@@ -18,6 +18,8 @@ struct PRBadge: Equatable, Hashable {
 struct SetSnapshot: Equatable, Hashable {
     var weightKg: Double?
     var reps: Int?
+    var setTypeRaw: String = WorkoutSetType.working.rawValue
+    var segments: [WorkoutSetSegment] = []
 }
 
 struct ExerciseHistoryPoint: Equatable, Hashable {
@@ -460,7 +462,8 @@ final class WorkoutHistoryStore {
                 let key = ex.historyKey
                 let sortedSets = ex.sets.sorted { $0.setIndex < $1.setIndex }
                 let counted = sortedSets.filter(\.countsForStats)
-                if let maxWeight = counted.compactMap(\.weightKg).max(), !seenKeys.contains(key) {
+                let statEntries = counted.flatMap(\.statEntries)
+                if let maxWeight = statEntries.compactMap(\.weightKg).max(), !seenKeys.contains(key) {
                     let prior = bestByKey[key]
                     if prior == nil || maxWeight > prior! {
                         records.append(PersonalRecord(
@@ -473,8 +476,8 @@ final class WorkoutHistoryStore {
                     }
                 }
 
-                for s in counted {
-                    guard let weight = s.weightKg, let reps = s.reps, reps > 0 else { continue }
+                for entry in statEntries {
+                    guard let weight = entry.weightKg, let reps = entry.reps, reps > 0 else { continue }
                     allWeightsByKey[key, default: []].append((weight, w.startedAt))
                     if let cur = exerciseBest[key] {
                         if weight > cur.weight || (weight == cur.weight && w.startedAt > cur.date) {
@@ -485,7 +488,7 @@ final class WorkoutHistoryStore {
                     }
                 }
 
-                if let maxWeight = counted.compactMap(\.weightKg).max() {
+                if let maxWeight = statEntries.compactMap(\.weightKg).max() {
                     bestByKey[key] = max(bestByKey[key] ?? maxWeight, maxWeight)
                     var point = perWorkoutPoint[key] ?? (nil, nil, nil)
                     point.maxWeight = max(point.maxWeight ?? maxWeight, maxWeight)
@@ -494,12 +497,14 @@ final class WorkoutHistoryStore {
                     perWorkoutPoint[key] = (nil, nil, nil)
                 }
 
-                if let last = sortedSets.last(where: { $0.weightKg != nil && $0.reps != nil }),
-                   let wt = last.weightKg,
-                   let reps = last.reps {
+                if let last = counted.last(where: {
+                    let summary = $0.summaryWeightReps
+                    return summary.weightKg != nil && summary.reps != nil
+                }) {
+                    let summary = last.summaryWeightReps
                     var point = perWorkoutPoint[key] ?? (nil, nil, nil)
-                    point.lastWeight = wt
-                    point.lastReps = reps
+                    point.lastWeight = summary.weightKg
+                    point.lastReps = summary.reps
                     perWorkoutPoint[key] = point
                 }
             }
@@ -551,7 +556,9 @@ final class WorkoutHistoryStore {
             let duration = w.endedAt.map { $0.timeIntervalSince(w.timerStartedAt ?? w.startedAt) }
             let volume = w.exercises.flatMap(\.sets).reduce(0.0) { acc, set in
                 guard set.countsForStats else { return acc }
-                return acc + (set.weightKg ?? 0) * Double(set.reps ?? 0)
+                return acc + set.statEntries.reduce(0.0) { entryAcc, entry in
+                    entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+                }
             }
             return WorkoutRowSummary(
                 id: w.localId,
@@ -559,7 +566,7 @@ final class WorkoutHistoryStore {
                 startedAt: w.startedAt,
                 durationSec: duration,
                 exerciseCount: w.exercises.count,
-                setCount: w.exercises.reduce(0) { $0 + $1.sets.count },
+                setCount: w.exercises.flatMap(\.sets).filter(\.countsForStats).count,
                 volumeKg: volume,
                 pr: prByWorkoutId[w.localId]
             )
@@ -655,7 +662,9 @@ final class WorkoutHistoryStore {
             for exercise in workout.exercises {
                 for set in exercise.sets where set.countsForStats {
                     summary.setCount += 1
-                    summary.volumeKg += (set.weightKg ?? 0) * Double(set.reps ?? 0)
+                    summary.volumeKg += set.statEntries.reduce(0.0) { acc, entry in
+                        acc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+                    }
                 }
             }
             days[day] = summary
@@ -684,7 +693,13 @@ extension PlanHistoryLookup {
                     .filter(\.countsForStats)
                     .sorted { $0.setIndex < $1.setIndex }
                 guard !done.isEmpty else { continue }
-                let snapshots = done.map { SetSnapshot(weightKg: $0.weightKg, reps: $0.reps) }
+                let snapshots = done.map {
+                    let summary = $0.summaryWeightReps
+                    return SetSnapshot(weightKg: summary.weightKg,
+                                       reps: summary.reps,
+                                       setTypeRaw: $0.setTypeRaw,
+                                       segments: $0.segments)
+                }
 
                 if let planItemId = ex.planItemId {
                     completedPlanItemIds.insert(planItemId)

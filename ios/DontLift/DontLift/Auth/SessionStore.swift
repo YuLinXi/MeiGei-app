@@ -38,12 +38,9 @@ final class SessionStore {
         }
         // provider 直接读 Keychain：线程安全且非 actor 隔离，避免捕获 MainActor 状态。
         let key = Self.tokenKey
+        let tokenSnapshot = self.token
         Task { [weak self] in
-            await APIClient.shared.setTokenProvider { Keychain.get(key) }
-            // 全局 401 → 登出回登录页（token 失效/过期时兜底，含把人困在补全页的失效 token）。
-            await APIClient.shared.setUnauthorizedHandler {
-                Task { @MainActor in self?.logout() }
-            }
+            await self?.installAPIHooks(tokenKey: key, tokenSnapshot: tokenSnapshot)
         }
     }
 
@@ -60,11 +57,12 @@ final class SessionStore {
 
     /// 登录成功：存 token + upsert 本地用户档案（首登写入 email/姓名，Apple 全名作补全页预填）。
     /// 随后异步拉 `GET /me` 回灌并刷新首登门控信号（needsProfileCompletion）。
-    func handleLogin(_ auth: AuthResponse, appleSub: String?, email: String?, displayName: String?) {
+    func handleLogin(_ auth: AuthResponse, appleSub: String?, email: String?, displayName: String?) async {
         Keychain.set(auth.token, for: Self.tokenKey)
         self.token = auth.token
         self.currentUserId = auth.userId
         upsertProfile(userId: auth.userId, appleSub: appleSub, email: email, displayName: displayName)
+        await installAPIHooks(tokenKey: Self.tokenKey, tokenSnapshot: auth.token)
         Task { await refreshProfile() }
     }
 
@@ -75,6 +73,7 @@ final class SessionStore {
         Keychain.delete(Self.tokenKey)
         token = nil
         currentUserId = nil
+        Task { await installAPIHooks(tokenKey: Self.tokenKey, tokenSnapshot: nil) }
         // 清门控：避免再次登录时 refreshProfile 返回前残留上次会话的判定值导致路由闪烁。
         needsProfileCompletion = nil
     }
@@ -156,6 +155,7 @@ final class SessionStore {
     /// 先补传上次失败的本地改动（避免随后回灌用服务端旧值覆盖本地未同步改动），
     /// 仅在无待传时才以服务端值为准。失败（离线）保持本地、门控按本地称呼兜底判定。
     func refreshProfile() async {
+        await installAPIHooks(tokenKey: Self.tokenKey, tokenSnapshot: token)
         let flushed = await flushPendingProfilePush()
         guard flushed else {
             // 仍有待传：保留本地、不拉服务端以免覆盖。本地有称呼则放行（离线优先），
@@ -250,5 +250,14 @@ final class SessionStore {
 
     private func setPushPending(_ pending: Bool) {
         UserDefaults.standard.set(pending, forKey: Self.pushPendingKey)
+    }
+
+    private func installAPIHooks(tokenKey: String, tokenSnapshot: String?) async {
+        await APIClient.shared.setTokenProvider { Keychain.get(tokenKey) ?? tokenSnapshot }
+        // 全局 401 → 登出回登录页（token 失效/过期时兜底，含把人困在补全页的失效 token）。
+        await APIClient.shared.setUnauthorizedHandler { [weak self] in
+            guard let session = self else { return }
+            Task { @MainActor in session.logout() }
+        }
     }
 }

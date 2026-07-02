@@ -47,7 +47,6 @@ struct WorkoutListView: View {
         ZStack(alignment: .bottom) {
             Theme.Color.bg.ignoresSafeArea()
             VStack(spacing: 0) {
-                homeHeader
                 ScrollView {
                     VStack(spacing: Theme.Spacing.lg) {
                         heroSection
@@ -63,7 +62,7 @@ struct WorkoutListView: View {
             }
             startCTA
         }
-        // 首页 Header 用自绘大标题，隐藏系统导航栏。
+        // 首页不展示顶部标题，隐藏系统导航栏。
         // 历史日历入口下移到「本周训练」标题行，开始训练收敛到底部悬浮 CTA。
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
@@ -129,22 +128,6 @@ struct WorkoutListView: View {
         }
         // 关闭系统下滑入场动画（仅在开关时生效）；改由 DeleteConfirmCover 内部 scrim/卡片淡入。
         .transaction(value: pendingDelete != nil) { $0.disablesAnimations = true }
-    }
-
-    // MARK: Header（设计图 .nav：大标题）
-
-    /// 固定大标题 Header：左「训练」(36/800/-.03em)。
-    private var homeHeader: some View {
-        HStack {
-            Text("训练")
-                .font(Theme.Font.display(size: 36, weight: .heavy))
-                .tracking(-1.08)
-                .foregroundStyle(Theme.Color.fg)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.top, 6)
-        .padding(.bottom, 4)
     }
 
     // MARK: Hero
@@ -504,13 +487,27 @@ func formatMinutes(_ seconds: Double) -> String {
 enum FocusedCell: Equatable {
     case weight(UUID)
     case reps(UUID)
+    case segmentWeight(setId: UUID, segmentId: UUID)
+    case segmentReps(setId: UUID, segmentId: UUID)
 
     var setId: UUID {
         switch self {
         case .weight(let id), .reps(let id): return id
+        case .segmentWeight(let setId, _), .segmentReps(let setId, _): return setId
         }
     }
-    var isWeight: Bool { if case .weight = self { return true } else { return false } }
+    var segmentId: UUID? {
+        switch self {
+        case .weight, .reps: return nil
+        case .segmentWeight(_, let segmentId), .segmentReps(_, let segmentId): return segmentId
+        }
+    }
+    var isWeight: Bool {
+        switch self {
+        case .weight, .segmentWeight: return true
+        case .reps, .segmentReps: return false
+        }
+    }
 }
 
 /// 组内可聚焦字段。
@@ -580,6 +577,8 @@ struct WorkoutLoggingView: View {
     @State private var menuSetId: UUID?
     /// 待二次确认删除的动作（nil = 无确认弹窗）。
     @State private var confirmDeleteExercise: WorkoutExercise?
+    /// 待确认改回普通组的递减组；确认后会丢弃额外 segment。
+    @State private var confirmConvertDropSet: WorkoutSet?
     /// ScrollView 视口在 .global 坐标的 frame（顶边 = 可视区上界）。
     @State private var scrollViewport: CGRect = .zero
     /// 自研键盘顶边的 .global Y（0 = 键盘未显示/未测得）；作为可视区下界。
@@ -636,7 +635,7 @@ struct WorkoutLoggingView: View {
     }
 
     private var completedSetCount: Int {
-        workout.exercises.flatMap(\.sets).filter(\.completed).count
+        workout.exercises.flatMap(\.sets).filter(\.countsForStats).count
     }
 
     private var remainingExerciseCount: Int {
@@ -668,7 +667,9 @@ struct WorkoutLoggingView: View {
     private var currentVolume: Double {
         workout.exercises.flatMap(\.sets).reduce(0.0) { acc, s in
             guard s.completed, s.countsForStats else { return acc }
-            return acc + (s.weightKg ?? 0) * Double(s.reps ?? 0)
+            return acc + s.statEntries.reduce(0.0) { entryAcc, entry in
+                entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+            }
         }
     }
 
@@ -697,7 +698,7 @@ struct WorkoutLoggingView: View {
         var parts: [String] = []
         if let t = workout.title, !t.isEmpty { parts.append(t) }
         parts.append("\(workout.exercises.count) 动作")
-        parts.append("\(workout.exercises.reduce(0) { $0 + $1.sets.count }) 组")
+        parts.append("\(workout.exercises.flatMap(\.sets).filter(\.countsForStats).count) 组")
         if let end = workout.endedAt {
             let from = workout.timerStartedAt ?? workout.startedAt
             parts.append("\(Int(end.timeIntervalSince(from) / 60)) 分钟")
@@ -724,8 +725,8 @@ struct WorkoutLoggingView: View {
                 return RestActivityAttributes.NextSet(
                     exerciseName: ex.exerciseName,
                     setIndex: next.setIndex + 1,
-                    weightText: next.weightKg.map { "\(formatKg($0)) kg" },
-                    repsText: next.reps.map { "\($0) 次" }
+                    weightText: next.summaryWeightReps.weightKg.map { "\(formatKg($0)) kg" },
+                    repsText: next.summaryWeightReps.reps.map { "\($0) 次" }
                 )
             }
         }
@@ -925,6 +926,20 @@ struct WorkoutLoggingView: View {
             confirmTitle: "删除",
             onConfirm: { [exercise = confirmDeleteExercise] in if let exercise { delete(exercise) } }
         )
+        .paperConfirmDialog(
+            isPresented: Binding(get: { confirmConvertDropSet != nil },
+                                 set: { if !$0 { confirmConvertDropSet = nil } }),
+            title: "改回普通组?",
+            message: "将保留第一组有效数据作为普通组，其它递减组数据会被移除。",
+            confirmTitle: "改回普通组",
+            onConfirm: { [set = confirmConvertDropSet] in
+                if let set {
+                    set.convertDropToWorkingUsingFirstSegment()
+                    confirmConvertDropSet = nil
+                    touch()
+                }
+            }
+        )
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in addExercise(pick) }
         }
@@ -1029,10 +1044,24 @@ struct WorkoutLoggingView: View {
     /// 组级菜单卡：纸感小卡 + 操作项列表。目前仅「删除组」，按列表结构预留后续更多组级操作。
     private func setMenuCard(for set: WorkoutSet) -> some View {
         VStack(spacing: 0) {
-            setMenuItem(icon: "flame", title: set.setType == .warmup ? "改回正式组" : "标为热身组") {
-                menuSetId = nil
-                if let ex = exercise(containing: set.localId) {
-                    ex.toggleSetType(set); Theme.Haptics.impact(.light); touch()
+            if set.isDropSet {
+                setMenuItem(icon: "arrow.uturn.backward", title: "改回普通组") {
+                    menuSetId = nil
+                    confirmConvertDropSet = set
+                }
+            } else {
+                setMenuItem(icon: "flame", title: set.setType == .warmup ? "改回正式组" : "标为热身组") {
+                    menuSetId = nil
+                    if let ex = exercise(containing: set.localId) {
+                        ex.toggleSetType(set); Theme.Haptics.impact(.light); touch()
+                    }
+                }
+                if set.setType == .working {
+                    Rectangle().fill(Theme.Color.border).frame(height: 1)
+                    setMenuItem(icon: "square.stack.3d.down.forward", title: "改为递减组") {
+                        menuSetId = nil
+                        convertToDropSet(set)
+                    }
                 }
             }
             if canContinueRest(for: set) {
@@ -1068,6 +1097,12 @@ struct WorkoutLoggingView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func convertToDropSet(_ set: WorkoutSet) {
+        set.configureAsDropSet(defaultWeight: set.weightKg, defaultReps: set.reps)
+        Theme.Haptics.impact(.light)
+        touch()
     }
 
     /// 删除某组：从聚合子树移除并落库，随后重排剩余组 setIndex 保持序号连续（第 1/2/3 组），最后即时落盘。
@@ -1734,6 +1769,9 @@ struct WorkoutLoggingView: View {
     /// 并移除因此变空的动作，保证训练记录与回写只含真实发生的数据。
     private func cleanupIncompleteSets() {
         for ex in workout.exercises {
+            for s in ex.sets where s.isDropSet {
+                s.pruneEmptyDropSegments(keepAtLeastOne: false)
+            }
             let incomplete = ex.sets.filter { !$0.completed }
             for s in incomplete { modelContext.delete(s) }
             ex.sets.removeAll { !$0.completed }
@@ -1887,13 +1925,23 @@ struct WorkoutLoggingView: View {
     private func currentText(for cell: FocusedCell) -> String {
         guard let s = set(for: cell.setId) else { return "" }
         switch cell {
-        case .weight: return s.weightKg.map { formatKg($0) } ?? ""
-        case .reps:   return s.reps.map(String.init) ?? ""
+        case .weight:
+            return s.weightKg.map { formatKg($0) } ?? ""
+        case .reps:
+            return s.reps.map(String.init) ?? ""
+        case .segmentWeight(_, let segmentId):
+            return segment(in: s, id: segmentId)?.weightKg.map { formatKg($0) } ?? ""
+        case .segmentReps(_, let segmentId):
+            return segment(in: s, id: segmentId)?.reps.map(String.init) ?? ""
         }
     }
 
     private func set(for id: UUID) -> WorkoutSet? {
         workout.exercises.flatMap(\.sets).first { $0.localId == id }
+    }
+
+    private func segment(in set: WorkoutSet, id: UUID) -> WorkoutSetSegment? {
+        set.segments.first { $0.segmentId == id }
     }
 
     private func exercise(containing setId: UUID) -> WorkoutExercise? {
@@ -1903,7 +1951,17 @@ struct WorkoutLoggingView: View {
     /// 当前动作的聚焦序列：组0.重量 → 组0.次数 → 组1.重量 → …
     private func sequence(for ex: WorkoutExercise) -> [FocusedCell] {
         ex.displaySortedSets
-            .flatMap { [FocusedCell.weight($0.localId), FocusedCell.reps($0.localId)] }
+            .flatMap { set in
+                if set.isDropSet {
+                    return set.sortedSegments.flatMap {
+                        [
+                            FocusedCell.segmentWeight(setId: set.localId, segmentId: $0.segmentId),
+                            FocusedCell.segmentReps(setId: set.localId, segmentId: $0.segmentId)
+                        ]
+                    }
+                }
+                return [FocusedCell.weight(set.localId), FocusedCell.reps(set.localId)]
+            }
     }
 
     // MARK: 自研键盘 · 按键
@@ -1953,6 +2011,14 @@ struct WorkoutLoggingView: View {
         switch cell {
         case .weight: s.weightKg = buffer.isEmpty ? nil : Double(buffer)
         case .reps:   s.reps = buffer.isEmpty ? nil : Int(buffer)
+        case .segmentWeight(_, let segmentId):
+            guard let idx = s.segments.firstIndex(where: { $0.segmentId == segmentId }) else { return }
+            s.segments[idx].weightKg = buffer.isEmpty ? nil : Double(buffer)
+            s.syncDropSummaryFromSegments()
+        case .segmentReps(_, let segmentId):
+            guard let idx = s.segments.firstIndex(where: { $0.segmentId == segmentId }) else { return }
+            s.segments[idx].reps = buffer.isEmpty ? nil : Int(buffer)
+            s.syncDropSummaryFromSegments()
         }
         touch()
     }
@@ -2483,6 +2549,7 @@ private struct ExerciseBlock: View {
                                // 键盘升起（任一组聚焦）时，待办弱提示让位给聚焦组，避免「双当前」。
                                isTodo: activeSetIndex == set.setIndex && focused == nil,
                                readOnly: readOnly,
+                               focusedCell: focused,
                                focusedField: focusedField(for: set),
                                editingText: editingText,
                                pendingReplace: pendingReplace,
@@ -2493,9 +2560,7 @@ private struct ExerciseBlock: View {
                                onUncomplete: { onUncompleteSet(set) },
                                onToggleType: { toggleType(set) },
                                onMore: { onMoreSet(set) },
-                               onFocus: { field in
-                                   onFocus(field == .weight ? .weight(set.localId) : .reps(set.localId))
-                               })
+                               onFocus: onFocus)
                         .id(set.localId)
                         // 仅聚焦组上报 .global frame，供父视图判断是否已在键盘上方可视区内。
                         .background {
@@ -2606,24 +2671,45 @@ private struct ExerciseBlock: View {
     }
 
     private var addSetButton: some View {
-        Button {
-            addSet()
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "plus").font(.system(size: 12, weight: .bold))
-                Text("加一组").font(Theme.Font.body(size: 12.5, weight: .semibold))
+        HStack(spacing: 10) {
+            Button {
+                addDropSet()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "square.stack.3d.down.forward").font(.system(size: 12, weight: .bold))
+                    Text("递减组").font(Theme.Font.body(size: 12.5, weight: .semibold))
+                }
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.horizontal, 12)
+                .frame(height: 36)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .stroke(Theme.Color.border, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                )
+                .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             }
-            .foregroundStyle(Theme.Color.muted)
-            .frame(maxWidth: .infinity)
-            .frame(height: 42)
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                    .stroke(Theme.Color.border2, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-            )
-            .contentShape(Rectangle())
-            .padding(.horizontal, 12).padding(.bottom, 12)
+            .buttonStyle(.plain)
+
+            Button {
+                addSet()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus").font(.system(size: 12, weight: .bold))
+                    Text("加一组").font(Theme.Font.body(size: 12.5, weight: .semibold))
+                }
+                .foregroundStyle(Theme.Color.fg2)
+                .padding(.horizontal, 22)
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .stroke(Theme.Color.fg2, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                )
+                .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(PressableButtonStyle())
+        .padding(.horizontal, 12).padding(.bottom, 12)
     }
 
     private func addSet() {
@@ -2631,8 +2717,26 @@ private struct ExerciseBlock: View {
         Theme.Feedback.addSetTap()
         let next = (exercise.sets.map(\.setIndex).max() ?? -1) + 1
         let previous = exercise.lastWorkingSetValues
-        exercise.sets.append(WorkoutSet(setIndex: next, weightKg: previous.weightKg, reps: previous.reps, setType: .working))
-        onChange()
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            exercise.sets.append(WorkoutSet(setIndex: next, weightKg: previous.weightKg, reps: previous.reps, setType: .working))
+            onChange()
+        }
+    }
+
+    private func addDropSet() {
+        Theme.Feedback.addSetTap()
+        let next = (exercise.sets.map(\.setIndex).max() ?? -1) + 1
+        let previous = exercise.lastWorkingSetValues
+        let newSet = WorkoutSet(setIndex: next, setType: .drop)
+        newSet.configureAsDropSet(defaultWeight: previous.weightKg, defaultReps: previous.reps)
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            exercise.sets.append(newSet)
+            onChange()
+        }
     }
 
     /// 切换组类型 working ⇄ warmup：复用模型方法（切类型 + 段尾重排），随后重算编号并落盘。
@@ -2657,6 +2761,8 @@ private struct SetRow: View {
     let isTodo: Bool
     /// 只读态：禁用输入与完成勾选，不可聚焦。
     var readOnly: Bool = false
+    /// 当前完整焦点，递减组 segment 输入用。
+    let focusedCell: FocusedCell?
     /// 本组当前被聚焦的字段（nil = 未聚焦本组）；非 nil ⟺ 编辑高亮落在本组。
     let focusedField: SetField?
     /// 聚焦字段的编辑缓冲串（含 "0." / "72." 中间态）。
@@ -2675,13 +2781,15 @@ private struct SetRow: View {
     /// 点击「更多操作」⋯：由父视图打开本组的菜单浮层。
     let onMore: () -> Void
     /// 请求聚焦本组某字段。
-    let onFocus: (SetField) -> Void
+    let onFocus: (FocusedCell) -> Void
+    /// 递减组内部段落是否展开；默认展开，方便新建后继续录入。
+    @State private var isDropExpanded = true
 
     /// 本组无障碍称谓：热身组「热身组」，正式组「第 N 组」。
     private var rowName: String { self.set.setType == .warmup ? "热身组" : "第 \(badgeText) 组" }
 
     /// 编辑高亮 = 本组有字段被聚焦。
-    private var isEditing: Bool { focusedField != nil }
+    private var isEditing: Bool { focusedCell?.setId == set.localId }
     /// 弱强调（次序号/勾选框）：编辑中或待办。
     private var emphasized: Bool { isEditing || isTodo }
     private var completionAnimation: Animation { .easeOut(duration: 0.18) }
@@ -2693,6 +2801,19 @@ private struct SetRow: View {
     }
 
     var body: some View {
+        Group {
+            if set.isDropSet {
+                dropBody
+            } else {
+                normalBody
+            }
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 5)
+        .animation(completionAnimation, value: set.completed)
+    }
+
+    private var normalBody: some View {
         // 原型 grid：[20 序号][重量窄][× ][次数窄][方形完成勾][弹性留白][⋯ 更多]。
         // 完成勾紧跟次数框左对齐；⋯ 被弹性留白推到行尾。
         HStack(spacing: 8) {
@@ -2700,19 +2821,112 @@ private struct SetRow: View {
             valueCell(text: weightDisplay, placeholder: "kg", unit: "kg",
                       inputMode: inputMode(for: .weight, text: weightDisplay),
                       label: "重量", value: set.weightKg.map { "\(formatKg($0)) 公斤" })
-                .onTapGesture { if !readOnly { onFocus(.weight) } }
+                .onTapGesture { if !readOnly { onFocus(.weight(set.localId)) } }
             Text("×").font(Theme.Font.mono(size: 11)).foregroundStyle(Theme.Color.muted).frame(width: 12)
             valueCell(text: repsDisplay, placeholder: "次", unit: "次",
                       inputMode: inputMode(for: .reps, text: repsDisplay),
                       label: "次数", value: set.reps.map { "\($0) 次" })
-                .onTapGesture { if !readOnly { onFocus(.reps) } }
+                .onTapGesture { if !readOnly { onFocus(.reps(set.localId)) } }
             checkButton
             Spacer(minLength: 8)
             trailingControls
         }
-        .padding(.horizontal, 15)
-        .padding(.vertical, 5)
-        .animation(completionAnimation, value: set.completed)
+    }
+
+    private var dropBody: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                badge
+                dropSummaryToggle
+                checkButton
+                Spacer(minLength: 8)
+                trailingControls
+            }
+
+            if isDropExpanded {
+                dropSegmentsPanel
+            }
+        }
+    }
+
+    private var dropSummaryToggle: some View {
+        Button {
+            isDropExpanded.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Text("递减组")
+                    .font(Theme.Font.body(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.accent)
+                Text(dropSegmentCountText)
+                    .font(Theme.Font.mono(size: 10.5, weight: .semibold))
+                    .foregroundStyle(isDropExpanded ? Theme.Color.accent : Theme.Color.muted)
+                    .padding(.horizontal, 7)
+                    .frame(height: 22)
+                    .background(isDropExpanded ? Theme.Color.accentSoft : Theme.Color.surface2.opacity(0.72),
+                                in: Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(isDropExpanded ? Theme.Color.accentSofter : Theme.Color.border2, lineWidth: 1)
+                    )
+                Spacer(minLength: 0)
+            }
+            .frame(width: 156, height: 36, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("递减组，\(dropSegmentCountText)，\(isDropExpanded ? "已展开" : "已折叠")")
+        .accessibilityHint("点按\(isDropExpanded ? "折叠" : "展开")递减组")
+    }
+
+    private var dropSegmentCountText: String {
+        "\(set.sortedSegments.count)组"
+    }
+
+    private var dropSegmentsPanel: some View {
+        HStack(alignment: .top, spacing: 8) {
+            RoundedRectangle(cornerRadius: 1, style: .continuous)
+                .fill(Theme.Color.accentSofter)
+                .frame(width: 2)
+                .padding(.vertical, 4)
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(Array(set.sortedSegments.enumerated()), id: \.element.segmentId) { index, segment in
+                    dropSegmentRow(segment, displayIndex: index)
+                }
+                if !readOnly {
+                    addDropSegmentButton
+                }
+            }
+        }
+        .padding(.top, 0)
+        .padding(.leading, 28)
+    }
+
+    private var addDropSegmentButton: some View {
+        Button {
+            _ = set.appendDropSegment(prefillFromLast: false)
+            onChange()
+        } label: {
+            HStack(spacing: 0) {
+                Color.clear.frame(width: 26)
+                HStack(spacing: 5) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("添加")
+                        .font(Theme.Font.body(size: 11.5, weight: .semibold))
+                }
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.horizontal, 9)
+                .frame(height: 28)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .stroke(Theme.Color.border, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                )
+            }
+            .frame(height: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("为第 \(badgeText) 组添加递减组内一组")
     }
 
     /// 序号徽章：可点击切换组类型（只读态退化为静态文本）。热身组显「热」（朱砂红文字，无底色）。
@@ -2722,7 +2936,7 @@ private struct SetRow: View {
             .font(Theme.Font.mono(size: 13, weight: .bold))
             .foregroundStyle(isWarmup ? Theme.Color.accent : snColor)
             .frame(width: 22, height: 20)
-        if readOnly {
+        if readOnly || set.isDropSet {
             label
         } else {
             Button { onToggleType() } label: { label }
@@ -2740,21 +2954,93 @@ private struct SetRow: View {
         focusedField == .reps ? editingText : (set.reps.map(String.init) ?? "")
     }
 
+    private func segmentWeightDisplay(_ segment: WorkoutSetSegment) -> String {
+        if focusedCell == .segmentWeight(setId: set.localId, segmentId: segment.segmentId) {
+            return editingText
+        }
+        return segment.weightKg.map { formatKg($0) } ?? ""
+    }
+
+    private func segmentRepsDisplay(_ segment: WorkoutSetSegment) -> String {
+        if focusedCell == .segmentReps(setId: set.localId, segmentId: segment.segmentId) {
+            return editingText
+        }
+        return segment.reps.map(String.init) ?? ""
+    }
+
     private func inputMode(for field: SetField, text: String) -> SetInputMode {
         guard focusedField == field else { return .inactive }
         return pendingReplace && !text.isEmpty ? .replacePending : .appending
     }
 
+    private func inputMode(for cell: FocusedCell, text: String) -> SetInputMode {
+        guard focusedCell == cell else { return .inactive }
+        return pendingReplace && !text.isEmpty ? .replacePending : .appending
+    }
+
+    private func dropSegmentRow(_ segment: WorkoutSetSegment, displayIndex: Int) -> some View {
+        let weightCell = FocusedCell.segmentWeight(setId: set.localId, segmentId: segment.segmentId)
+        let repsCell = FocusedCell.segmentReps(setId: set.localId, segmentId: segment.segmentId)
+        let weightText = segmentWeightDisplay(segment)
+        let repsText = segmentRepsDisplay(segment)
+
+        return HStack(spacing: 8) {
+            Text("\(displayIndex + 1)")
+                .font(Theme.Font.mono(size: 11, weight: .bold))
+                .foregroundStyle(Theme.Color.muted)
+                .frame(width: 18, height: 30)
+            valueCell(text: weightText, placeholder: "kg", unit: "kg",
+                      inputMode: inputMode(for: weightCell, text: weightText),
+                      label: "第 \(displayIndex + 1) 组重量",
+                      value: segment.weightKg.map { "\(formatKg($0)) 公斤" },
+                      width: 54,
+                      height: 30,
+                      numberSize: 13.5)
+                .onTapGesture { if !readOnly { onFocus(weightCell) } }
+            Text("×").font(Theme.Font.mono(size: 11)).foregroundStyle(Theme.Color.muted).frame(width: 12)
+            valueCell(text: repsText, placeholder: "次", unit: "次",
+                      inputMode: inputMode(for: repsCell, text: repsText),
+                      label: "第 \(displayIndex + 1) 组次数",
+                      value: segment.reps.map { "\($0) 次" },
+                      width: 54,
+                      height: 30,
+                      numberSize: 13.5)
+                .onTapGesture { if !readOnly { onFocus(repsCell) } }
+            if !readOnly && set.segments.count > 1 {
+                Button {
+                    set.removeDropSegment(segment.segmentId)
+                    onChange()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.Color.muted)
+                        .frame(width: 30, height: 30)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("删除第 \(displayIndex + 1) 组")
+            } else {
+                Color.clear.frame(width: 44, height: 44)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(rowName)，递减组第 \(displayIndex + 1) 组")
+    }
+
     /// 重量/次数输入框：定宽收窄（让右侧腾出完成勾 + 更多操作），居中数字。
     private func valueCell(text: String, placeholder: String, unit: String, inputMode: SetInputMode,
-                           label: String, value: String?) -> some View {
+                           label: String, value: String?,
+                           width: CGFloat = 64,
+                           height: CGFloat = 36,
+                           numberSize: CGFloat = 15) -> some View {
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
         let displayText = text.isEmpty ? placeholder : text
 
         return ZStack(alignment: .bottomTrailing) {
             HStack(spacing: 2) {
                 Text(displayText)
-                    .font(Theme.Font.number(size: 15, weight: .bold))
+                    .font(Theme.Font.number(size: numberSize, weight: .bold))
                     .foregroundStyle(valueTextColor(isPlaceholder: text.isEmpty))
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -2774,7 +3060,7 @@ private struct SetRow: View {
                     .padding(.bottom, 3)
             }
         }
-        .frame(width: 64, height: 36)
+        .frame(width: width, height: height)
         .background(valueCellBackground, in: shape)
         .overlay(
             shape.stroke(valueCellBorder(inputMode: inputMode),
