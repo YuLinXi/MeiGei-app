@@ -126,6 +126,9 @@ struct PlanListView: View {
         }
         return "\(orderedGroups.count) 个分组 · \(orderedPlans.count) 个计划 · \(totalSuggestedSets) 组"
     }
+    private var sectionToggleAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.18)
+    }
 
     private var sections: [PlanGroupSection] {
         let grouped = Dictionary(grouping: orderedPlans) { plan in resolvedGroupId(for: plan) }
@@ -162,7 +165,7 @@ struct PlanListView: View {
             VStack(spacing: 0) {
                 header
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                         if isCompletelyEmpty {
                             emptyMineCard
                         } else {
@@ -181,6 +184,7 @@ struct PlanListView: View {
                     }
                     .padding(.horizontal, Theme.Spacing.lg)
                     .padding(.top, Theme.Spacing.md)
+                    .animation(sectionToggleAnimation, value: expandedSectionId)
                 }
             }
         }
@@ -417,7 +421,7 @@ struct PlanListView: View {
     }
 
     private func toggleSection(_ section: PlanGroupSection) {
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+        withAnimation(sectionToggleAnimation) {
             expandedSectionId = expandedSectionId == section.id ? nil : section.id
         }
         Theme.Haptics.selection()
