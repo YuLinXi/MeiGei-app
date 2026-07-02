@@ -1,10 +1,10 @@
 ## ADDED Requirements
 
-### Requirement: 递减组录入与分段记录
+### Requirement: 递减组录入与内部组记录
 
-系统 SHALL 支持「递减组」作为训练中单组记录的一种正式类组型。递减组在 UI 中 MUST 始终显示为「递减组」，但系统 MUST NOT 校验、推断或持久化其真实重量方向；递增、递减或混合输入均 SHALL 只作为用户录入的有序分段保存。
+系统 SHALL 支持「递减组」作为训练中单组记录的一种正式类组型。递减组在 UI 中 MUST 始终显示为「递减组」，但系统 MUST NOT 校验、推断或持久化其真实重量方向；递增、递减或混合输入均 SHALL 只作为用户录入的有序内部组保存。
 
-递减组 MUST 是一个父级 `WorkoutSet`：组编号、完成勾选、组间休息、备注、删除、排序和同步均作用于父级 set。递减组内部 SHALL 包含一个或多个有序 segment，每个 segment 至少包含稳定 `segmentId`、`segmentIndex`、`weightKg` 与 `reps`。递减组与热身组 MUST 互斥；递减组 SHALL 作为正式类组计入统计。
+递减组 MUST 是一个父级 `WorkoutSet`：组编号、完成勾选、组间休息、备注、删除、排序和同步均作用于父级 set。递减组内部 SHALL 包含一个或多个有序内部组，每个内部组至少包含稳定 `segmentId`、`segmentIndex`、`weightKg` 与 `reps`。递减组与热身组 MUST 互斥；递减组 SHALL 作为正式类组计入统计。
 
 动作卡底部 SHALL 在「加一组」左侧并列展示「递减组」快速添加入口。每组右侧更多操作菜单 SHALL 支持普通组改为递减组，以及递减组改回普通组。
 
@@ -12,24 +12,24 @@
 - **WHEN** 用户在某动作卡底部点击「递减组」
 - **THEN** 系统在该动作末尾新增一个父级 `WorkoutSet`
 - **AND** 该组 UI 显示为「递减组」
-- **AND** 该组默认包含至少 2 个 segment
-- **AND** 若存在上一正式组，首个 segment 预填上一正式组的重量与次数
+- **AND** 该组默认包含至少 2 个内部组
+- **AND** 若存在上一正式组，首个内部组预填上一正式组的重量与次数
 
 #### Scenario: 普通组改为递减组
 - **WHEN** 用户在普通正式组右侧更多操作里选择「改为递减组」
 - **THEN** 系统将该父级 set 标记为递减组
-- **AND** 原普通组的 `weightKg/reps` 成为第 1 个 segment
-- **AND** 系统追加一个空白 segment 供继续录入
+- **AND** 原普通组的 `weightKg/reps` 成为第 1 个内部组
+- **AND** 系统追加一个空白内部组供继续录入
 
 #### Scenario: 递减组改回普通组
 - **WHEN** 用户在递减组右侧更多操作里选择「改回普通组」并确认
-- **THEN** 系统使用第一个有效 segment 回填父级 `weightKg/reps`
-- **AND** 其它 segment 被移除
+- **THEN** 系统使用第一个有效内部组回填父级 `weightKg/reps`
+- **AND** 其它内部组被移除
 - **AND** 该组恢复为普通正式组
 
 #### Scenario: 不校验递减方向
 - **WHEN** 用户在递减组内录入 `50kg×10、60kg×8、55kg×6`
-- **THEN** 系统保存这些有序 segment
+- **THEN** 系统保存这些有序内部组
 - **AND** 不提示方向错误、不自动改名为递增组或混合组
 
 #### Scenario: 递减组与热身组互斥
@@ -39,59 +39,59 @@
 
 ### Requirement: 递减组统计、PR 与历史曲线
 
-系统 SHALL 将递减组作为 1 个逻辑正式组计数。训练量、总次数、PR、历史曲线、训练详情聚合、分享海报和 Team 打卡容量 MUST 按递减组有效 segments 展开计算。未完成递减组、空白 segment、热身组 MUST NOT 计入统计。
+系统 SHALL 将递减组作为 1 个逻辑正式组计数。训练量、总次数、PR、历史曲线、训练详情聚合、分享海报和 Team 打卡容量 MUST 按递减组有效内部组展开计算。未完成递减组、空白内部组、热身组 MUST NOT 计入统计。
 
-系统 MUST 提供统一的统计派生口径，使普通组、热身组与递减组在 PR、周统计、历史快照、计划回写和 Team 摘要中得到一致结果。统计数据 MUST 可由原始 `WorkoutSet` 与 segment 重算，MUST NOT 持久化冗余统计。
+系统 MUST 提供统一的统计派生口径，使普通组、热身组与递减组在 PR、周统计、历史快照、计划回写和 Team 摘要中得到一致结果。统计数据 MUST 可由原始 `WorkoutSet` 与内部组重算，MUST NOT 持久化冗余统计。
 
 #### Scenario: 递减组计为一个逻辑组
-- **WHEN** 用户完成一个递减组，segments 为 `80kg×8、60kg×6、45kg×8`
+- **WHEN** 用户完成一个递减组，内部组为 `80kg×8、60kg×6、45kg×8`
 - **THEN** 已完成组数增加 1
 - **AND** 训练量增加 `80*8 + 60*6 + 45*8`
 - **AND** 总次数增加 `8 + 6 + 8`
 
 #### Scenario: 递减组刷新 PR
-- **WHEN** 用户完成一个递减组，segments 中最大重量超过该动作历史最大重量
+- **WHEN** 用户完成一个递减组，内部组中最大重量超过该动作历史最大重量
 - **THEN** 系统按该最大重量识别 PR
 - **AND** PR 庆祝、动作库 PR 副标和动作历史摘要使用同一最大重量
 
 #### Scenario: 未完成递减组不计统计
-- **WHEN** 用户录入递减组分段但未勾选完成
-- **THEN** 该递减组及其所有 segment 不计入训练量、总次数、PR 或历史曲线
+- **WHEN** 用户录入递减组内部组但未勾选完成
+- **THEN** 该递减组及其所有内部组不计入训练量、总次数、PR 或历史曲线
 
-#### Scenario: 空白分段不计统计
-- **WHEN** 递减组包含一个完全空白 segment
-- **THEN** 系统保存或清理该空白 segment 时不让它影响训练量、总次数或 PR
+#### Scenario: 空白内部组不计统计
+- **WHEN** 递减组包含一个完全空白内部组
+- **THEN** 系统保存或清理该空白内部组时不让它影响训练量、总次数或 PR
 
 ### Requirement: 递减组详情、海报与 Team 打卡展示
 
-训练详情、训练分享海报、Team 打卡摘要和 Team 打卡详情 SHALL 展示递减组分段信息。紧凑位置 MAY 展示递减组摘要（如 `80×8 +2段`），详情位置 MUST 能展示每个有效 segment 的重量与次数。
+训练详情、训练分享海报、Team 打卡摘要和 Team 打卡详情 SHALL 展示递减组内部组信息。紧凑位置 MAY 展示递减组摘要（如 `80×8 +2组`），详情位置 MUST 能展示每个有效内部组的重量与次数。
 
 Team 打卡摘要 MUST 在结构化 payload 中保留递减组 set type 与 segments。旧摘要缺少 set type 或 segments 时，客户端 MUST 按普通组兼容展示。
 
 #### Scenario: 训练详情展示递减组流水
 - **WHEN** 用户打开包含递减组的已完成训练详情
 - **THEN** 对应组显示「递减组」标识
-- **AND** 展示该组的所有有效 segment
+- **AND** 展示该组的所有有效内部组
 
 #### Scenario: 海报展示递减组摘要
 - **WHEN** 用户为包含递减组的训练生成分享海报
-- **THEN** 动作高光行使用递减组最大重量 segment 作为顶组
-- **AND** 文案能表达该组含额外分段
+- **THEN** 动作高光行使用递减组最大重量内部组作为顶组
+- **AND** 文案能表达该组含额外内部组
 
-#### Scenario: Team 打卡保留分段
+#### Scenario: Team 打卡保留内部组
 - **WHEN** 用户自动或手动分享一条包含递减组的训练到 Team
-- **THEN** checkin summary 中该组包含 set type 与 segment 列表
-- **AND** Team 成员查看时能看到递减组分段
+- **THEN** checkin summary 中该组包含 set type 与内部组列表
+- **AND** Team 成员查看时能看到递减组内部组
 
 ### Requirement: 递减组同步与兼容
 
-Workout 同步 SHALL 保留递减组分段。后端 SHALL 持久化 `workout_set.segments`，并在 Workout 聚合 push/pull 中原样收发。旧训练记录缺少 segments 时 MUST 按空数组处理；旧计划缺少 set prescriptions 时 MUST 按现有 `suggested*` 字段处理。
+Workout 同步 SHALL 保留递减组内部组。后端 SHALL 持久化 `workout_set.segments`，并在 Workout 聚合 push/pull 中原样收发。旧训练记录缺少 segments 时 MUST 按空数组处理；旧计划缺少 set prescriptions 时 MUST 按现有 `suggested*` 字段处理。
 
-递减组不 SHALL 拥有独立同步信封。Workout 聚合冲突仍 SHALL 以聚合根 `updatedAt` last-write-wins 处理；系统 MUST NOT 做逐 segment merge。
+递减组不 SHALL 拥有独立同步信封。Workout 聚合冲突仍 SHALL 以聚合根 `updatedAt` last-write-wins 处理；系统 MUST NOT 做逐内部组 merge。
 
 #### Scenario: 跨设备同步递减组
 - **WHEN** 设备 A 记录一个递减组并完成同步
-- **THEN** 设备 B 下拉该 workout 后能看到同一递减组及其所有 segments
+- **THEN** 设备 B 下拉该 workout 后能看到同一递减组及其所有内部组
 
 #### Scenario: 旧数据无 segments
 - **WHEN** 客户端读取缺少 segments 字段的旧 workout
@@ -107,12 +107,26 @@ Workout 同步 SHALL 保留递减组分段。后端 SHALL 持久化 `workout_set
 
 训练计划项 SHALL 支持可选的有序组处方 `setPrescriptions`。每个处方 MUST 拥有稳定 `prescriptionId`，并能表达普通组或递减组。递减组处方 MUST 包含有序 segments。计划项缺少 `setPrescriptions` 时，系统 MUST 继续按现有 `suggestedSets/suggestedReps/suggestedWeightKg` 生成普通组，以兼容旧计划。
 
-保存为计划、自适应回写、严格模式预填、自适应模式历史预填、计划详情下次有效处方、Team 计划分享和 Team 计划 Fork 均 SHALL 保留递减组结构。计划列表与旧字段摘要 MAY 继续使用 `suggestedSets/suggestedReps/suggestedWeightKg` 展示简要强度。
+保存为计划、自适应回写、严格模式预填、自适应模式历史预填、训练模板新建、计划详情编辑、计划详情下次有效处方、Team 计划分享和 Team 计划 Fork 均 SHALL 保留递减组结构。计划列表与旧字段摘要 MAY 继续使用 `suggestedSets/suggestedReps/suggestedWeightKg` 展示简要强度。
+
+训练模板新建与计划详情编辑 SHALL 允许用户为某个计划动作手动创建和编辑递减组处方。该编辑能力 SHALL 支持添加递减组、编辑递减组内部有序 segments 的重量/次数、删除 segment，以及在保存后写入 `setPrescriptions`。计划处方编辑中的递减组 SHALL NOT 展示完成勾选、休息、备注或训练中完成状态。
 
 #### Scenario: 保存训练为计划保留递减组
 - **WHEN** 用户将包含递减组的已完成无计划训练保存为计划
 - **THEN** 新计划对应动作的 `setPrescriptions` 包含递减组处方
 - **AND** 递减组处方包含已完成递减组的有效 segments
+
+#### Scenario: 新建训练模板时手动添加递减组
+- **WHEN** 用户新建训练模板并为某个动作添加递减组处方
+- **THEN** 保存后的计划项 `setPrescriptions` 包含 `setType=drop` 的处方
+- **AND** 该递减组处方包含用户录入的有序 segments
+- **AND** 下次从该计划开始训练时生成对应递减组父级 set
+
+#### Scenario: 编辑计划详情中的递减组处方
+- **WHEN** 用户在计划详情里编辑某动作并新增、删除或调整递减组内部组
+- **THEN** 系统保存更新后的 `setPrescriptions`
+- **AND** 计划详情下次有效处方预览展示递减组结构
+- **AND** `suggestedSets/suggestedReps/suggestedWeightKg` 摘要同步更新以兼容列表和旧端
 
 #### Scenario: 严格计划预填递减组
 - **WHEN** 用户从包含递减组处方的严格计划开始训练
@@ -180,6 +194,7 @@ Team 分享计划与 Fork MUST 保留递减组结构、组数和次数，但 MUS
 - **WHEN** 用户在计划详情里添加一个新动作
 - **THEN** 计划项默认保存 `suggestedSets=4` 与 `suggestedReps=10`
 - **AND** 下次从该计划开始训练时，此动作直接生成 4 个 `reps=10、completed=false` 的普通组
+- **AND** 用户仍可在计划动作处方编辑区把其中任意普通组改为递减组或追加递减组处方
 
 #### Scenario: 未打勾组在结束训练时清理
 - **WHEN** 某动作预填 4 组，用户只对 2 组打勾后结束训练

@@ -23,7 +23,6 @@ struct TeamListView: View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
             VStack(spacing: 0) {
-                header
                 ScrollView {
                     // 原型 scroll 直接铺团队卡（无「我的 Team」分组标签），下拉刷新走系统 refreshable。
                     LazyVStack(alignment: .leading, spacing: Theme.Spacing.md) {
@@ -44,7 +43,12 @@ struct TeamListView: View {
                 }
             }
         }
-        // 自绘大标题头（与训练/动作 Tab 一致），隐藏系统导航栏。
+        .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
+            if !teamService.teams.isEmpty {
+                floatingAddMenu
+            }
+        }
+        // Team 根页不展示顶部标题，隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(item: $selectedTeam) { TeamDetailView(team: $0) }
         .sheet(isPresented: $creating) { CreateTeamSheet() }
@@ -94,23 +98,14 @@ struct TeamListView: View {
         }
     }
 
-    // MARK: Header（大标题「Team」+ 右侧圆形朱砂红加号菜单，与动作 Tab 一致）
+    // MARK: 右下角添加入口
 
-    private var header: some View {
-        HStack {
-            Text("Team")
-                .font(Theme.Font.display(size: 36, weight: .heavy))
-                .tracking(-1.08)
-                .foregroundStyle(Theme.Color.fg)
-            Spacer(minLength: 0)
-            // 空态已有大号双 CTA，此时不再出右上 +，避免重复入口；有 Team 后才显示。
-            if !teamService.teams.isEmpty {
-                CircleAddMenu(items: teamHeaderMenuItems, accessibilityLabel: "创建或加入 Team")
-            }
-        }
-        .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.top, 6)
-        .padding(.bottom, 4)
+    private var floatingAddMenu: some View {
+        CircleAddMenu(items: teamHeaderMenuItems, accessibilityLabel: "创建或加入 Team")
+            .frame(width: 48, height: 48)
+            .padding(.trailing, Theme.Spacing.lg)
+            .padding(.top, Theme.Spacing.sm)
+            .padding(.bottom, Theme.Spacing.md)
     }
 
     private var teamHeaderMenuItems: [PaperMenuItem] {

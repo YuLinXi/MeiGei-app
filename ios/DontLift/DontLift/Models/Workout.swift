@@ -244,7 +244,7 @@ extension WorkoutSet {
             }
             if parts.isEmpty { return "递减组" }
             if parts.count <= 2 { return parts.joined(separator: " / ") }
-            return "\(parts[0]) +\(parts.count - 1)段"
+            return "\(parts[0]) +\(parts.count - 1)组"
         }
         let w = weightKg.map(formatKg) ?? "—"
         let r = reps.map(String.init) ?? "—"

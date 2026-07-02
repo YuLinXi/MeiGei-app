@@ -437,7 +437,7 @@ final class SwipeBackProbeController: UIViewController {
     }
 }
 
-// MARK: - 圆形「添加」按钮（主操作，accent 朱砂红 + 白底 + border + sm 阴影，36×36）
+// MARK: - 圆形「添加」按钮（主操作，accent 朱砂红 + 白底 + border + sm 阴影，42×42）
 
 /// 仅外观：朱砂红 plus 图标。供 Button 与纸感动作菜单作为 label 复用，确保两类入口视觉一致。
 struct CircleAddLabel: View {
@@ -445,13 +445,15 @@ struct CircleAddLabel: View {
 
     var body: some View {
         Image(systemName: "plus")
-            .font(.system(size: 18, weight: .semibold))
+            .font(.system(size: 20, weight: .semibold))
             .foregroundStyle(Theme.Color.accent)
-            .frame(width: 36, height: 36)
+            .frame(width: 42, height: 42)
             .background(active ? Theme.Color.accentSoft : Theme.Color.surface, in: Circle())
             .overlay(Circle().stroke(active ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
             .shadow(color: Theme.Color.fg.opacity(Theme.ShadowLevel.sm.opacity),
                     radius: Theme.ShadowLevel.sm.radius, x: 0, y: Theme.ShadowLevel.sm.y)
+            .frame(width: 48, height: 48)
+            .contentShape(Circle())
     }
 }
 

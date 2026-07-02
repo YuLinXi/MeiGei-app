@@ -365,7 +365,7 @@ struct TeamCheckinDetailSheet: View {
             if set.setType == .drop {
                 ForEach((set.segments ?? []).filter { $0.weightKg != nil || $0.reps != nil }) { segment in
                     HStack {
-                        Text("段 \(segment.segmentIndex + 1)")
+                        Text("组 \(segment.segmentIndex + 1)")
                             .font(Theme.Font.mono(size: 10, weight: .semibold))
                             .foregroundStyle(Theme.Color.muted)
                             .frame(width: 34, alignment: .leading)

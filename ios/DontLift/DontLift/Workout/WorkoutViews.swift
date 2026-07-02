@@ -47,7 +47,6 @@ struct WorkoutListView: View {
         ZStack(alignment: .bottom) {
             Theme.Color.bg.ignoresSafeArea()
             VStack(spacing: 0) {
-                homeHeader
                 ScrollView {
                     VStack(spacing: Theme.Spacing.lg) {
                         heroSection
@@ -63,7 +62,7 @@ struct WorkoutListView: View {
             }
             startCTA
         }
-        // 首页 Header 用自绘大标题，隐藏系统导航栏。
+        // 首页不展示顶部标题，隐藏系统导航栏。
         // 历史日历入口下移到「本周训练」标题行，开始训练收敛到底部悬浮 CTA。
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
@@ -129,22 +128,6 @@ struct WorkoutListView: View {
         }
         // 关闭系统下滑入场动画（仅在开关时生效）；改由 DeleteConfirmCover 内部 scrim/卡片淡入。
         .transaction(value: pendingDelete != nil) { $0.disablesAnimations = true }
-    }
-
-    // MARK: Header（设计图 .nav：大标题）
-
-    /// 固定大标题 Header：左「训练」(36/800/-.03em)。
-    private var homeHeader: some View {
-        HStack {
-            Text("训练")
-                .font(Theme.Font.display(size: 36, weight: .heavy))
-                .tracking(-1.08)
-                .foregroundStyle(Theme.Color.fg)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.top, 6)
-        .padding(.bottom, 4)
     }
 
     // MARK: Hero
@@ -947,7 +930,7 @@ struct WorkoutLoggingView: View {
             isPresented: Binding(get: { confirmConvertDropSet != nil },
                                  set: { if !$0 { confirmConvertDropSet = nil } }),
             title: "改回普通组?",
-            message: "将保留第一个有效分段作为普通组，其它分段会被移除。",
+            message: "将保留第一组有效数据作为普通组，其它递减组数据会被移除。",
             confirmTitle: "改回普通组",
             onConfirm: { [set = confirmConvertDropSet] in
                 if let set {
@@ -2696,16 +2679,16 @@ private struct ExerciseBlock: View {
                     Image(systemName: "square.stack.3d.down.forward").font(.system(size: 12, weight: .bold))
                     Text("递减组").font(Theme.Font.body(size: 12.5, weight: .semibold))
                 }
-                .foregroundStyle(Theme.Color.fg2)
-                .frame(maxWidth: .infinity)
-                .frame(height: 42)
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.horizontal, 12)
+                .frame(height: 36)
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                        .stroke(Theme.Color.border2, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        .stroke(Theme.Color.border, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
                 )
-                .contentShape(Rectangle())
+                .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             }
-            .buttonStyle(PressableButtonStyle())
+            .buttonStyle(.plain)
 
             Button {
                 addSet()
@@ -2714,16 +2697,17 @@ private struct ExerciseBlock: View {
                     Image(systemName: "plus").font(.system(size: 12, weight: .bold))
                     Text("加一组").font(Theme.Font.body(size: 12.5, weight: .semibold))
                 }
-                .foregroundStyle(Theme.Color.muted)
+                .foregroundStyle(Theme.Color.fg2)
+                .padding(.horizontal, 22)
                 .frame(maxWidth: .infinity)
-                .frame(height: 42)
+                .frame(height: 40)
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                        .stroke(Theme.Color.border2, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        .stroke(Theme.Color.fg2, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
                 )
-                .contentShape(Rectangle())
+                .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             }
-            .buttonStyle(PressableButtonStyle())
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 12).padding(.bottom, 12)
     }
@@ -2733,8 +2717,12 @@ private struct ExerciseBlock: View {
         Theme.Feedback.addSetTap()
         let next = (exercise.sets.map(\.setIndex).max() ?? -1) + 1
         let previous = exercise.lastWorkingSetValues
-        exercise.sets.append(WorkoutSet(setIndex: next, weightKg: previous.weightKg, reps: previous.reps, setType: .working))
-        onChange()
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            exercise.sets.append(WorkoutSet(setIndex: next, weightKg: previous.weightKg, reps: previous.reps, setType: .working))
+            onChange()
+        }
     }
 
     private func addDropSet() {
@@ -2743,10 +2731,11 @@ private struct ExerciseBlock: View {
         let previous = exercise.lastWorkingSetValues
         let newSet = WorkoutSet(setIndex: next, setType: .drop)
         newSet.configureAsDropSet(defaultWeight: previous.weightKg, defaultReps: previous.reps)
-        exercise.sets.append(newSet)
-        onChange()
-        if let first = newSet.sortedSegments.first {
-            onFocus(.segmentWeight(setId: newSet.localId, segmentId: first.segmentId))
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            exercise.sets.append(newSet)
+            onChange()
         }
     }
 
@@ -2793,6 +2782,8 @@ private struct SetRow: View {
     let onMore: () -> Void
     /// 请求聚焦本组某字段。
     let onFocus: (FocusedCell) -> Void
+    /// 递减组内部段落是否展开；默认展开，方便新建后继续录入。
+    @State private var isDropExpanded = true
 
     /// 本组无障碍称谓：热身组「热身组」，正式组「第 N 组」。
     private var rowName: String { self.set.setType == .warmup ? "热身组" : "第 \(badgeText) 组" }
@@ -2843,50 +2834,99 @@ private struct SetRow: View {
     }
 
     private var dropBody: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 badge
-                Text("递减组")
-                    .font(Theme.Font.body(size: 12, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
-                    .padding(.horizontal, 8)
-                    .frame(height: 24)
-                    .background(Theme.Color.accentSofter, in: Capsule())
-                Text(set.compactValueText)
-                    .font(Theme.Font.mono(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
-                    .lineLimit(1)
+                dropSummaryToggle
                 checkButton
                 Spacer(minLength: 8)
                 trailingControls
             }
 
-            VStack(spacing: 6) {
+            if isDropExpanded {
+                dropSegmentsPanel
+            }
+        }
+    }
+
+    private var dropSummaryToggle: some View {
+        Button {
+            isDropExpanded.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Text("递减组")
+                    .font(Theme.Font.body(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.accent)
+                Text(dropSegmentCountText)
+                    .font(Theme.Font.mono(size: 10.5, weight: .semibold))
+                    .foregroundStyle(isDropExpanded ? Theme.Color.accent : Theme.Color.muted)
+                    .padding(.horizontal, 7)
+                    .frame(height: 22)
+                    .background(isDropExpanded ? Theme.Color.accentSoft : Theme.Color.surface2.opacity(0.72),
+                                in: Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(isDropExpanded ? Theme.Color.accentSofter : Theme.Color.border2, lineWidth: 1)
+                    )
+                Spacer(minLength: 0)
+            }
+            .frame(width: 156, height: 36, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("递减组，\(dropSegmentCountText)，\(isDropExpanded ? "已展开" : "已折叠")")
+        .accessibilityHint("点按\(isDropExpanded ? "折叠" : "展开")递减组")
+    }
+
+    private var dropSegmentCountText: String {
+        "\(set.sortedSegments.count)组"
+    }
+
+    private var dropSegmentsPanel: some View {
+        HStack(alignment: .top, spacing: 8) {
+            RoundedRectangle(cornerRadius: 1, style: .continuous)
+                .fill(Theme.Color.accentSofter)
+                .frame(width: 2)
+                .padding(.vertical, 4)
+            VStack(alignment: .leading, spacing: 3) {
                 ForEach(Array(set.sortedSegments.enumerated()), id: \.element.segmentId) { index, segment in
                     dropSegmentRow(segment, displayIndex: index)
                 }
                 if !readOnly {
-                    Button {
-                        let segment = set.appendDropSegment(prefillFromLast: false)
-                        onChange()
-                        onFocus(.segmentWeight(setId: set.localId, segmentId: segment.segmentId))
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "plus").font(.system(size: 10, weight: .bold))
-                            Text("添加一段").font(Theme.Font.body(size: 11.5, weight: .semibold))
-                        }
-                        .foregroundStyle(Theme.Color.muted)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 30)
-                        .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("为第 \(badgeText) 组添加递减组分段")
+                    addDropSegmentButton
                 }
             }
-            .padding(.leading, 30)
         }
+        .padding(.top, 0)
+        .padding(.leading, 28)
+    }
+
+    private var addDropSegmentButton: some View {
+        Button {
+            _ = set.appendDropSegment(prefillFromLast: false)
+            onChange()
+        } label: {
+            HStack(spacing: 0) {
+                Color.clear.frame(width: 26)
+                HStack(spacing: 5) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("添加")
+                        .font(Theme.Font.body(size: 11.5, weight: .semibold))
+                }
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.horizontal, 9)
+                .frame(height: 28)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .stroke(Theme.Color.border, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                )
+            }
+            .frame(height: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("为第 \(badgeText) 组添加递减组内一组")
     }
 
     /// 序号徽章：可点击切换组类型（只读态退化为静态文本）。热身组显「热」（朱砂红文字，无底色）。
@@ -2948,17 +2988,23 @@ private struct SetRow: View {
             Text("\(displayIndex + 1)")
                 .font(Theme.Font.mono(size: 11, weight: .bold))
                 .foregroundStyle(Theme.Color.muted)
-                .frame(width: 18, height: 18)
+                .frame(width: 18, height: 30)
             valueCell(text: weightText, placeholder: "kg", unit: "kg",
                       inputMode: inputMode(for: weightCell, text: weightText),
-                      label: "第 \(displayIndex + 1) 段重量",
-                      value: segment.weightKg.map { "\(formatKg($0)) 公斤" })
+                      label: "第 \(displayIndex + 1) 组重量",
+                      value: segment.weightKg.map { "\(formatKg($0)) 公斤" },
+                      width: 54,
+                      height: 30,
+                      numberSize: 13.5)
                 .onTapGesture { if !readOnly { onFocus(weightCell) } }
             Text("×").font(Theme.Font.mono(size: 11)).foregroundStyle(Theme.Color.muted).frame(width: 12)
             valueCell(text: repsText, placeholder: "次", unit: "次",
                       inputMode: inputMode(for: repsCell, text: repsText),
-                      label: "第 \(displayIndex + 1) 段次数",
-                      value: segment.reps.map { "\($0) 次" })
+                      label: "第 \(displayIndex + 1) 组次数",
+                      value: segment.reps.map { "\($0) 次" },
+                      width: 54,
+                      height: 30,
+                      numberSize: 13.5)
                 .onTapGesture { if !readOnly { onFocus(repsCell) } }
             if !readOnly && set.segments.count > 1 {
                 Button {
@@ -2966,30 +3012,35 @@ private struct SetRow: View {
                     onChange()
                 } label: {
                     Image(systemName: "trash")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Theme.Color.muted)
-                        .frame(width: 30, height: 36)
+                        .frame(width: 30, height: 30)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("删除第 \(displayIndex + 1) 段")
+                .accessibilityLabel("删除第 \(displayIndex + 1) 组")
             } else {
-                Color.clear.frame(width: 30, height: 36)
+                Color.clear.frame(width: 44, height: 44)
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(rowName)，递减组第 \(displayIndex + 1) 段")
+        .accessibilityLabel("\(rowName)，递减组第 \(displayIndex + 1) 组")
     }
 
     /// 重量/次数输入框：定宽收窄（让右侧腾出完成勾 + 更多操作），居中数字。
     private func valueCell(text: String, placeholder: String, unit: String, inputMode: SetInputMode,
-                           label: String, value: String?) -> some View {
+                           label: String, value: String?,
+                           width: CGFloat = 64,
+                           height: CGFloat = 36,
+                           numberSize: CGFloat = 15) -> some View {
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
         let displayText = text.isEmpty ? placeholder : text
 
         return ZStack(alignment: .bottomTrailing) {
             HStack(spacing: 2) {
                 Text(displayText)
-                    .font(Theme.Font.number(size: 15, weight: .bold))
+                    .font(Theme.Font.number(size: numberSize, weight: .bold))
                     .foregroundStyle(valueTextColor(isPlaceholder: text.isEmpty))
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -3009,7 +3060,7 @@ private struct SetRow: View {
                     .padding(.bottom, 3)
             }
         }
-        .frame(width: 64, height: 36)
+        .frame(width: width, height: height)
         .background(valueCellBackground, in: shape)
         .overlay(
             shape.stroke(valueCellBorder(inputMode: inputMode),

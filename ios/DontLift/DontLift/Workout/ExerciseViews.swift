@@ -92,7 +92,7 @@ private enum MuscleThumbnailAssetKey: String {
     }
 }
 
-/// 动作库 · Tab 根页：保留顶部标题与右上自定义动作创建入口。
+/// 动作库 · Tab 根页：不展示顶部标题，仅保留右上自定义动作创建入口。
 struct ExerciseLibraryView: View {
     @State private var showingCreate = false
     @State private var selectedExercise: BuiltinExercise?
@@ -101,31 +101,27 @@ struct ExerciseLibraryView: View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
             VStack(spacing: 0) {
-                header
                 ExerciseLibraryContentView(
                     mode: .browse { selectedExercise = $0 },
-                    emptyHint: "试试其他关键词，或点右上 + 添加自定义动作。",
-                    emptyPlainHint: "切换部位，或点右上 + 添加自定义动作。"
+                    emptyHint: "试试其他关键词，或点右下 + 添加自定义动作。",
+                    emptyPlainHint: "切换部位，或点右下 + 添加自定义动作。"
                 )
             }
+        }
+        .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
+            floatingAddButton
         }
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingCreate) { CustomExerciseEditorView() }
         .navigationDestination(item: $selectedExercise) { ExerciseDetailView(exercise: $0) }
     }
 
-    private var header: some View {
-        HStack {
-            Text("动作库")
-                .font(Theme.Font.display(size: 36, weight: .heavy))
-                .tracking(-1.08)
-                .foregroundStyle(Theme.Color.fg)
-            Spacer(minLength: 0)
-            CircleAddButton(action: { showingCreate = true }, accessibilityLabel: "添加自定义动作")
-        }
-        .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.top, 6)
-        .padding(.bottom, 4)
+    private var floatingAddButton: some View {
+        CircleAddButton(action: { showingCreate = true }, accessibilityLabel: "添加自定义动作")
+            .frame(width: 48, height: 48)
+            .padding(.trailing, Theme.Spacing.lg)
+            .padding(.top, Theme.Spacing.sm)
+            .padding(.bottom, Theme.Spacing.md)
     }
 }
 

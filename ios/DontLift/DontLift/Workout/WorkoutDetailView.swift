@@ -499,6 +499,8 @@ private struct LogSetRow: View {
 
             Spacer(minLength: 0)
 
+            if let actualRestText { restTag(actualRestText) }
+
             if isPR { prTag }
         }
         .padding(.horizontal, 15)
@@ -518,10 +520,6 @@ private struct LogSetRow: View {
                         .padding(.horizontal, 7)
                         .padding(.vertical, 2)
                         .background(Theme.Color.accentSofter, in: Capsule())
-                    Text(set.compactValueText)
-                        .font(Theme.Font.mono(size: 12, weight: .semibold))
-                        .foregroundStyle(valueColor)
-                        .lineLimit(1)
                 }
                 ForEach(set.effectiveSegments) { segment in
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
@@ -585,18 +583,44 @@ private struct LogSetRow: View {
         .overlay(Capsule().stroke(Theme.Color.accent.opacity(0.18), lineWidth: 1))
     }
 
+    private var actualRestText: String? {
+        guard set.completed, let seconds = set.actualRestSeconds else { return nil }
+        return formatDetailRest(seconds)
+    }
+
+    private func restTag(_ text: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: "timer")
+                .font(.system(size: 8, weight: .bold))
+            Text(text)
+                .font(Theme.Font.mono(size: 9, weight: .bold))
+        }
+        .foregroundStyle(Theme.Color.muted)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(Theme.Color.bg, in: Capsule())
+        .overlay(Capsule().stroke(Theme.Color.border, lineWidth: 1))
+    }
+
     private var a11yLabel: String {
+        let rest = actualRestText.map { "，休息用时 \($0)" } ?? ""
         if set.isDropSet {
             let values = set.effectiveSegments.enumerated().map { idx, segment in
                 let w = segment.weightKg.map { "\(formatKg($0)) 公斤" } ?? "未记录重量"
                 let r = segment.reps.map { "\($0) 次" } ?? "未记录次数"
                 return "第 \(idx + 1) 段，\(w)，\(r)"
             }.joined(separator: "，")
-            return "第 \(badgeText) 组，递减组，\(values)" + (isPR ? "，新纪录" : "")
+            return "第 \(badgeText) 组，递减组，\(values)" + rest + (isPR ? "，新纪录" : "")
         }
         let w = set.weightKg.map { "\(formatKg($0)) 公斤" } ?? "未记录重量"
         let r = set.reps.map { "\($0) 次" } ?? "未记录次数"
         let name = set.setType == .warmup ? "热身组" : "第 \(badgeText) 组"
-        return "\(name)，\(w)，\(r)" + (isPR ? "，新纪录" : "")
+        return "\(name)，\(w)，\(r)" + rest + (isPR ? "，新纪录" : "")
     }
+}
+
+private func formatDetailRest(_ seconds: Int) -> String {
+    let total = max(0, seconds)
+    if total < 60 { return "\(total)s" }
+    return String(format: "%d:%02d", total / 60, total % 60)
 }

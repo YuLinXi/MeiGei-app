@@ -154,6 +154,88 @@ extension PlanItem {
     var orderedSetPrescriptions: [PlanSetPrescription] {
         (setPrescriptions ?? []).sorted { $0.orderIndex < $1.orderIndex }
     }
+
+    func manualSetPrescriptionsForEditing() -> [PlanSetPrescription] {
+        let existing = orderedSetPrescriptions
+        if !existing.isEmpty { return Self.normalizedManualSetPrescriptions(existing) }
+        let count = max(1, suggestedSets ?? PlanDefaults.suggestedSets)
+        return (0..<count).map {
+            PlanSetPrescription(orderIndex: $0,
+                                weightKg: suggestedWeightKg,
+                                reps: suggestedReps ?? PlanDefaults.suggestedReps)
+        }
+    }
+
+    mutating func applyManualSetPrescriptions(_ prescriptions: [PlanSetPrescription]) {
+        let normalized = Self.normalizedManualSetPrescriptions(prescriptions)
+        let finalPrescriptions = normalized.isEmpty
+            ? [PlanSetPrescription(orderIndex: 0, reps: PlanDefaults.suggestedReps)]
+            : normalized
+        setPrescriptions = finalPrescriptions
+        suggestedSets = finalPrescriptions.count
+        let summary = Self.summaryWeightReps(from: finalPrescriptions)
+        suggestedWeightKg = summary.weightKg
+        suggestedReps = summary.reps
+    }
+
+    static func normalizedManualSetPrescriptions(_ prescriptions: [PlanSetPrescription]) -> [PlanSetPrescription] {
+        prescriptions.enumerated().map { idx, prescription in
+            if prescription.setType == .drop {
+                let sourceSegments = prescription.segments.isEmpty
+                    ? [WorkoutSetSegment(segmentIndex: 0, weightKg: prescription.weightKg, reps: prescription.reps),
+                       WorkoutSetSegment(segmentIndex: 1)]
+                    : prescription.segments
+                let segments = sourceSegments
+                    .sorted { $0.segmentIndex < $1.segmentIndex }
+                    .enumerated()
+                    .map { segmentIndex, segment in
+                        WorkoutSetSegment(segmentId: segment.segmentId,
+                                          segmentIndex: segmentIndex,
+                                          weightKg: segment.weightKg,
+                                          reps: segment.reps)
+                    }
+                let summary = summaryWeightReps(from: segments)
+                return PlanSetPrescription(prescriptionId: prescription.prescriptionId,
+                                           setType: .drop,
+                                           orderIndex: idx,
+                                           weightKg: summary.weightKg,
+                                           reps: summary.reps,
+                                           segments: segments)
+            }
+            return PlanSetPrescription(prescriptionId: prescription.prescriptionId,
+                                       setType: .working,
+                                       orderIndex: idx,
+                                       weightKg: prescription.weightKg,
+                                       reps: prescription.reps)
+        }
+    }
+
+    private static func summaryWeightReps(from prescriptions: [PlanSetPrescription]) -> (weightKg: Double?, reps: Int?) {
+        let entries = prescriptions.flatMap { prescription -> [(weightKg: Double?, reps: Int?)] in
+            if prescription.setType == .drop {
+                return prescription.segments
+                    .sorted { $0.segmentIndex < $1.segmentIndex }
+                    .map { ($0.weightKg, $0.reps) }
+            }
+            return [(prescription.weightKg, prescription.reps)]
+        }
+        return summaryWeightReps(from: entries)
+    }
+
+    private static func summaryWeightReps(from segments: [WorkoutSetSegment]) -> (weightKg: Double?, reps: Int?) {
+        summaryWeightReps(from: segments
+            .sorted { $0.segmentIndex < $1.segmentIndex }
+            .map { ($0.weightKg, $0.reps) })
+    }
+
+    private static func summaryWeightReps(from entries: [(weightKg: Double?, reps: Int?)]) -> (weightKg: Double?, reps: Int?) {
+        let effective = entries.filter { $0.weightKg != nil || $0.reps != nil }
+        if let top = effective.filter({ $0.weightKg != nil }).max(by: { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }) {
+            return (top.weightKg, top.reps)
+        }
+        if let first = effective.first { return (first.weightKg, first.reps) }
+        return (nil, nil)
+    }
 }
 
 /// 训练计划模板（参与同步，对应后端 workout_plan，items 以 jsonb 整体存储）。

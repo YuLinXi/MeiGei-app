@@ -109,6 +109,37 @@ struct AdaptivePlanTests {
         #expect(sets[0].segments.map(\.reps) == [8, 6])
     }
 
+    @Test func manualPrescriptionEditingWritesDropSetSummaryAndPrefill() {
+        var item = PlanItem(builtinExerciseCode: "BB_BENCH",
+                            exerciseName: "卧推",
+                            orderIndex: 0,
+                            suggestedSets: 4,
+                            suggestedReps: 10)
+
+        item.applyManualSetPrescriptions([
+            PlanSetPrescription(setType: .working, orderIndex: 0, weightKg: 70, reps: 5),
+            PlanSetPrescription(setType: .drop,
+                                orderIndex: 1,
+                                segments: [
+                                    WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8),
+                                    WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6)
+                                ])
+        ])
+
+        #expect(item.suggestedSets == 2)
+        #expect(item.suggestedWeightKg == 80)
+        #expect(item.suggestedReps == 8)
+        #expect(item.setPrescriptions?.map(\.orderIndex) == [0, 1])
+        #expect(item.setPrescriptions?.last?.setType == .drop)
+
+        let sets = PlanPrefill.sets(for: item, mode: .strict, history: [])
+        #expect(sets.count == 2)
+        #expect(sets[0].setType == .working)
+        #expect(sets[1].setType == .drop)
+        #expect(sets[1].segments.map(\.weightKg) == [80, 60])
+        #expect(sets[1].segments.map(\.reps) == [8, 6])
+    }
+
     @Test func strictModeDoesNotCreateFallbackSetsWhenRequiredPresetMissing() {
         let missingSets = PlanItem(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0,
                                    suggestedSets: nil, suggestedReps: 8, suggestedWeightKg: 60)

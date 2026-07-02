@@ -44,9 +44,9 @@ final class AuthService: NSObject {
                 body: AppleLoginRequest(identityToken: identityToken, authorizationCode: authorizationCode),
                 authorized: false,
                 retryOnConnectivity: true)   // 全新安装首笔请求常因可达性未就绪秒拒 -1009，重试规避
-            session.handleLogin(auth, appleSub: credential.user,
-                                email: credential.email,
-                                displayName: displayName.isEmpty ? nil : displayName)
+            await session.handleLogin(auth, appleSub: credential.user,
+                                      email: credential.email,
+                                      displayName: displayName.isEmpty ? nil : displayName)
         }
     }
 
@@ -56,7 +56,7 @@ final class AuthService: NSObject {
         let auth: AuthResponse = try await APIClient.shared.send(
             "POST", "/auth/dev/token", authorized: false
         )
-        session.handleLogin(auth, appleSub: "dev", email: "dev@dontlift.local", displayName: "Dev")
+        await session.handleLogin(auth, appleSub: "dev", email: "dev@dontlift.local", displayName: "Dev")
     }
 
     private func exchange(identityToken: String, authorizationCode: String?,
@@ -69,7 +69,7 @@ final class AuthService: NSObject {
                     authorized: false,
                     retryOnConnectivity: true   // 全新安装首笔请求常因可达性未就绪秒拒 -1009，重试规避
                 )
-                session.handleLogin(auth, appleSub: appleSub, email: email, displayName: displayName)
+                await session.handleLogin(auth, appleSub: appleSub, email: email, displayName: displayName)
                 continuation?.resume()
             } catch {
                 continuation?.resume(throwing: error)
