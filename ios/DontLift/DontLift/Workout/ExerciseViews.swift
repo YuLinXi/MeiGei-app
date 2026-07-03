@@ -19,6 +19,17 @@ struct LibraryChip: Identifiable, Hashable {
     let title: String
 }
 
+struct LibraryQuickIndexHitTesting {
+    static func itemIndex(at y: CGFloat, itemCount: Int, itemHeight: CGFloat, spacing: CGFloat) -> Int? {
+        guard itemCount > 0, itemHeight > 0, spacing >= 0 else { return nil }
+        let totalHeight = CGFloat(itemCount) * itemHeight + CGFloat(max(0, itemCount - 1)) * spacing
+        guard totalHeight > 0 else { return nil }
+        let clampedY = min(max(y, 0), totalHeight - 0.001)
+        let stride = itemHeight + spacing
+        return min(itemCount - 1, max(0, Int(clampedY / stride)))
+    }
+}
+
 /// 动作库左栏选择态（解剖三级树的当前下钻位置）。
 private enum LibrarySelection: Hashable {
     case all                                   // 全部
@@ -58,6 +69,105 @@ private struct RowCardSlice: ViewModifier {
 private enum ExerciseLibraryContentMode {
     case browse(onBuiltin: (BuiltinExercise) -> Void)
     case pick(onPick: (ExercisePick) -> Void)
+}
+
+private struct LibraryQuickIndexItem: Identifiable, Hashable {
+    var id: String
+    var title: String
+    var label: String
+    var systemName: String?
+    var isSelected: Bool
+}
+
+private struct LibraryQuickIndex: View {
+    let items: [LibraryQuickIndexItem]
+    let onActivate: (LibraryQuickIndexItem) -> Void
+
+    @State private var activeItemId: String?
+
+    private static let itemHeight: CGFloat = 28
+    private static let itemSpacing: CGFloat = 6
+    private static let hitWidth: CGFloat = 42
+
+    private var contentHeight: CGFloat {
+        CGFloat(items.count) * Self.itemHeight + CGFloat(max(0, items.count - 1)) * Self.itemSpacing
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            VStack(spacing: Self.itemSpacing) {
+                ForEach(items) { item in
+                    indexItem(item)
+                        .frame(width: Self.hitWidth, height: Self.itemHeight)
+                }
+            }
+            .frame(width: Self.hitWidth, height: contentHeight, alignment: .top)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                    .onChanged { value in
+                        guard let index = LibraryQuickIndexHitTesting.itemIndex(
+                            at: value.location.y,
+                            itemCount: items.count,
+                            itemHeight: Self.itemHeight,
+                            spacing: Self.itemSpacing
+                        ) else { return }
+                        activate(items[index])
+                    }
+                    .onEnded { _ in
+                        activeItemId = nil
+                    }
+            )
+            .accessibilityElement(children: .contain)
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+        }
+        .frame(width: Self.hitWidth, height: contentHeight)
+        .padding(.vertical, 6)
+    }
+
+    private func activate(_ item: LibraryQuickIndexItem) {
+        guard activeItemId != item.id else { return }
+        activeItemId = item.id
+        Theme.Haptics.selection()
+        onActivate(item)
+    }
+
+    @ViewBuilder
+    private func indexItem(_ item: LibraryQuickIndexItem) -> some View {
+        let highlighted = item.isSelected || activeItemId == item.id
+        Group {
+            if let systemName = item.systemName {
+                Image(systemName: systemName)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.Color.accent)
+            } else {
+                Text(item.title)
+                    .font(Theme.Font.mono(size: 10, weight: .bold))
+                    .foregroundStyle(highlighted ? Theme.Color.accent : Theme.Color.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+        }
+        .frame(width: 28, height: 28)
+        .background {
+            Circle()
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    Circle()
+                        .fill((highlighted ? Theme.Color.accentSoft : Theme.Color.surface).opacity(highlighted ? 0.72 : 0.42))
+                }
+        }
+        .overlay {
+            Circle()
+                .stroke((highlighted ? Theme.Color.accentSofter : Theme.Color.border).opacity(highlighted ? 0.9 : 0.52), lineWidth: 0.75)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(item.label)
+        .accessibilityAddTraits(item.isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction {
+            activate(item)
+        }
+    }
 }
 
 private enum MuscleThumbnailAssetKey: String {
@@ -145,6 +255,7 @@ private struct ExerciseLibraryContentView: View {
     let emptyHint: String
     let emptyPlainHint: String
 
+    private static let quickIndexTopID = "__top"
     private static let initialLibraryRowLimit = 60
     private static let libraryRowPageSize = 50
 
@@ -476,8 +587,10 @@ private struct ExerciseLibraryContentView: View {
                     .padding(.top, 8)
                 }
 
-                equipmentQuickFilter(proxy)
-                    .padding(.trailing, 6)
+                LibraryQuickIndex(items: quickIndexItems) { item in
+                    activateQuickIndexItem(item, proxy: proxy)
+                }
+                    .padding(.trailing, 4)
                     .padding(.top, 8)
                     .frame(maxHeight: .infinity, alignment: .topTrailing)
             }
@@ -501,47 +614,33 @@ private struct ExerciseLibraryContentView: View {
         }
     }
 
-    private func equipmentQuickFilter(_ proxy: ScrollViewProxy) -> some View {
-        VStack(spacing: 6) {
-            Button {
-                scrollLibToTop(proxy)
-            } label: {
-                Image(systemName: "arrow.up.to.line")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
-                    .frame(width: 28, height: 28)
-                    .background(Theme.Color.accentSoft, in: Circle())
-                    .overlay(Circle().stroke(Theme.Color.accentSofter, lineWidth: 1))
-            }
-            .buttonStyle(PressableButtonStyle())
-            .accessibilityLabel("回到顶部")
-
-            ForEach(equipChips) { chip in
-                equipmentQuickFilterButton(chip, proxy: proxy)
-            }
+    private var quickIndexItems: [LibraryQuickIndexItem] {
+        [LibraryQuickIndexItem(
+            id: Self.quickIndexTopID,
+            title: "",
+            label: "回到顶部",
+            systemName: "arrow.up",
+            isSelected: false
+        )]
+        + equipChips.map { chip in
+            LibraryQuickIndexItem(
+                id: chip.id,
+                title: equipmentQuickLabel(for: chip),
+                label: "筛选\(chip.title)",
+                systemName: nil,
+                isSelected: equip == chip.id
+            )
         }
     }
 
-    private func equipmentQuickFilterButton(_ chip: LibraryChip, proxy: ScrollViewProxy) -> some View {
-        let selected = equip == chip.id
-        return Button {
-            if selected {
-                scrollLibToTop(proxy)
-            } else {
-                Theme.Haptics.impact(.light)
-                equip = chip.id
-            }
-        } label: {
-            Text(equipmentQuickLabel(for: chip))
-                .font(Theme.Font.mono(size: 10, weight: .bold))
-                .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.muted)
-                .frame(width: 28, height: 26)
-                .background(selected ? Theme.Color.accentSoft : Theme.Color.surface, in: Capsule())
-                .overlay(Capsule().stroke(selected ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
+    private func activateQuickIndexItem(_ item: LibraryQuickIndexItem, proxy: ScrollViewProxy) {
+        if item.id == Self.quickIndexTopID {
+            scrollLibToTop(proxy, haptic: false)
+        } else if equip == item.id {
+            scrollLibToTop(proxy, haptic: false)
+        } else {
+            equip = item.id
         }
-        .buttonStyle(PressableButtonStyle())
-        .accessibilityLabel("筛选\(chip.title)")
-        .accessibilityAddTraits(selected ? .isSelected : AccessibilityTraits())
     }
 
     private func equipmentQuickLabel(for chip: LibraryChip) -> String {
@@ -564,8 +663,8 @@ private struct ExerciseLibraryContentView: View {
     }
 
     /// 平滑回到动作列表顶部（用于重复点击已激活 chip）。
-    private func scrollLibToTop(_ proxy: ScrollViewProxy) {
-        Theme.Haptics.impact(.light)
+    private func scrollLibToTop(_ proxy: ScrollViewProxy, haptic: Bool = true) {
+        if haptic { Theme.Haptics.impact(.light) }
         withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo("LIB_TOP", anchor: .top) }
     }
 

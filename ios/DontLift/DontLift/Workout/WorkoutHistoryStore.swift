@@ -56,6 +56,7 @@ struct WorkoutRowSummary: Identifiable, Equatable, Hashable {
 struct HomeWorkoutSnapshot: Equatable {
     var currentWeekStats: WeeklyStats
     var weekWorkouts: [WorkoutRowSummary]
+    var weekTrainingDays: [WeekTrainingDayStatus]
     var recentPlanIds: Set<UUID>
     var activePlanId: UUID?
     var prByWorkoutId: [UUID: PRBadge]
@@ -63,6 +64,7 @@ struct HomeWorkoutSnapshot: Equatable {
     static let empty = HomeWorkoutSnapshot(
         currentWeekStats: .empty,
         weekWorkouts: [],
+        weekTrainingDays: WorkoutWeeklyStats.dayStatuses(workouts: [], reference: .now, calendar: .currentMondayFirst),
         recentPlanIds: [],
         activePlanId: nil,
         prByWorkoutId: [:]
@@ -594,6 +596,11 @@ final class WorkoutHistoryStore {
                 calendar: .currentMondayFirst
             ),
             weekWorkouts: Array(weekWorkouts),
+            weekTrainingDays: WorkoutWeeklyStats.dayStatuses(
+                workouts: finishedDesc,
+                reference: now,
+                calendar: .currentMondayFirst
+            ),
             recentPlanIds: recentPlanIds,
             activePlanId: activePlanId,
             prByWorkoutId: prByWorkoutId

@@ -249,9 +249,12 @@ struct PlanListView: View {
 
     private var planOverview: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            Text("总览").eyebrowStyle()
+            Text("总览")
+                .font(Theme.Font.mono(size: 12, weight: .semibold))
+                .tracking(0.08 * 12)
+                .foregroundStyle(Theme.Color.muted)
             Text(planListOverview)
-                .font(Theme.Font.mono(size: 11, weight: .semibold))
+                .font(Theme.Font.mono(size: 12.5, weight: .semibold))
                 .foregroundStyle(Theme.Color.muted)
                 .lineLimit(1)
                 .minimumScaleFactor(0.88)

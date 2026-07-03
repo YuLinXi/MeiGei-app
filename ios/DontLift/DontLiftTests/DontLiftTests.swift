@@ -93,6 +93,52 @@ struct WorkoutWeeklyStatsTests {
         #expect(s.sessionCount == 1)
         #expect(s.volumeKg == 50 * 4)
     }
+
+    @Test func emptyWeekDayStatusesCoverSevenDays() {
+        var comps = DateComponents()
+        comps.year = 2026; comps.month = 5; comps.day = 25; comps.hour = 12
+        let monday = mondayCalendar.date(from: comps)!
+
+        let days = WorkoutWeeklyStats.dayStatuses(workouts: [], reference: monday, calendar: mondayCalendar)
+
+        #expect(days.count == 7)
+        #expect(days.allSatisfy { !$0.isCompleted })
+        #expect(days.first?.weekdayIndex == 0)
+        #expect(days.first?.isToday == true)
+    }
+
+    @Test func sameDayMultipleWorkoutsLightOneDayWithSessionCount() {
+        var comps = DateComponents()
+        comps.year = 2026; comps.month = 5; comps.day = 27; comps.hour = 9
+        let wednesdayMorning = mondayCalendar.date(from: comps)!
+        comps.hour = 20
+        let wednesdayEvening = mondayCalendar.date(from: comps)!
+
+        let first = makeWorkout(startedAt: wednesdayMorning, endedAt: wednesdayMorning, sets: [(50, 5)])
+        let second = makeWorkout(startedAt: wednesdayEvening, endedAt: wednesdayEvening, sets: [(60, 5)])
+        let days = WorkoutWeeklyStats.dayStatuses(workouts: [first, second], reference: wednesdayMorning, calendar: mondayCalendar)
+        let wednesday = days[2]
+
+        #expect(wednesday.isCompleted)
+        #expect(wednesday.sessionCount == 2)
+        #expect(days.filter(\.isCompleted).count == 1)
+    }
+
+    @Test func dayStatusesUseMondayWeekBoundary() {
+        var comps = DateComponents()
+        comps.year = 2026; comps.month = 6; comps.day = 1; comps.hour = 12
+        let monday = mondayCalendar.date(from: comps)!
+        let previousSunday = mondayCalendar.date(byAdding: .day, value: -1, to: monday)!
+        let currentSunday = mondayCalendar.date(byAdding: .day, value: 6, to: monday)!
+        let old = makeWorkout(startedAt: previousSunday, endedAt: previousSunday, sets: [(50, 5)])
+        let current = makeWorkout(startedAt: currentSunday, endedAt: currentSunday, sets: [(60, 5)])
+
+        let days = WorkoutWeeklyStats.dayStatuses(workouts: [old, current], reference: monday, calendar: mondayCalendar)
+
+        #expect(days[6].isCompleted)
+        #expect(days[6].sessionCount == 1)
+        #expect(days.filter(\.isCompleted).count == 1)
+    }
 }
 
 struct TeamMemberDTOTests {

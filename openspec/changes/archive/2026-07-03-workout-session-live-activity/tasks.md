@@ -38,7 +38,7 @@
 ## 6. 基础设施 / 验证
 
 - [x] 6.1 运行 iOS Simulator 构建：`xcodebuild -project DontLift.xcodeproj -scheme DontLift -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -configuration Debug CODE_SIGNING_ALLOWED=NO build`。
-- [ ] 6.2 在 Simulator 或本地可执行路径中验证训练计时开始、进入休息、休息调时、提前结束休息、结束训练、放弃训练均不会崩溃。
-- [ ] 6.3 真机验证锁屏与 Dynamic Island：`workout` phase 显示训练正向计时，`rest` phase 显示休息倒计时，休息结束后恢复训练正向计时。
-- [ ] 6.4 真机验证 Live Activity 权限关闭时的降级路径：App 内 REC/FAB/弹窗、本地通知、声音与触觉仍可工作。
-- [ ] 6.5 条件验证 Apple Watch Smart Stack；若未出现，按平台条件能力记录为降级，不作为失败。
+- [x] 6.2 在 Simulator 或本地可执行路径中验证训练计时开始、进入休息、休息调时、提前结束休息、结束训练、放弃训练均不会崩溃。
+- [x] 6.3 真机验证锁屏与 Dynamic Island：`workout` phase 显示训练正向计时，`rest` phase 显示休息倒计时，休息结束后恢复训练正向计时。
+- [x] 6.4 真机验证 Live Activity 权限关闭时的降级路径：App 内 REC/FAB/弹窗、本地通知、声音与触觉仍可工作。
+- [x] 6.5 条件验证 Apple Watch Smart Stack；若未出现，按平台条件能力记录为降级，不作为失败。

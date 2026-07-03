@@ -50,6 +50,7 @@ struct WorkoutListView: View {
                 ScrollView {
                     VStack(spacing: Theme.Spacing.lg) {
                         heroSection
+                        weekCompletionSection
                         statsGrid
                         weekTrainingSection
                         Color.clear.frame(height: 80) // 给底部 CTA 留位
@@ -197,6 +198,71 @@ struct WorkoutListView: View {
 
     private var divider: some View {
         Rectangle().fill(Theme.Color.border).frame(width: 1)
+    }
+
+    // MARK: 一周训练勾选
+
+    private var weekCompletionSection: some View {
+        let days = historyStore.home.weekTrainingDays
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("本周节奏").eyebrowStyle()
+            HStack(spacing: 7) {
+                ForEach(days) { day in
+                    weekDayBadge(day)
+                }
+            }
+        }
+        .cardStyle(padding: Theme.Spacing.md)
+    }
+
+    private func weekDayBadge(_ day: WeekTrainingDayStatus) -> some View {
+        VStack(spacing: 7) {
+            Text(Self.weekdayTitle(for: day.weekdayIndex))
+                .font(Theme.Font.mono(size: 10, weight: .bold))
+                .foregroundStyle(day.isToday ? Theme.Color.accent : Theme.Color.muted)
+                .frame(height: 12)
+            ZStack {
+                Circle()
+                    .fill(weekDayFill(day))
+                    .overlay(
+                        Circle()
+                            .stroke(day.isToday ? Theme.Color.accent : Theme.Color.border, lineWidth: day.isToday || !day.isCompleted ? 1 : 0)
+                    )
+                if day.isCompleted {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundStyle(Theme.Color.bg)
+                } else if day.isToday {
+                    Circle()
+                        .fill(Theme.Color.accent)
+                        .frame(width: 5, height: 5)
+                }
+            }
+            .frame(width: 28, height: 28)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(weekDayAccessibilityLabel(day))
+    }
+
+    private func weekDayFill(_ day: WeekTrainingDayStatus) -> Color {
+        if day.isCompleted { return Theme.Color.accent }
+        if day.isToday { return Theme.Color.accentSoft }
+        return Theme.Color.surface2
+    }
+
+    private func weekDayAccessibilityLabel(_ day: WeekTrainingDayStatus) -> String {
+        let title = Self.weekdayTitle(for: day.weekdayIndex)
+        if day.sessionCount > 1 { return "周\(title)，已完成 \(day.sessionCount) 次训练" }
+        if day.isCompleted { return "周\(title)，已完成训练" }
+        if day.isToday { return "周\(title)，今天，未完成训练" }
+        return "周\(title)，未完成训练"
+    }
+
+    private static func weekdayTitle(for index: Int) -> String {
+        let titles = ["一", "二", "三", "四", "五", "六", "日"]
+        guard titles.indices.contains(index) else { return "" }
+        return titles[index]
     }
 
     // MARK: 本周训练

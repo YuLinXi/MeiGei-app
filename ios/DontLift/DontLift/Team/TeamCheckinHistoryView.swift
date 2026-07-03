@@ -44,6 +44,7 @@ struct TeamCheckinHistoryView: View {
     private var archiveGroups: [CalendarHistoryYearArchiveGroup] {
         TeamCheckinHistoryModels.archiveGroups(
             currentMonth: monthStart(for: .now),
+            earliestSelectableMonth: teamCreatedMonthStart,
             loadedMonths: loadedMonths,
             memberName: displayName(for:),
             calendar: calendar

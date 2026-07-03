@@ -15,6 +15,16 @@ struct WeeklyStats: Equatable {
     static let empty = WeeklyStats(volumeKg: 0, sessionCount: 0, setCount: 0, repCount: 0)
 }
 
+struct WeekTrainingDayStatus: Identifiable, Equatable, Hashable {
+    var date: Date
+    var weekdayIndex: Int
+    var sessionCount: Int
+    var isToday: Bool
+
+    var id: Date { date }
+    var isCompleted: Bool { sessionCount > 0 }
+}
+
 enum WorkoutWeeklyStats {
     /// 计算给定参考日期所在「自然周（周一起）」的训练聚合。
     static func compute(workouts: [Workout], reference: Date = .now, calendar: Calendar = .currentMondayFirst) -> WeeklyStats {
@@ -46,6 +56,28 @@ enum WorkoutWeeklyStats {
         let start = calendar.date(from: comps) ?? calendar.startOfDay(for: date)
         let end = calendar.date(byAdding: .weekOfYear, value: 1, to: start) ?? start
         return (start, end)
+    }
+
+    static func dayStatuses(workouts: [Workout], reference: Date = .now, calendar: Calendar = .currentMondayFirst) -> [WeekTrainingDayStatus] {
+        let (start, end) = weekBounds(for: reference, calendar: calendar)
+        var countsByDay: [Date: Int] = [:]
+        for workout in workouts {
+            guard workout.isFinished else { continue }
+            guard workout.startedAt >= start, workout.startedAt < end else { continue }
+            let day = calendar.startOfDay(for: workout.startedAt)
+            countsByDay[day, default: 0] += 1
+        }
+        let today = calendar.startOfDay(for: reference)
+        return (0..<7).compactMap { index in
+            guard let day = calendar.date(byAdding: .day, value: index, to: start) else { return nil }
+            let normalized = calendar.startOfDay(for: day)
+            return WeekTrainingDayStatus(
+                date: normalized,
+                weekdayIndex: index,
+                sessionCount: countsByDay[normalized] ?? 0,
+                isToday: calendar.isDate(normalized, inSameDayAs: today)
+            )
+        }
     }
 }
 

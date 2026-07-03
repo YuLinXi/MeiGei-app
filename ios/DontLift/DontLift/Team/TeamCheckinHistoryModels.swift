@@ -77,30 +77,38 @@ enum TeamCheckinHistoryModels {
 
     static func archiveGroups(
         currentMonth: Date,
+        earliestSelectableMonth: Date? = nil,
         loadedMonths: [Date: TeamCheckinHistoryMonthData],
         memberName: (UUID) -> String,
         calendar: Calendar
     ) -> [CalendarHistoryYearArchiveGroup] {
-        let earliest = loadedMonths.keys.min() ?? currentMonth
+        let earliest = [earliestSelectableMonth, loadedMonths.keys.min(), currentMonth]
+            .compactMap { $0 }
+            .min() ?? currentMonth
         var items: [CalendarHistoryMonthArchiveItem] = []
         var cursor = currentMonth
         while cursor >= earliest {
+            let cachedMonth = loadedMonths[cursor]
             let snapshot = monthSnapshot(
                 monthStart: cursor,
-                cachedMonth: loadedMonths[cursor],
+                cachedMonth: cachedMonth,
                 memberName: memberName,
                 calendar: calendar
             )
-            let activeDays = Set(snapshot.days.compactMap { day -> Int? in
-                guard day.isInDisplayedMonth, day.summary != nil else { return nil }
-                return calendar.component(.day, from: day.date)
-            })
+            let isLoaded = cachedMonth != nil
+            let activeDays = isLoaded
+                ? Set(snapshot.days.compactMap { day -> Int? in
+                    guard day.isInDisplayedMonth, day.summary != nil else { return nil }
+                    return calendar.component(.day, from: day.date)
+                })
+                : []
             items.append(CalendarHistoryMonthArchiveItem(
                 monthStart: cursor,
-                trainingDayCount: activeDays.count,
-                workoutCount: snapshot.rowCount,
-                setCount: snapshot.setCount,
-                volumeKg: snapshot.volumeKg,
+                isLoaded: isLoaded,
+                trainingDayCount: isLoaded ? activeDays.count : 0,
+                workoutCount: isLoaded ? snapshot.rowCount : 0,
+                setCount: isLoaded ? snapshot.setCount : 0,
+                volumeKg: isLoaded ? snapshot.volumeKg : 0,
                 activeDayNumbers: activeDays
             ))
             guard let previous = calendar.date(byAdding: .month, value: -1, to: cursor) else { break }
