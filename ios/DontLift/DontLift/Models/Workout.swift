@@ -25,6 +25,8 @@ final class Workout: Syncable {
     var timerStartedAt: Date?
     var endedAt: Date?
     var note: String?
+    /// 一级训练单元索引 JSON。nil/空数组表示旧数据：按 `exercises.orderIndex` 派生为单动作单元。
+    var unitsJSON: String?
 
     @Relationship(deleteRule: .cascade, inverse: \WorkoutExercise.workout)
     var exercises: [WorkoutExercise]
@@ -40,6 +42,7 @@ final class Workout: Syncable {
         timerStartedAt: Date? = nil,
         endedAt: Date? = nil,
         note: String? = nil,
+        unitsJSON: String? = nil,
         exercises: [WorkoutExercise] = [],
         now: Date = .now
     ) {
@@ -58,7 +61,69 @@ final class Workout: Syncable {
         self.timerStartedAt = timerStartedAt
         self.endedAt = endedAt
         self.note = note
+        self.unitsJSON = unitsJSON
         self.exercises = exercises
+    }
+}
+
+enum WorkoutUnitKind: String, Codable {
+    case singleExercise
+    case superset
+}
+
+/// 训练记录中的一级训练单元。真实重量/次数仍由 `WorkoutExercise/WorkoutSet` 承载；
+/// 这里保存展示顺序、单动作/超级组边界和超级组轮后休息等结构信息。
+struct WorkoutUnit: Codable, Identifiable, Hashable {
+    var unitId: UUID
+    var kindRaw: String
+    var orderIndex: Int
+    var singleExerciseId: UUID?
+    var superset: WorkoutSupersetUnit?
+
+    var id: UUID { unitId }
+
+    init(
+        unitId: UUID = UUID(),
+        kind: WorkoutUnitKind,
+        orderIndex: Int,
+        singleExerciseId: UUID? = nil,
+        superset: WorkoutSupersetUnit? = nil
+    ) {
+        self.unitId = unitId
+        self.kindRaw = kind.rawValue
+        self.orderIndex = orderIndex
+        self.singleExerciseId = singleExerciseId
+        self.superset = superset
+    }
+
+    var kind: WorkoutUnitKind {
+        WorkoutUnitKind(rawValue: kindRaw) ?? .singleExercise
+    }
+}
+
+struct WorkoutSupersetUnit: Codable, Hashable {
+    var roundCount: Int
+    var restAfterRoundSeconds: Int?
+    var members: [WorkoutSupersetMember]
+
+    init(roundCount: Int, restAfterRoundSeconds: Int? = nil, members: [WorkoutSupersetMember]) {
+        self.roundCount = max(1, roundCount)
+        self.restAfterRoundSeconds = restAfterRoundSeconds
+        self.members = members.sorted { $0.orderIndex < $1.orderIndex }
+    }
+}
+
+struct WorkoutSupersetMember: Codable, Identifiable, Hashable {
+    var memberId: UUID
+    var exerciseId: UUID
+    var orderIndex: Int
+
+    var id: UUID { memberId }
+
+    init(memberId: UUID = UUID(), exerciseId: UUID, orderIndex: Int) {
+        self.memberId = memberId
+        self.exerciseId = exerciseId
+        self.orderIndex = orderIndex
     }
 }
 
@@ -69,6 +134,189 @@ extension Workout {
     var isActive: Bool { deletedAt == nil && endedAt == nil }
     /// 已完成会话：未删除且已结束。
     var isFinished: Bool { deletedAt == nil && endedAt != nil }
+
+    var storedUnits: [WorkoutUnit] {
+        get { Self.decodeUnits(unitsJSON) }
+        set { unitsJSON = Self.encodeUnits(newValue) }
+    }
+
+    /// 对外使用的一级训练单元列表。旧训练没有 `unitsJSON` 时自动按动作列表派生单动作单元。
+    var trainingUnits: [WorkoutUnit] {
+        let decoded = storedUnits
+        guard !decoded.isEmpty else {
+            return exercises
+                .sorted { $0.orderIndex < $1.orderIndex }
+                .enumerated()
+                .map { index, ex in
+                    WorkoutUnit(unitId: ex.localId,
+                                kind: .singleExercise,
+                                orderIndex: index,
+                                singleExerciseId: ex.localId)
+                }
+        }
+
+        let exerciseIds = Set(exercises.map(\.localId))
+        let referencedIds = Set(decoded.flatMap { unit -> [UUID] in
+            switch unit.kind {
+            case .singleExercise:
+                return unit.singleExerciseId.map { [$0] } ?? []
+            case .superset:
+                return unit.superset?.members.map(\.exerciseId) ?? []
+            }
+        })
+        let validUnits = decoded.filter { unit in
+            switch unit.kind {
+            case .singleExercise:
+                return unit.singleExerciseId.map { exerciseIds.contains($0) } ?? false
+            case .superset:
+                return unit.superset?.members.count == 2
+                    && unit.superset?.members.allSatisfy({ exerciseIds.contains($0.exerciseId) }) == true
+            }
+        }
+        let unreferenced = exercises
+            .filter { !referencedIds.contains($0.localId) }
+            .sorted { $0.orderIndex < $1.orderIndex }
+            .enumerated()
+            .map { offset, ex in
+                WorkoutUnit(unitId: ex.localId,
+                            kind: .singleExercise,
+                            orderIndex: (validUnits.map(\.orderIndex).max() ?? -1) + offset + 1,
+                            singleExerciseId: ex.localId)
+            }
+        return (validUnits + unreferenced).sorted { $0.orderIndex < $1.orderIndex }
+    }
+
+    var supersetExerciseIds: Set<UUID> {
+        Set(trainingUnits.flatMap { unit -> [UUID] in
+            guard unit.kind == .superset else { return [] }
+            return unit.superset?.members.map(\.exerciseId) ?? []
+        })
+    }
+
+    var totalExerciseCountForDisplay: Int {
+        trainingUnits.reduce(0) { total, unit in
+            switch unit.kind {
+            case .singleExercise:
+                return total + 1
+            case .superset:
+                return total + (unit.superset?.members.count ?? 0)
+            }
+        }
+    }
+
+    func exercise(id: UUID) -> WorkoutExercise? {
+        exercises.first { $0.localId == id }
+    }
+
+    func updateTrainingUnits(_ units: [WorkoutUnit]) {
+        storedUnits = normalizedUnits(units)
+    }
+
+    func appendSingleExerciseUnit(for exercise: WorkoutExercise) {
+        var units = trainingUnits
+        units.append(WorkoutUnit(kind: .singleExercise,
+                                 orderIndex: (units.map(\.orderIndex).max() ?? -1) + 1,
+                                 singleExerciseId: exercise.localId))
+        updateTrainingUnits(units)
+    }
+
+    func appendSupersetUnit(first: WorkoutExercise,
+                            second: WorkoutExercise,
+                            roundCount: Int,
+                            restAfterRoundSeconds: Int? = nil) {
+        var units = trainingUnits
+        let unit = WorkoutUnit(
+            kind: .superset,
+            orderIndex: (units.map(\.orderIndex).max() ?? -1) + 1,
+            superset: WorkoutSupersetUnit(
+                roundCount: roundCount,
+                restAfterRoundSeconds: restAfterRoundSeconds,
+                members: [
+                    WorkoutSupersetMember(exerciseId: first.localId, orderIndex: 0),
+                    WorkoutSupersetMember(exerciseId: second.localId, orderIndex: 1)
+                ]
+            )
+        )
+        units.append(unit)
+        updateTrainingUnits(units)
+    }
+
+    func removeExerciseFromUnits(_ exerciseId: UUID) {
+        let units = trainingUnits.compactMap { unit -> WorkoutUnit? in
+            switch unit.kind {
+            case .singleExercise:
+                return unit.singleExerciseId == exerciseId ? nil : unit
+            case .superset:
+                guard unit.superset?.members.contains(where: { $0.exerciseId == exerciseId }) == false else { return nil }
+                return unit
+            }
+        }
+        updateTrainingUnits(units)
+    }
+
+    func replaceSupersetWithSingles(_ unitId: UUID) {
+        var units = trainingUnits
+        guard let idx = units.firstIndex(where: { $0.unitId == unitId }),
+              let superset = units[idx].superset else { return }
+        let baseOrder = units[idx].orderIndex
+        let singles = superset.members.sorted { $0.orderIndex < $1.orderIndex }.enumerated().map { offset, member in
+            WorkoutUnit(kind: .singleExercise,
+                        orderIndex: baseOrder + offset,
+                        singleExerciseId: member.exerciseId)
+        }
+        units.remove(at: idx)
+        units.insert(contentsOf: singles, at: idx)
+        updateTrainingUnits(units)
+    }
+
+    func updateSuperset(_ unit: WorkoutUnit) {
+        var units = trainingUnits
+        if let idx = units.firstIndex(where: { $0.unitId == unit.unitId }) {
+            units[idx] = unit
+            updateTrainingUnits(units)
+        }
+    }
+
+    private func normalizedUnits(_ units: [WorkoutUnit]) -> [WorkoutUnit] {
+        units
+            .sorted { $0.orderIndex < $1.orderIndex }
+            .enumerated()
+            .map { index, unit in
+                var copy = unit
+                copy.orderIndex = index
+                if var superset = copy.superset {
+                    superset.members = superset.members.sorted { $0.orderIndex < $1.orderIndex }
+                        .enumerated()
+                        .map { memberIndex, member in
+                            WorkoutSupersetMember(memberId: member.memberId,
+                                                  exerciseId: member.exerciseId,
+                                                  orderIndex: memberIndex)
+                        }
+                    superset.roundCount = max(1, superset.roundCount)
+                    copy.superset = superset
+                }
+                return copy
+            }
+    }
+
+    static func encodeUnits(_ units: [WorkoutUnit]) -> String? {
+        guard !units.isEmpty,
+              let data = try? JSONCoding.encoder.encode(units),
+              let json = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return json
+    }
+
+    static func decodeUnits(_ json: String?) -> [WorkoutUnit] {
+        guard let json,
+              !json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let data = json.data(using: .utf8),
+              let units = try? JSONCoding.decoder.decode([WorkoutUnit].self, from: data) else {
+            return []
+        }
+        return units.sorted { $0.orderIndex < $1.orderIndex }
+    }
 }
 
 /// 训练中的一个动作条目（聚合子节点，不单独同步）。

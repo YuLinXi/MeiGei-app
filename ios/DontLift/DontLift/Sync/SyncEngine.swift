@@ -469,6 +469,7 @@ final class SyncEngine {
                            sourcePlanNameSnapshot: m.sourcePlanNameSnapshot,
                            title: m.title,
                            startedAt: m.startedAt, endedAt: m.endedAt, note: m.note,
+                           units: m.unitsJSON,
                            createdAt: nil, updatedAt: m.updatedAt, deletedAt: m.deletedAt, version: m.version)
         return WorkoutTreeDTO(workout: w, exercises: nodes)
     }
@@ -482,6 +483,7 @@ final class SyncEngine {
         m.title = w.title
         if let s = w.startedAt { m.startedAt = s }
         m.endedAt = w.endedAt; m.note = w.note
+        m.unitsJSON = w.units
         m.updatedAt = w.updatedAt; m.deletedAt = w.deletedAt
         m.version = w.version ?? m.version
         m.serverId = w.id; m.syncStatus = .synced

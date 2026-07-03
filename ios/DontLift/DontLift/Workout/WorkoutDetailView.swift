@@ -273,12 +273,30 @@ struct WorkoutDetailView: View {
 
     private var logSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            Text("动作日志 · \(sortedExercises.count)").eyebrowStyle()
-            ForEach(sortedExercises) { ex in
-                ExerciseLogCard(exercise: ex, prMaxWeight: prMaxByKey[ex.historyKey])
+            Text("动作日志 · \(workout.totalExerciseCountForDisplay)").eyebrowStyle()
+            ForEach(workout.trainingUnits) { unit in
+                logUnit(unit)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func logUnit(_ unit: WorkoutUnit) -> some View {
+        switch unit.kind {
+        case .singleExercise:
+            if let id = unit.singleExerciseId,
+               let ex = workout.exercise(id: id) {
+                ExerciseLogCard(exercise: ex, prMaxWeight: prMaxByKey[ex.historyKey])
+            }
+        case .superset:
+            if let superset = unit.superset,
+               superset.members.count == 2,
+               let first = workout.exercise(id: superset.members[0].exerciseId),
+               let second = workout.exercise(id: superset.members[1].exerciseId) {
+                SupersetLogCard(first: first, second: second, roundCount: superset.roundCount)
+            }
+        }
     }
 
     // MARK: actions
@@ -310,6 +328,100 @@ struct WorkoutDetailView: View {
 }
 
 // MARK: - 单个动作的只读日志卡
+
+private struct SupersetLogCard: View {
+    let first: WorkoutExercise
+    let second: WorkoutExercise
+    let roundCount: Int
+
+    private var firstSets: [WorkoutSet] { first.sets.sorted { $0.setIndex < $1.setIndex } }
+    private var secondSets: [WorkoutSet] { second.sets.sorted { $0.setIndex < $1.setIndex } }
+    private var effectiveRoundCount: Int { min(roundCount, min(firstSets.count, secondSets.count)) }
+    private var completedRounds: Int {
+        (0..<effectiveRoundCount).filter { firstSets[$0].completed && secondSets[$0].completed }.count
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text("超级组")
+                            .font(Theme.Font.mono(size: 10, weight: .bold))
+                            .foregroundStyle(Theme.Color.accent)
+                            .padding(.horizontal, 7)
+                            .frame(height: 22)
+                            .background(Theme.Color.accentSoft, in: Capsule())
+                        Text("\(completedRounds)/\(effectiveRoundCount) 轮")
+                            .font(Theme.Font.mono(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.Color.muted)
+                    }
+                    Text("\(first.displayExerciseName) + \(second.displayExerciseName)")
+                        .font(Theme.Font.l2)
+                        .foregroundStyle(Theme.Color.fg)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 15)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+
+            Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.horizontal, 15)
+
+            VStack(spacing: 0) {
+                ForEach(Array(0..<effectiveRoundCount), id: \.self) { index in
+                    if index > 0 {
+                        Rectangle().fill(Theme.Color.border.opacity(0.55)).frame(height: 1)
+                            .padding(.horizontal, 15)
+                    }
+                    roundRow(index)
+                }
+            }
+            .padding(.vertical, 3)
+        }
+        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .stroke(Theme.Color.border, lineWidth: 1)
+        )
+        .paperShadow(.sm, cornerRadius: Theme.Radius.lg)
+    }
+
+    private func roundRow(_ index: Int) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text("#\(index + 1)")
+                    .font(Theme.Font.mono(size: 11, weight: .bold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .frame(width: 34, alignment: .leading)
+                Text(first.displayExerciseName)
+                    .font(Theme.Font.body(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+                Spacer(minLength: 8)
+                valueText(firstSets[index])
+            }
+            HStack {
+                Text("")
+                    .frame(width: 34)
+                Text(second.displayExerciseName)
+                    .font(Theme.Font.body(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+                Spacer(minLength: 8)
+                valueText(secondSets[index])
+            }
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 10)
+    }
+
+    private func valueText(_ set: WorkoutSet) -> some View {
+        let value = set.compactValueText
+        return Text(value)
+            .font(Theme.Font.mono(size: 12, weight: .semibold))
+            .foregroundStyle(set.completed ? Theme.Color.fg : Theme.Color.muted)
+    }
+}
 
 private struct ExerciseLogCard: View {
     let exercise: WorkoutExercise

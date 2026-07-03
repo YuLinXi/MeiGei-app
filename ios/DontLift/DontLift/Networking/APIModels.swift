@@ -157,6 +157,8 @@ struct WorkoutDTO: Codable {
     var startedAt: Date?
     var endedAt: Date?
     var note: String?
+    /// 一级训练单元 JSON 字符串；旧后端/旧数据缺失时本地按动作列表派生。
+    var units: String?
     var createdAt: Date?
     var updatedAt: Date
     var deletedAt: Date?
@@ -263,7 +265,7 @@ struct TeamCheckinDTO: Decodable, Identifiable, Hashable {
     var parsedSummary: CheckinSummary {
         guard let s = decodedSummary else {
             return CheckinSummary(title: nil, startedAt: nil, endedAt: nil,
-                                  exerciseCount: 0, totalSets: 0, totalVolumeKg: 0, exercises: [])
+                                  exerciseCount: 0, totalSets: 0, totalVolumeKg: 0, exercises: [], units: nil)
         }
         return s
     }
@@ -305,7 +307,7 @@ struct ServerPlanDTO: Decodable, Identifiable, Hashable {
         let names = decodedItems
             .sorted { $0.orderIndex < $1.orderIndex }
             .prefix(3)
-            .map(\.displayExerciseName)
+            .map(\.unitDisplayName)
         return names.isEmpty ? "暂无动作" : names.joined(separator: "、")
     }
 
@@ -353,7 +355,7 @@ struct TeamPlanShareCardDTO: Decodable, Identifiable, Hashable {
         let names = decodedItems
             .sorted { $0.orderIndex < $1.orderIndex }
             .prefix(3)
-            .map(\.displayExerciseName)
+            .map(\.unitDisplayName)
         return names.isEmpty ? "暂无动作" : names.joined(separator: "、")
     }
 

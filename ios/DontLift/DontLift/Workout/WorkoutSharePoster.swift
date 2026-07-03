@@ -42,14 +42,33 @@ struct WorkoutPosterData: Equatable {
         self.setCountText = "\(statSets.count)"
         self.exerciseCountText = "\(exercises.count)"
 
-        let lines = exercises.enumerated().map { index, exercise in
-            Self.exerciseLine(exercise, index: index)
-        }
+        let lines = Self.exerciseLines(workout: workout)
         self.exerciseLines = lines
         self.prLines = personalRecords.prefix(3).map {
             PRLine(id: $0.exerciseKey,
                    name: $0.exerciseName,
                    weightText: "\(formatKg($0.weightKg))kg")
+        }
+    }
+
+    private static func exerciseLines(workout: Workout) -> [ExerciseLine] {
+        let exercises = workout.exercises.sorted { $0.orderIndex < $1.orderIndex }
+        let byId = Dictionary(uniqueKeysWithValues: exercises.map { ($0.localId, $0) })
+        return workout.trainingUnits.enumerated().compactMap { index, unit in
+            switch unit.kind {
+            case .singleExercise:
+                guard let id = unit.singleExerciseId, let exercise = byId[id] else { return nil }
+                return Self.exerciseLine(exercise, index: index)
+            case .superset:
+                let members = unit.superset?.members
+                    .sorted { $0.orderIndex < $1.orderIndex }
+                    .compactMap { byId[$0.exerciseId] } ?? []
+                guard members.count == 2 else { return nil }
+                let rounds = unit.superset?.roundCount ?? members.map { $0.sets.count }.min() ?? 0
+                return ExerciseLine(id: "\(index)-\(unit.unitId.uuidString)",
+                                    name: "超级组 · \(members[0].displayExerciseName) + \(members[1].displayExerciseName)",
+                                    topSetText: "\(rounds) 轮 · \(rounds * 2) 组")
+            }
         }
     }
 

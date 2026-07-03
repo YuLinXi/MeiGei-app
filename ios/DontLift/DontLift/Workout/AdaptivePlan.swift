@@ -24,6 +24,9 @@ enum PlanPrefill {
     /// 严格模式要求每个动作都有组数与次数；开始训练和切换模式都应复用同一校验。
     static func missingStrictRequiredItems(in items: [PlanItem]) -> [PlanItem] {
         items.filter {
+            if $0.isSuperset {
+                return $0.supersetRounds <= 0 || $0.orderedSupersetMembers.contains { $0.suggestedReps == nil }
+            }
             if !$0.orderedSetPrescriptions.isEmpty { return false }
             return ($0.suggestedSets ?? 0) <= 0 || $0.suggestedReps == nil
         }
@@ -107,6 +110,7 @@ enum PlanPrefill {
 
     /// 为一个计划项生成开始训练时的落值组。新建组一律 `completed=false`。
     static func sets(for item: PlanItem, mode: WorkoutPlanMode, history: [Workout]) -> [WorkoutSet] {
+        guard !item.isSuperset else { return [] }
         if mode == .strict {
             let prescriptions = item.orderedSetPrescriptions
             if !prescriptions.isEmpty { return sets(from: prescriptions) }
@@ -125,6 +129,7 @@ enum PlanPrefill {
     }
 
     static func sets(for item: PlanItem, mode: WorkoutPlanMode, lookup: PlanHistoryLookup) -> [WorkoutSet] {
+        guard !item.isSuperset else { return [] }
         if mode == .strict {
             let prescriptions = item.orderedSetPrescriptions
             if !prescriptions.isEmpty { return sets(from: prescriptions) }
@@ -179,6 +184,79 @@ enum PlanPrefill {
                                   weightKg: segment.weightKg,
                                   reps: segment.reps)
             }
+    }
+}
+
+enum PlanWorkoutBuilder {
+    static func workout(from plan: WorkoutPlan, lookup: PlanHistoryLookup) -> Workout {
+        let workout = workout(title: plan.name,
+                              items: plan.items,
+                              mode: plan.mode,
+                              lookup: lookup)
+        workout.planId = plan.localId
+        return workout
+    }
+
+    static func workout(title: String?,
+                        items: [PlanItem],
+                        mode: WorkoutPlanMode,
+                        lookup: PlanHistoryLookup) -> Workout {
+        let workout = Workout(title: title)
+        var exerciseOrder = 0
+        for item in items.sorted(by: { $0.orderIndex < $1.orderIndex }) {
+            if item.isSuperset {
+                appendSuperset(from: item, to: workout, exerciseOrder: &exerciseOrder)
+                continue
+            }
+            let exercise = WorkoutExercise(builtinExerciseCode: item.builtinExerciseCode,
+                                           customExerciseId: item.customExerciseId,
+                                           exerciseName: item.displayExerciseName,
+                                           primaryMuscle: item.resolvedPrimaryMuscle,
+                                           orderIndex: exerciseOrder,
+                                           planItemId: item.itemId)
+            exercise.sets = PlanPrefill.sets(for: item, mode: mode, lookup: lookup)
+            workout.exercises.append(exercise)
+            workout.appendSingleExerciseUnit(for: exercise)
+            exerciseOrder += 1
+        }
+        return workout
+    }
+
+    private static func appendSuperset(from item: PlanItem, to workout: Workout, exerciseOrder: inout Int) {
+        let members = item.orderedSupersetMembers
+        guard members.count == 2 else { return }
+        let first = workoutExercise(from: members[0], orderIndex: exerciseOrder)
+        first.sets = supersetSets(rounds: item.supersetRounds, member: members[0])
+        exerciseOrder += 1
+
+        let second = workoutExercise(from: members[1], orderIndex: exerciseOrder)
+        second.sets = supersetSets(rounds: item.supersetRounds, member: members[1])
+        exerciseOrder += 1
+
+        workout.exercises.append(first)
+        workout.exercises.append(second)
+        workout.appendSupersetUnit(first: first,
+                                   second: second,
+                                   roundCount: item.supersetRounds,
+                                   restAfterRoundSeconds: item.supersetRestAfterRoundSeconds)
+    }
+
+    private static func workoutExercise(from member: PlanSupersetMember, orderIndex: Int) -> WorkoutExercise {
+        WorkoutExercise(builtinExerciseCode: member.builtinExerciseCode,
+                        customExerciseId: member.customExerciseId,
+                        exerciseName: member.displayExerciseName,
+                        primaryMuscle: member.resolvedPrimaryMuscle,
+                        orderIndex: orderIndex,
+                        planItemId: member.memberId)
+    }
+
+    private static func supersetSets(rounds: Int, member: PlanSupersetMember) -> [WorkoutSet] {
+        (0..<max(1, rounds)).map {
+            WorkoutSet(setIndex: $0,
+                       weightKg: member.suggestedWeightKg,
+                       reps: member.suggestedReps,
+                       setType: .working)
+        }
     }
 }
 
@@ -338,6 +416,15 @@ enum PlanWriteback {
 
     /// 计划项强度摘要：`组×次×重kg`，缺省段省略。
     static func summary(_ i: PlanItem) -> String {
+        if i.isSuperset {
+            let memberText = i.orderedSupersetMembers.map { member in
+                var parts: [String] = [member.displayExerciseName]
+                if let reps = member.suggestedReps { parts.append("\(reps) 次") }
+                if let weight = member.suggestedWeightKg { parts.append("\(formatKg(weight)) kg") }
+                return parts.joined(separator: " · ")
+            }.joined(separator: " / ")
+            return "超级组 · \(i.supersetRounds) 轮 · \(memberText)"
+        }
         var parts: [String] = []
         if let s = i.suggestedSets { parts.append("\(s) 组") }
         if let r = i.suggestedReps { parts.append("\(r) 次") }
@@ -352,13 +439,34 @@ enum PlanWriteback {
         var diffs: [ItemDiff] = []
         var touchedItemIds = Set<UUID>()          // 被 UPDATE 命中的原计划项 itemId
         var nextOrder = (items.map(\.orderIndex).max() ?? -1) + 1
+        let supersetExerciseIds = workout.supersetExerciseIds
 
         for ex in workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }) {
             let working = ex.sets.filter { $0.countsForStats }     // completed 正式组
             guard !working.isEmpty else { continue }               // 本次没做/没完成 → 不回写该动作
+            if ex.planItemId == nil && supersetExerciseIds.contains(ex.localId) {
+                continue
+            }
             // 顶组：最大重量统计 entry（递减组展开到 segment，nil 重量当 0）。
             guard let top = working.flatMap(\.statEntries).max(by: { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }) else { continue }
             let setCount = working.count
+
+            if let target = supersetMemberTarget(for: ex, in: items) {
+                let before = summary(items[target.itemIndex])
+                var item = items[target.itemIndex]
+                var members = item.orderedSupersetMembers
+                members[target.memberIndex].suggestedWeightKg = top.weightKg
+                members[target.memberIndex].suggestedReps = top.reps
+                item.supersetMembers = members
+                items[target.itemIndex] = item
+                touchedItemIds.insert(item.itemId)
+                let after = summary(item)
+                if after != before {
+                    diffs.append(ItemDiff(kind: .updated, exerciseName: ex.exerciseName,
+                                          oldText: before, newText: after))
+                }
+                continue
+            }
 
             // 匹配：planItemId 精确优先；缺失/找不到时，仅在 historyKey 命中唯一项时 fallback。
             let matchIdx = matchIndex(for: ex, in: items)
@@ -412,8 +520,19 @@ enum PlanWriteback {
         if let pid = ex.planItemId, let exact = items.firstIndex(where: { $0.itemId == pid }) {
             return exact
         }
-        let fallbackMatches = items.indices.filter { items[$0].historyKey == ex.historyKey }
+        let fallbackMatches = items.indices.filter { !items[$0].isSuperset && items[$0].historyKey == ex.historyKey }
         return fallbackMatches.count == 1 ? fallbackMatches[0] : nil
+    }
+
+    private static func supersetMemberTarget(for ex: WorkoutExercise, in items: [PlanItem]) -> (itemIndex: Int, memberIndex: Int)? {
+        guard let planItemId = ex.planItemId else { return nil }
+        for itemIndex in items.indices where items[itemIndex].isSuperset {
+            let members = items[itemIndex].orderedSupersetMembers
+            if let memberIndex = members.firstIndex(where: { $0.memberId == planItemId }) {
+                return (itemIndex, memberIndex)
+            }
+        }
+        return nil
     }
 
     private static func prescription(from set: WorkoutSet, orderIndex: Int, existing: PlanSetPrescription? = nil) -> PlanSetPrescription {

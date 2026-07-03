@@ -36,4 +36,7 @@ public class Workout extends BaseEntity implements UserOwned {
     private OffsetDateTime endedAt;
 
     private String note;
+
+    /** 一级训练单元 jsonb 字符串；空数组表示旧数据按 workout_exercise 顺序派生单动作。 */
+    private String units;
 }

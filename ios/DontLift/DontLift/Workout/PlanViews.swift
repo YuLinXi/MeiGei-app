@@ -452,7 +452,7 @@ struct PlanListView: View {
                     .minimumScaleFactor(0.86)
                     .layoutPriority(1)
                 HStack(spacing: 6) {
-                    planMetricPill("\(plan.items.count) 个动作")
+                    planMetricPill("\(plan.totalExerciseCount) 个动作")
                     planMetricPill("\(plan.totalSuggestedSets) 组")
                 }
 
@@ -606,7 +606,9 @@ struct PlanDetailView: View {
     private var planGroups: [WorkoutPlanGroup]
 
     @State private var pickingExercise = false
+    @State private var creatingSuperset = false
     @State private var editingItem: PlanItem?
+    @State private var editingSupersetItem: PlanItem?
     @State private var editing = false
     @State private var movingGroup = false
     @State private var sharingToTeam = false
@@ -640,7 +642,7 @@ struct PlanDetailView: View {
 
     private var planOrderItems: [ExerciseOrderItem] {
         orderedItems.map {
-            ExerciseOrderItem(id: $0.itemId, title: $0.exerciseName, subtitle: subtitle($0))
+            ExerciseOrderItem(id: $0.itemId, title: $0.unitDisplayName, subtitle: subtitle($0))
         }
     }
 
@@ -665,7 +667,7 @@ struct PlanDetailView: View {
                             data: orderedItems,
                             id: \.itemId,
                             coordinator: swipe,
-                            onTap: { editingItem = $0 },
+                            onTap: { editPlanItem($0) },
                             onDelete: { item, rect in
                                 deleteRect = rect
                                 pendingDeleteItem = item
@@ -740,6 +742,11 @@ struct PlanDetailView: View {
             pendingEditAfterPick = nil
             editingItem = item
         }
+        .sheet(isPresented: $creatingSuperset) {
+            SupersetCreationSheet { result in
+                addPlanSuperset(result)
+            }
+        }
         .sheet(item: $editingItem) { item in
             PlanItemEditorView(item: item) { updated in
                 var items = plan.items
@@ -749,6 +756,12 @@ struct PlanDetailView: View {
                     plan.markDirty()
                     try? modelContext.save()
                 }
+            }
+        }
+        .sheet(item: $editingSupersetItem) { item in
+            SupersetCreationSheet(title: "编辑超级组",
+                                  initial: supersetInitialResult(from: item)) { result in
+                updatePlanSuperset(itemId: item.itemId, result: result)
             }
         }
         .sheet(isPresented: $editing) {
@@ -828,7 +841,7 @@ struct PlanDetailView: View {
     // 仅保留动作数与总组数；计划模式在下方规则卡展示，避免重复。
     private var statRow: some View {
         HStack(spacing: 0) {
-            statCell(n: "\(plan.items.count)", k: "动作")
+            statCell(n: "\(plan.totalExerciseCount)", k: "动作")
             statDivider
             statCell(n: "\(totalSets)", k: "总组数")
         }
@@ -886,8 +899,9 @@ struct PlanDetailView: View {
     private func planItemRow(_ item: PlanItem) -> some View {
         // 序号按当前顺序推出（动作数极少，firstIndex 开销可忽略）。
         let index = (orderedItems.firstIndex { $0.itemId == item.itemId } ?? 0) + 1
-        let preview = PlanPrescriptionPreview.make(for: item, mode: plan.mode,
-                                                   lookup: historyStore.planLookup, planId: plan.localId)
+        let preview = item.isSuperset ? nil : PlanPrescriptionPreview.make(for: item, mode: plan.mode,
+                                                                           lookup: historyStore.planLookup,
+                                                                           planId: plan.localId)
         let showsSource = plan.mode != .strict
         return HStack(spacing: 11) {
             Text(String(format: "%02d", index))
@@ -895,22 +909,32 @@ struct PlanDetailView: View {
                 .foregroundStyle(Theme.Color.muted)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.displayExerciseName)
-                    .font(Theme.Font.body(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Text(preview.summaryText)
+                HStack(spacing: 6) {
+                    Text(item.unitDisplayName)
+                        .font(Theme.Font.body(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.Color.fg)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    if item.isSuperset {
+                        Text("超级组")
+                            .font(Theme.Font.mono(size: 9, weight: .bold))
+                            .foregroundStyle(Theme.Color.accent)
+                            .padding(.horizontal, 6)
+                            .frame(height: 20)
+                            .background(Theme.Color.accentSoft, in: Capsule())
+                    }
+                }
+                Text(item.isSuperset ? supersetSubtitle(item) : (preview?.summaryText ?? "未设建议"))
                     .font(Theme.Font.mono(size: 12))
                     .foregroundStyle(Theme.Color.muted)
-                if showsSource {
+                if showsSource, let preview {
                     Text(preview.detailText)
                         .font(Theme.Font.body(size: 12))
                         .foregroundStyle(Theme.Color.fg2)
                 }
             }
             Spacer(minLength: 0)
-            if showsSource {
+            if showsSource, let preview {
                 sourceBadge(preview.badgeText)
             }
             editItemButton(item)
@@ -918,10 +942,34 @@ struct PlanDetailView: View {
         .cardStyle()
     }
 
+    private func supersetSubtitle(_ item: PlanItem) -> String {
+        let memberText = item.orderedSupersetMembers.map { member in
+            switch (member.suggestedWeightKg, member.suggestedReps) {
+            case let (.some(weight), .some(reps)):
+                return "\(formatKg(weight)) kg × \(reps)"
+            case let (.some(weight), .none):
+                return "\(formatKg(weight)) kg"
+            case let (.none, .some(reps)):
+                return "\(reps) 次"
+            case (.none, .none):
+                return "未设"
+            }
+        }.joined(separator: " / ")
+        return "\(item.supersetRounds) 轮 · \(item.supersetRounds * 2) 组 · \(memberText)"
+    }
+
+    private func editPlanItem(_ item: PlanItem) {
+        swipe.collapseAll()
+        if item.isSuperset {
+            editingSupersetItem = item
+        } else {
+            editingItem = item
+        }
+    }
+
     private func editItemButton(_ item: PlanItem) -> some View {
         Button {
-            swipe.collapseAll()
-            editingItem = item
+            editPlanItem(item)
         } label: {
             Image(systemName: "square.and.pencil")
                 .font(.system(size: 16, weight: .semibold))
@@ -930,7 +978,7 @@ struct PlanDetailView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("编辑\(item.displayExerciseName)")
+        .accessibilityLabel("编辑\(item.unitDisplayName)")
     }
 
     private var modeInfoCard: some View {
@@ -984,22 +1032,39 @@ struct PlanDetailView: View {
         .cardStyle()
     }
 
-    // 对齐原型 .add-row：虚线 border2 1.5px、muted、12/600、padding 12、加号 15。
     private var addExerciseCTA: some View {
-        Button { pickingExercise = true } label: {
-            HStack(spacing: 7) {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .bold))
-                Text("添加动作")
-                    .font(Theme.Font.body(size: 12, weight: .semibold))
+        HStack(spacing: 10) {
+            addPlanUnitButton(title: "超级组", systemImage: "square.stack.3d.up", compact: true) {
+                creatingSuperset = true
             }
-            .foregroundStyle(Theme.Color.muted)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                    .strokeBorder(Theme.Color.border2, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+            addPlanUnitButton(title: "添加动作", systemImage: "plus", compact: false) {
+                pickingExercise = true
+            }
+        }
+    }
+
+    private func addPlanUnitButton(title: String,
+                                   systemImage: String,
+                                   compact: Bool,
+                                   action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12, weight: .bold))
+                Text(title)
+                    .font(Theme.Font.body(size: 12.5, weight: .semibold))
+            }
+            .foregroundStyle(compact ? Theme.Color.muted : Theme.Color.accent)
+            .padding(.horizontal, compact ? 12 : 22)
+            .frame(maxWidth: compact ? nil : .infinity)
+            .frame(height: compact ? 36 : 40)
+            .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                    .stroke(compact ? Theme.Color.border : Theme.Color.accentSofter,
+                            style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
             )
+            .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -1074,6 +1139,7 @@ struct PlanDetailView: View {
     }
 
     private func subtitle(_ item: PlanItem) -> String {
+        if item.isSuperset { return supersetSubtitle(item) }
         // 对齐原型 .pm：「3 组 × 10 · 60 kg」/「3 组 × 12」；重量可空时仅显示组×次。
         var parts: [String] = []
         if let s = item.suggestedSets, let r = item.suggestedReps { parts.append("\(s) 组 × \(r)") }
@@ -1085,24 +1151,58 @@ struct PlanDetailView: View {
     private func duplicate() {
         // Fork 规则（design.md D8）：复制 动作 + 组数 + 次数，清空重量（重量最私人）；副本默认自适应。
         let copy = WorkoutPlan(name: plan.name + " · 副本",
-                               items: plan.items.map {
-                                   PlanItem(itemId: UUID(),
-                                            builtinExerciseCode: $0.builtinExerciseCode,
-                                            customExerciseId: $0.customExerciseId,
-                                            exerciseName: $0.exerciseName,
-                                            primaryMuscle: $0.primaryMuscle,
-                                            equipmentType: $0.equipmentType,
-                                            orderIndex: $0.orderIndex,
-                                            suggestedSets: $0.suggestedSets,
-                                            suggestedReps: $0.suggestedReps,
-                                            suggestedWeightKg: nil)
-                               },
+                               items: plan.items.map(weightlessCopyForDuplicate(_:)),
                                mode: .adaptive,
                                forkedFrom: plan.localId,
                                groupId: plan.groupId,
                                sortOrder: plan.sortOrder + 1)
         modelContext.insert(copy)
         try? modelContext.save()
+    }
+
+    private func weightlessCopyForDuplicate(_ item: PlanItem) -> PlanItem {
+        if item.isSuperset {
+            return PlanItem.superset(
+                itemId: UUID(),
+                orderIndex: item.orderIndex,
+                roundCount: item.supersetRounds,
+                restAfterRoundSeconds: item.supersetRestAfterRoundSeconds,
+                members: item.orderedSupersetMembers.map {
+                    PlanSupersetMember(memberId: UUID(),
+                                       builtinExerciseCode: $0.builtinExerciseCode,
+                                       customExerciseId: $0.customExerciseId,
+                                       exerciseName: $0.exerciseName,
+                                       primaryMuscle: $0.primaryMuscle,
+                                       equipmentType: $0.equipmentType,
+                                       orderIndex: $0.orderIndex,
+                                       suggestedWeightKg: nil,
+                                       suggestedReps: $0.suggestedReps)
+                }
+            )
+        }
+        return PlanItem(itemId: UUID(),
+                        builtinExerciseCode: item.builtinExerciseCode,
+                        customExerciseId: item.customExerciseId,
+                        exerciseName: item.exerciseName,
+                        primaryMuscle: item.primaryMuscle,
+                        equipmentType: item.equipmentType,
+                        orderIndex: item.orderIndex,
+                        suggestedSets: item.suggestedSets,
+                        suggestedReps: item.suggestedReps,
+                        suggestedWeightKg: nil,
+                        setPrescriptions: item.orderedSetPrescriptions.map {
+                            PlanSetPrescription(prescriptionId: UUID(),
+                                                setType: $0.setType,
+                                                orderIndex: $0.orderIndex,
+                                                weightKg: nil,
+                                                reps: $0.reps,
+                                                segments: $0.segments.map {
+                                                    WorkoutSetSegment(segmentId: UUID(),
+                                                                      segmentIndex: $0.segmentIndex,
+                                                                      weightKg: nil,
+                                                                      reps: $0.reps)
+                                                })
+                        })
     }
 
     /// 单一活跃会话守卫：存在进行中会话时弹「继续 / 丢弃」，否则新建并进入。
@@ -1135,22 +1235,7 @@ struct PlanDetailView: View {
     }
 
     private func buildFromPlan() -> Workout {
-        let w = Workout(planId: plan.localId, title: plan.name)
-        let mode = plan.mode
-        for (i, item) in orderedItems.enumerated() {
-            let ex = WorkoutExercise(
-                builtinExerciseCode: item.builtinExerciseCode,
-                customExerciseId: item.customExerciseId,
-                exerciseName: item.displayExerciseName,
-                primaryMuscle: item.resolvedPrimaryMuscle,
-                orderIndex: i,
-                planItemId: item.itemId   // 自适应回写合并主键（design.md D3）
-            )
-            // 按模式落值（design.md D1/D4）：严格整组复制预设；自适应历史优先→回退预设。
-            ex.sets = PlanPrefill.sets(for: item, mode: mode, lookup: historyStore.planLookup)
-            w.exercises.append(ex)
-        }
-        return w
+        PlanWorkoutBuilder.workout(from: plan, lookup: historyStore.planLookup)
     }
 
     private func commit(_ build: () -> Workout) {
@@ -1160,6 +1245,75 @@ struct PlanDetailView: View {
         historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
         NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
         workoutPresentation.present(w)
+    }
+
+    private func addPlanSuperset(_ result: SupersetCreationResult) {
+        var items = plan.items
+        items.append(planSupersetItem(from: result, itemId: UUID(), orderIndex: items.count, existing: nil))
+        plan.items = items
+        plan.markDirty()
+        try? modelContext.save()
+    }
+
+    private func updatePlanSuperset(itemId: UUID, result: SupersetCreationResult) {
+        var items = plan.items
+        guard let idx = items.firstIndex(where: { $0.itemId == itemId }) else { return }
+        items[idx] = planSupersetItem(from: result,
+                                      itemId: itemId,
+                                      orderIndex: items[idx].orderIndex,
+                                      existing: items[idx])
+        plan.items = items
+        plan.markDirty()
+        try? modelContext.save()
+    }
+
+    private func planSupersetItem(from result: SupersetCreationResult,
+                                  itemId: UUID,
+                                  orderIndex: Int,
+                                  existing: PlanItem?) -> PlanItem {
+        PlanItem.superset(
+            itemId: itemId,
+            orderIndex: orderIndex,
+            roundCount: result.roundCount,
+            restAfterRoundSeconds: existing?.supersetRestAfterRoundSeconds,
+            members: [
+                planSupersetMember(from: result.first, orderIndex: 0),
+                planSupersetMember(from: result.second, orderIndex: 1)
+            ]
+        )
+    }
+
+    private func planSupersetMember(from member: SupersetCreationResult.Member, orderIndex: Int) -> PlanSupersetMember {
+        PlanSupersetMember(memberId: member.memberId ?? UUID(),
+                           builtinExerciseCode: member.pick.builtinCode,
+                           customExerciseId: member.pick.customId,
+                           exerciseName: member.pick.name,
+                           primaryMuscle: member.pick.primaryMuscle,
+                           equipmentType: member.pick.equipmentType,
+                           orderIndex: orderIndex,
+                           suggestedWeightKg: member.weightKg,
+                           suggestedReps: member.reps)
+    }
+
+    private func supersetInitialResult(from item: PlanItem) -> SupersetCreationResult? {
+        let members = item.orderedSupersetMembers
+        guard members.count == 2 else { return nil }
+        return SupersetCreationResult(
+            roundCount: item.supersetRounds,
+            first: supersetResultMember(from: members[0]),
+            second: supersetResultMember(from: members[1])
+        )
+    }
+
+    private func supersetResultMember(from member: PlanSupersetMember) -> SupersetCreationResult.Member {
+        .init(memberId: member.memberId,
+              pick: ExercisePick(builtinCode: member.builtinExerciseCode,
+                                 customId: member.customExerciseId,
+                                 name: member.displayExerciseName,
+                                 primaryMuscle: member.resolvedPrimaryMuscle,
+                                 equipmentType: member.resolvedEquipmentType),
+              weightKg: member.suggestedWeightKg,
+              reps: member.suggestedReps)
     }
 
     private func delete() {
@@ -1331,7 +1485,7 @@ private struct PlanShareToTeamSheet: View {
             Text(plan.name)
                 .font(Theme.Font.body(size: 16, weight: .bold))
                 .foregroundStyle(Theme.Color.fg)
-            Text("\(plan.items.count) 个动作 · 不包含重量 · 可更新")
+            Text("\(plan.totalExerciseCount) 个动作 · 不包含重量 · 可更新")
                 .font(Theme.Font.mono(size: 11))
                 .foregroundStyle(Theme.Color.muted)
             Text("队友可复制或直接开始训练；已分享的 Team 可取消分享。")
@@ -1988,12 +2142,13 @@ struct PlanItemEditorView: View {
                     Text("添加")
                         .font(Theme.Font.body(size: 11.5, weight: .semibold))
                 }
-                .foregroundStyle(Theme.Color.muted)
+                .foregroundStyle(Theme.Color.accent)
                 .padding(.horizontal, 10)
                 .frame(height: 30)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                        .stroke(Theme.Color.border, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        .stroke(Theme.Color.accentSofter, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
                 )
             }
             .buttonStyle(.plain)
@@ -2061,12 +2216,14 @@ struct PlanItemEditorView: View {
                 Image(systemName: systemImage).font(.system(size: 12, weight: .bold))
                 Text(title).font(Theme.Font.body(size: 12.5, weight: .semibold))
             }
-            .foregroundStyle(Theme.Color.fg2)
+            .foregroundStyle(title == "递减组" ? Theme.Color.muted : Theme.Color.accent)
             .frame(maxWidth: .infinity)
             .frame(height: 40)
+            .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                    .stroke(Theme.Color.fg2, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    .stroke(title == "递减组" ? Theme.Color.border : Theme.Color.accentSofter,
+                            style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
             )
         }
         .buttonStyle(.plain)

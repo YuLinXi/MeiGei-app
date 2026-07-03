@@ -431,20 +431,7 @@ struct WorkoutListView: View {
         }
         Theme.Haptics.impact(.medium)
         beginSession {
-            let w = Workout(planId: plan.localId, title: plan.name)
-            let mode = plan.mode
-            let orderedItems = plan.items.sorted(by: { $0.orderIndex < $1.orderIndex })
-            for (i, item) in orderedItems.enumerated() {
-                let ex = WorkoutExercise(builtinExerciseCode: item.builtinExerciseCode,
-                                         customExerciseId: item.customExerciseId,
-                                         exerciseName: item.displayExerciseName,
-                                         primaryMuscle: item.resolvedPrimaryMuscle,
-                                         orderIndex: i,
-                                         planItemId: item.itemId)
-                ex.sets = PlanPrefill.sets(for: item, mode: mode, lookup: historyStore.planLookup)
-                w.exercises.append(ex)
-            }
-            return w
+            PlanWorkoutBuilder.workout(from: plan, lookup: historyStore.planLookup)
         }
     }
 
@@ -666,6 +653,7 @@ struct WorkoutLoggingView: View {
     @State private var savedAsPlan = false
     @State private var showingPosterPreview = false
     @State private var lastDetectedRecords: [PersonalRecord] = []
+    @State private var creatingSuperset = false
 
     private static let continuedRestDuration: TimeInterval = 30
     private static let exerciseNoteLimit = 200
@@ -1009,6 +997,9 @@ struct WorkoutLoggingView: View {
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in addExercise(pick) }
         }
+        .sheet(isPresented: $creatingSuperset) {
+            SupersetCreationSheet { result in addSuperset(result) }
+        }
         .sheet(isPresented: $showingOrderEditor) {
             ExerciseOrderEditorSheet(title: "调整动作顺序",
                                      items: workoutOrderItems,
@@ -1222,7 +1213,7 @@ struct WorkoutLoggingView: View {
 
     private var exerciseSectionHeader: some View {
         Group {
-            if canEdit && workout.exercises.count > 1 {
+            if canEdit && workout.exercises.count > 1 && workout.supersetExerciseIds.isEmpty {
                 HStack {
                     Text("训练动作")
                         .font(Theme.Font.body(size: 12, weight: .bold))
@@ -1256,13 +1247,12 @@ struct WorkoutLoggingView: View {
 
     /// 手风琴默认展开项：第一个仍有未完成 set 的动作，否则第一个动作。
     private var defaultExpandedId: UUID? {
-        let sorted = workout.exercises.sorted { $0.orderIndex < $1.orderIndex }
-        return sorted.first(where: { ex in ex.sets.contains { !$0.completed } })?.localId
-            ?? sorted.first?.localId
+        let units = workout.trainingUnits
+        return units.first(where: unitHasIncomplete(_:))?.unitId ?? units.first?.unitId
     }
 
     private var exerciseList: some View {
-        let sorted = workout.exercises.sorted { $0.orderIndex < $1.orderIndex }
+        let units = workout.trainingUnits
         let activeId: UUID?
         switch accordion {
         case .auto: activeId = defaultExpandedId
@@ -1270,13 +1260,43 @@ struct WorkoutLoggingView: View {
         case .collapsedAll: activeId = nil
         }
         return VStack(spacing: Theme.Spacing.md) {
-            ForEach(sorted) { ex in
-                let fallbackRestSeconds = restByExercise[ex.localId] ?? Int(restTimer.defaultDuration)
-                ExerciseBlock(exercise: ex,
+            ForEach(units) { unit in
+                unitBlock(unit, activeId: activeId)
+            }
+            // 只读（已完成且未进入编辑态）时隐藏「添加动作」入口。
+            if canEdit {
+                HStack(spacing: 10) {
+                    addWorkoutUnitButton(title: "超级组", systemImage: "square.stack.3d.up", compact: true) {
+                        prepareForPresentation()
+                        creatingSuperset = true
+                    }
+                    addWorkoutUnitButton(title: "添加动作", systemImage: "plus", compact: false) {
+                        prepareForPresentation()
+                        pickingExercise = true
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func unitBlock(_ unit: WorkoutUnit, activeId: UUID?) -> some View {
+        switch unit.kind {
+        case .singleExercise:
+            if let exerciseId = unit.singleExerciseId,
+               let ex = workout.exercise(id: exerciseId) {
+                singleExerciseBlock(ex, unitId: unit.unitId, activeId: activeId)
+            }
+        case .superset:
+            if let superset = unit.superset,
+               superset.members.count == 2,
+               let first = workout.exercise(id: superset.members[0].exerciseId),
+               let second = workout.exercise(id: superset.members[1].exerciseId) {
+                SupersetBlock(unit: unit,
+                              first: first,
+                              second: second,
                               readOnly: !canEdit,
-                              menuSetId: menuSetId,
-                              isExpanded: activeId == ex.localId,
-                              isMenuOpen: menuExerciseId == ex.localId,
+                              isExpanded: activeId == unit.unitId,
                               focused: focused,
                               editingText: buffer,
                               pendingReplace: pendingReplace,
@@ -1284,71 +1304,85 @@ struct WorkoutLoggingView: View {
                               onToggleExpand: {
                                   prepareForPresentation()
                                   withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                                      // 点已展开的项 → 全部折叠；点其它项 → 互斥展开它。
-                                      accordion = (activeId == ex.localId) ? .collapsedAll : .expanded(ex.localId)
+                                      accordion = (activeId == unit.unitId) ? .collapsedAll : .expanded(unit.unitId)
                                   }
                               },
-                              onMoreTap: {
-                                  let opening = menuExerciseId != ex.localId
-                                  prepareForPresentation()
-                                  menuExerciseId = opening ? ex.localId : nil
-                              },
-                              onEditNote: {
-                                  beginNoteEditing(for: ex)
-                              },
-                              onMoreSet: { set in
-                                  // 打开该组「更多操作」菜单：先收键盘（避免菜单被遮、且防删除聚焦组后 focused 悬空），
-                                  // 与动作级 ⋯ 菜单互斥。
-                                  prepareForPresentation()
-                                  withAnimation(.easeOut(duration: 0.18)) { menuSetId = set.localId }
-                              },
+                              onRestChange: { seconds in updateSupersetRest(unit, seconds: seconds) },
+                              onRoundCountChange: { rounds in updateSupersetRoundCount(unit, rounds: rounds) },
+                              onDissolve: { dissolveSuperset(unit) },
                               onChange: touch,
-                              onCompleteSet: { set in
-                                  if focused != nil { dismissKeypad() }
-                                  if accordion == .auto { accordion = .expanded(ex.localId) }
-                                  // 完成第一组即自动启动训练计时（幂等：已启动则不动）。
-                                  startTimerIfNeeded()
-                                  let secs = WorkoutRestPolicy.plannedRestSeconds(
-                                      completing: set,
-                                      in: ex,
-                                      fallbackSeconds: fallbackRestSeconds
-                                  )
-                                  set.plannedRestSeconds = secs
-                                  touch()
-                                  if secs > 0 {
-                                      recordActiveRestIfNeeded()
-                                      continuedRestBaseBySet[set.localId] = nil
-                                      let nextSet = nextSetSummary
-                                      workoutLiveActivity.syncWorkout(workout)
-                                      restTimer.start(duration: TimeInterval(secs),
-                                                      label: nextSet?.exerciseName ?? ex.exerciseName,
-                                                      nextSet: nextSet,
-                                                      setId: set.localId)
-                                      restTimer.nextHint = nextHint
-                                  }
+                              onCompleteRound: { anchorSet in
+                                  completeSupersetRound(anchorSet: anchorSet,
+                                                        unit: unit,
+                                                        fallbackSeconds: superset.restAfterRoundSeconds ?? Int(restTimer.defaultDuration))
                               },
-                              onUncompleteSet: { set in
-                                  clearRestRecord(for: set.localId)
+                              onUncompleteRound: { sets in
+                                  for set in sets { clearRestRecord(for: set.localId) }
                               })
             }
-            // 只读（已完成且未进入编辑态）时隐藏「添加动作」入口。
-            if canEdit {
-                Button {
-                    prepareForPresentation()
-                    pickingExercise = true
-                } label: {
-                    Label("添加动作", systemImage: "plus")
-                        .font(Theme.Font.body(size: 14, weight: .medium))
-                        .foregroundStyle(Theme.Color.fg2)
-                        .frame(maxWidth: .infinity).frame(height: 44)
-                        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Theme.Radius.md)
-                                .stroke(Theme.Color.border, style: StrokeStyle(lineWidth: 1, dash: [4]))
-                        )
-                }.buttonStyle(.plain)
-            }
         }
+    }
+
+    private func singleExerciseBlock(_ ex: WorkoutExercise, unitId: UUID, activeId: UUID?) -> some View {
+        let fallbackRestSeconds = restByExercise[ex.localId] ?? Int(restTimer.defaultDuration)
+        return ExerciseBlock(exercise: ex,
+                             readOnly: !canEdit,
+                             menuSetId: menuSetId,
+                             isExpanded: activeId == unitId,
+                             isMenuOpen: menuExerciseId == ex.localId,
+                             focused: focused,
+                             editingText: buffer,
+                             pendingReplace: pendingReplace,
+                             onFocus: focus,
+                             onToggleExpand: {
+                                 prepareForPresentation()
+                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                     accordion = (activeId == unitId) ? .collapsedAll : .expanded(unitId)
+                                 }
+                             },
+                             onMoreTap: {
+                                 let opening = menuExerciseId != ex.localId
+                                 prepareForPresentation()
+                                 menuExerciseId = opening ? ex.localId : nil
+                             },
+                             onEditNote: {
+                                 beginNoteEditing(for: ex)
+                             },
+                             onMoreSet: { set in
+                                 prepareForPresentation()
+                                 withAnimation(.easeOut(duration: 0.18)) { menuSetId = set.localId }
+                             },
+                             onChange: touch,
+                             onCompleteSet: { set in
+                                 completeSingleSet(set, in: ex, unitId: unitId, fallbackRestSeconds: fallbackRestSeconds)
+                             },
+                             onUncompleteSet: { set in
+                                 clearRestRecord(for: set.localId)
+                             })
+    }
+
+    private func addWorkoutUnitButton(title: String,
+                                      systemImage: String,
+                                      compact: Bool,
+                                      action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage).font(.system(size: 12, weight: .bold))
+                Text(title).font(Theme.Font.body(size: 12.5, weight: .semibold))
+            }
+                .foregroundStyle(compact ? Theme.Color.muted : Theme.Color.accent)
+                .padding(.horizontal, compact ? 12 : 22)
+                .frame(maxWidth: compact ? nil : .infinity)
+                .frame(height: compact ? 36 : 40)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .stroke(compact ? Theme.Color.border : Theme.Color.accentSofter,
+                                style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                )
+                .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: 动作 ⋯ 组间休息菜单（顶层浮层，放大版）
@@ -1574,16 +1608,130 @@ struct WorkoutLoggingView: View {
 
     // MARK: actions
 
+    private func unitHasIncomplete(_ unit: WorkoutUnit) -> Bool {
+        switch unit.kind {
+        case .singleExercise:
+            guard let id = unit.singleExerciseId,
+                  let ex = workout.exercise(id: id) else { return false }
+            return ex.sets.contains { !$0.completed }
+        case .superset:
+            guard let members = unit.superset?.members else { return false }
+            return members.contains { member in
+                workout.exercise(id: member.exerciseId)?.sets.contains { !$0.completed } == true
+            }
+        }
+    }
+
+    private func completeSingleSet(_ set: WorkoutSet, in ex: WorkoutExercise, unitId: UUID, fallbackRestSeconds: Int) {
+        if focused != nil { dismissKeypad() }
+        if accordion == .auto { accordion = .expanded(unitId) }
+        startTimerIfNeeded()
+        let secs = WorkoutRestPolicy.plannedRestSeconds(
+            completing: set,
+            in: ex,
+            fallbackSeconds: fallbackRestSeconds
+        )
+        set.plannedRestSeconds = secs
+        touch()
+        if secs > 0 {
+            recordActiveRestIfNeeded()
+            continuedRestBaseBySet[set.localId] = nil
+            let nextSet = nextSetSummary
+            workoutLiveActivity.syncWorkout(workout)
+            restTimer.start(duration: TimeInterval(secs),
+                            label: nextSet?.exerciseName ?? ex.exerciseName,
+                            nextSet: nextSet,
+                            setId: set.localId)
+            restTimer.nextHint = nextHint
+        }
+    }
+
+    private func completeSupersetRound(anchorSet: WorkoutSet, unit: WorkoutUnit, fallbackSeconds: Int) {
+        if focused != nil { dismissKeypad() }
+        if accordion == .auto { accordion = .expanded(unit.unitId) }
+        startTimerIfNeeded()
+        let secs = max(0, fallbackSeconds)
+        anchorSet.plannedRestSeconds = secs
+        touch()
+        if secs > 0 {
+            recordActiveRestIfNeeded()
+            continuedRestBaseBySet[anchorSet.localId] = nil
+            let nextSet = nextSetSummary
+            workoutLiveActivity.syncWorkout(workout)
+            restTimer.start(duration: TimeInterval(secs),
+                            label: nextSet?.exerciseName ?? "超级组",
+                            nextSet: nextSet,
+                            setId: anchorSet.localId)
+            restTimer.nextHint = nextHint
+        }
+    }
+
+    private func updateSupersetRest(_ unit: WorkoutUnit, seconds: Int?) {
+        var updated = unit
+        if var superset = updated.superset {
+            superset.restAfterRoundSeconds = seconds
+            updated.superset = superset
+            workout.updateSuperset(updated)
+            touch()
+        }
+    }
+
+    private func updateSupersetRoundCount(_ unit: WorkoutUnit, rounds: Int) {
+        var updated = unit
+        if var superset = updated.superset {
+            superset.roundCount = max(1, rounds)
+            updated.superset = superset
+            workout.updateSuperset(updated)
+            touch()
+        }
+    }
+
+    private func dissolveSuperset(_ unit: WorkoutUnit) {
+        workout.replaceSupersetWithSingles(unit.unitId)
+        touch()
+    }
+
     private func addExercise(_ pick: ExercisePick) {
         let ex = WorkoutExercise(builtinExerciseCode: pick.builtinCode, customExerciseId: pick.customId,
                                  exerciseName: pick.name, primaryMuscle: pick.primaryMuscle,
                                  orderIndex: workout.exercises.count)
         ex.sets = [WorkoutSet(setIndex: 0)]
         workout.exercises.append(ex)
+        workout.appendSingleExerciseUnit(for: ex)
         touch()
     }
 
+    private func addSuperset(_ result: SupersetCreationResult) {
+        let first = workoutExercise(from: result.first, orderIndex: workout.exercises.count)
+        first.sets = supersetSets(rounds: result.roundCount, member: result.first)
+        let second = workoutExercise(from: result.second, orderIndex: workout.exercises.count + 1)
+        second.sets = supersetSets(rounds: result.roundCount, member: result.second)
+        workout.exercises.append(first)
+        workout.exercises.append(second)
+        workout.appendSupersetUnit(first: first, second: second, roundCount: result.roundCount)
+        touch()
+    }
+
+    private func workoutExercise(from member: SupersetCreationResult.Member, orderIndex: Int) -> WorkoutExercise {
+        WorkoutExercise(builtinExerciseCode: member.pick.builtinCode,
+                        customExerciseId: member.pick.customId,
+                        exerciseName: member.pick.name,
+                        primaryMuscle: member.pick.primaryMuscle,
+                        orderIndex: orderIndex,
+                        planItemId: member.memberId)
+    }
+
+    private func supersetSets(rounds: Int, member: SupersetCreationResult.Member) -> [WorkoutSet] {
+        (0..<max(1, rounds)).map {
+            WorkoutSet(setIndex: $0,
+                       weightKg: member.weightKg,
+                       reps: member.reps,
+                       setType: .working)
+        }
+    }
+
     private func delete(_ ex: WorkoutExercise) {
+        workout.removeExerciseFromUnits(ex.localId)
         workout.exercises.removeAll { $0.localId == ex.localId }
         modelContext.delete(ex)
         touch()
@@ -1845,6 +1993,7 @@ struct WorkoutLoggingView: View {
         let empty = workout.exercises.filter { $0.sets.isEmpty }
         for ex in empty { modelContext.delete(ex) }
         workout.exercises.removeAll { $0.sets.isEmpty }
+        workout.updateTrainingUnits(workout.trainingUnits)
     }
 
     /// 自适应回写：把本次实绩 upsert 合并回来源计划（仅 adaptive 计划、有实际改动时）。
@@ -2109,6 +2258,29 @@ struct WorkoutLoggingView: View {
     /// 与 ExerciseBlock.addSet 行为一致；高频操作不离键盘。
     private func keypadAddSet() {
         guard let cell = focused, let ex = exercise(containing: cell.setId) else { return }
+        if let unit = workout.trainingUnits.first(where: { unit in
+            unit.superset?.members.contains(where: { $0.exerciseId == ex.localId }) == true
+        }), let superset = unit.superset, superset.members.count == 2,
+           let first = workout.exercise(id: superset.members[0].exerciseId),
+           let second = workout.exercise(id: superset.members[1].exerciseId) {
+            Theme.Feedback.addSetTap()
+            let firstPrev = first.lastWorkingSetValues
+            let secondPrev = second.lastWorkingSetValues
+            let firstSet = WorkoutSet(setIndex: (first.sets.map(\.setIndex).max() ?? -1) + 1,
+                                      weightKg: firstPrev.weightKg,
+                                      reps: firstPrev.reps,
+                                      setType: .working)
+            let secondSet = WorkoutSet(setIndex: (second.sets.map(\.setIndex).max() ?? -1) + 1,
+                                       weightKg: secondPrev.weightKg,
+                                       reps: secondPrev.reps,
+                                       setType: .working)
+            first.sets.append(firstSet)
+            second.sets.append(secondSet)
+            updateSupersetRoundCount(unit, rounds: superset.roundCount + 1)
+            touch()
+            focus(.weight(ex.localId == first.localId ? firstSet.localId : secondSet.localId))
+            return
+        }
         // 默认追加正式组，预填上一**正式**组重量与次数（热身组不作预填源）。
         Theme.Feedback.addSetTap()
         let next = (ex.sets.map(\.setIndex).max() ?? -1) + 1
@@ -2205,7 +2377,7 @@ private struct SaveWorkoutAsPlanSheet: View {
             Text("\(templateItems.count) 个动作")
                 .font(Theme.Font.body(size: 15, weight: .bold))
                 .foregroundStyle(Theme.Color.fg)
-            Text(templateItems.prefix(3).map(\.displayExerciseName).joined(separator: "、"))
+            Text(templateItems.prefix(3).map(\.unitDisplayName).joined(separator: "、"))
                 .font(Theme.Font.mono(size: 11))
                 .foregroundStyle(Theme.Color.muted)
                 .lineLimit(1)
@@ -2748,6 +2920,7 @@ private struct ExerciseBlock: View {
                 .foregroundStyle(Theme.Color.muted)
                 .padding(.horizontal, 12)
                 .frame(height: 36)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                         .stroke(Theme.Color.border, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
@@ -2763,13 +2936,14 @@ private struct ExerciseBlock: View {
                     Image(systemName: "plus").font(.system(size: 12, weight: .bold))
                     Text("加一组").font(Theme.Font.body(size: 12.5, weight: .semibold))
                 }
-                .foregroundStyle(Theme.Color.fg2)
+                .foregroundStyle(Theme.Color.accent)
                 .padding(.horizontal, 22)
                 .frame(maxWidth: .infinity)
                 .frame(height: 40)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                        .stroke(Theme.Color.fg2, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        .stroke(Theme.Color.accentSofter, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
                 )
                 .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             }
@@ -2816,6 +2990,289 @@ private struct ExerciseBlock: View {
         guard set.completed else { return nil }
         guard let seconds = set.actualRestSeconds else { return nil }
         return formatShortRest(seconds)
+    }
+}
+
+private struct SupersetBlock: View {
+    @Environment(\.modelContext) private var modelContext
+    let unit: WorkoutUnit
+    @Bindable var first: WorkoutExercise
+    @Bindable var second: WorkoutExercise
+    var readOnly: Bool = false
+    var isExpanded: Bool = true
+    var focused: FocusedCell? = nil
+    var editingText: String = ""
+    var pendingReplace: Bool = false
+    var onFocus: (FocusedCell) -> Void = { _ in }
+    var onToggleExpand: () -> Void = {}
+    var onRestChange: (Int?) -> Void = { _ in }
+    var onRoundCountChange: (Int) -> Void = { _ in }
+    var onDissolve: () -> Void = {}
+    let onChange: () -> Void
+    let onCompleteRound: (WorkoutSet) -> Void
+    let onUncompleteRound: ([WorkoutSet]) -> Void
+
+    private var firstSets: [WorkoutSet] { first.sets.sorted { $0.setIndex < $1.setIndex } }
+    private var secondSets: [WorkoutSet] { second.sets.sorted { $0.setIndex < $1.setIndex } }
+    private var roundCount: Int { min(firstSets.count, secondSets.count) }
+    private var completedRounds: Int {
+        (0..<roundCount).filter { firstSets[$0].completed && secondSets[$0].completed }.count
+    }
+    private var isAllDone: Bool { roundCount > 0 && completedRounds == roundCount }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            head
+            if isExpanded {
+                Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.horizontal, 15)
+                VStack(spacing: 0) {
+                    ForEach(Array(0..<roundCount), id: \.self) { index in
+                        roundRow(index)
+                    }
+                }
+                .padding(.top, 6)
+                .padding(.bottom, 8)
+                if !readOnly { roundActions }
+            }
+        }
+        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .stroke(isExpanded ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1)
+        )
+        .paperShadow(.sm, cornerRadius: Theme.Radius.lg)
+    }
+
+    private var head: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text("超级组")
+                        .font(Theme.Font.mono(size: 10, weight: .bold))
+                        .foregroundStyle(Theme.Color.accent)
+                        .padding(.horizontal, 7)
+                        .frame(height: 22)
+                        .background(Theme.Color.accentSoft, in: Capsule())
+                    Text("\(completedRounds)/\(roundCount) 轮")
+                        .font(Theme.Font.mono(size: 11, weight: .semibold))
+                        .foregroundStyle(isAllDone ? Theme.Color.accent : Theme.Color.muted)
+                }
+                Text("\(first.displayExerciseName) + \(second.displayExerciseName)")
+                    .font(Theme.Font.l2)
+                    .foregroundStyle(isAllDone ? Theme.Color.muted : Theme.Color.fg)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            Spacer(minLength: 8)
+            if isExpanded && !readOnly { moreMenu }
+            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+        }
+        .padding(.horizontal, 15)
+        .frame(minHeight: isExpanded ? 58 : 54)
+        .contentShape(Rectangle())
+        .onTapGesture { onToggleExpand() }
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button("轮后休息 关") { onRestChange(0) }
+            Button("轮后休息 60s") { onRestChange(60) }
+            Button("轮后休息 90s") { onRestChange(90) }
+            Button("轮后休息 120s") { onRestChange(120) }
+            Button("解除超级组") { onDissolve() }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+                .frame(width: 34, height: 34)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func roundRow(_ index: Int) -> some View {
+        let firstSet = firstSets[index]
+        let secondSet = secondSets[index]
+        let completed = firstSet.completed && secondSet.completed
+        return VStack(spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                Text("\(index + 1)")
+                    .font(Theme.Font.mono(size: 13, weight: .bold))
+                    .foregroundStyle(completed ? Theme.Color.accent : Theme.Color.muted)
+                    .frame(width: 24, height: 30)
+                    .background(completed ? Theme.Color.accentSoft : Theme.Color.surface2.opacity(0.65), in: Capsule())
+                VStack(spacing: 8) {
+                    memberFields(exercise: first, set: firstSet)
+                    memberFields(exercise: second, set: secondSet)
+                }
+                roundCompleteButton(firstSet: firstSet, secondSet: secondSet)
+            }
+            if let rest = secondSet.actualRestSeconds {
+                Text("上轮休息 \(formatShortRest(rest))")
+                    .font(Theme.Font.mono(size: 9, weight: .bold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            if index < roundCount - 1 {
+                Rectangle().fill(Theme.Color.border).frame(height: 1)
+            }
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 8)
+    }
+
+    private func memberFields(exercise: WorkoutExercise, set: WorkoutSet) -> some View {
+        HStack(spacing: 8) {
+            Text(exercise.displayExerciseName)
+                .font(Theme.Font.body(size: 13, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            valueCell(set: set, field: .weight)
+            Text("×").font(Theme.Font.mono(size: 11)).foregroundStyle(Theme.Color.muted).frame(width: 10)
+            valueCell(set: set, field: .reps)
+        }
+    }
+
+    private func valueCell(set: WorkoutSet, field: SetField) -> some View {
+        let cell: FocusedCell = field == .weight ? .weight(set.localId) : .reps(set.localId)
+        let isFocused = focused == cell
+        let text: String = {
+            if isFocused { return editingText }
+            switch field {
+            case .weight: return set.weightKg.map { formatKg($0) } ?? ""
+            case .reps: return set.reps.map(String.init) ?? ""
+            }
+        }()
+        let placeholder = field == .weight ? "kg" : "次"
+        let inputMode: SetInputMode = isFocused
+            ? (pendingReplace && !text.isEmpty ? .replacePending : .appending)
+            : .inactive
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+        return ZStack(alignment: .bottomTrailing) {
+            Text(text.isEmpty ? placeholder : text)
+                .font(Theme.Font.number(size: 14, weight: .bold))
+                .foregroundStyle(set.completed ? (text.isEmpty ? .white.opacity(0.7) : .white) : (text.isEmpty ? Theme.Color.muted : Theme.Color.fg))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(inputMode == .replacePending ? Theme.Color.accentSofter : .clear,
+                            in: RoundedRectangle(cornerRadius: 3, style: .continuous))
+            if !text.isEmpty {
+                Text(placeholder)
+                    .font(Theme.Font.mono(size: 8, weight: .bold))
+                    .foregroundStyle(set.completed ? .white.opacity(0.78) : Theme.Color.muted)
+                    .padding(.trailing, 5)
+                    .padding(.bottom, 3)
+            }
+        }
+        .frame(width: 56, height: 34)
+        .background(set.completed ? Theme.Color.accent : Theme.Color.surface, in: shape)
+        .overlay(shape.stroke(isFocused ? Theme.Color.accent : Theme.Color.border,
+                              lineWidth: isFocused ? 1.7 : 1))
+        .contentShape(Rectangle())
+        .onTapGesture { if !readOnly { onFocus(cell) } }
+    }
+
+    private func roundCompleteButton(firstSet: WorkoutSet, secondSet: WorkoutSet) -> some View {
+        let completed = firstSet.completed && secondSet.completed
+        return Button {
+            Theme.Haptics.impact(.light)
+            let willComplete = !completed
+            withAnimation(.easeOut(duration: 0.18)) {
+                firstSet.completed = willComplete
+                secondSet.completed = willComplete
+            }
+            onChange()
+            if willComplete {
+                onCompleteRound(secondSet)
+            } else {
+                onUncompleteRound([firstSet, secondSet])
+            }
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: completed ? "checkmark" : "checkmark.circle")
+                    .font(.system(size: 16, weight: .bold))
+                Text(completed ? "已完成" : "完成本轮")
+                    .font(Theme.Font.body(size: 10, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .foregroundStyle(completed ? .white : Theme.Color.muted)
+            .frame(width: 66, height: 72)
+            .background(completed ? Theme.Color.accent : Theme.Color.surface2,
+                        in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                    .stroke(completed ? Theme.Color.accent : Theme.Color.border, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(readOnly)
+    }
+
+    private var roundActions: some View {
+        HStack(spacing: 10) {
+            Button { addRound() } label: {
+                Label("加一轮", systemImage: "plus")
+                    .font(Theme.Font.body(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                            .stroke(Theme.Color.fg2, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    )
+            }
+            .buttonStyle(.plain)
+
+            Button { deleteLastRound() } label: {
+                Label("删末轮", systemImage: "minus")
+                    .font(Theme.Font.body(size: 12.5, weight: .semibold))
+                    .foregroundStyle(roundCount > 1 ? Theme.Color.muted : Theme.Color.border2)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                            .stroke(Theme.Color.border, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(roundCount <= 1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 12)
+    }
+
+    private func addRound() {
+        Theme.Feedback.addSetTap()
+        let nextRoundCount = roundCount + 1
+        let firstPrev = first.lastWorkingSetValues
+        let secondPrev = second.lastWorkingSetValues
+        first.sets.append(WorkoutSet(setIndex: (first.sets.map(\.setIndex).max() ?? -1) + 1,
+                                     weightKg: firstPrev.weightKg,
+                                     reps: firstPrev.reps,
+                                     setType: .working))
+        second.sets.append(WorkoutSet(setIndex: (second.sets.map(\.setIndex).max() ?? -1) + 1,
+                                      weightKg: secondPrev.weightKg,
+                                      reps: secondPrev.reps,
+                                      setType: .working))
+        onRoundCountChange(nextRoundCount)
+        onChange()
+    }
+
+    private func deleteLastRound() {
+        guard roundCount > 1,
+              let firstLast = firstSets.last,
+              let secondLast = secondSets.last else { return }
+        let nextRoundCount = roundCount - 1
+        first.sets.removeAll { $0.localId == firstLast.localId }
+        second.sets.removeAll { $0.localId == secondLast.localId }
+        modelContext.delete(firstLast)
+        modelContext.delete(secondLast)
+        onRoundCountChange(nextRoundCount)
+        onChange()
     }
 }
 
@@ -2980,12 +3437,13 @@ private struct SetRow: View {
                     Text("添加")
                         .font(Theme.Font.body(size: 11.5, weight: .semibold))
                 }
-                .foregroundStyle(Theme.Color.muted)
+                .foregroundStyle(Theme.Color.accent)
                 .padding(.horizontal, 9)
                 .frame(height: 28)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                        .stroke(Theme.Color.border, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        .stroke(Theme.Color.accentSofter, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
                 )
             }
             .frame(height: 44, alignment: .leading)

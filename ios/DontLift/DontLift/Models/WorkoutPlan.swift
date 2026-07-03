@@ -67,10 +67,54 @@ struct PlanSetPrescription: Codable, Identifiable, Hashable {
     }
 }
 
+enum PlanUnitKind: String, Codable {
+    case singleExercise
+    case superset
+}
+
+/// 超级组计划成员。超级组统一轮数，成员只保存各自动作引用和每轮重量/次数。
+struct PlanSupersetMember: Codable, Identifiable, Hashable {
+    var memberId: UUID
+    var builtinExerciseCode: String?
+    var customExerciseId: UUID?
+    var exerciseName: String
+    var primaryMuscle: String?
+    var equipmentType: String?
+    var orderIndex: Int
+    var suggestedWeightKg: Double?
+    var suggestedReps: Int?
+
+    var id: UUID { memberId }
+
+    init(
+        memberId: UUID = UUID(),
+        builtinExerciseCode: String? = nil,
+        customExerciseId: UUID? = nil,
+        exerciseName: String,
+        primaryMuscle: String? = nil,
+        equipmentType: String? = nil,
+        orderIndex: Int,
+        suggestedWeightKg: Double? = nil,
+        suggestedReps: Int? = nil
+    ) {
+        self.memberId = memberId
+        self.builtinExerciseCode = builtinExerciseCode
+        self.customExerciseId = customExerciseId
+        self.exerciseName = exerciseName
+        self.primaryMuscle = primaryMuscle
+        self.equipmentType = equipmentType
+        self.orderIndex = orderIndex
+        self.suggestedWeightKg = suggestedWeightKg
+        self.suggestedReps = suggestedReps
+    }
+}
+
 /// 训练计划模板里的单个动作项。每项带稳定 `itemId`（design.md D5），
 /// 供编辑、Fork、diff 时定位。整体以 jsonb 文档随计划读写。
 struct PlanItem: Codable, Identifiable, Hashable {
     var itemId: UUID
+    /// nil/`singleExercise` 为旧单动作项；`superset` 表示一级超级组计划单元。
+    var unitKindRaw: String?
     /// 内置动作 code 或自定义动作引用，二选一。
     var builtinExerciseCode: String?
     var customExerciseId: UUID?
@@ -83,11 +127,18 @@ struct PlanItem: Codable, Identifiable, Hashable {
     var suggestedWeightKg: Double?
     /// 可选逐组处方；缺失时继续使用 `suggested*` 兼容旧计划。
     var setPrescriptions: [PlanSetPrescription]?
+    /// 超级组固定 2 个成员；非超级组为空。
+    var supersetMembers: [PlanSupersetMember]?
+    /// 超级组统一轮数；非超级组为空。
+    var supersetRoundCount: Int?
+    /// 超级组轮后休息；创建时不要求填写，后续可从更多菜单设置。
+    var supersetRestAfterRoundSeconds: Int?
 
     var id: UUID { itemId }
 
     init(
         itemId: UUID = UUID(),
+        unitKind: PlanUnitKind = .singleExercise,
         builtinExerciseCode: String? = nil,
         customExerciseId: UUID? = nil,
         exerciseName: String,
@@ -97,9 +148,13 @@ struct PlanItem: Codable, Identifiable, Hashable {
         suggestedSets: Int? = nil,
         suggestedReps: Int? = nil,
         suggestedWeightKg: Double? = nil,
-        setPrescriptions: [PlanSetPrescription]? = nil
+        setPrescriptions: [PlanSetPrescription]? = nil,
+        supersetMembers: [PlanSupersetMember]? = nil,
+        supersetRoundCount: Int? = nil,
+        supersetRestAfterRoundSeconds: Int? = nil
     ) {
         self.itemId = itemId
+        self.unitKindRaw = unitKind == .singleExercise ? nil : unitKind.rawValue
         self.builtinExerciseCode = builtinExerciseCode
         self.customExerciseId = customExerciseId
         self.exerciseName = exerciseName
@@ -110,10 +165,70 @@ struct PlanItem: Codable, Identifiable, Hashable {
         self.suggestedReps = suggestedReps
         self.suggestedWeightKg = suggestedWeightKg
         self.setPrescriptions = setPrescriptions
+        self.supersetMembers = supersetMembers
+        self.supersetRoundCount = supersetRoundCount
+        self.supersetRestAfterRoundSeconds = supersetRestAfterRoundSeconds
     }
 }
 
 extension PlanItem {
+    var unitKind: PlanUnitKind {
+        unitKindRaw.flatMap(PlanUnitKind.init(rawValue:)) ?? .singleExercise
+    }
+
+    var isSuperset: Bool {
+        unitKind == .superset && orderedSupersetMembers.count == 2
+    }
+
+    var orderedSupersetMembers: [PlanSupersetMember] {
+        (supersetMembers ?? []).sorted { $0.orderIndex < $1.orderIndex }
+    }
+
+    var supersetRounds: Int {
+        max(1, supersetRoundCount ?? suggestedSets ?? PlanDefaults.suggestedSets)
+    }
+
+    var supersetTitle: String {
+        let names = orderedSupersetMembers.map(\.displayExerciseName)
+        guard names.count == 2 else { return "超级组" }
+        return "\(names[0]) + \(names[1])"
+    }
+
+    var unitDisplayName: String {
+        isSuperset ? supersetTitle : displayExerciseName
+    }
+
+    static func superset(
+        itemId: UUID = UUID(),
+        orderIndex: Int,
+        roundCount: Int,
+        restAfterRoundSeconds: Int? = nil,
+        members: [PlanSupersetMember]
+    ) -> PlanItem {
+        PlanItem(itemId: itemId,
+                 unitKind: .superset,
+                 exerciseName: "超级组",
+                 orderIndex: orderIndex,
+                 suggestedSets: max(1, roundCount),
+                 supersetMembers: members
+                    .sorted { $0.orderIndex < $1.orderIndex }
+                    .prefix(2)
+                    .enumerated()
+                    .map { idx, member in
+                        PlanSupersetMember(memberId: member.memberId,
+                                           builtinExerciseCode: member.builtinExerciseCode,
+                                           customExerciseId: member.customExerciseId,
+                                           exerciseName: member.exerciseName,
+                                           primaryMuscle: member.primaryMuscle,
+                                           equipmentType: member.equipmentType,
+                                           orderIndex: idx,
+                                           suggestedWeightKg: member.suggestedWeightKg,
+                                           suggestedReps: member.suggestedReps)
+                    },
+                 supersetRoundCount: max(1, roundCount),
+                 supersetRestAfterRoundSeconds: restAfterRoundSeconds)
+    }
+
     private var trimmedSnapshotName: String? {
         let value = exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value
@@ -141,12 +256,22 @@ extension PlanItem {
     }
 
     static func unstartableItems(in items: [PlanItem]) -> [PlanItem] {
-        items.filter { $0.resolvedExerciseName == nil }
+        items.filter { item in
+            if item.isSuperset {
+                return item.orderedSupersetMembers.contains { $0.resolvedExerciseName == nil }
+            }
+            return item.resolvedExerciseName == nil
+        }
     }
 
     static func unstartableMessage(for items: [PlanItem]) -> String {
-        let refs = items.map { item in
-            item.builtinExerciseCode ?? item.customExerciseId?.uuidString ?? item.itemId.uuidString
+        let refs = items.flatMap { item -> [String] in
+            if item.isSuperset {
+                return item.orderedSupersetMembers.map {
+                    $0.builtinExerciseCode ?? $0.customExerciseId?.uuidString ?? $0.memberId.uuidString
+                }
+            }
+            return [item.builtinExerciseCode ?? item.customExerciseId?.uuidString ?? item.itemId.uuidString]
         }
         return "计划包含无法识别且缺少名称快照的动作：" + refs.joined(separator: "、") + "。请更新 App 或重新编辑该计划后再开始训练。"
     }
@@ -238,6 +363,41 @@ extension PlanItem {
     }
 }
 
+extension PlanSupersetMember {
+    private var trimmedSnapshotName: String? {
+        let value = exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private var resolvedBuiltin: BuiltinExercise? {
+        ExerciseLibrary.resolve(code: builtinExerciseCode, name: trimmedSnapshotName)
+    }
+
+    var resolvedExerciseName: String? {
+        resolvedBuiltin?.name ?? trimmedSnapshotName
+    }
+
+    var displayExerciseName: String {
+        resolvedExerciseName ?? "未知动作"
+    }
+
+    var resolvedPrimaryMuscle: String? {
+        primaryMuscle ?? resolvedBuiltin?.category
+    }
+
+    var resolvedEquipmentType: String? {
+        equipmentType ?? resolvedBuiltin?.equipmentType
+    }
+
+    var historyKey: String {
+        ExerciseLibrary.canonicalHistoryKey(
+            code: builtinExerciseCode,
+            name: exerciseName,
+            customId: customExerciseId
+        )
+    }
+}
+
 /// 训练计划模板（参与同步，对应后端 workout_plan，items 以 jsonb 整体存储）。
 @Model
 final class WorkoutPlan: Syncable {
@@ -303,7 +463,16 @@ extension WorkoutPlan {
     /// 计划详情 statRow 与计划列表 featured 卡共用，避免两处算法漂移。
     var totalSuggestedSets: Int {
         items.reduce(0) { total, item in
-            total + (item.setPrescriptions?.count ?? item.suggestedSets ?? 0)
+            if item.isSuperset {
+                return total + item.supersetRounds * item.orderedSupersetMembers.count
+            }
+            return total + (item.setPrescriptions?.count ?? item.suggestedSets ?? 0)
+        }
+    }
+
+    var totalExerciseCount: Int {
+        items.reduce(0) { total, item in
+            total + (item.isSuperset ? item.orderedSupersetMembers.count : 1)
         }
     }
 

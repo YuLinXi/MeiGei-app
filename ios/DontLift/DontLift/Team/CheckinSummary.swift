@@ -13,11 +13,26 @@ struct CheckinSummary: Codable, Hashable, Identifiable {
     /// 已完成组的总容量（Σ 重量×次数），kg。
     var totalVolumeKg: Double
     var exercises: [ExerciseSummary]
+    var units: [UnitSummary]?
 
     struct ExerciseSummary: Codable, Hashable, Identifiable {
         var name: String
         var sets: [SetSummary]
         var id: String { name }
+    }
+
+    struct UnitSummary: Codable, Hashable, Identifiable {
+        var unitId: UUID
+        var kindRaw: String
+        var title: String
+        var roundCount: Int?
+        var exercises: [ExerciseSummary]
+
+        var id: UUID { unitId }
+
+        var kind: WorkoutUnitKind {
+            WorkoutUnitKind(rawValue: kindRaw) ?? .singleExercise
+        }
     }
 
     struct SetSummary: Codable, Hashable {
@@ -64,7 +79,39 @@ extension CheckinSummary {
             exerciseCount: exs.count,
             totalSets: totalSets,
             totalVolumeKg: volume,
-            exercises: summaries)
+            exercises: summaries,
+            units: Self.unitSummaries(workout: workout, exerciseSummaries: summaries))
+    }
+
+    private static func unitSummaries(workout: Workout, exerciseSummaries: [ExerciseSummary]) -> [UnitSummary] {
+        let summaryByExerciseId = Dictionary(uniqueKeysWithValues: workout.exercises
+            .sorted { $0.orderIndex < $1.orderIndex }
+            .enumerated()
+            .compactMap { index, exercise -> (UUID, ExerciseSummary)? in
+                guard exerciseSummaries.indices.contains(index) else { return nil }
+                return (exercise.localId, exerciseSummaries[index])
+            })
+        return workout.trainingUnits.map { unit in
+            switch unit.kind {
+            case .singleExercise:
+                let exercise = unit.singleExerciseId.flatMap { summaryByExerciseId[$0] }
+                return UnitSummary(unitId: unit.unitId,
+                                   kindRaw: unit.kindRaw,
+                                   title: exercise?.name ?? "动作",
+                                   roundCount: nil,
+                                   exercises: exercise.map { [$0] } ?? [])
+            case .superset:
+                let exercises = unit.superset?.members
+                    .sorted { $0.orderIndex < $1.orderIndex }
+                    .compactMap { summaryByExerciseId[$0.exerciseId] } ?? []
+                let title = exercises.map(\.name).joined(separator: " + ")
+                return UnitSummary(unitId: unit.unitId,
+                                   kindRaw: unit.kindRaw,
+                                   title: title.isEmpty ? "超级组" : title,
+                                   roundCount: unit.superset?.roundCount,
+                                   exercises: exercises)
+            }
+        }
     }
 
     /// 列表行用的一句话摘要。

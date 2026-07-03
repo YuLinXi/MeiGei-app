@@ -365,18 +365,37 @@ final class TeamService {
     }
 
     static func weightlessItemsJSON(from plan: WorkoutPlan) -> String {
-        let items = plan.items.map {
-            PlanItem(itemId: $0.itemId,
-                     builtinExerciseCode: $0.builtinExerciseCode,
-                     customExerciseId: $0.customExerciseId,
-                     exerciseName: $0.exerciseName,
-                     primaryMuscle: $0.primaryMuscle,
-                     equipmentType: $0.equipmentType,
-                     orderIndex: $0.orderIndex,
-                     suggestedSets: $0.suggestedSets,
-                     suggestedReps: $0.suggestedReps,
-                     suggestedWeightKg: nil,
-                     setPrescriptions: weightlessPrescriptions($0.orderedSetPrescriptions))
+        let items = plan.items.map { item in
+            if item.isSuperset {
+                return PlanItem.superset(
+                    itemId: item.itemId,
+                    orderIndex: item.orderIndex,
+                    roundCount: item.supersetRounds,
+                    restAfterRoundSeconds: item.supersetRestAfterRoundSeconds,
+                    members: item.orderedSupersetMembers.map {
+                        PlanSupersetMember(memberId: $0.memberId,
+                                           builtinExerciseCode: $0.builtinExerciseCode,
+                                           customExerciseId: $0.customExerciseId,
+                                           exerciseName: $0.exerciseName,
+                                           primaryMuscle: $0.primaryMuscle,
+                                           equipmentType: $0.equipmentType,
+                                           orderIndex: $0.orderIndex,
+                                           suggestedWeightKg: nil,
+                                           suggestedReps: $0.suggestedReps)
+                    }
+                )
+            }
+            return PlanItem(itemId: item.itemId,
+                            builtinExerciseCode: item.builtinExerciseCode,
+                            customExerciseId: item.customExerciseId,
+                            exerciseName: item.exerciseName,
+                            primaryMuscle: item.primaryMuscle,
+                            equipmentType: item.equipmentType,
+                            orderIndex: item.orderIndex,
+                            suggestedSets: item.suggestedSets,
+                            suggestedReps: item.suggestedReps,
+                            suggestedWeightKg: nil,
+                            setPrescriptions: weightlessPrescriptions(item.orderedSetPrescriptions))
         }
         return (try? String(data: JSONCoding.encoder.encode(items), encoding: .utf8)) ?? "[]"
     }

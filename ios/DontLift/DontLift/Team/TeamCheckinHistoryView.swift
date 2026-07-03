@@ -251,7 +251,9 @@ struct TeamCheckinDetailSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     header
-                    if let summary, !summary.exercises.isEmpty {
+                    if let summary, let units = summary.units, !units.isEmpty {
+                        unitList(units)
+                    } else if let summary, !summary.exercises.isEmpty {
                         exerciseList(summary.exercises)
                     } else {
                         snapshotUnavailable
@@ -331,6 +333,48 @@ struct TeamCheckinDetailSheet: View {
                             .foregroundStyle(Theme.Color.muted)
                     } else {
                         VStack(spacing: 6) {
+                            ForEach(Array(exercise.sets.enumerated()), id: \.offset) { index, set in
+                                checkinSetRow(set, index: index)
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cardStyle()
+            }
+        }
+    }
+
+    private func unitList(_ units: [CheckinSummary.UnitSummary]) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            Text("训练单元")
+                .eyebrowStyle()
+            ForEach(units) { unit in
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    HStack(spacing: 6) {
+                        Text(unit.title)
+                            .font(Theme.Font.body(size: 15, weight: .bold))
+                            .foregroundStyle(Theme.Color.fg)
+                            .lineLimit(1)
+                        if unit.kind == .superset {
+                            Text("超级组")
+                                .font(Theme.Font.mono(size: 9, weight: .bold))
+                                .foregroundStyle(Theme.Color.accent)
+                                .padding(.horizontal, 6)
+                                .frame(height: 20)
+                                .background(Theme.Color.accentSoft, in: Capsule())
+                        }
+                    }
+                    if unit.kind == .superset, let rounds = unit.roundCount {
+                        Text("\(rounds) 轮 · \(rounds * unit.exercises.count) 组")
+                            .font(Theme.Font.mono(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.Color.muted)
+                    }
+                    ForEach(unit.exercises) { exercise in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(exercise.name)
+                                .font(Theme.Font.body(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.Color.fg2)
                             ForEach(Array(exercise.sets.enumerated()), id: \.offset) { index, set in
                                 checkinSetRow(set, index: index)
                             }
