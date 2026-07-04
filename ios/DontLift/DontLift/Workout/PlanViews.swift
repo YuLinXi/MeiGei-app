@@ -192,6 +192,7 @@ struct PlanListView: View {
         .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
             floatingAddMenu
         }
+        .rootTabTopScrim()
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             WorkoutPerformanceMonitor.event("plan.list.appear")

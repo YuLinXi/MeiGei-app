@@ -65,6 +65,7 @@ struct ProfileView: View {
                 }
             }
         }
+        .rootTabTopScrim()
         // 我的页不展示顶部标题，隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
         .task {

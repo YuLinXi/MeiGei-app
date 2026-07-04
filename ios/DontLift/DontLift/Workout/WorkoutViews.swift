@@ -63,6 +63,7 @@ struct WorkoutListView: View {
             }
             startCTA
         }
+        .rootTabTopScrim()
         // 首页不展示顶部标题，隐藏系统导航栏。
         // 历史日历入口下移到「本周训练」标题行，开始训练收敛到底部悬浮 CTA。
         .toolbar(.hidden, for: .navigationBar)

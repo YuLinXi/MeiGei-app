@@ -55,6 +55,28 @@ extension View {
             .shadow(color: Theme.Color.fg.opacity(Theme.ShadowLevel.sm.opacity), radius: Theme.ShadowLevel.sm.radius, x: 0, y: Theme.ShadowLevel.sm.y)
     }
 
+    /// 根 Tab 隐藏系统导航栏后，遮住滚动内容穿到状态栏下方的区域。
+    func rootTabTopScrim(fadeHeight: CGFloat = Theme.Spacing.md) -> some View {
+        self.overlay(alignment: .top) {
+            GeometryReader { proxy in
+                VStack(spacing: 0) {
+                    Theme.Color.bg
+                        .frame(height: proxy.safeAreaInsets.top)
+                    LinearGradient(
+                        colors: [Theme.Color.bg, Theme.Color.bg.opacity(0)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: fadeHeight)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .ignoresSafeArea(edges: .top)
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
     /// 等宽小字 ALL CAPS + tracking + muted。常用于栏目标签。
     func eyebrowStyle() -> some View {
         self

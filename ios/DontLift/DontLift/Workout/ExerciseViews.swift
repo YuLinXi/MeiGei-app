@@ -216,11 +216,13 @@ struct ExerciseLibraryView: View {
                     emptyHint: "试试其他关键词，或点右下 + 添加自定义动作。",
                     emptyPlainHint: "切换部位，或点右下 + 添加自定义动作。"
                 )
+                .padding(.top, Theme.Spacing.md)
             }
         }
         .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
             floatingAddButton
         }
+        .rootTabTopScrim()
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingCreate) { CustomExerciseEditorView() }
         .navigationDestination(item: $selectedExercise) { ExerciseDetailView(exercise: $0) }
