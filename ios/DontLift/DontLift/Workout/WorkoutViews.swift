@@ -3,7 +3,7 @@ import SwiftData
 
 // MARK: - 训练首页（设计稿 01）
 
-/// 训练首页：本周 hero + 两宫格 + 本周训练列表 + 悬浮 CTA。
+/// 训练首页：本周 hero + 本周节奏 + 本周训练列表 + 悬浮 CTA。
 struct WorkoutListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(RestTimerController.self) private var restTimer
@@ -51,7 +51,6 @@ struct WorkoutListView: View {
                     VStack(spacing: Theme.Spacing.lg) {
                         heroSection
                         weekCompletionSection
-                        statsGrid
                         weekTrainingSection
                         Color.clear.frame(height: 80) // 给底部 CTA 留位
                     }
@@ -170,35 +169,6 @@ struct WorkoutListView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .cardStyle()
         }
-    }
-
-    // MARK: 两宫格
-
-    private var statsGrid: some View {
-        HStack(spacing: 0) {
-            statCell(label: "总组数", value: stats.setCount > 0 ? "\(stats.setCount)" : "—")
-            divider
-            statCell(label: "总次数", value: stats.repCount > 0 ? "\(stats.repCount)" : "—")
-        }
-        .cardStyle(padding: 0)
-        .frame(height: 88)
-    }
-
-    private func statCell(label: String, value: String) -> some View {
-        VStack(spacing: 4) {
-            Text(value).numStyle(size: 22).foregroundStyle(Theme.Color.fg)
-                .lineLimit(1).minimumScaleFactor(0.7)
-            Text(label).eyebrowStyle()
-                .lineLimit(1).minimumScaleFactor(0.85)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(label)
-        .accessibilityValue(value)
-    }
-
-    private var divider: some View {
-        Rectangle().fill(Theme.Color.border).frame(width: 1)
     }
 
     // MARK: 一周训练勾选
