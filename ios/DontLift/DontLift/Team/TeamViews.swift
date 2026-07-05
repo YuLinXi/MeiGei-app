@@ -48,6 +48,7 @@ struct TeamListView: View {
                 floatingAddMenu
             }
         }
+        .rootTabTopScrim()
         // Team 根页不展示顶部标题，隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(item: $selectedTeam) { TeamDetailView(team: $0) }
@@ -1450,7 +1451,7 @@ struct FeedItemCard: View {
             var sep = AttributedString(" · ")
             sep.foregroundColor = Theme.Color.fg2
             s.append(sep)
-            var vol = AttributedString("\(formatKg(summary.totalVolumeKg)) kg")
+            var vol = AttributedString("\(formatKg(summary.totalVolumeKg)) kg·rep")
             vol.foregroundColor = Theme.Color.fg
             s.append(vol)
         }
@@ -1823,22 +1824,13 @@ struct TeamPlansView: View {
     }
 
     private func buildWorkout(from share: TeamPlanShareCardDTO) -> Workout {
-        let w = Workout(planId: nil,
-                        sourceShareId: share.shareId,
-                        sourceShareVersionId: share.versionId,
-                        sourcePlanNameSnapshot: share.planNameSnapshot,
-                        title: share.planNameSnapshot)
-        let orderedItems = share.decodedItems.sorted { $0.orderIndex < $1.orderIndex }
-        for (i, item) in orderedItems.enumerated() {
-            let ex = WorkoutExercise(builtinExerciseCode: item.builtinExerciseCode,
-                                     customExerciseId: item.customExerciseId,
-                                     exerciseName: item.displayExerciseName,
-                                     primaryMuscle: item.resolvedPrimaryMuscle,
-                                     orderIndex: i,
-                                     planItemId: item.itemId)
-            ex.sets = PlanPrefill.sets(for: item, mode: .adaptive, lookup: historyStore.planLookup)
-            w.exercises.append(ex)
-        }
+        let w = PlanWorkoutBuilder.workout(title: share.planNameSnapshot,
+                                           items: share.decodedItems,
+                                           mode: share.planMode,
+                                           lookup: historyStore.planLookup)
+        w.sourceShareId = share.shareId
+        w.sourceShareVersionId = share.versionId
+        w.sourcePlanNameSnapshot = share.planNameSnapshot
         return w
     }
 
@@ -2008,9 +2000,17 @@ private struct TeamPlanShareDetailView: View {
                 .frame(width: 22, height: 22)
                 .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.displayExerciseName)
-                    .font(Theme.Font.body(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg)
+                HStack(spacing: 6) {
+                    if item.isDropSet {
+                        WorkoutStructureIcon(kind: .dropSet)
+                    } else if item.isSuperset {
+                        WorkoutStructureIcon(kind: .superset)
+                    }
+                    Text(itemTitle(item))
+                        .font(Theme.Font.body(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.Color.fg)
+                        .lineLimit(1)
+                }
                 Text(itemPrescription(item))
                     .font(Theme.Font.mono(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.muted)
@@ -2085,6 +2085,9 @@ private struct TeamPlanShareDetailView: View {
     }
 
     private func itemPrescription(_ item: PlanItem) -> String {
+        if item.isSuperset {
+            return "\(item.supersetRounds) 组 · 共 \(item.supersetRounds * item.orderedSupersetMembers.count) 组动作"
+        }
         let sets = max(1, item.suggestedSets ?? PlanDefaults.suggestedSets)
         if let reps = item.suggestedReps {
             return "\(sets) 组 × \(reps) 次"
@@ -2092,8 +2095,16 @@ private struct TeamPlanShareDetailView: View {
         return "\(sets) 组"
     }
 
+    private func itemTitle(_ item: PlanItem) -> String {
+        if item.isSuperset { return item.supersetTitle }
+        return item.displayExerciseName
+    }
+
     private func itemMeta(_ item: PlanItem) -> String? {
-        [item.resolvedPrimaryMuscle, item.resolvedEquipmentType]
+        if item.isSuperset {
+            return nil
+        }
+        return [item.resolvedPrimaryMuscle, item.resolvedEquipmentType]
             .compactMap { value in
                 let text = value?.trimmingCharacters(in: .whitespacesAndNewlines)
                 return text?.isEmpty == false ? text : nil

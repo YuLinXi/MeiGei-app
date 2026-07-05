@@ -44,6 +44,7 @@ struct TeamCheckinHistoryView: View {
     private var archiveGroups: [CalendarHistoryYearArchiveGroup] {
         TeamCheckinHistoryModels.archiveGroups(
             currentMonth: monthStart(for: .now),
+            earliestSelectableMonth: teamCreatedMonthStart,
             loadedMonths: loadedMonths,
             memberName: displayName(for:),
             calendar: calendar
@@ -250,7 +251,9 @@ struct TeamCheckinDetailSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     header
-                    if let summary, !summary.exercises.isEmpty {
+                    if let summary, let units = summary.units, !units.isEmpty {
+                        unitList(units)
+                    } else if let summary, !summary.exercises.isEmpty {
                         exerciseList(summary.exercises)
                     } else {
                         snapshotUnavailable
@@ -294,7 +297,7 @@ struct TeamCheckinDetailSheet: View {
             HStack(spacing: 8) {
                 statPill(title: "动作", value: summary.map { "\($0.exerciseCount)" } ?? "—")
                 statPill(title: "组数", value: summary.map { "\($0.totalSets)" } ?? "—")
-                statPill(title: "容量", value: summary.map { formatKg($0.totalVolumeKg) + "kg" } ?? "—")
+                statPill(title: "训练量", value: summary.map { formatKg($0.totalVolumeKg) + "kg·rep" } ?? "—")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -342,6 +345,45 @@ struct TeamCheckinDetailSheet: View {
         }
     }
 
+    private func unitList(_ units: [CheckinSummary.UnitSummary]) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            Text("训练单元")
+                .eyebrowStyle()
+            ForEach(units) { unit in
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    HStack(spacing: 6) {
+                        if unit.kind == .dropSet {
+                            WorkoutStructureIcon(kind: .dropSet)
+                        } else if unit.kind == .superset {
+                            WorkoutStructureIcon(kind: .superset)
+                        }
+                        Text(unit.title)
+                            .font(Theme.Font.body(size: 15, weight: .bold))
+                            .foregroundStyle(Theme.Color.fg)
+                            .lineLimit(1)
+                    }
+                    if unit.kind == .superset, let rounds = unit.roundCount {
+                        Text("\(rounds) 组 · 共 \(rounds * unit.exercises.count) 组动作")
+                            .font(Theme.Font.mono(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.Color.muted)
+                    }
+                    ForEach(unit.exercises) { exercise in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(exercise.name)
+                                .font(Theme.Font.body(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.Color.fg2)
+                            ForEach(Array(exercise.sets.enumerated()), id: \.offset) { index, set in
+                                checkinSetRow(set, index: index)
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cardStyle()
+            }
+        }
+    }
+
     @ViewBuilder
     private func checkinSetRow(_ set: CheckinSummary.SetSummary, index: Int) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -351,12 +393,7 @@ struct TeamCheckinDetailSheet: View {
                     .foregroundStyle(Theme.Color.muted)
                     .frame(width: 34, alignment: .leading)
                 if set.setType == .drop {
-                    Text("递减组")
-                        .font(Theme.Font.body(size: 11, weight: .bold))
-                        .foregroundStyle(Theme.Color.accent)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(Theme.Color.accentSofter, in: Capsule())
+                    WorkoutStructureIcon(kind: .dropSet)
                 } else {
                     setValueLine(weightKg: set.weightKg, reps: set.reps)
                 }

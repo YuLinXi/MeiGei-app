@@ -56,10 +56,12 @@ struct WorkoutPlanTemplateFactoryTests {
             )
         ]
         workout.exercises = [exercise]
+        workout.appendDropSetUnit(for: exercise)
 
         let items = workout.planTemplateItems()
 
         #expect(items.count == 1)
+        #expect(items[0].isDropSet)
         #expect(items[0].suggestedSets == 1)
         #expect(items[0].suggestedWeightKg == 80)
         #expect(items[0].suggestedReps == 8)

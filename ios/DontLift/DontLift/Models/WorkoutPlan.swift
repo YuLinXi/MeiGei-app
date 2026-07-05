@@ -41,6 +41,7 @@ struct PlanSetPrescription: Codable, Identifiable, Hashable {
     var orderIndex: Int
     var weightKg: Double?
     var reps: Int?
+    var isWarmup: Bool?
     var segments: [WorkoutSetSegment]
 
     var id: UUID { prescriptionId }
@@ -51,13 +52,15 @@ struct PlanSetPrescription: Codable, Identifiable, Hashable {
         orderIndex: Int,
         weightKg: Double? = nil,
         reps: Int? = nil,
+        isWarmup: Bool? = nil,
         segments: [WorkoutSetSegment] = []
     ) {
         self.prescriptionId = prescriptionId
-        self.setTypeRaw = setType.rawValue
+        self.setTypeRaw = setType == .warmup ? WorkoutSetType.working.rawValue : setType.rawValue
         self.orderIndex = orderIndex
         self.weightKg = weightKg
         self.reps = reps
+        self.isWarmup = isWarmup ?? (setType == .warmup ? true : nil)
         self.segments = segments
     }
 
@@ -65,12 +68,61 @@ struct PlanSetPrescription: Codable, Identifiable, Hashable {
         get { WorkoutSetType(rawValue: setTypeRaw) ?? .working }
         set { setTypeRaw = newValue.rawValue }
     }
+
+    var isWarmupEffective: Bool {
+        isWarmup ?? (setTypeRaw == WorkoutSetType.warmup.rawValue)
+    }
+}
+
+enum PlanUnitKind: String, Codable {
+    case singleExercise
+    case dropSet
+    case superset
+}
+
+/// 超级组计划成员。超级组统一组数，成员只保存各自动作引用和每组重量/次数。
+struct PlanSupersetMember: Codable, Identifiable, Hashable {
+    var memberId: UUID
+    var builtinExerciseCode: String?
+    var customExerciseId: UUID?
+    var exerciseName: String
+    var primaryMuscle: String?
+    var equipmentType: String?
+    var orderIndex: Int
+    var suggestedWeightKg: Double?
+    var suggestedReps: Int?
+
+    var id: UUID { memberId }
+
+    init(
+        memberId: UUID = UUID(),
+        builtinExerciseCode: String? = nil,
+        customExerciseId: UUID? = nil,
+        exerciseName: String,
+        primaryMuscle: String? = nil,
+        equipmentType: String? = nil,
+        orderIndex: Int,
+        suggestedWeightKg: Double? = nil,
+        suggestedReps: Int? = nil
+    ) {
+        self.memberId = memberId
+        self.builtinExerciseCode = builtinExerciseCode
+        self.customExerciseId = customExerciseId
+        self.exerciseName = exerciseName
+        self.primaryMuscle = primaryMuscle
+        self.equipmentType = equipmentType
+        self.orderIndex = orderIndex
+        self.suggestedWeightKg = suggestedWeightKg
+        self.suggestedReps = suggestedReps
+    }
 }
 
 /// 训练计划模板里的单个动作项。每项带稳定 `itemId`（design.md D5），
 /// 供编辑、Fork、diff 时定位。整体以 jsonb 文档随计划读写。
 struct PlanItem: Codable, Identifiable, Hashable {
     var itemId: UUID
+    /// nil/`singleExercise` 为旧单动作项；`dropSet`/`superset` 表示一级结构计划单元。
+    var unitKindRaw: String?
     /// 内置动作 code 或自定义动作引用，二选一。
     var builtinExerciseCode: String?
     var customExerciseId: UUID?
@@ -83,11 +135,18 @@ struct PlanItem: Codable, Identifiable, Hashable {
     var suggestedWeightKg: Double?
     /// 可选逐组处方；缺失时继续使用 `suggested*` 兼容旧计划。
     var setPrescriptions: [PlanSetPrescription]?
+    /// 超级组固定 2 个成员；非超级组为空。
+    var supersetMembers: [PlanSupersetMember]?
+    /// 超级组统一组数；非超级组为空。
+    var supersetRoundCount: Int?
+    /// 超级组组后休息；创建时不要求填写，后续可从更多菜单设置。
+    var supersetRestAfterRoundSeconds: Int?
 
     var id: UUID { itemId }
 
     init(
         itemId: UUID = UUID(),
+        unitKind: PlanUnitKind = .singleExercise,
         builtinExerciseCode: String? = nil,
         customExerciseId: UUID? = nil,
         exerciseName: String,
@@ -97,9 +156,13 @@ struct PlanItem: Codable, Identifiable, Hashable {
         suggestedSets: Int? = nil,
         suggestedReps: Int? = nil,
         suggestedWeightKg: Double? = nil,
-        setPrescriptions: [PlanSetPrescription]? = nil
+        setPrescriptions: [PlanSetPrescription]? = nil,
+        supersetMembers: [PlanSupersetMember]? = nil,
+        supersetRoundCount: Int? = nil,
+        supersetRestAfterRoundSeconds: Int? = nil
     ) {
         self.itemId = itemId
+        self.unitKindRaw = unitKind == .singleExercise ? nil : unitKind.rawValue
         self.builtinExerciseCode = builtinExerciseCode
         self.customExerciseId = customExerciseId
         self.exerciseName = exerciseName
@@ -110,10 +173,126 @@ struct PlanItem: Codable, Identifiable, Hashable {
         self.suggestedReps = suggestedReps
         self.suggestedWeightKg = suggestedWeightKg
         self.setPrescriptions = setPrescriptions
+        self.supersetMembers = supersetMembers
+        self.supersetRoundCount = supersetRoundCount
+        self.supersetRestAfterRoundSeconds = supersetRestAfterRoundSeconds
     }
 }
 
 extension PlanItem {
+    var unitKind: PlanUnitKind {
+        unitKindRaw.flatMap(PlanUnitKind.init(rawValue:)) ?? .singleExercise
+    }
+
+    var isSuperset: Bool {
+        unitKind == .superset && orderedSupersetMembers.count == 2
+    }
+
+    var isDropSet: Bool {
+        unitKind == .dropSet
+    }
+
+    var orderedSupersetMembers: [PlanSupersetMember] {
+        (supersetMembers ?? []).sorted { $0.orderIndex < $1.orderIndex }
+    }
+
+    var supersetRounds: Int {
+        max(1, supersetRoundCount ?? suggestedSets ?? PlanDefaults.suggestedSets)
+    }
+
+    var supersetTitle: String {
+        let names = orderedSupersetMembers.map(\.displayExerciseName)
+        guard names.count == 2 else { return "超级组" }
+        return "\(names[0]) + \(names[1])"
+    }
+
+    var unitDisplayName: String {
+        if isSuperset { return supersetTitle }
+        if isDropSet { return "递减组 · \(displayExerciseName)" }
+        return displayExerciseName
+    }
+
+    var dropSetPrescriptions: [PlanSetPrescription] {
+        orderedSetPrescriptions.filter { $0.setType == .drop }
+    }
+
+    static func superset(
+        itemId: UUID = UUID(),
+        orderIndex: Int,
+        roundCount: Int,
+        restAfterRoundSeconds: Int? = nil,
+        members: [PlanSupersetMember]
+    ) -> PlanItem {
+        PlanItem(itemId: itemId,
+                 unitKind: .superset,
+                 exerciseName: "超级组",
+                 orderIndex: orderIndex,
+                 suggestedSets: max(1, roundCount),
+                 supersetMembers: members
+                    .sorted { $0.orderIndex < $1.orderIndex }
+                    .prefix(2)
+                    .enumerated()
+                    .map { idx, member in
+                        PlanSupersetMember(memberId: member.memberId,
+                                           builtinExerciseCode: member.builtinExerciseCode,
+                                           customExerciseId: member.customExerciseId,
+                                           exerciseName: member.exerciseName,
+                                           primaryMuscle: member.primaryMuscle,
+                                           equipmentType: member.equipmentType,
+                                           orderIndex: idx,
+                                           suggestedWeightKg: member.suggestedWeightKg,
+                                           suggestedReps: member.suggestedReps)
+                    },
+                 supersetRoundCount: max(1, roundCount),
+                 supersetRestAfterRoundSeconds: restAfterRoundSeconds)
+    }
+
+    static func dropSet(
+        itemId: UUID = UUID(),
+        orderIndex: Int,
+        builtinExerciseCode: String? = nil,
+        customExerciseId: UUID? = nil,
+        exerciseName: String,
+        primaryMuscle: String? = nil,
+        equipmentType: String? = nil,
+        groupCount: Int = 1,
+        isWarmup: Bool = false,
+        segments: [WorkoutSetSegment]
+    ) -> PlanItem {
+        let normalizedSegments = segments
+            .sorted { $0.segmentIndex < $1.segmentIndex }
+            .enumerated()
+            .map { idx, segment in
+                WorkoutSetSegment(segmentId: segment.segmentId,
+                                  segmentIndex: idx,
+                                  weightKg: segment.weightKg,
+                                  reps: segment.reps)
+            }
+        let summary = summaryWeightReps(from: normalizedSegments)
+        let effectiveGroupCount = max(1, groupCount)
+        let template = PlanSetPrescription(setType: .drop,
+                                           orderIndex: 0,
+                                           weightKg: summary.weightKg,
+                                           reps: summary.reps,
+                                           isWarmup: isWarmup,
+                                           segments: normalizedSegments)
+        let prescriptions = dropPrescriptionClones(from: template,
+                                                    count: effectiveGroupCount,
+                                                    existing: [])
+        return PlanItem(itemId: itemId,
+                        unitKind: .dropSet,
+                        builtinExerciseCode: builtinExerciseCode,
+                        customExerciseId: customExerciseId,
+                        exerciseName: exerciseName,
+                        primaryMuscle: primaryMuscle,
+                        equipmentType: equipmentType,
+                        orderIndex: orderIndex,
+                        suggestedSets: effectiveGroupCount,
+                        suggestedReps: summary.reps,
+                        suggestedWeightKg: summary.weightKg,
+                        setPrescriptions: prescriptions)
+    }
+
     private var trimmedSnapshotName: String? {
         let value = exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value
@@ -141,12 +320,22 @@ extension PlanItem {
     }
 
     static func unstartableItems(in items: [PlanItem]) -> [PlanItem] {
-        items.filter { $0.resolvedExerciseName == nil }
+        items.filter { item in
+            if item.isSuperset {
+                return item.orderedSupersetMembers.contains { $0.resolvedExerciseName == nil }
+            }
+            return item.resolvedExerciseName == nil
+        }
     }
 
     static func unstartableMessage(for items: [PlanItem]) -> String {
-        let refs = items.map { item in
-            item.builtinExerciseCode ?? item.customExerciseId?.uuidString ?? item.itemId.uuidString
+        let refs = items.flatMap { item -> [String] in
+            if item.isSuperset {
+                return item.orderedSupersetMembers.map {
+                    $0.builtinExerciseCode ?? $0.customExerciseId?.uuidString ?? $0.memberId.uuidString
+                }
+            }
+            return [item.builtinExerciseCode ?? item.customExerciseId?.uuidString ?? item.itemId.uuidString]
         }
         return "计划包含无法识别且缺少名称快照的动作：" + refs.joined(separator: "、") + "。请更新 App 或重新编辑该计划后再开始训练。"
     }
@@ -156,8 +345,25 @@ extension PlanItem {
     }
 
     func manualSetPrescriptionsForEditing() -> [PlanSetPrescription] {
+        if isDropSet {
+            if let existing = dropSetPrescriptions.first {
+                return Self.normalizedManualSetPrescriptions([existing])
+            }
+            let segments = [
+                WorkoutSetSegment(segmentIndex: 0, weightKg: suggestedWeightKg, reps: suggestedReps ?? PlanDefaults.suggestedReps),
+                WorkoutSetSegment(segmentIndex: 1)
+            ]
+            return Self.normalizedManualSetPrescriptions([
+                PlanSetPrescription(setType: .drop,
+                                    orderIndex: 0,
+                                    weightKg: suggestedWeightKg,
+                                    reps: suggestedReps,
+                                    segments: segments)
+            ])
+        }
         let existing = orderedSetPrescriptions
-        if !existing.isEmpty { return Self.normalizedManualSetPrescriptions(existing) }
+        let workingOnly = existing.filter { $0.setType != .drop }
+        if !workingOnly.isEmpty { return Self.normalizedManualSetPrescriptions(workingOnly) }
         let count = max(1, suggestedSets ?? PlanDefaults.suggestedSets)
         return (0..<count).map {
             PlanSetPrescription(orderIndex: $0,
@@ -167,7 +373,41 @@ extension PlanItem {
     }
 
     mutating func applyManualSetPrescriptions(_ prescriptions: [PlanSetPrescription]) {
-        let normalized = Self.normalizedManualSetPrescriptions(prescriptions)
+        if isDropSet {
+            let source = prescriptions.first(where: { $0.setType == .drop }) ?? prescriptions.first
+            let dropSource = source.map {
+                $0.setType == .drop
+                    ? $0
+                    : PlanSetPrescription(prescriptionId: $0.prescriptionId,
+                                          setType: .drop,
+                                          orderIndex: 0,
+                                          weightKg: $0.weightKg,
+                                          reps: $0.reps,
+                                          isWarmup: $0.isWarmup,
+                                          segments: [
+                                            WorkoutSetSegment(segmentIndex: 0, weightKg: $0.weightKg, reps: $0.reps),
+                                            WorkoutSetSegment(segmentIndex: 1)
+                                          ])
+            } ?? PlanSetPrescription(setType: .drop,
+                                     orderIndex: 0,
+                                     reps: PlanDefaults.suggestedReps,
+                                     segments: [
+                                        WorkoutSetSegment(segmentIndex: 0, reps: PlanDefaults.suggestedReps),
+                                        WorkoutSetSegment(segmentIndex: 1)
+                                     ])
+            let normalized = Self.normalizedManualSetPrescriptions([dropSource])
+            let finalPrescription = normalized.first ?? dropSource
+            let groupCount = max(1, suggestedSets ?? dropSetPrescriptions.count)
+            setPrescriptions = Self.dropPrescriptionClones(from: finalPrescription,
+                                                           count: groupCount,
+                                                           existing: dropSetPrescriptions)
+            suggestedSets = groupCount
+            let summary = Self.summaryWeightReps(from: finalPrescription.segments)
+            suggestedWeightKg = summary.weightKg
+            suggestedReps = summary.reps
+            return
+        }
+        let normalized = Self.normalizedManualSetPrescriptions(prescriptions.filter { $0.setType != .drop })
         let finalPrescriptions = normalized.isEmpty
             ? [PlanSetPrescription(orderIndex: 0, reps: PlanDefaults.suggestedReps)]
             : normalized
@@ -200,13 +440,15 @@ extension PlanItem {
                                            orderIndex: idx,
                                            weightKg: summary.weightKg,
                                            reps: summary.reps,
+                                           isWarmup: prescription.isWarmupEffective,
                                            segments: segments)
             }
             return PlanSetPrescription(prescriptionId: prescription.prescriptionId,
                                        setType: .working,
                                        orderIndex: idx,
                                        weightKg: prescription.weightKg,
-                                       reps: prescription.reps)
+                                       reps: prescription.reps,
+                                       isWarmup: prescription.isWarmupEffective)
         }
     }
 
@@ -222,6 +464,33 @@ extension PlanItem {
         return summaryWeightReps(from: entries)
     }
 
+    private static func dropPrescriptionClones(from template: PlanSetPrescription,
+                                               count: Int,
+                                               existing: [PlanSetPrescription]) -> [PlanSetPrescription] {
+        let templateSegments = template.segments
+            .sorted { $0.segmentIndex < $1.segmentIndex }
+        return (0..<max(1, count)).map { index in
+            let existingPrescription = existing.indices.contains(index) ? existing[index] : nil
+            let existingSegments = existingPrescription?.segments.sorted { $0.segmentIndex < $1.segmentIndex } ?? []
+            let segments = templateSegments.enumerated().map { segmentIndex, segment in
+                WorkoutSetSegment(segmentId: existingSegments.indices.contains(segmentIndex)
+                                  ? existingSegments[segmentIndex].segmentId
+                                  : (index == 0 ? segment.segmentId : UUID()),
+                                  segmentIndex: segmentIndex,
+                                  weightKg: segment.weightKg,
+                                  reps: segment.reps)
+            }
+            let summary = summaryWeightReps(from: segments)
+            return PlanSetPrescription(prescriptionId: existingPrescription?.prescriptionId ?? (index == 0 ? template.prescriptionId : UUID()),
+                                       setType: .drop,
+                                       orderIndex: index,
+                                       weightKg: summary.weightKg,
+                                       reps: summary.reps,
+                                       isWarmup: template.isWarmupEffective,
+                                       segments: segments)
+        }
+    }
+
     private static func summaryWeightReps(from segments: [WorkoutSetSegment]) -> (weightKg: Double?, reps: Int?) {
         summaryWeightReps(from: segments
             .sorted { $0.segmentIndex < $1.segmentIndex }
@@ -235,6 +504,41 @@ extension PlanItem {
         }
         if let first = effective.first { return (first.weightKg, first.reps) }
         return (nil, nil)
+    }
+}
+
+extension PlanSupersetMember {
+    private var trimmedSnapshotName: String? {
+        let value = exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private var resolvedBuiltin: BuiltinExercise? {
+        ExerciseLibrary.resolve(code: builtinExerciseCode, name: trimmedSnapshotName)
+    }
+
+    var resolvedExerciseName: String? {
+        resolvedBuiltin?.name ?? trimmedSnapshotName
+    }
+
+    var displayExerciseName: String {
+        resolvedExerciseName ?? "未知动作"
+    }
+
+    var resolvedPrimaryMuscle: String? {
+        primaryMuscle ?? resolvedBuiltin?.category
+    }
+
+    var resolvedEquipmentType: String? {
+        equipmentType ?? resolvedBuiltin?.equipmentType
+    }
+
+    var historyKey: String {
+        ExerciseLibrary.canonicalHistoryKey(
+            code: builtinExerciseCode,
+            name: exerciseName,
+            customId: customExerciseId
+        )
     }
 }
 
@@ -303,7 +607,19 @@ extension WorkoutPlan {
     /// 计划详情 statRow 与计划列表 featured 卡共用，避免两处算法漂移。
     var totalSuggestedSets: Int {
         items.reduce(0) { total, item in
-            total + (item.setPrescriptions?.count ?? item.suggestedSets ?? 0)
+            if item.isSuperset {
+                return total + item.supersetRounds * item.orderedSupersetMembers.count
+            }
+            if item.isDropSet {
+                return total + max(1, item.suggestedSets ?? 1)
+            }
+            return total + (item.setPrescriptions?.count ?? item.suggestedSets ?? 0)
+        }
+    }
+
+    var totalExerciseCount: Int {
+        items.reduce(0) { total, item in
+            total + (item.isSuperset ? item.orderedSupersetMembers.count : 1)
         }
     }
 

@@ -4,6 +4,14 @@ struct ExerciseOrderItem: Identifiable, Equatable {
     let id: UUID
     let title: String
     let subtitle: String
+    let structureKind: WorkoutStructureIconKind?
+
+    init(id: UUID, title: String, subtitle: String, structureKind: WorkoutStructureIconKind? = nil) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.structureKind = structureKind
+    }
 }
 
 struct ExerciseOrderEditorSheet: View {
@@ -62,6 +70,9 @@ struct ExerciseOrderEditorSheet: View {
                 .font(Theme.Font.mono(size: 12, weight: .bold))
                 .foregroundStyle(Theme.Color.muted)
                 .frame(width: 28, alignment: .leading)
+            if let structureKind = item.structureKind {
+                WorkoutStructureIcon(kind: structureKind)
+            }
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
                     .font(Theme.Font.body(size: 16, weight: .semibold))

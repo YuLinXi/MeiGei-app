@@ -89,6 +89,7 @@ class WorkoutSyncServiceTest {
         assertThat(inserted.getWorkoutExerciseId()).isEqualTo(exercise.getId());
         assertThat(inserted.getPlannedRestSeconds()).isEqualTo(120);
         assertThat(inserted.getActualRestSeconds()).isEqualTo(137);
+        assertThat(inserted.getIsWarmup()).isFalse();
         assertThat(inserted.getSegments()).contains("\"weightKg\":80");
     }
 
@@ -118,6 +119,58 @@ class WorkoutSyncServiceTest {
         ArgumentCaptor<WorkoutSet> captor = ArgumentCaptor.forClass(WorkoutSet.class);
         verify(setMapper).insert(captor.capture());
         assertThat(captor.getValue().getSegments()).isEqualTo("[]");
+        assertThat(captor.getValue().getIsWarmup()).isFalse();
+    }
+
+    @Test
+    void push_normalizesLegacyWarmupSetTypeToIsWarmup() {
+        WorkoutSyncService service = new WorkoutSyncService(workoutMapper, exerciseMapper, setMapper, checkinService);
+        UUID userId = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.now();
+        Workout workout = workout(now);
+        WorkoutExercise exercise = new WorkoutExercise();
+        exercise.setId(UUID.randomUUID());
+        exercise.setExerciseName("杠铃卧推");
+        exercise.setOrderIndex(0);
+        WorkoutSet set = new WorkoutSet();
+        set.setId(UUID.randomUUID());
+        set.setSetIndex(0);
+        set.setCompleted(true);
+        set.setSetType("warmup");
+        when(workoutMapper.findByIdIncludingDeleted(workout.getId())).thenReturn(null);
+
+        service.push(userId, List.of(new WorkoutTree(
+                workout,
+                List.of(new WorkoutTree.ExerciseNode(exercise, List.of(set)))
+        )));
+
+        ArgumentCaptor<WorkoutSet> captor = ArgumentCaptor.forClass(WorkoutSet.class);
+        verify(setMapper).insert(captor.capture());
+        assertThat(captor.getValue().getSetType()).isEqualTo("working");
+        assertThat(captor.getValue().getIsWarmup()).isTrue();
+    }
+
+    @Test
+    void push_preservesWorkoutUnitsWhenReplacingAggregate() {
+        WorkoutSyncService service = new WorkoutSyncService(workoutMapper, exerciseMapper, setMapper, checkinService);
+        UUID userId = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.now();
+        Workout server = workout(now.minusMinutes(10));
+        server.setVersion(2);
+        Workout incoming = workout(now);
+        incoming.setId(server.getId());
+        String units = """
+                [{"unitId":"%s","kindRaw":"superset","orderIndex":0,"singleExerciseId":null,"superset":{"roundCount":4,"restAfterRoundSeconds":90,"members":[{"memberId":"%s","exerciseId":"%s","orderIndex":0},{"memberId":"%s","exerciseId":"%s","orderIndex":1}]}}]
+                """.formatted(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        incoming.setUnits(units);
+        when(workoutMapper.findByIdIncludingDeleted(incoming.getId())).thenReturn(server);
+
+        service.push(userId, List.of(new WorkoutTree(incoming, List.of())));
+
+        ArgumentCaptor<Workout> captor = ArgumentCaptor.forClass(Workout.class);
+        verify(workoutMapper).updateById(captor.capture());
+        assertThat(captor.getValue().getUnits()).isEqualTo(units);
+        assertThat(captor.getValue().getVersion()).isEqualTo(2);
     }
 
     private Workout workout(OffsetDateTime updatedAt) {

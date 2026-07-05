@@ -156,7 +156,7 @@ final class WorkoutLiveActivityController {
     }
 
     private func makeWorkoutState(for workout: Workout) -> RestActivityAttributes.ContentState {
-        let completed = workout.exercises.flatMap(\.sets).filter(\.countsForStats).count
+        let completed = workout.completedStatEntryCount
         let remainingExercises = workout.exercises.filter { ex in
             ex.sets.contains { !$0.completed }
         }.count

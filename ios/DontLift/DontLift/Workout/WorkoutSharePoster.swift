@@ -5,6 +5,7 @@ import Photos
 struct WorkoutPosterData: Equatable {
     struct ExerciseLine: Identifiable, Equatable {
         let id: String
+        let structureKind: WorkoutStructureIconKind?
         let name: String
         let topSetText: String
     }
@@ -21,35 +22,74 @@ struct WorkoutPosterData: Equatable {
     let volumeText: String
     let setCountText: String
     let exerciseCountText: String
+    let calorieValueText: String?
     let exerciseLines: [ExerciseLine]
     let prLines: [PRLine]
 
-    init(workout: Workout, personalRecords: [PersonalRecord] = []) {
+    init(
+        workout: Workout,
+        personalRecords: [PersonalRecord] = [],
+        caloriePreferences: WorkoutCaloriePreferences = WorkoutCaloriePreferences()
+    ) {
         let exercises = workout.exercises.sorted { $0.orderIndex < $1.orderIndex }
-        let completedSets = exercises.flatMap(\.sets).filter(\.completed)
-        let statSets = completedSets.filter(\.countsForStats)
+        let statSets = exercises.flatMap(\.sets).filter(\.countsForStats)
         let totalVolume = statSets.reduce(0.0) { acc, set in
             acc + set.statEntries.reduce(0.0) { entryAcc, entry in
                 entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
             }
         }
+        let statSetCount = statSets.count
 
         self.title = Self.title(for: workout, exercises: exercises)
         self.dateText = Self.dateFormatter.string(from: workout.startedAt)
         self.durationText = Self.durationText(start: workout.timerStartedAt ?? workout.startedAt,
                                               end: workout.endedAt ?? workout.startedAt)
         self.volumeText = Self.volumeText(totalVolume)
-        self.setCountText = "\(statSets.count)"
+        self.setCountText = "\(statSetCount)"
         self.exerciseCountText = "\(exercises.count)"
+        self.calorieValueText = WorkoutCalorieEstimator
+            .estimate(workout: workout, preferences: caloriePreferences)?
+            .valueText
 
-        let lines = exercises.enumerated().map { index, exercise in
-            Self.exerciseLine(exercise, index: index)
-        }
+        let lines = Self.exerciseLines(workout: workout)
         self.exerciseLines = lines
         self.prLines = personalRecords.prefix(3).map {
             PRLine(id: $0.exerciseKey,
                    name: $0.exerciseName,
                    weightText: "\(formatKg($0.weightKg))kg")
+        }
+    }
+
+    private static func exerciseLines(workout: Workout) -> [ExerciseLine] {
+        let exercises = workout.exercises.sorted { $0.orderIndex < $1.orderIndex }
+        let byId = Dictionary(uniqueKeysWithValues: exercises.map { ($0.localId, $0) })
+        return workout.trainingUnits.enumerated().compactMap { index, unit in
+            switch unit.kind {
+            case .singleExercise, .dropSet:
+                guard let id = unit.singleExerciseId, let exercise = byId[id] else { return nil }
+                let line = Self.exerciseLine(exercise, index: index)
+                guard unit.kind == .dropSet else {
+                    return line
+                }
+                return ExerciseLine(id: line.id,
+                                    structureKind: .dropSet,
+                                    name: line.name,
+                                    topSetText: line.topSetText)
+            case .superset:
+                let members = unit.superset?.members
+                    .sorted { $0.orderIndex < $1.orderIndex }
+                    .compactMap { byId[$0.exerciseId] } ?? []
+                guard members.count == 2 else { return nil }
+                let counts = members.map { member in
+                    member.sets.filter(\.countsForStats).count
+                }
+                let rounds = counts.min() ?? 0
+                let actionSets = counts.reduce(0, +)
+                return ExerciseLine(id: "\(index)-\(unit.unitId.uuidString)",
+                                    structureKind: .superset,
+                                    name: "超级组 · \(members[0].displayExerciseName) + \(members[1].displayExerciseName)",
+                                    topSetText: "\(rounds) 组 · 共 \(actionSets) 组动作")
+            }
         }
     }
 
@@ -86,22 +126,24 @@ struct WorkoutPosterData: Equatable {
     private static func exerciseLine(_ exercise: WorkoutExercise, index: Int) -> ExerciseLine {
         let statSets = exercise.displaySortedSets.filter { $0.completed && $0.countsForStats }
         return ExerciseLine(id: "\(index)-\(exercise.localId.uuidString)",
+                            structureKind: nil,
                             name: exercise.displayExerciseName,
                             topSetText: topSetText(in: statSets))
     }
 
     private static func topSetText(in sets: [WorkoutSet]) -> String {
         guard !sets.isEmpty else { return "已完成" }
+        let count = sets.count
         if let weighted = topWeightedSet(in: sets) {
             if let reps = weighted.reps {
-                return "\(formatKg(weighted.weightKg))kg × \(reps)次 · 共\(sets.count)组"
+                return "\(formatKg(weighted.weightKg))kg × \(reps)次 · 共\(count)组"
             }
-            return "\(formatKg(weighted.weightKg))kg · 共\(sets.count)组"
+            return "\(formatKg(weighted.weightKg))kg · 共\(count)组"
         }
         if let reps = sets.flatMap(\.statEntries).compactMap(\.reps).max() {
-            return "\(reps)次 · 共\(sets.count)组"
+            return "\(reps)次 · 共\(count)组"
         }
-        return "共\(sets.count)组"
+        return "共\(count)组"
     }
 
     private static func topWeightedSet(in sets: [WorkoutSet]) -> (weightKg: Double, reps: Int?)? {
@@ -130,7 +172,9 @@ struct WorkoutPosterPreviewSheet: View {
     @State private var hasSavedPoster = false
 
     private var data: WorkoutPosterData {
-        WorkoutPosterData(workout: workout, personalRecords: personalRecords)
+        WorkoutPosterData(workout: workout,
+                          personalRecords: personalRecords,
+                          caloriePreferences: .current())
     }
 
     var body: some View {
@@ -323,8 +367,11 @@ private struct WorkoutPosterVisualCardView: View {
                     .padding(.top, 7)
 
                 HStack(spacing: 8) {
+                    if let calorieValueText = data.calorieValueText {
+                        visualMetric(calorieValueText, "消耗", unit: "kcal", highlighted: true)
+                    }
                     visualMetric(data.durationText, "时长", unit: "min")
-                    visualMetric(data.volumeText, "训练量", unit: "kg")
+                    visualMetric(data.volumeText, "训练量", unit: "kg·rep")
                     visualMetric(data.setCountText, "组数")
                 }
                 .padding(.top, 24)
@@ -384,21 +431,21 @@ private struct WorkoutPosterVisualCardView: View {
         .accessibilityHidden(true)
     }
 
-    private func visualMetric(_ value: String, _ label: String, unit: String? = nil) -> some View {
+    private func visualMetric(_ value: String, _ label: String, unit: String? = nil, highlighted: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(value)
                 .font(Theme.Font.number(size: 22, weight: .bold))
-                .foregroundStyle(paper)
+                .foregroundStyle(highlighted ? Theme.Color.accent : paper)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(label)
                     .font(Theme.Font.mono(size: 9.5, weight: .bold))
-                    .foregroundStyle(paper.opacity(0.52))
+                    .foregroundStyle(highlighted ? Theme.Color.accent.opacity(0.74) : paper.opacity(0.52))
                 if let unit {
                     Text("(\(unit))")
                         .font(Theme.Font.mono(size: 7.2, weight: .bold))
-                        .foregroundStyle(paper.opacity(0.42))
+                        .foregroundStyle(highlighted ? Theme.Color.accent.opacity(0.54) : paper.opacity(0.42))
                 }
             }
             .lineLimit(1)
@@ -410,12 +457,17 @@ private struct WorkoutPosterVisualCardView: View {
         VStack(spacing: exerciseRowSpacing) {
             ForEach(data.exerciseLines) { line in
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(line.name)
-                        .font(Theme.Font.body(size: exerciseNameFontSize, weight: .semibold))
-                        .foregroundStyle(paper)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.76)
-                        .frame(width: exerciseNameColumnWidth, alignment: .leading)
+                    HStack(spacing: 6) {
+                        if let kind = line.structureKind {
+                            WorkoutStructureIcon(kind: kind, size: 18, symbolSize: 9)
+                        }
+                        Text(line.name)
+                            .font(Theme.Font.body(size: exerciseNameFontSize, weight: .semibold))
+                            .foregroundStyle(paper)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.76)
+                    }
+                    .frame(width: exerciseNameColumnWidth, alignment: .leading)
                     Text(line.topSetText)
                         .font(Theme.Font.mono(size: exerciseValueFontSize, weight: .bold))
                         .foregroundStyle(paper.opacity(0.82))

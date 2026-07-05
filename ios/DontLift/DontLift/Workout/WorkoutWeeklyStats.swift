@@ -4,8 +4,8 @@ import Foundation
 ///
 /// 「本周」= 本地时区当周周一 00:00 到次周一 00:00。
 /// 训练量：每组 `weightKg * reps` 求和（缺值视为 0）。
-/// 总组数：所有训练里全部 set 计数（不要求 completed，与现有 logging 视图一致）。
-/// 总次数：本周训练 session 数（按 startedAt 落入本周）。
+/// 总组数：已完成且非热身的父组数；递减组训练量/次数按有效 segments 展开。
+/// 总次数：已完成且非热身 entry 的 reps 总和。
 struct WeeklyStats: Equatable {
     var volumeKg: Double
     var sessionCount: Int
@@ -13,6 +13,16 @@ struct WeeklyStats: Equatable {
     var repCount: Int
 
     static let empty = WeeklyStats(volumeKg: 0, sessionCount: 0, setCount: 0, repCount: 0)
+}
+
+struct WeekTrainingDayStatus: Identifiable, Equatable, Hashable {
+    var date: Date
+    var weekdayIndex: Int
+    var sessionCount: Int
+    var isToday: Bool
+
+    var id: Date { date }
+    var isCompleted: Bool { sessionCount > 0 }
 }
 
 enum WorkoutWeeklyStats {
@@ -46,6 +56,28 @@ enum WorkoutWeeklyStats {
         let start = calendar.date(from: comps) ?? calendar.startOfDay(for: date)
         let end = calendar.date(byAdding: .weekOfYear, value: 1, to: start) ?? start
         return (start, end)
+    }
+
+    static func dayStatuses(workouts: [Workout], reference: Date = .now, calendar: Calendar = .currentMondayFirst) -> [WeekTrainingDayStatus] {
+        let (start, end) = weekBounds(for: reference, calendar: calendar)
+        var countsByDay: [Date: Int] = [:]
+        for workout in workouts {
+            guard workout.isFinished else { continue }
+            guard workout.startedAt >= start, workout.startedAt < end else { continue }
+            let day = calendar.startOfDay(for: workout.startedAt)
+            countsByDay[day, default: 0] += 1
+        }
+        let today = calendar.startOfDay(for: reference)
+        return (0..<7).compactMap { index in
+            guard let day = calendar.date(byAdding: .day, value: index, to: start) else { return nil }
+            let normalized = calendar.startOfDay(for: day)
+            return WeekTrainingDayStatus(
+                date: normalized,
+                weekdayIndex: index,
+                sessionCount: countsByDay[normalized] ?? 0,
+                isToday: calendar.isDate(normalized, inSameDayAs: today)
+            )
+        }
     }
 }
 

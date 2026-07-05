@@ -56,17 +56,16 @@ struct WorkoutDetailView: View {
 
     /// 已完成组数（口径与首页/记录中三联数一致：完成勾选的组）。
     private var completedSetCount: Int {
-        workout.exercises.flatMap(\.sets).filter(\.countsForStats).count
+        workout.completedStatEntryCount
     }
 
     /// 训练量 kg·rep：完成组的 重量 × 次数 之和。
     private var totalVolume: Double {
-        workout.exercises.flatMap(\.sets).reduce(0.0) { acc, s in
-            guard s.countsForStats else { return acc }
-            return acc + s.statEntries.reduce(0.0) { entryAcc, entry in
-                entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
-            }
-        }
+        workout.completedStatVolumeKg
+    }
+
+    private var calorieEstimate: WorkoutCalorieEstimate? {
+        WorkoutCalorieEstimator.estimate(workout: workout)
     }
 
     var body: some View {
@@ -76,6 +75,7 @@ struct WorkoutDetailView: View {
                 VStack(spacing: Theme.Spacing.md) {
                     summaryCard
                     triadStats
+                    if let calorieEstimate { calorieEstimateRow(calorieEstimate) }
                     if !personalRecords.isEmpty { prStrip }
                     logSection
                     Color.clear.frame(height: 24)
@@ -213,6 +213,29 @@ struct WorkoutDetailView: View {
         Rectangle().fill(Theme.Color.border).frame(width: 1)
     }
 
+    private func calorieEstimateRow(_ estimate: WorkoutCalorieEstimate) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "flame.fill")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.Color.accent)
+            Text(estimate.fullText)
+                .font(Theme.Font.mono(size: 12, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .stroke(Theme.Color.border, lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(estimate.fullText)
+    }
+
     /// 时长：≥1 小时显示 `H:MM`，否则 `M′`。
     private var durationText: String {
         guard let end = workout.endedAt else { return "—" }
@@ -273,12 +296,30 @@ struct WorkoutDetailView: View {
 
     private var logSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            Text("动作日志 · \(sortedExercises.count)").eyebrowStyle()
-            ForEach(sortedExercises) { ex in
-                ExerciseLogCard(exercise: ex, prMaxWeight: prMaxByKey[ex.historyKey])
+            Text("动作日志 · \(workout.totalExerciseCountForDisplay)").eyebrowStyle()
+            ForEach(workout.trainingUnits) { unit in
+                logUnit(unit)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func logUnit(_ unit: WorkoutUnit) -> some View {
+        switch unit.kind {
+        case .singleExercise, .dropSet:
+            if let id = unit.singleExerciseId,
+               let ex = workout.exercise(id: id) {
+                ExerciseLogCard(exercise: ex, prMaxWeight: prMaxByKey[ex.historyKey])
+            }
+        case .superset:
+            if let superset = unit.superset,
+               superset.members.count == 2,
+               let first = workout.exercise(id: superset.members[0].exerciseId),
+               let second = workout.exercise(id: superset.members[1].exerciseId) {
+                SupersetLogCard(first: first, second: second, roundCount: superset.roundCount)
+            }
+        }
     }
 
     // MARK: actions
@@ -311,6 +352,95 @@ struct WorkoutDetailView: View {
 
 // MARK: - 单个动作的只读日志卡
 
+private struct SupersetLogCard: View {
+    let first: WorkoutExercise
+    let second: WorkoutExercise
+    let roundCount: Int
+
+    private var firstSets: [WorkoutSet] { first.sets.sorted { $0.setIndex < $1.setIndex } }
+    private var secondSets: [WorkoutSet] { second.sets.sorted { $0.setIndex < $1.setIndex } }
+    private var effectiveRoundCount: Int { min(roundCount, min(firstSets.count, secondSets.count)) }
+    private var completedRounds: Int {
+        (0..<effectiveRoundCount).filter { firstSets[$0].completed && secondSets[$0].completed }.count
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        WorkoutStructureIcon(kind: .superset)
+                        Text("\(completedRounds)/\(effectiveRoundCount) 组")
+                            .font(Theme.Font.mono(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.Color.muted)
+                    }
+                    Text("\(first.displayExerciseName) + \(second.displayExerciseName)")
+                        .font(Theme.Font.l2)
+                        .foregroundStyle(Theme.Color.fg)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 15)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+
+            Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.horizontal, 15)
+
+            VStack(spacing: 0) {
+                ForEach(Array(0..<effectiveRoundCount), id: \.self) { index in
+                    if index > 0 {
+                        Rectangle().fill(Theme.Color.border.opacity(0.55)).frame(height: 1)
+                            .padding(.horizontal, 15)
+                    }
+                    roundRow(index)
+                }
+            }
+            .padding(.vertical, 3)
+        }
+        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .stroke(Theme.Color.border, lineWidth: 1)
+        )
+        .paperShadow(.sm, cornerRadius: Theme.Radius.lg)
+    }
+
+    private func roundRow(_ index: Int) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text("#\(index + 1)")
+                    .font(Theme.Font.mono(size: 11, weight: .bold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .frame(width: 34, alignment: .leading)
+                Text(first.displayExerciseName)
+                    .font(Theme.Font.body(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+                Spacer(minLength: 8)
+                valueText(firstSets[index])
+            }
+            HStack {
+                Text("")
+                    .frame(width: 34)
+                Text(second.displayExerciseName)
+                    .font(Theme.Font.body(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+                Spacer(minLength: 8)
+                valueText(secondSets[index])
+            }
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 10)
+    }
+
+    private func valueText(_ set: WorkoutSet) -> some View {
+        let value = set.compactValueText
+        return Text(value)
+            .font(Theme.Font.mono(size: 12, weight: .semibold))
+            .foregroundStyle(set.completed ? Theme.Color.fg : Theme.Color.muted)
+    }
+}
+
 private struct ExerciseLogCard: View {
     let exercise: WorkoutExercise
     /// 该动作本次的 PR 重量（非 nil 时，等于此重量的首个组标 ▲ PR）。
@@ -322,9 +452,9 @@ private struct ExerciseLogCard: View {
     }
     /// 只读徽章：热身组 `W`；正式组按「仅正式组」展示序相对序号 1..n。
     private func badgeText(for set: WorkoutSet) -> String {
-        if set.setType == .warmup { return "热" }
+        if set.isWarmupEffective { return "热" }
         var n = 0
-        for s in sortedSets where s.setType != .warmup {
+        for s in sortedSets where !s.isWarmupEffective {
             n += 1
             if s.localId == set.localId { return "\(n)" }
         }
@@ -335,7 +465,9 @@ private struct ExerciseLogCard: View {
     private var aggText: String {
         let done = sortedSets.filter(\.completed)
         let statSets = done.filter(\.countsForStats)
-        let count = statSets.isEmpty ? sortedSets.count : statSets.count
+        let count = statSets.isEmpty
+            ? sortedSets.count
+            : statSets.count
         let vol = (statSets.isEmpty ? sortedSets : statSets).reduce(0.0) { acc, s in
             guard s.countsForStats else { return acc }
             return acc + s.statEntries.reduce(0.0) { entryAcc, entry in
@@ -490,9 +622,9 @@ private struct LogSetRow: View {
         HStack(spacing: 10) {
             Text(badgeText)
                 .font(Theme.Font.mono(size: 11, weight: .bold))
-                .foregroundStyle(set.setType == .warmup ? Theme.Color.accent : Theme.Color.muted)
+                .foregroundStyle(set.isWarmupEffective ? Theme.Color.accent : Theme.Color.muted)
                 .frame(width: 22, height: 18)
-                .background(set.setType == .warmup ? Theme.Color.accentSoft : Color.clear,
+                .background(set.isWarmupEffective ? Theme.Color.accentSoft : Color.clear,
                             in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
 
             valueContent
@@ -514,12 +646,7 @@ private struct LogSetRow: View {
         if set.isDropSet {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
-                    Text("递减组")
-                        .font(Theme.Font.body(size: 11, weight: .bold))
-                        .foregroundStyle(Theme.Color.accent)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(Theme.Color.accentSofter, in: Capsule())
+                    WorkoutStructureIcon(kind: .dropSet)
                 }
                 ForEach(set.effectiveSegments) { segment in
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
@@ -614,7 +741,7 @@ private struct LogSetRow: View {
         }
         let w = set.weightKg.map { "\(formatKg($0)) 公斤" } ?? "未记录重量"
         let r = set.reps.map { "\($0) 次" } ?? "未记录次数"
-        let name = set.setType == .warmup ? "热身组" : "第 \(badgeText) 组"
+        let name = set.isWarmupEffective ? "热身组" : "第 \(badgeText) 组"
         return "\(name)，\(w)，\(r)" + rest + (isPR ? "，新纪录" : "")
     }
 }

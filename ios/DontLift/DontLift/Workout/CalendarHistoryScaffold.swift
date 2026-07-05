@@ -34,6 +34,7 @@ struct CalendarHistoryMonthSnapshot<Row: Identifiable & Hashable>: Equatable, Ha
 
 struct CalendarHistoryMonthArchiveItem: Identifiable, Equatable, Hashable {
     var monthStart: Date
+    var isLoaded: Bool = true
     var trainingDayCount: Int
     var workoutCount: Int
     var setCount: Int
@@ -587,7 +588,14 @@ private struct CalendarHistoryMonthArchiveSheet: View {
                         Text("\(calendar.component(.month, from: item.monthStart))月")
                             .font(Theme.Font.body(size: 18, weight: .bold))
                             .foregroundStyle(Theme.Color.fg)
-                        if item.trainingDayCount > 0 {
+                        if !item.isLoaded {
+                            Text("点按加载")
+                                .font(Theme.Font.body(size: 12, weight: .bold))
+                                .foregroundStyle(Theme.Color.fg2)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Theme.Color.surface2, in: Capsule())
+                        } else if item.trainingDayCount > 0 {
                             Text("\(item.trainingDayCount)天")
                                 .font(Theme.Font.body(size: 12, weight: .bold))
                                 .foregroundStyle(Theme.Color.accent)
@@ -601,10 +609,10 @@ private struct CalendarHistoryMonthArchiveSheet: View {
                 Spacer(minLength: Theme.Spacing.sm)
                 HStack(spacing: 8) {
                     VStack(alignment: .trailing, spacing: 3) {
-                        Text(item.workoutCount > 0 ? "\(item.workoutCount)次" : "—")
+                        Text(!item.isLoaded ? "加载" : (item.workoutCount > 0 ? "\(item.workoutCount)次" : "—"))
                             .font(Theme.Font.mono(size: 12, weight: .bold))
-                            .foregroundStyle(item.workoutCount > 0 ? Theme.Color.fg2 : Theme.Color.muted)
-                        Text(item.volumeKg > 0 ? formatTons(item.volumeKg) + "t" : "—")
+                            .foregroundStyle(!item.isLoaded || item.workoutCount > 0 ? Theme.Color.fg2 : Theme.Color.muted)
+                        Text(!item.isLoaded ? "未加载" : (item.volumeKg > 0 ? formatTons(item.volumeKg) + "t" : "—"))
                             .font(Theme.Font.mono(size: 10, weight: .medium))
                             .foregroundStyle(Theme.Color.muted)
                     }
@@ -630,12 +638,19 @@ private struct CalendarHistoryMonthArchiveSheet: View {
         HStack(spacing: 2) {
             ForEach(1...31, id: \.self) { day in
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(item.activeDayNumbers.contains(day) ? Theme.Color.accent : Theme.Color.border)
+                    .fill(monthDensityColor(item, day: day))
                     .frame(width: 4, height: 8)
                     .opacity(day <= daysInMonth(item.monthStart) ? 1 : 0)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func monthDensityColor(_ item: CalendarHistoryMonthArchiveItem, day: Int) -> Color {
+        if !item.isLoaded {
+            return day % 2 == 0 ? Theme.Color.surface2 : Theme.Color.accentSofter
+        }
+        return item.activeDayNumbers.contains(day) ? Theme.Color.accent : Theme.Color.border
     }
 
     private func daysInMonth(_ monthStart: Date) -> Int {
@@ -656,6 +671,9 @@ private struct CalendarHistoryMonthArchiveSheet: View {
     private func monthAccessibilityLabel(_ item: CalendarHistoryMonthArchiveItem) -> String {
         let year = calendar.component(.year, from: item.monthStart)
         let month = calendar.component(.month, from: item.monthStart)
+        if !item.isLoaded {
+            return "\(year)年\(month)月，尚未加载，点按加载"
+        }
         if item.trainingDayCount > 0 {
             return "\(year)年\(month)月，\(item.trainingDayCount)天有训练，\(item.workoutCount)次训练"
         }

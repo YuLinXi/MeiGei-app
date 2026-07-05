@@ -10,9 +10,10 @@ struct CheckinSummary: Codable, Hashable, Identifiable {
     var endedAt: Date?
     var exerciseCount: Int
     var totalSets: Int
-    /// 已完成组的总容量（Σ 重量×次数），kg。
+    /// 已完成组的总训练量（Σ 重量×次数），kg·rep。
     var totalVolumeKg: Double
     var exercises: [ExerciseSummary]
+    var units: [UnitSummary]?
 
     struct ExerciseSummary: Codable, Hashable, Identifiable {
         var name: String
@@ -20,10 +21,25 @@ struct CheckinSummary: Codable, Hashable, Identifiable {
         var id: String { name }
     }
 
+    struct UnitSummary: Codable, Hashable, Identifiable {
+        var unitId: UUID
+        var kindRaw: String
+        var title: String
+        var roundCount: Int?
+        var exercises: [ExerciseSummary]
+
+        var id: UUID { unitId }
+
+        var kind: WorkoutUnitKind {
+            WorkoutUnitKind(rawValue: kindRaw) ?? .singleExercise
+        }
+    }
+
     struct SetSummary: Codable, Hashable {
         var weightKg: Double?
         var reps: Int?
         var setTypeRaw: String?
+        var isWarmup: Bool?
         var segments: [WorkoutSetSegment]?
 
         var setType: WorkoutSetType {
@@ -54,6 +70,7 @@ extension CheckinSummary {
                     return SetSummary(weightKg: summary.weightKg,
                                       reps: summary.reps,
                                       setTypeRaw: $0.setTypeRaw,
+                                      isWarmup: $0.isWarmupEffective,
                                       segments: $0.segments)
                 })
         }
@@ -64,13 +81,52 @@ extension CheckinSummary {
             exerciseCount: exs.count,
             totalSets: totalSets,
             totalVolumeKg: volume,
-            exercises: summaries)
+            exercises: summaries,
+            units: Self.unitSummaries(workout: workout, exerciseSummaries: summaries))
+    }
+
+    private static func unitSummaries(workout: Workout, exerciseSummaries: [ExerciseSummary]) -> [UnitSummary] {
+        let summaryByExerciseId = Dictionary(uniqueKeysWithValues: workout.exercises
+            .sorted { $0.orderIndex < $1.orderIndex }
+            .enumerated()
+            .compactMap { index, exercise -> (UUID, ExerciseSummary)? in
+                guard exerciseSummaries.indices.contains(index) else { return nil }
+                return (exercise.localId, exerciseSummaries[index])
+            })
+        return workout.trainingUnits.map { unit in
+            switch unit.kind {
+            case .singleExercise:
+                let exercise = unit.singleExerciseId.flatMap { summaryByExerciseId[$0] }
+                return UnitSummary(unitId: unit.unitId,
+                                   kindRaw: unit.kindRaw,
+                                   title: exercise?.name ?? "动作",
+                                   roundCount: nil,
+                                   exercises: exercise.map { [$0] } ?? [])
+            case .dropSet:
+                let exercise = unit.singleExerciseId.flatMap { summaryByExerciseId[$0] }
+                return UnitSummary(unitId: unit.unitId,
+                                   kindRaw: unit.kindRaw,
+                                   title: exercise?.name ?? "动作",
+                                   roundCount: nil,
+                                   exercises: exercise.map { [$0] } ?? [])
+            case .superset:
+                let exercises = unit.superset?.members
+                    .sorted { $0.orderIndex < $1.orderIndex }
+                    .compactMap { summaryByExerciseId[$0.exerciseId] } ?? []
+                let title = exercises.map(\.name).joined(separator: " + ")
+                return UnitSummary(unitId: unit.unitId,
+                                   kindRaw: unit.kindRaw,
+                                   title: title.isEmpty ? "超级组" : title,
+                                   roundCount: exercises.map(\.sets.count).min(),
+                                   exercises: exercises)
+            }
+        }
     }
 
     /// 列表行用的一句话摘要。
     var headline: String {
         var parts = ["\(exerciseCount)个动作", "\(totalSets)组"]
-        if totalVolumeKg > 0 { parts.append("\(formatKg(totalVolumeKg)) kg 容量") }
+        if totalVolumeKg > 0 { parts.append("\(formatKg(totalVolumeKg)) kg·rep") }
         return parts.joined(separator: " · ")
     }
 }

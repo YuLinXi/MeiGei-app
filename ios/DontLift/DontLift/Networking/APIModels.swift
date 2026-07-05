@@ -157,6 +157,8 @@ struct WorkoutDTO: Codable {
     var startedAt: Date?
     var endedAt: Date?
     var note: String?
+    /// 一级训练单元 JSON 字符串；旧后端/旧数据缺失时本地按动作列表派生。
+    var units: String?
     var createdAt: Date?
     var updatedAt: Date
     var deletedAt: Date?
@@ -189,8 +191,10 @@ struct WorkoutSetDTO: Codable {
     var plannedRestSeconds: Int?
     /// 该组休息完成后的真实秒数；旧后端/旧数据缺失时为 nil。
     var actualRestSeconds: Int?
-    /// 组类型 raw（"working"/"warmup"）。解码缺失时由 SyncEngine 兜底 `working`，兼容旧后端/旧数据。
+    /// 组结构类型 raw（"working"/"drop"）。旧 `"warmup"` 由 SyncEngine 兜底迁移为 `isWarmup`。
     var setType: String?
+    /// 热身标记。旧后端/旧数据缺失时按 false，并兼容 `setType == "warmup"`。
+    var isWarmup: Bool?
     /// 递减组分段 JSON 字符串；旧后端/旧数据缺失时按空数组处理。
     var segments: String?
 }
@@ -263,7 +267,7 @@ struct TeamCheckinDTO: Decodable, Identifiable, Hashable {
     var parsedSummary: CheckinSummary {
         guard let s = decodedSummary else {
             return CheckinSummary(title: nil, startedAt: nil, endedAt: nil,
-                                  exerciseCount: 0, totalSets: 0, totalVolumeKg: 0, exercises: [])
+                                  exerciseCount: 0, totalSets: 0, totalVolumeKg: 0, exercises: [], units: nil)
         }
         return s
     }
@@ -305,7 +309,7 @@ struct ServerPlanDTO: Decodable, Identifiable, Hashable {
         let names = decodedItems
             .sorted { $0.orderIndex < $1.orderIndex }
             .prefix(3)
-            .map(\.displayExerciseName)
+            .map(\.unitDisplayName)
         return names.isEmpty ? "暂无动作" : names.joined(separator: "、")
     }
 
@@ -353,7 +357,7 @@ struct TeamPlanShareCardDTO: Decodable, Identifiable, Hashable {
         let names = decodedItems
             .sorted { $0.orderIndex < $1.orderIndex }
             .prefix(3)
-            .map(\.displayExerciseName)
+            .map(\.unitDisplayName)
         return names.isEmpty ? "暂无动作" : names.joined(separator: "、")
     }
 

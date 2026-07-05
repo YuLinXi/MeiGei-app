@@ -154,11 +154,6 @@ struct PlanListView: View {
         historyStore.planUsage[plan.localId] ?? .empty
     }
 
-    private func usageSummary(for plan: WorkoutPlan) -> String {
-        let usage = usage(for: plan)
-        return "累计训练 \(usage.completedCount) 次"
-    }
-
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
@@ -192,6 +187,7 @@ struct PlanListView: View {
         .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
             floatingAddMenu
         }
+        .rootTabTopScrim()
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             WorkoutPerformanceMonitor.event("plan.list.appear")
@@ -249,9 +245,12 @@ struct PlanListView: View {
 
     private var planOverview: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            Text("总览").eyebrowStyle()
+            Text("总览")
+                .font(Theme.Font.mono(size: 12, weight: .semibold))
+                .tracking(0.08 * 12)
+                .foregroundStyle(Theme.Color.muted)
             Text(planListOverview)
-                .font(Theme.Font.mono(size: 11, weight: .semibold))
+                .font(Theme.Font.mono(size: 12.5, weight: .semibold))
                 .foregroundStyle(Theme.Color.muted)
                 .lineLimit(1)
                 .minimumScaleFactor(0.88)
@@ -388,8 +387,7 @@ struct PlanListView: View {
             let names = section.plans.prefix(2).map(\.name).joined(separator: " / ")
             return section.plans.count > 2 ? "\(names) 等 \(section.plans.count) 个计划" : names
         }
-        let sets = section.plans.reduce(0) { $0 + $1.totalSuggestedSets }
-        return "\(section.plans.count) 个计划 · \(sets) 组"
+        return "\(section.plans.count) 个计划"
     }
 
     private func sectionMenuItems(for section: PlanGroupSection) -> [PaperMenuItem] {
@@ -440,28 +438,22 @@ struct PlanListView: View {
     private func planCard(_ plan: WorkoutPlan, position: PlanListCardPosition = .single) -> some View {
         let usage = usage(for: plan)
         return HStack(alignment: .center, spacing: Theme.Spacing.md) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(plan.name)
-                    .font(Theme.Font.body(size: 17, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .minimumScaleFactor(0.86)
-                    .layoutPriority(1)
-                HStack(spacing: 6) {
-                    planMetricPill("\(plan.items.count) 个动作")
-                    planMetricPill("\(plan.totalSuggestedSets) 组")
-                }
-
-                HStack(spacing: Theme.Spacing.xs) {
-                    Image(systemName: usage.completedCount == 0 ? "circle" : "clock.arrow.circlepath")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Theme.Color.muted)
-                        .frame(width: 14)
-                    Text(usageSummary(for: plan))
-                        .font(Theme.Font.mono(size: 10.5))
-                        .foregroundStyle(Theme.Color.muted)
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
+                    Text(plan.name)
+                        .font(Theme.Font.body(size: 17, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg)
                         .lineLimit(1)
+                        .truncationMode(.tail)
+                        .minimumScaleFactor(0.86)
+
+                    Spacer(minLength: Theme.Spacing.xs)
+
+                    planUsageInlineLabel(usage)
+                }
+                HStack(spacing: 6) {
+                    planMetricPill("\(plan.totalExerciseCount) 个动作")
+                    planMetricPill("\(plan.totalSuggestedSets) 组")
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -475,12 +467,26 @@ struct PlanListView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .planListAttachedCardStyle(
             position: position,
-            padding: EdgeInsets(top: 12,
+            padding: EdgeInsets(top: 10,
                                 leading: Theme.Spacing.md,
-                                bottom: 12,
+                                bottom: 10,
                                 trailing: Theme.Spacing.sm)
         )
         .accessibilityElement(children: .combine)
+    }
+
+    private func planUsageInlineLabel(_ usage: PlanUsageSummary) -> some View {
+        HStack(spacing: Theme.Spacing.xs) {
+            Image(systemName: usage.completedCount == 0 ? "circle" : "clock.arrow.circlepath")
+                .font(.system(size: 10, weight: .semibold))
+                .frame(width: 14)
+            Text("累计训练 \(usage.completedCount) 次")
+                .font(Theme.Font.mono(size: 10.5))
+                .lineLimit(1)
+        }
+        .foregroundStyle(Theme.Color.muted)
+        .fixedSize(horizontal: true, vertical: false)
+        .layoutPriority(1)
     }
 
     private func planMetricPill(_ title: String) -> some View {
@@ -603,7 +609,10 @@ struct PlanDetailView: View {
     private var planGroups: [WorkoutPlanGroup]
 
     @State private var pickingExercise = false
+    @State private var creatingSuperset = false
+    @State private var pendingPlanUnitKind: PlanUnitKind = .singleExercise
     @State private var editingItem: PlanItem?
+    @State private var editingSupersetItem: PlanItem?
     @State private var editing = false
     @State private var movingGroup = false
     @State private var sharingToTeam = false
@@ -637,7 +646,10 @@ struct PlanDetailView: View {
 
     private var planOrderItems: [ExerciseOrderItem] {
         orderedItems.map {
-            ExerciseOrderItem(id: $0.itemId, title: $0.exerciseName, subtitle: subtitle($0))
+            ExerciseOrderItem(id: $0.itemId,
+                              title: planItemTitle($0),
+                              subtitle: subtitle($0),
+                              structureKind: structureKind(for: $0))
         }
     }
 
@@ -662,7 +674,7 @@ struct PlanDetailView: View {
                             data: orderedItems,
                             id: \.itemId,
                             coordinator: swipe,
-                            onTap: { editingItem = $0 },
+                            onTap: { editPlanItem($0) },
                             onDelete: { item, rect in
                                 deleteRect = rect
                                 pendingDeleteItem = item
@@ -718,13 +730,7 @@ struct PlanDetailView: View {
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in
                 var items = plan.items
-                let newItem = PlanItem(builtinExerciseCode: pick.builtinCode, customExerciseId: pick.customId,
-                                       exerciseName: pick.name,
-                                       primaryMuscle: pick.primaryMuscle,
-                                       equipmentType: pick.equipmentType,
-                                       orderIndex: items.count,
-                                       suggestedSets: PlanDefaults.suggestedSets,
-                                       suggestedReps: PlanDefaults.suggestedReps)
+                let newItem = planItem(from: pick, kind: pendingPlanUnitKind, orderIndex: items.count)
                 items.append(newItem)
                 plan.items = items
                 plan.markDirty()
@@ -735,7 +741,13 @@ struct PlanDetailView: View {
         .onChange(of: pickingExercise) { _, isPresented in
             guard !isPresented, let item = pendingEditAfterPick else { return }
             pendingEditAfterPick = nil
+            pendingPlanUnitKind = .singleExercise
             editingItem = item
+        }
+        .sheet(isPresented: $creatingSuperset) {
+            SupersetCreationSheet { result in
+                addPlanSuperset(result)
+            }
         }
         .sheet(item: $editingItem) { item in
             PlanItemEditorView(item: item) { updated in
@@ -746,6 +758,12 @@ struct PlanDetailView: View {
                     plan.markDirty()
                     try? modelContext.save()
                 }
+            }
+        }
+        .sheet(item: $editingSupersetItem) { item in
+            SupersetCreationSheet(title: "编辑超级组",
+                                  initial: supersetInitialResult(from: item)) { result in
+                updatePlanSuperset(itemId: item.itemId, result: result)
             }
         }
         .sheet(isPresented: $editing) {
@@ -825,7 +843,7 @@ struct PlanDetailView: View {
     // 仅保留动作数与总组数；计划模式在下方规则卡展示，避免重复。
     private var statRow: some View {
         HStack(spacing: 0) {
-            statCell(n: "\(plan.items.count)", k: "动作")
+            statCell(n: "\(plan.totalExerciseCount)", k: "动作")
             statDivider
             statCell(n: "\(totalSets)", k: "总组数")
         }
@@ -883,42 +901,70 @@ struct PlanDetailView: View {
     private func planItemRow(_ item: PlanItem) -> some View {
         // 序号按当前顺序推出（动作数极少，firstIndex 开销可忽略）。
         let index = (orderedItems.firstIndex { $0.itemId == item.itemId } ?? 0) + 1
-        let preview = PlanPrescriptionPreview.make(for: item, mode: plan.mode,
-                                                   lookup: historyStore.planLookup, planId: plan.localId)
-        let showsSource = plan.mode != .strict
         return HStack(spacing: 11) {
             Text(String(format: "%02d", index))
                 .font(Theme.Font.mono(size: 12, weight: .bold))
                 .foregroundStyle(Theme.Color.muted)
                 .frame(width: 18)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.displayExerciseName)
-                    .font(Theme.Font.body(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Text(preview.summaryText)
-                    .font(Theme.Font.mono(size: 12))
-                    .foregroundStyle(Theme.Color.muted)
-                if showsSource {
-                    Text(preview.detailText)
-                        .font(Theme.Font.body(size: 12))
-                        .foregroundStyle(Theme.Color.fg2)
-                }
-            }
+            planItemKindIcon(item)
+            Text(planItemTitle(item))
+                .font(Theme.Font.body(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 0)
-            if showsSource {
-                sourceBadge(preview.badgeText)
-            }
             editItemButton(item)
         }
-        .cardStyle()
+        .cardStyle(padding: 12)
+    }
+
+    private func planItemTitle(_ item: PlanItem) -> String {
+        if item.isSuperset { return item.supersetTitle }
+        return item.displayExerciseName
+    }
+
+    private func structureKind(for item: PlanItem) -> WorkoutStructureIconKind? {
+        if item.isDropSet { return .dropSet }
+        if item.isSuperset { return .superset }
+        return nil
+    }
+
+    @ViewBuilder
+    private func planItemKindIcon(_ item: PlanItem) -> some View {
+        if let kind = structureKind(for: item) {
+            WorkoutStructureIcon(kind: kind)
+        }
+    }
+
+    private func supersetPrescriptionSummary(_ item: PlanItem) -> String {
+        let memberText = item.orderedSupersetMembers.map { member in
+            switch (member.suggestedWeightKg, member.suggestedReps) {
+            case let (.some(weight), .some(reps)):
+                return "\(formatKg(weight)) kg × \(reps)"
+            case let (.some(weight), .none):
+                return "\(formatKg(weight)) kg"
+            case let (.none, .some(reps)):
+                return "\(reps) 次"
+            case (.none, .none):
+                return "未设"
+            }
+        }.joined(separator: " / ")
+        return "\(memberText) × \(item.supersetRounds)组"
+    }
+
+    private func editPlanItem(_ item: PlanItem) {
+        swipe.collapseAll()
+        if item.isSuperset {
+            editingSupersetItem = item
+        } else {
+            editingItem = item
+        }
     }
 
     private func editItemButton(_ item: PlanItem) -> some View {
         Button {
-            swipe.collapseAll()
-            editingItem = item
+            editPlanItem(item)
         } label: {
             Image(systemName: "square.and.pencil")
                 .font(.system(size: 16, weight: .semibold))
@@ -927,7 +973,7 @@ struct PlanDetailView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("编辑\(item.displayExerciseName)")
+        .accessibilityLabel("编辑\(item.unitDisplayName)")
     }
 
     private var modeInfoCard: some View {
@@ -943,7 +989,7 @@ struct PlanDetailView: View {
                         .foregroundStyle(Theme.Color.fg)
                     Text(plan.mode == .adaptive
                          ? "自适应模式会按下方处方预填；完成后继续跟随实绩更新，跳过动作会保留。"
-                         : "严格模式会复制计划预设；完成后不回写，每个动作需有组数与次数。")
+                         : "严格模式会复制当前处方；完成后不回写，每个动作需有组数与次数。")
                         .font(Theme.Font.body(size: 12))
                         .foregroundStyle(Theme.Color.fg2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -959,15 +1005,6 @@ struct PlanDetailView: View {
         .buttonStyle(.plain)
     }
 
-    private func sourceBadge(_ text: String) -> some View {
-        Text(text)
-            .font(Theme.Font.mono(size: 10, weight: .bold))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 4)
-            .background(Theme.Color.accentSoft, in: Capsule())
-            .foregroundStyle(Theme.Color.accent)
-    }
-
     private var emptyExercisesCard: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("还没有动作")
@@ -981,22 +1018,50 @@ struct PlanDetailView: View {
         .cardStyle()
     }
 
-    // 对齐原型 .add-row：虚线 border2 1.5px、muted、12/600、padding 12、加号 15。
     private var addExerciseCTA: some View {
-        Button { pickingExercise = true } label: {
-            HStack(spacing: 7) {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .bold))
-                Text("添加动作")
-                    .font(Theme.Font.body(size: 12, weight: .semibold))
+        HStack(spacing: 10) {
+            structureMenuButton
+            addPlanUnitButton(title: "添加动作", systemImage: "plus", compact: false) {
+                pendingPlanUnitKind = .singleExercise
+                pickingExercise = true
             }
-            .foregroundStyle(Theme.Color.muted)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                    .strokeBorder(Theme.Color.border2, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+        }
+    }
+
+    private var structureMenuButton: some View {
+        WorkoutStructureMenuButton(
+            onAddDropSet: {
+                pendingPlanUnitKind = .dropSet
+                pickingExercise = true
+            },
+            onAddSuperset: {
+                creatingSuperset = true
+            }
+        )
+    }
+
+    private func addPlanUnitButton(title: String,
+                                   systemImage: String,
+                                   compact: Bool,
+                                   action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12, weight: .bold))
+                Text(title)
+                    .font(Theme.Font.body(size: 12.5, weight: .semibold))
+            }
+            .foregroundStyle(compact ? Theme.Color.muted : Theme.Color.accent)
+            .padding(.horizontal, compact ? 12 : 22)
+            .frame(maxWidth: compact ? nil : .infinity)
+            .frame(height: compact ? 36 : 40)
+            .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                    .stroke(compact ? Theme.Color.border : Theme.Color.accentSofter,
+                            style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
             )
+            .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -1071,6 +1136,7 @@ struct PlanDetailView: View {
     }
 
     private func subtitle(_ item: PlanItem) -> String {
+        if item.isSuperset { return supersetPrescriptionSummary(item) }
         // 对齐原型 .pm：「3 组 × 10 · 60 kg」/「3 组 × 12」；重量可空时仅显示组×次。
         var parts: [String] = []
         if let s = item.suggestedSets, let r = item.suggestedReps { parts.append("\(s) 组 × \(r)") }
@@ -1079,27 +1145,116 @@ struct PlanDetailView: View {
         return parts.isEmpty ? "未设建议" : parts.joined(separator: " · ")
     }
 
+    private func planItem(from pick: ExercisePick, kind: PlanUnitKind, orderIndex: Int) -> PlanItem {
+        switch kind {
+        case .dropSet:
+            return PlanItem.dropSet(orderIndex: orderIndex,
+                                    builtinExerciseCode: pick.builtinCode,
+                                    customExerciseId: pick.customId,
+                                    exerciseName: pick.name,
+                                    primaryMuscle: pick.primaryMuscle,
+                                    equipmentType: pick.equipmentType,
+                                    segments: [
+                                        WorkoutSetSegment(segmentIndex: 0, reps: PlanDefaults.suggestedReps),
+                                        WorkoutSetSegment(segmentIndex: 1)
+                                    ])
+        case .singleExercise, .superset:
+            return PlanItem(builtinExerciseCode: pick.builtinCode,
+                            customExerciseId: pick.customId,
+                            exerciseName: pick.name,
+                            primaryMuscle: pick.primaryMuscle,
+                            equipmentType: pick.equipmentType,
+                            orderIndex: orderIndex,
+                            suggestedSets: PlanDefaults.suggestedSets,
+                            suggestedReps: PlanDefaults.suggestedReps)
+        }
+    }
+
     private func duplicate() {
         // Fork 规则（design.md D8）：复制 动作 + 组数 + 次数，清空重量（重量最私人）；副本默认自适应。
         let copy = WorkoutPlan(name: plan.name + " · 副本",
-                               items: plan.items.map {
-                                   PlanItem(itemId: UUID(),
-                                            builtinExerciseCode: $0.builtinExerciseCode,
-                                            customExerciseId: $0.customExerciseId,
-                                            exerciseName: $0.exerciseName,
-                                            primaryMuscle: $0.primaryMuscle,
-                                            equipmentType: $0.equipmentType,
-                                            orderIndex: $0.orderIndex,
-                                            suggestedSets: $0.suggestedSets,
-                                            suggestedReps: $0.suggestedReps,
-                                            suggestedWeightKg: nil)
-                               },
+                               items: plan.items.map(weightlessCopyForDuplicate(_:)),
                                mode: .adaptive,
                                forkedFrom: plan.localId,
                                groupId: plan.groupId,
                                sortOrder: plan.sortOrder + 1)
         modelContext.insert(copy)
         try? modelContext.save()
+    }
+
+    private func weightlessCopyForDuplicate(_ item: PlanItem) -> PlanItem {
+        if item.isSuperset {
+            return PlanItem.superset(
+                itemId: UUID(),
+                orderIndex: item.orderIndex,
+                roundCount: item.supersetRounds,
+                restAfterRoundSeconds: item.supersetRestAfterRoundSeconds,
+                members: item.orderedSupersetMembers.map {
+                    PlanSupersetMember(memberId: UUID(),
+                                       builtinExerciseCode: $0.builtinExerciseCode,
+                                       customExerciseId: $0.customExerciseId,
+                                       exerciseName: $0.exerciseName,
+                                       primaryMuscle: $0.primaryMuscle,
+                                       equipmentType: $0.equipmentType,
+                                       orderIndex: $0.orderIndex,
+                                       suggestedWeightKg: nil,
+                                       suggestedReps: $0.suggestedReps)
+                }
+            )
+        }
+        if item.isDropSet {
+            let prescriptions = item.dropSetPrescriptions.enumerated().map { idx, prescription in
+                PlanSetPrescription(setType: .drop,
+                                    orderIndex: idx,
+                                    weightKg: nil,
+                                    reps: prescription.reps,
+                                    isWarmup: prescription.isWarmupEffective,
+                                    segments: prescription.segments
+                                        .sorted { $0.segmentIndex < $1.segmentIndex }
+                                        .enumerated()
+                                        .map { segmentIndex, segment in
+                                            WorkoutSetSegment(segmentIndex: segmentIndex,
+                                                              weightKg: nil,
+                                                              reps: segment.reps)
+                                        })
+            }
+            return PlanItem(itemId: UUID(),
+                            unitKind: .dropSet,
+                            builtinExerciseCode: item.builtinExerciseCode,
+                            customExerciseId: item.customExerciseId,
+                            exerciseName: item.displayExerciseName,
+                            primaryMuscle: item.primaryMuscle,
+                            equipmentType: item.equipmentType,
+                            orderIndex: item.orderIndex,
+                            suggestedSets: max(1, item.suggestedSets ?? prescriptions.count),
+                            suggestedReps: item.suggestedReps,
+                            suggestedWeightKg: nil,
+                            setPrescriptions: prescriptions.isEmpty ? nil : prescriptions)
+        }
+        return PlanItem(itemId: UUID(),
+                        builtinExerciseCode: item.builtinExerciseCode,
+                        customExerciseId: item.customExerciseId,
+                        exerciseName: item.exerciseName,
+                        primaryMuscle: item.primaryMuscle,
+                        equipmentType: item.equipmentType,
+                        orderIndex: item.orderIndex,
+                        suggestedSets: item.suggestedSets,
+                        suggestedReps: item.suggestedReps,
+                        suggestedWeightKg: nil,
+                        setPrescriptions: item.orderedSetPrescriptions.map {
+                            PlanSetPrescription(prescriptionId: UUID(),
+                                                setType: $0.setType,
+                                                orderIndex: $0.orderIndex,
+                                                weightKg: nil,
+                                                reps: $0.reps,
+                                                isWarmup: $0.isWarmup,
+                                                segments: $0.segments.map {
+                                                    WorkoutSetSegment(segmentId: UUID(),
+                                                                      segmentIndex: $0.segmentIndex,
+                                                                      weightKg: nil,
+                                                                      reps: $0.reps)
+                                                })
+                        })
     }
 
     /// 单一活跃会话守卫：存在进行中会话时弹「继续 / 丢弃」，否则新建并进入。
@@ -1132,22 +1287,7 @@ struct PlanDetailView: View {
     }
 
     private func buildFromPlan() -> Workout {
-        let w = Workout(planId: plan.localId, title: plan.name)
-        let mode = plan.mode
-        for (i, item) in orderedItems.enumerated() {
-            let ex = WorkoutExercise(
-                builtinExerciseCode: item.builtinExerciseCode,
-                customExerciseId: item.customExerciseId,
-                exerciseName: item.displayExerciseName,
-                primaryMuscle: item.resolvedPrimaryMuscle,
-                orderIndex: i,
-                planItemId: item.itemId   // 自适应回写合并主键（design.md D3）
-            )
-            // 按模式落值（design.md D1/D4）：严格整组复制预设；自适应历史优先→回退预设。
-            ex.sets = PlanPrefill.sets(for: item, mode: mode, lookup: historyStore.planLookup)
-            w.exercises.append(ex)
-        }
-        return w
+        PlanWorkoutBuilder.workout(from: plan, lookup: historyStore.planLookup)
     }
 
     private func commit(_ build: () -> Workout) {
@@ -1157,6 +1297,75 @@ struct PlanDetailView: View {
         historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
         NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
         workoutPresentation.present(w)
+    }
+
+    private func addPlanSuperset(_ result: SupersetCreationResult) {
+        var items = plan.items
+        items.append(planSupersetItem(from: result, itemId: UUID(), orderIndex: items.count, existing: nil))
+        plan.items = items
+        plan.markDirty()
+        try? modelContext.save()
+    }
+
+    private func updatePlanSuperset(itemId: UUID, result: SupersetCreationResult) {
+        var items = plan.items
+        guard let idx = items.firstIndex(where: { $0.itemId == itemId }) else { return }
+        items[idx] = planSupersetItem(from: result,
+                                      itemId: itemId,
+                                      orderIndex: items[idx].orderIndex,
+                                      existing: items[idx])
+        plan.items = items
+        plan.markDirty()
+        try? modelContext.save()
+    }
+
+    private func planSupersetItem(from result: SupersetCreationResult,
+                                  itemId: UUID,
+                                  orderIndex: Int,
+                                  existing: PlanItem?) -> PlanItem {
+        PlanItem.superset(
+            itemId: itemId,
+            orderIndex: orderIndex,
+            roundCount: result.roundCount,
+            restAfterRoundSeconds: existing?.supersetRestAfterRoundSeconds,
+            members: [
+                planSupersetMember(from: result.first, orderIndex: 0),
+                planSupersetMember(from: result.second, orderIndex: 1)
+            ]
+        )
+    }
+
+    private func planSupersetMember(from member: SupersetCreationResult.Member, orderIndex: Int) -> PlanSupersetMember {
+        PlanSupersetMember(memberId: member.memberId ?? UUID(),
+                           builtinExerciseCode: member.pick.builtinCode,
+                           customExerciseId: member.pick.customId,
+                           exerciseName: member.pick.name,
+                           primaryMuscle: member.pick.primaryMuscle,
+                           equipmentType: member.pick.equipmentType,
+                           orderIndex: orderIndex,
+                           suggestedWeightKg: member.weightKg,
+                           suggestedReps: member.reps)
+    }
+
+    private func supersetInitialResult(from item: PlanItem) -> SupersetCreationResult? {
+        let members = item.orderedSupersetMembers
+        guard members.count == 2 else { return nil }
+        return SupersetCreationResult(
+            roundCount: item.supersetRounds,
+            first: supersetResultMember(from: members[0]),
+            second: supersetResultMember(from: members[1])
+        )
+    }
+
+    private func supersetResultMember(from member: PlanSupersetMember) -> SupersetCreationResult.Member {
+        .init(memberId: member.memberId,
+              pick: ExercisePick(builtinCode: member.builtinExerciseCode,
+                                 customId: member.customExerciseId,
+                                 name: member.displayExerciseName,
+                                 primaryMuscle: member.resolvedPrimaryMuscle,
+                                 equipmentType: member.resolvedEquipmentType),
+              weightKg: member.suggestedWeightKg,
+              reps: member.suggestedReps)
     }
 
     private func delete() {
@@ -1328,7 +1537,7 @@ private struct PlanShareToTeamSheet: View {
             Text(plan.name)
                 .font(Theme.Font.body(size: 16, weight: .bold))
                 .foregroundStyle(Theme.Color.fg)
-            Text("\(plan.items.count) 个动作 · 不包含重量 · 可更新")
+            Text("\(plan.totalExerciseCount) 个动作 · 不包含重量 · 可更新")
                 .font(Theme.Font.mono(size: 11))
                 .foregroundStyle(Theme.Color.muted)
             Text("队友可复制或直接开始训练；已分享的 Team 可取消分享。")
@@ -1692,7 +1901,7 @@ struct PlanGroupEditorSheet: View {
         }
         .background(Theme.Color.bg.ignoresSafeArea())
         .presentationBackground(Theme.Color.bg)
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
     }
 
     private func save() {
@@ -1821,9 +2030,31 @@ struct PlanMoveGroupSheet: View {
 
 // MARK: - 单个动作项的建议参数编辑（保留原 Form，sheet 内）
 
+private enum PlanItemEditorField: Equatable {
+    case workingGroupCount
+    case workingReps
+    case workingWeight
+    case dropOuterGroupCount
+    case dropChildGroupCount
+    case dropSegmentWeight(UUID)
+    case dropSegmentReps(UUID)
+
+    var allowsDecimal: Bool {
+        switch self {
+        case .workingWeight, .dropSegmentWeight:
+            return true
+        case .workingGroupCount, .workingReps, .dropOuterGroupCount, .dropChildGroupCount, .dropSegmentReps:
+            return false
+        }
+    }
+}
+
 struct PlanItemEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var prescriptions: [EditablePlanPrescription]
+    @State private var focusedField: PlanItemEditorField?
+    @State private var replaceOnInput = false
+    @State private var dropOuterGroupCountText: String
     private let original: PlanItem
     let onSave: (PlanItem) -> Void
 
@@ -1832,12 +2063,13 @@ struct PlanItemEditorView: View {
         self.original = item
         self.onSave = onSave
         _prescriptions = State(initialValue: item.manualSetPrescriptionsForEditing().map(EditablePlanPrescription.init))
+        _dropOuterGroupCountText = State(initialValue: "\(max(1, item.suggestedSets ?? 1))")
     }
 
     var body: some View {
         VStack(spacing: 0) {
             PaperSheetHeader(
-                title: "编辑动作",
+                title: original.isDropSet ? "编辑递减组" : "编辑动作",
                 cancelTitle: "取消",
                 confirmTitle: "完成",
                 background: Theme.Color.bg,
@@ -1847,280 +2079,450 @@ struct PlanItemEditorView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    Text(original.displayExerciseName)
-                        .font(Theme.Font.l1)
-                        .foregroundStyle(Theme.Color.fg)
+                    editorTitle
                     prescriptionEditor
-                    Color.clear.frame(height: 18)
+                    Color.clear.frame(height: focusedField == nil ? 18 : 250)
                 }
                 .padding(Theme.Spacing.lg)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .background(Theme.Color.bg)
+            if focusedField != nil {
+                NumericFormKeypad(decimalEnabled: focusedField?.allowsDecimal == true,
+                                  onDigit: keypadDigit,
+                                  onDot: keypadDot,
+                                  onBackspace: keypadBackspace,
+                                  onPrev: focusPreviousField,
+                                  onNext: focusNextField,
+                                  onDone: { focusedField = nil })
+            }
         }
         .background(Theme.Color.bg.ignoresSafeArea())
         .presentationBackground(Theme.Color.bg)
         .presentationDetents([.large])
+        .animation(.spring(response: 0.32, dampingFraction: 0.88), value: focusedField)
+    }
+
+    private var editorTitle: some View {
+        VStack(alignment: .leading, spacing: original.isDropSet ? 8 : 0) {
+            Text(original.displayExerciseName)
+                .font(Theme.Font.l1)
+                .foregroundStyle(Theme.Color.fg)
+            if original.isDropSet {
+                HStack(spacing: 6) {
+                    WorkoutStructureIcon(kind: .dropSet)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
     }
 
     private func save() {
         var updated = original
-        let models = prescriptions.enumerated().map { idx, draft in
-            draft.model(orderIndex: idx)
+        if original.isDropSet {
+            updated.suggestedSets = dropOuterGroupCount
+            updated.applyManualSetPrescriptions(dropSetModels)
+        } else {
+            updated.applyManualSetPrescriptions(workingModels)
         }
-        updated.applyManualSetPrescriptions(models)
         onSave(updated)
         dismiss()
     }
 
     private var prescriptionEditor: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            HStack {
-                Text("组处方").eyebrowStyle()
-                Spacer(minLength: 8)
-                Text("\(prescriptions.count) 组")
-                    .font(Theme.Font.mono(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
-            }
+            original.isDropSet ? AnyView(dropSetPrescriptionCard) : AnyView(workingPrescriptionCard)
+        }
+    }
 
-            VStack(spacing: 8) {
-                ForEach(Array(prescriptions.enumerated()), id: \.element.id) { index, _ in
-                    prescriptionCard(index)
+    private var workingGroupCount: Int {
+        max(1, prescriptions.count)
+    }
+
+    private var dropOuterGroupCount: Int {
+        max(1, Int(dropOuterGroupCountText) ?? 1)
+    }
+
+    private var dropChildGroupCount: Int {
+        max(1, prescriptions.first?.segments.count ?? 1)
+    }
+
+    private var workingModels: [PlanSetPrescription] {
+        let source = prescriptions.first ?? .working(weight: "", reps: "\(PlanDefaults.suggestedReps)")
+        return (0..<workingGroupCount).map { index in
+            let prescription = prescriptions.indices.contains(index) ? prescriptions[index] : source
+            return EditablePlanPrescription.working(id: prescriptions.indices.contains(index) ? prescriptions[index].id : UUID(),
+                                             weight: prescription.weight,
+                                             reps: prescription.reps,
+                                             isWarmup: prescription.isWarmup)
+                .model(orderIndex: index)
+        }
+    }
+
+    private var dropSetModels: [PlanSetPrescription] {
+        var draft = prescriptions.first ?? .drop(firstWeight: "", firstReps: "\(PlanDefaults.suggestedReps)")
+        draft.isWarmup = false
+        return [draft.model(orderIndex: 0)]
+    }
+
+    private var workingWeightBinding: Binding<String> {
+        Binding(
+            get: { prescriptions.first?.weight ?? "" },
+            set: { setWorkingWeight($0) }
+        )
+    }
+
+    private var workingRepsBinding: Binding<String> {
+        Binding(
+            get: { prescriptions.first?.reps ?? "\(PlanDefaults.suggestedReps)" },
+            set: { setWorkingReps($0) }
+        )
+    }
+
+    private var workingPrescriptionCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            workingGroupCountRow
+            Rectangle().fill(Theme.Color.border).frame(height: 1)
+            HStack(spacing: 8) {
+                valueField(title: "重量（可选）", placeholder: "kg", text: workingWeightBinding.wrappedValue, focused: focusedField == .workingWeight) {
+                    focus(.workingWeight)
+                }
+                valueField(title: "次数", placeholder: "次", text: workingRepsBinding.wrappedValue, focused: focusedField == .workingReps) {
+                    focus(.workingReps)
                 }
             }
+        }
+        .cardStyle(padding: 12, cornerRadius: Theme.Radius.md)
+    }
 
-            HStack(spacing: 10) {
-                addPrescriptionButton(title: "加一组", systemImage: "plus") {
-                    addWorkingPrescription()
-                }
-                addPrescriptionButton(title: "递减组", systemImage: "square.stack.3d.down.forward") {
-                    addDropPrescription()
-                }
+    private var workingGroupCountRow: some View {
+        HStack(spacing: 12) {
+            Text("组数")
+                .font(Theme.Font.body(size: 13, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+                .frame(width: 44, alignment: .leading)
+            valuePill(text: "\(workingGroupCount)",
+                      placeholder: "组",
+                      focused: focusedField == .workingGroupCount,
+                      width: nil) {
+                focus(.workingGroupCount)
             }
         }
     }
 
-    @ViewBuilder
-    private func prescriptionCard(_ index: Int) -> some View {
-        if prescriptions.indices.contains(index) {
-            let draft = prescriptions[index]
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    Text("\(index + 1)")
-                        .font(Theme.Font.mono(size: 12, weight: .bold))
-                        .foregroundStyle(Theme.Color.muted)
-                        .frame(width: 22, alignment: .leading)
-                    Text(draft.setType == .drop ? "递减组" : "普通组")
-                        .font(Theme.Font.body(size: 13, weight: .bold))
-                        .foregroundStyle(draft.setType == .drop ? Theme.Color.accent : Theme.Color.fg)
-                    if draft.setType == .drop {
-                        Text("\(draft.segments.count)组")
-                            .font(Theme.Font.mono(size: 10.5, weight: .semibold))
-                            .foregroundStyle(Theme.Color.accent)
-                            .padding(.horizontal, 7)
-                            .frame(height: 22)
-                            .background(Theme.Color.accentSoft, in: Capsule())
-                            .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1))
-                    }
-                    Spacer(minLength: 8)
-                    Button {
-                        toggleType(at: index)
-                    } label: {
-                        Text(draft.setType == .drop ? "普通组" : "递减组")
-                            .font(Theme.Font.body(size: 11.5, weight: .semibold))
-                            .foregroundStyle(Theme.Color.fg2)
-                            .padding(.horizontal, 9)
-                            .frame(height: 28)
-                            .overlay(
-                                Capsule().stroke(Theme.Color.border2, lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("将第 \(index + 1) 组改为\(draft.setType == .drop ? "普通组" : "递减组")")
-                    if prescriptions.count > 1 {
-                        Button {
-                            deletePrescription(at: index)
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Theme.Color.muted)
-                                .frame(width: 34, height: 34)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("删除第 \(index + 1) 组")
-                    }
-                }
-
-                if draft.setType == .drop {
-                    dropFields(index)
-                } else {
-                    workingFields(index)
-                }
+    private var dropSetPrescriptionCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            dropOuterGroupCountRow
+            Rectangle().fill(Theme.Color.border).frame(height: 1)
+            ForEach(Array(dropSegments.enumerated()), id: \.element.id) { index, segment in
+                dropSegmentRow(segment, index: index)
             }
-            .cardStyle(padding: 11, cornerRadius: Theme.Radius.md)
+            addDropSegmentButton
         }
+        .cardStyle(padding: 12, cornerRadius: Theme.Radius.md)
     }
 
-    private func workingFields(_ index: Int) -> some View {
-        HStack(spacing: 8) {
-            valueField(title: "重量", placeholder: "kg", text: binding(index, \.weight), keyboard: .decimalPad)
-            Text("×")
-                .font(Theme.Font.mono(size: 12, weight: .semibold))
-                .foregroundStyle(Theme.Color.muted)
-                .padding(.top, 18)
-            valueField(title: "次数", placeholder: "次", text: binding(index, \.reps), keyboard: .numberPad)
-        }
-    }
-
-    private func dropFields(_ index: Int) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(Array(prescriptions[index].segments.enumerated()), id: \.element.id) { segmentIndex, _ in
-                dropSegmentRow(prescriptionIndex: index, segmentIndex: segmentIndex)
-            }
-            Button {
-                addSegment(to: index)
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "plus").font(.system(size: 10, weight: .bold))
-                    Text("添加")
-                        .font(Theme.Font.body(size: 11.5, weight: .semibold))
-                }
-                .foregroundStyle(Theme.Color.muted)
-                .padding(.horizontal, 10)
-                .frame(height: 30)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                        .stroke(Theme.Color.border, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                )
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, 28)
-            .accessibilityLabel("为第 \(index + 1) 个递减组添加一组")
-        }
-        .padding(.leading, 6)
-    }
-
-    private func dropSegmentRow(prescriptionIndex: Int, segmentIndex: Int) -> some View {
-        HStack(spacing: 8) {
-            Text("\(segmentIndex + 1)")
-                .font(Theme.Font.mono(size: 11, weight: .bold))
-                .foregroundStyle(Theme.Color.muted)
-                .frame(width: 20, alignment: .leading)
-            valueField(title: "重量", placeholder: "kg",
-                       text: segmentBinding(prescriptionIndex, segmentIndex, \.weight),
-                       keyboard: .decimalPad)
-            Text("×")
-                .font(Theme.Font.mono(size: 12, weight: .semibold))
-                .foregroundStyle(Theme.Color.muted)
-                .padding(.top, 18)
-            valueField(title: "次数", placeholder: "次",
-                       text: segmentBinding(prescriptionIndex, segmentIndex, \.reps),
-                       keyboard: .numberPad)
-            if prescriptions[prescriptionIndex].segments.count > 1 {
-                Button {
-                    deleteSegment(prescriptionIndex: prescriptionIndex, segmentIndex: segmentIndex)
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.Color.muted)
-                        .frame(width: 32, height: 32)
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 18)
-                .accessibilityLabel("删除第 \(prescriptionIndex + 1) 个递减组内第 \(segmentIndex + 1) 组")
+    private var dropOuterGroupCountRow: some View {
+        HStack(spacing: 12) {
+            Text("组数")
+                .font(Theme.Font.body(size: 13, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+                .frame(width: 44, alignment: .leading)
+            valuePill(text: dropOuterGroupCountText,
+                      placeholder: "组",
+                      focused: focusedField == .dropOuterGroupCount,
+                      width: nil) {
+                focus(.dropOuterGroupCount)
             }
         }
     }
 
-    private func valueField(title: String, placeholder: String, text: Binding<String>, keyboard: UIKeyboardType) -> some View {
+    private var dropSegments: [EditablePlanSegment] {
+        prescriptions.first?.segments ?? []
+    }
+
+    private func countField(title: String, text: String, focused: Bool, onTap: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(Theme.Font.mono(size: 9, weight: .semibold))
                 .foregroundStyle(Theme.Color.muted)
-            TextField(placeholder, text: text)
-                .keyboardType(keyboard)
-                .font(Theme.Font.number(size: 14, weight: .bold))
-                .foregroundStyle(Theme.Color.fg)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 8)
-                .frame(height: 34)
-                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                        .stroke(Theme.Color.border, lineWidth: 1)
-                )
+            valuePill(text: text, placeholder: "组", focused: focused, width: nil, onTap: onTap)
         }
     }
 
-    private func addPrescriptionButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: systemImage).font(.system(size: 12, weight: .bold))
-                Text(title).font(Theme.Font.body(size: 12.5, weight: .semibold))
+    private var addDropSegmentButton: some View {
+        Button {
+            setDropChildGroupCount(dropChildGroupCount + 1)
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .bold))
+                Text("添加子组")
+                    .font(Theme.Font.body(size: 11.5, weight: .semibold))
             }
-            .foregroundStyle(Theme.Color.fg2)
+            .foregroundStyle(Theme.Color.accent)
             .frame(maxWidth: .infinity)
-            .frame(height: 40)
+            .frame(height: 32)
+            .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                    .stroke(Theme.Color.fg2, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    .stroke(Theme.Color.accentSofter, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("添加递减组内子组")
     }
 
-    private func binding(_ index: Int, _ keyPath: WritableKeyPath<EditablePlanPrescription, String>) -> Binding<String> {
-        Binding(
-            get: { prescriptions[index][keyPath: keyPath] },
-            set: { prescriptions[index][keyPath: keyPath] = $0 }
-        )
+    private func dropSegmentRow(_ segment: EditablePlanSegment, index: Int) -> some View {
+        HStack(spacing: 8) {
+            Text("\(index + 1)")
+                .font(Theme.Font.mono(size: 11, weight: .bold))
+                .foregroundStyle(Theme.Color.muted)
+                .frame(width: 18, alignment: .leading)
+            valueField(title: "重量", placeholder: "kg",
+                       text: segment.weight,
+                       focused: focusedField == .dropSegmentWeight(segment.id)) {
+                focus(.dropSegmentWeight(segment.id))
+            }
+            Text("×")
+                .font(Theme.Font.mono(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.top, 16)
+            valueField(title: "次数", placeholder: "次",
+                       text: segment.reps,
+                       focused: focusedField == .dropSegmentReps(segment.id)) {
+                focus(.dropSegmentReps(segment.id))
+            }
+        }
     }
 
-    private func segmentBinding(_ prescriptionIndex: Int,
-                                _ segmentIndex: Int,
-                                _ keyPath: WritableKeyPath<EditablePlanSegment, String>) -> Binding<String> {
-        Binding(
-            get: { prescriptions[prescriptionIndex].segments[segmentIndex][keyPath: keyPath] },
-            set: { prescriptions[prescriptionIndex].segments[segmentIndex][keyPath: keyPath] = $0 }
-        )
+    private func valueField(title: String, placeholder: String, text: String, focused: Bool, onTap: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(Theme.Font.mono(size: 9, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+            valuePill(text: text, placeholder: placeholder, focused: focused, width: nil, onTap: onTap)
+        }
     }
 
-    private func addWorkingPrescription() {
-        let source = prescriptions.last?.representativeText ?? (weight: "", reps: "\(PlanDefaults.suggestedReps)")
-        prescriptions.append(.working(weight: source.weight, reps: source.reps))
+    private func valuePill(text: String, placeholder: String, focused: Bool, width: CGFloat?, onTap: @escaping () -> Void) -> some View {
+        let display = text.isEmpty ? placeholder : text
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+        return Button(action: onTap) {
+            Text(display)
+                .font(Theme.Font.number(size: 14, weight: .bold))
+                .foregroundStyle(text.isEmpty ? Theme.Color.muted.opacity(0.45) : Theme.Color.fg)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity)
+                .frame(height: 30)
+                .padding(.horizontal, 7)
+                .background(Theme.Color.surface, in: shape)
+                .overlay(
+                    shape.stroke(focused ? Theme.Color.accent : Theme.Color.border,
+                                 lineWidth: focused ? 1.7 : 1)
+                )
+                .frame(width: width)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(display)
     }
 
-    private func addDropPrescription() {
-        let source = prescriptions.last?.representativeText ?? (weight: "", reps: "\(PlanDefaults.suggestedReps)")
-        prescriptions.append(.drop(firstWeight: source.weight, firstReps: source.reps))
+    @ViewBuilder
+    private func warmupButton(for index: Int) -> some View {
+        if prescriptions.indices.contains(index) {
+            let isWarmup = prescriptions[index].isWarmup
+            Button {
+                prescriptions[index].isWarmup.toggle()
+            } label: {
+                Label("热身", systemImage: isWarmup ? "flame.fill" : "flame")
+                    .font(Theme.Font.body(size: 11.5, weight: .semibold))
+                    .foregroundStyle(isWarmup ? Theme.Color.accent : Theme.Color.fg2)
+                    .padding(.horizontal, 9)
+                    .frame(height: 28)
+                    .overlay(Capsule().stroke(Theme.Color.border2, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isWarmup ? "取消热身组" : "标记为热身组")
+        }
     }
 
-    private func deletePrescription(at index: Int) {
-        prescriptions.remove(at: index)
+    private func ensureWorkingPrescription() {
         if prescriptions.isEmpty {
             prescriptions.append(.working(weight: "", reps: "\(PlanDefaults.suggestedReps)"))
         }
-    }
-
-    private func toggleType(at index: Int) {
-        if prescriptions[index].setType == .drop {
-            let source = prescriptions[index].representativeText
-            prescriptions[index] = .working(id: prescriptions[index].id, weight: source.weight, reps: source.reps)
-        } else {
-            prescriptions[index] = .drop(id: prescriptions[index].id,
-                                         firstWeight: prescriptions[index].weight,
-                                         firstReps: prescriptions[index].reps)
+        for index in prescriptions.indices {
+            prescriptions[index].setType = .working
+            prescriptions[index].segments = []
         }
     }
 
-    private func addSegment(to index: Int) {
-        prescriptions[index].segments.append(EditablePlanSegment(weight: "", reps: ""))
+    private func setWorkingWeight(_ value: String) {
+        ensureWorkingPrescription()
+        for index in prescriptions.indices {
+            prescriptions[index].weight = value
+        }
     }
 
-    private func deleteSegment(prescriptionIndex: Int, segmentIndex: Int) {
-        prescriptions[prescriptionIndex].segments.remove(at: segmentIndex)
-        if prescriptions[prescriptionIndex].segments.isEmpty {
-            prescriptions[prescriptionIndex].segments.append(EditablePlanSegment(weight: "", reps: ""))
+    private func setWorkingReps(_ value: String) {
+        ensureWorkingPrescription()
+        for index in prescriptions.indices {
+            prescriptions[index].reps = value
+        }
+    }
+
+    private func setWorkingGroupCount(_ count: Int) {
+        ensureWorkingPrescription()
+        let target = max(1, count)
+        let source = prescriptions.first?.representativeText ?? (weight: "", reps: "\(PlanDefaults.suggestedReps)")
+        if prescriptions.count < target {
+            while prescriptions.count < target {
+                prescriptions.append(.working(weight: source.weight, reps: source.reps, isWarmup: false))
+            }
+        } else if prescriptions.count > target {
+            prescriptions.removeLast(prescriptions.count - target)
+        }
+    }
+
+    private func ensureDropPrescription() {
+        if prescriptions.isEmpty {
+            prescriptions.append(.drop(firstWeight: "", firstReps: "\(PlanDefaults.suggestedReps)"))
+        }
+        prescriptions[0].setType = .drop
+        if prescriptions[0].segments.isEmpty {
+            prescriptions[0].segments = [
+                EditablePlanSegment(weight: "", reps: "\(PlanDefaults.suggestedReps)"),
+                EditablePlanSegment(weight: "", reps: "")
+            ]
+        }
+        if prescriptions.count > 1 {
+            prescriptions.removeLast(prescriptions.count - 1)
+        }
+    }
+
+    private func setDropChildGroupCount(_ count: Int) {
+        ensureDropPrescription()
+        let target = max(1, count)
+        if prescriptions[0].segments.count < target {
+            while prescriptions[0].segments.count < target {
+                prescriptions[0].segments.append(EditablePlanSegment(weight: "", reps: ""))
+            }
+        } else if prescriptions[0].segments.count > target {
+            prescriptions[0].segments.removeLast(prescriptions[0].segments.count - target)
+        }
+    }
+
+    private func setDropOuterGroupCount(_ count: Int) {
+        let target = max(1, count)
+        dropOuterGroupCountText = "\(target)"
+    }
+
+    private func setDropSegmentWeight(_ value: String, segmentId: UUID) {
+        ensureDropPrescription()
+        guard let index = prescriptions[0].segments.firstIndex(where: { $0.id == segmentId }) else { return }
+        prescriptions[0].segments[index].weight = value
+    }
+
+    private func setDropSegmentReps(_ value: String, segmentId: UUID) {
+        ensureDropPrescription()
+        guard let index = prescriptions[0].segments.firstIndex(where: { $0.id == segmentId }) else { return }
+        prescriptions[0].segments[index].reps = value
+    }
+
+    private func focus(_ field: PlanItemEditorField) {
+        focusedField = field
+        replaceOnInput = true
+    }
+
+    private var focusSequence: [PlanItemEditorField] {
+        if original.isDropSet {
+            return [.dropOuterGroupCount] + dropSegments.flatMap {
+                [PlanItemEditorField.dropSegmentWeight($0.id), .dropSegmentReps($0.id)]
+            }
+        }
+        return [.workingGroupCount, .workingWeight, .workingReps]
+    }
+
+    private func focusPreviousField() {
+        guard !focusSequence.isEmpty else { return }
+        guard let focusedField, let index = focusSequence.firstIndex(of: focusedField) else {
+            focus(focusSequence[0])
+            return
+        }
+        focus(focusSequence[(index - 1 + focusSequence.count) % focusSequence.count])
+    }
+
+    private func focusNextField() {
+        guard !focusSequence.isEmpty else { return }
+        guard let focusedField, let index = focusSequence.firstIndex(of: focusedField) else {
+            focus(focusSequence[0])
+            return
+        }
+        focus(focusSequence[(index + 1) % focusSequence.count])
+    }
+
+    private func keypadDigit(_ digit: Int) {
+        guard let field = focusedField else { return }
+        let prefix = replaceOnInput ? "" : text(for: field)
+        setText(prefix + "\(digit)", for: field)
+        replaceOnInput = false
+    }
+
+    private func keypadDot() {
+        guard let field = focusedField, field.allowsDecimal else { return }
+        let current = replaceOnInput ? "" : text(for: field)
+        guard !current.contains(".") else { return }
+        setText(current.isEmpty ? "0." : current + ".", for: field)
+        replaceOnInput = false
+    }
+
+    private func keypadBackspace() {
+        guard let field = focusedField else { return }
+        var current = text(for: field)
+        if replaceOnInput {
+            current = ""
+        } else if !current.isEmpty {
+            current.removeLast()
+        }
+        setText(current, for: field)
+        replaceOnInput = false
+    }
+
+    private func text(for field: PlanItemEditorField) -> String {
+        switch field {
+        case .workingGroupCount:
+            return "\(workingGroupCount)"
+        case .workingReps:
+            return workingRepsBinding.wrappedValue
+        case .workingWeight:
+            return workingWeightBinding.wrappedValue
+        case .dropOuterGroupCount:
+            return dropOuterGroupCountText
+        case .dropChildGroupCount:
+            return "\(dropChildGroupCount)"
+        case .dropSegmentWeight(let id):
+            return dropSegments.first(where: { $0.id == id })?.weight ?? ""
+        case .dropSegmentReps(let id):
+            return dropSegments.first(where: { $0.id == id })?.reps ?? ""
+        }
+    }
+
+    private func setText(_ value: String, for field: PlanItemEditorField) {
+        switch field {
+        case .workingGroupCount:
+            setWorkingGroupCount(intValue(value) ?? 1)
+        case .workingReps:
+            setWorkingReps(value)
+        case .workingWeight:
+            setWorkingWeight(value)
+        case .dropOuterGroupCount:
+            setDropOuterGroupCount(intValue(value) ?? 1)
+        case .dropChildGroupCount:
+            setDropChildGroupCount(intValue(value) ?? 1)
+        case .dropSegmentWeight(let id):
+            setDropSegmentWeight(value, segmentId: id)
+        case .dropSegmentReps(let id):
+            setDropSegmentReps(value, segmentId: id)
         }
     }
 }
@@ -2130,6 +2532,7 @@ private struct EditablePlanPrescription: Identifiable, Hashable {
     var setType: WorkoutSetType
     var weight: String
     var reps: String
+    var isWarmup: Bool
     var segments: [EditablePlanSegment]
 
     init(_ prescription: PlanSetPrescription) {
@@ -2137,6 +2540,7 @@ private struct EditablePlanPrescription: Identifiable, Hashable {
         setType = prescription.setType == .drop ? .drop : .working
         weight = prescription.weightKg.map { $0 == $0.rounded() ? String(Int($0)) : String($0) } ?? ""
         reps = prescription.reps.map(String.init) ?? ""
+        isWarmup = prescription.isWarmupEffective
         segments = prescription.segments
             .sorted { $0.segmentIndex < $1.segmentIndex }
             .map { segment in
@@ -2149,8 +2553,8 @@ private struct EditablePlanPrescription: Identifiable, Hashable {
         }
     }
 
-    static func working(id: UUID = UUID(), weight: String, reps: String) -> EditablePlanPrescription {
-        EditablePlanPrescription(id: id, setType: .working, weight: weight, reps: reps, segments: [])
+    static func working(id: UUID = UUID(), weight: String, reps: String, isWarmup: Bool = false) -> EditablePlanPrescription {
+        EditablePlanPrescription(id: id, setType: .working, weight: weight, reps: reps, isWarmup: isWarmup, segments: [])
     }
 
     static func drop(id: UUID = UUID(), firstWeight: String, firstReps: String) -> EditablePlanPrescription {
@@ -2158,15 +2562,17 @@ private struct EditablePlanPrescription: Identifiable, Hashable {
                                  setType: .drop,
                                  weight: "",
                                  reps: "",
+                                 isWarmup: false,
                                  segments: [EditablePlanSegment(weight: firstWeight, reps: firstReps),
                                             EditablePlanSegment(weight: "", reps: "")])
     }
 
-    private init(id: UUID, setType: WorkoutSetType, weight: String, reps: String, segments: [EditablePlanSegment]) {
+    private init(id: UUID, setType: WorkoutSetType, weight: String, reps: String, isWarmup: Bool, segments: [EditablePlanSegment]) {
         self.id = id
         self.setType = setType
         self.weight = weight
         self.reps = reps
+        self.isWarmup = isWarmup
         self.segments = segments
     }
 
@@ -2189,13 +2595,15 @@ private struct EditablePlanPrescription: Identifiable, Hashable {
             return PlanSetPrescription(prescriptionId: id,
                                        setType: .drop,
                                        orderIndex: orderIndex,
+                                       isWarmup: isWarmup,
                                        segments: modelSegments)
         }
         return PlanSetPrescription(prescriptionId: id,
                                    setType: .working,
                                    orderIndex: orderIndex,
                                    weightKg: decimalValue(weight),
-                                   reps: intValue(reps))
+                                   reps: intValue(reps),
+                                   isWarmup: isWarmup)
     }
 }
 

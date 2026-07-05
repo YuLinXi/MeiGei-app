@@ -19,6 +19,7 @@ struct SetSnapshot: Equatable, Hashable {
     var weightKg: Double?
     var reps: Int?
     var setTypeRaw: String = WorkoutSetType.working.rawValue
+    var isWarmup: Bool = false
     var segments: [WorkoutSetSegment] = []
 }
 
@@ -56,6 +57,7 @@ struct WorkoutRowSummary: Identifiable, Equatable, Hashable {
 struct HomeWorkoutSnapshot: Equatable {
     var currentWeekStats: WeeklyStats
     var weekWorkouts: [WorkoutRowSummary]
+    var weekTrainingDays: [WeekTrainingDayStatus]
     var recentPlanIds: Set<UUID>
     var activePlanId: UUID?
     var prByWorkoutId: [UUID: PRBadge]
@@ -63,6 +65,7 @@ struct HomeWorkoutSnapshot: Equatable {
     static let empty = HomeWorkoutSnapshot(
         currentWeekStats: .empty,
         weekWorkouts: [],
+        weekTrainingDays: WorkoutWeeklyStats.dayStatuses(workouts: [], reference: .now, calendar: .currentMondayFirst),
         recentPlanIds: [],
         activePlanId: nil,
         prByWorkoutId: [:]
@@ -141,6 +144,10 @@ struct PlanUsageSummary: Equatable, Hashable {
 struct LatestExercisePerformance: Equatable {
     var date: Date
     var sets: [SetSnapshot]
+
+    func matches(_ item: PlanItem) -> Bool {
+        sets.contains { $0.setTypeRaw == WorkoutSetType.drop.rawValue } == item.isDropSet
+    }
 }
 
 struct PlanWorkoutCompletionSnapshot: Equatable {
@@ -161,12 +168,15 @@ struct PlanHistoryLookup: Equatable {
     )
 
     func latestSets(for item: PlanItem) -> [SetSnapshot] {
-        if let exact = latestByPlanItemId[item.itemId] { return exact.sets }
-        return latestByHistoryKey[item.historyKey]?.sets ?? []
+        if let exact = latestByPlanItemId[item.itemId], exact.matches(item) { return exact.sets }
+        if let fallback = latestByHistoryKey[item.historyKey], fallback.matches(item) { return fallback.sets }
+        return []
     }
 
     func latestDate(for item: PlanItem) -> Date? {
-        latestByPlanItemId[item.itemId]?.date ?? latestByHistoryKey[item.historyKey]?.date
+        if let exact = latestByPlanItemId[item.itemId], exact.matches(item) { return exact.date }
+        if let fallback = latestByHistoryKey[item.historyKey], fallback.matches(item) { return fallback.date }
+        return nil
     }
 
     func keptDate(for item: PlanItem, planId: UUID?) -> Date? {
@@ -443,7 +453,7 @@ final class WorkoutHistoryStore {
         for w in workouts {
             if w.syncStatus != .synced { pendingCount += 1 }
             exerciseCount += w.exercises.count
-            for ex in w.exercises { setCount += ex.sets.count }
+            setCount += w.completedStatEntryCount
         }
 
         var prByWorkoutId: [UUID: PRBadge] = [:]
@@ -566,7 +576,7 @@ final class WorkoutHistoryStore {
                 startedAt: w.startedAt,
                 durationSec: duration,
                 exerciseCount: w.exercises.count,
-                setCount: w.exercises.flatMap(\.sets).filter(\.countsForStats).count,
+                setCount: w.completedStatEntryCount,
                 volumeKg: volume,
                 pr: prByWorkoutId[w.localId]
             )
@@ -594,6 +604,11 @@ final class WorkoutHistoryStore {
                 calendar: .currentMondayFirst
             ),
             weekWorkouts: Array(weekWorkouts),
+            weekTrainingDays: WorkoutWeeklyStats.dayStatuses(
+                workouts: finishedDesc,
+                reference: now,
+                calendar: .currentMondayFirst
+            ),
             recentPlanIds: recentPlanIds,
             activePlanId: activePlanId,
             prByWorkoutId: prByWorkoutId
@@ -698,6 +713,7 @@ extension PlanHistoryLookup {
                     return SetSnapshot(weightKg: summary.weightKg,
                                        reps: summary.reps,
                                        setTypeRaw: $0.setTypeRaw,
+                                       isWarmup: $0.isWarmupEffective,
                                        segments: $0.segments)
                 }
 

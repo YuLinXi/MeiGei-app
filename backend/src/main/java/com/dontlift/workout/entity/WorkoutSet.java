@@ -34,8 +34,11 @@ public class WorkoutSet {
     /** 该组休息完成后的真实秒数；旧数据可为空。 */
     private Integer actualRestSeconds;
 
-    /** 组类型（"working"/"warmup"）。WorkoutTree 内嵌实体，随 Jackson 自动序列化；DB 列默认 'working'。 */
+    /** 组结构类型（"working"/"drop"）。旧 "warmup" 上传会在同步服务里兼容转为 isWarmup。 */
     private String setType;
+
+    /** 热身标记，独立于结构类型。 */
+    private Boolean isWarmup;
 
     /**
      * 递减组分段 jsonb 字符串。普通组/热身组为空数组。
