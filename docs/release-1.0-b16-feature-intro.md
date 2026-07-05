@@ -2,7 +2,7 @@
 
 > 适用版本：`1.0 (build 16)`
 > 后端状态：已部署。2026-07-05 23:13 CST 通过 `./backend/deploy/release-update.sh` 部署到生产，Flyway 最新为 `V18 workout set is warmup success=true`，部署前 DB 备份为 `./backups/dontlift_2026-07-05_231315.sql.gz`。
-> iOS 状态：已准备上传 TestFlight，尚未上传。
+> iOS 状态：TestFlight `1.0 (16)` 已发布，2026-07-05 23:33 CST 由用户确认。
 
 ## 一句话摘要
 
@@ -38,7 +38,7 @@
 - V17/V18 对旧客户端兼容：旧 workout 没有 `units` 时按普通动作列表展示；旧 warmup raw 值由服务端和新客户端兼容迁移。
 - 未升级 iOS 用户不会看到超级组、新训练单元入口和 kcal 估算；旧客户端继续可记录普通训练，但无法表达 build 16 的新结构。
 - build 16 的 kcal 估算是设备本地辅助信息，不影响旧客户端、后端接口或 HealthKit。
-- TestFlight 未上传前不要创建 `v1.0-b16` tag；后端部署完成且 TestFlight 可安装后再打 tag。
+- TestFlight `1.0 (16)` 已发布，后端也已部署到 `V18`，可以创建并推送 `v1.0-b16` tag。
 
 ## 已完成验证
 
@@ -52,6 +52,7 @@
 - 生产 health 已确认：`curl -fsS https://dontlift.peipadada.com/actuator/health` 返回 `{"status":"UP","groups":["liveness","readiness"]}`。
 - 生产 dev token 已确认关闭：`POST https://dontlift.peipadada.com/auth/dev/token` 返回 `404`。
 - 生产 Flyway 已确认最新为 `18  workout set is warmup  success=true`，并包含 `17  workout units  success=true`。
+- TestFlight `1.0 (16)` 已发布，2026-07-05 23:33 CST 由用户确认。
 
 ## TestFlight 回归重点
 

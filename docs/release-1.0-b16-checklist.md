@@ -2,16 +2,17 @@
 
 > 生成于 2026-07-05 23:01 CST，分支 `feature/v1.0-b16`。
 > 后端部署更新于 2026-07-05 23:22 CST。
+> TestFlight 状态更新于 2026-07-05 23:33 CST。
 > 本次发版功能介绍见 [`release-1.0-b16-feature-intro.md`](./release-1.0-b16-feature-intro.md)。
 
 ## 0. 本次发版摘要
 
 - 版本号：`MARKETING_VERSION = 1.0`，`CURRENT_PROJECT_VERSION = 16`。
 - 后端部署：已完成。生产 Flyway 最新为 `V18 workout set is warmup success=true`。
-- iOS 状态：准备上传 TestFlight，尚未上传。
+- iOS 状态：TestFlight `1.0 (16)` 已发布，用户已确认。
 - iOS 重点：超级组训练单元、递减组升格为独立训练单元、热身标记独立化、训练 kcal 本地估算、分享海报 kcal 强展示。
-- 发布顺序：后端已部署到 `V18` 并确认 health/Flyway；下一步上传 TestFlight `1.0 (16)`。
-- Tag 策略：后端部署完成、TestFlight `1.0 (16)` 处理完成并确认可安装后，再创建并推送 `v1.0-b16`。
+- 发布顺序：后端已部署到 `V18` 并确认 health/Flyway；TestFlight `1.0 (16)` 已发布。
+- Tag 策略：后端部署完成、TestFlight `1.0 (16)` 处理完成并确认可安装，允许创建并推送 `v1.0-b16`。
 
 ## 1. 已完成准备
 
@@ -28,7 +29,7 @@
 - [x] 生产 Flyway 当前最新记录已查询：`18  workout set is warmup  success=true`。
 - [x] 后端生产部署完成并确认 `V18` 迁移成功。
 - [x] 部署前生产 DB 备份完成：`./backups/dontlift_2026-07-05_231315.sql.gz`。
-- [ ] TestFlight `1.0 (16)` 上传完成并可安装。
+- [x] TestFlight `1.0 (16)` 上传完成并可安装，2026-07-05 23:33 CST 由用户确认。
 - [ ] TestFlight 真机主流程回归细节已补充到发版记录。
 - [ ] `feature/v1.0-b16` 已合并回 `main`。
 - [ ] `v1.0-b16` tag 已创建并推送。
