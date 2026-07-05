@@ -91,9 +91,16 @@ private struct PaperActionMenuAnchorReader: View {
 }
 
 /// 触发按钮 + 自绘纸感动作菜单。菜单用透明 `fullScreenCover` 承载，避免被 toolbar / TabBar 层级裁切。
+enum PaperActionMenuPlacement {
+    case automatic
+    case above
+    case below
+}
+
 struct PaperActionMenuButton<Label: View>: View {
     let items: [PaperMenuItem]
     var accessibilityLabel: String = "菜单"
+    var placement: PaperActionMenuPlacement = .automatic
     private let label: (Bool) -> Label
 
     @State private var isPresented = false
@@ -102,10 +109,12 @@ struct PaperActionMenuButton<Label: View>: View {
     init(
         items: [PaperMenuItem],
         accessibilityLabel: String = "菜单",
+        placement: PaperActionMenuPlacement = .automatic,
         @ViewBuilder label: @escaping (Bool) -> Label
     ) {
         self.items = items
         self.accessibilityLabel = accessibilityLabel
+        self.placement = placement
         self.label = label
     }
 
@@ -123,7 +132,8 @@ struct PaperActionMenuButton<Label: View>: View {
         .fullScreenCover(isPresented: $isPresented) {
             PaperActionMenuOverlay(isPresented: $isPresented,
                                    anchorFrame: anchorFrame,
-                                   items: items)
+                                   items: items,
+                                   placement: placement)
                 .ignoresSafeArea()
                 .presentationBackground(.clear)
                 .interactiveDismissDisabled()
@@ -137,6 +147,7 @@ private struct PaperActionMenuOverlay: View {
     @Binding var isPresented: Bool
     let anchorFrame: CGRect
     let items: [PaperMenuItem]
+    let placement: PaperActionMenuPlacement
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown = false
@@ -198,7 +209,15 @@ private struct PaperActionMenuOverlay: View {
         let maxY = container.height - safeArea.bottom - edgePadding - menuSize.height
         let belowY = anchorFrame.maxY + anchorGap
         let aboveY = anchorFrame.minY - anchorGap - menuSize.height
-        let proposedY = belowY <= maxY ? belowY : aboveY
+        let proposedY: CGFloat
+        switch placement {
+        case .automatic:
+            proposedY = belowY <= maxY ? belowY : aboveY
+        case .above:
+            proposedY = aboveY
+        case .below:
+            proposedY = belowY
+        }
         let y = min(max(proposedY, minY), max(minY, maxY))
 
         return CGPoint(x: x, y: y)

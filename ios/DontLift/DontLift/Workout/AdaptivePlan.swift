@@ -27,7 +27,12 @@ enum PlanPrefill {
             if $0.isSuperset {
                 return $0.supersetRounds <= 0 || $0.orderedSupersetMembers.contains { $0.suggestedReps == nil }
             }
-            if !$0.orderedSetPrescriptions.isEmpty { return false }
+            let prescriptions = startPrescriptions(for: $0)
+            if $0.isDropSet {
+                guard let drop = prescriptions.first else { return true }
+                return drop.segments.allSatisfy { $0.weightKg == nil && $0.reps == nil }
+            }
+            if !prescriptions.isEmpty { return false }
             return ($0.suggestedSets ?? 0) <= 0 || $0.suggestedReps == nil
         }
     }
@@ -43,9 +48,13 @@ enum PlanPrefill {
     }
 
     static func lastCompletedSnapshots(for item: PlanItem, in history: [Workout]) -> [SetSnapshot] {
-        let exact = lastCompletedSets(in: history) { $0.planItemId == item.itemId }
+        let exact = lastCompletedSets(in: history) {
+            $0.planItemId == item.itemId && matchesPlanUnitKind($0, item: item)
+        }
         if !exact.isEmpty { return exact }
-        return lastCompletedSnapshots(forHistoryKey: item.historyKey, in: history)
+        return lastCompletedSets(in: history) {
+            $0.planItemId == nil && $0.historyKey == item.historyKey && matchesPlanUnitKind($0, item: item)
+        }
     }
 
     static func lastCompletedSets(for item: PlanItem, in lookup: PlanHistoryLookup) -> [(weightKg: Double?, reps: Int?)] {
@@ -77,12 +86,17 @@ enum PlanPrefill {
                         return SetSnapshot(weightKg: summary.weightKg,
                                            reps: summary.reps,
                                            setTypeRaw: $0.setTypeRaw,
+                                           isWarmup: $0.isWarmupEffective,
                                            segments: $0.segments)
                     }
                 }
             }
         }
         return []
+    }
+
+    private static func matchesPlanUnitKind(_ exercise: WorkoutExercise, item: PlanItem) -> Bool {
+        exercise.sets.contains { $0.isDropSet } == item.isDropSet
     }
 
     /// 历史里某动作最近一次 completed 正式组所在训练日期；供计划详情展示来源说明。
@@ -112,7 +126,7 @@ enum PlanPrefill {
     static func sets(for item: PlanItem, mode: WorkoutPlanMode, history: [Workout]) -> [WorkoutSet] {
         guard !item.isSuperset else { return [] }
         if mode == .strict {
-            let prescriptions = item.orderedSetPrescriptions
+            let prescriptions = startPrescriptions(for: item)
             if !prescriptions.isEmpty { return sets(from: prescriptions) }
             guard let count = item.suggestedSets, count > 0, item.suggestedReps != nil else { return [] }
             return legacySets(for: item, count: count)
@@ -122,7 +136,7 @@ enum PlanPrefill {
             ? lastCompletedSnapshots(for: item, in: history)
             : []
         if !last.isEmpty { return sets(from: last) }
-        let prescriptions = item.orderedSetPrescriptions
+        let prescriptions = startPrescriptions(for: item)
         if !prescriptions.isEmpty { return sets(from: prescriptions) }
         let count = max(1, item.suggestedSets ?? PlanDefaults.suggestedSets)
         return legacySets(for: item, count: count)
@@ -131,7 +145,7 @@ enum PlanPrefill {
     static func sets(for item: PlanItem, mode: WorkoutPlanMode, lookup: PlanHistoryLookup) -> [WorkoutSet] {
         guard !item.isSuperset else { return [] }
         if mode == .strict {
-            let prescriptions = item.orderedSetPrescriptions
+            let prescriptions = startPrescriptions(for: item)
             if !prescriptions.isEmpty { return sets(from: prescriptions) }
             guard let count = item.suggestedSets, count > 0, item.suggestedReps != nil else { return [] }
             return legacySets(for: item, count: count)
@@ -139,10 +153,35 @@ enum PlanPrefill {
 
         let last = mode == .adaptive ? lastCompletedSnapshots(for: item, in: lookup) : []
         if !last.isEmpty { return sets(from: last) }
-        let prescriptions = item.orderedSetPrescriptions
+        let prescriptions = startPrescriptions(for: item)
         if !prescriptions.isEmpty { return sets(from: prescriptions) }
         let count = max(1, item.suggestedSets ?? PlanDefaults.suggestedSets)
         return legacySets(for: item, count: count)
+    }
+
+    private static func startPrescriptions(for item: PlanItem) -> [PlanSetPrescription] {
+        if item.isDropSet {
+            guard let template = item.dropSetPrescriptions.first else { return [] }
+            let count = max(1, item.suggestedSets ?? 1)
+            return (0..<count).map { index in
+                PlanSetPrescription(prescriptionId: index == 0 ? template.prescriptionId : UUID(),
+                                    setType: .drop,
+                                    orderIndex: index,
+                                    weightKg: template.weightKg,
+                                    reps: template.reps,
+                                    isWarmup: template.isWarmup,
+                                    segments: template.segments
+                                        .sorted { $0.segmentIndex < $1.segmentIndex }
+                                        .enumerated()
+                                        .map { segmentIndex, segment in
+                                            WorkoutSetSegment(segmentId: index == 0 ? segment.segmentId : UUID(),
+                                                              segmentIndex: segmentIndex,
+                                                              weightKg: segment.weightKg,
+                                                              reps: segment.reps)
+                                        })
+            }
+        }
+        return item.orderedSetPrescriptions.filter { $0.setType != .drop }
     }
 
     private static func legacySets(for item: PlanItem, count: Int) -> [WorkoutSet] {
@@ -159,6 +198,7 @@ enum PlanPrefill {
                               weightKg: prescription.weightKg,
                               reps: prescription.reps,
                               setType: type,
+                              isWarmup: prescription.isWarmup,
                               segments: type == .drop ? segments : [])
         }
     }
@@ -171,6 +211,7 @@ enum PlanPrefill {
                               weightKg: snapshot.weightKg,
                               reps: snapshot.reps,
                               setType: type,
+                              isWarmup: snapshot.isWarmup,
                               segments: type == .drop ? segments : [])
         }
     }
@@ -216,7 +257,11 @@ enum PlanWorkoutBuilder {
                                            planItemId: item.itemId)
             exercise.sets = PlanPrefill.sets(for: item, mode: mode, lookup: lookup)
             workout.exercises.append(exercise)
-            workout.appendSingleExerciseUnit(for: exercise)
+            if item.isDropSet {
+                workout.appendDropSetUnit(for: exercise)
+            } else {
+                workout.appendSingleExerciseUnit(for: exercise)
+            }
             exerciseOrder += 1
         }
         return workout
@@ -306,7 +351,7 @@ struct PlanPrescriptionPreview {
 
     var summaryText: String {
         guard !sets.isEmpty else { return "缺少组数/次数" }
-        let countText = "下次 \(sets.count) 组"
+        let countText = "下次 \(previewSetCount) 组"
         guard let representative = representativeSet else { return countText }
         let values = representative.summaryWeightReps
         let dropText = sets.contains(where: \.isDropSet) ? " · 含递减组" : ""
@@ -330,6 +375,12 @@ struct PlanPrescriptionPreview {
             return weighted.max { ($0.summaryWeightReps.weightKg ?? 0) < ($1.summaryWeightReps.weightKg ?? 0) }
         }
         return sets.first { $0.summaryWeightReps.reps != nil } ?? sets.first
+    }
+
+    private var previewSetCount: Int {
+        sets.reduce(0) { total, set in
+            total + (set.isDropSet ? max(1, set.effectiveSegments.count) : 1)
+        }
     }
 
     static func make(for item: PlanItem, mode: WorkoutPlanMode, history: [Workout], planId: UUID? = nil) -> PlanPrescriptionPreview {
@@ -423,7 +474,14 @@ enum PlanWriteback {
                 if let weight = member.suggestedWeightKg { parts.append("\(formatKg(weight)) kg") }
                 return parts.joined(separator: " · ")
             }.joined(separator: " / ")
-            return "超级组 · \(i.supersetRounds) 轮 · \(memberText)"
+            return "超级组 · \(i.supersetRounds) 组 · \(memberText)"
+        }
+        if i.isDropSet {
+            var parts: [String] = ["递减组"]
+            if let s = i.suggestedSets { parts.append("\(s) 组") }
+            if let r = i.suggestedReps { parts.append("\(r) 次") }
+            if let w = i.suggestedWeightKg { parts.append("\(formatKg(w)) kg") }
+            return parts.joined(separator: " · ")
         }
         var parts: [String] = []
         if let s = i.suggestedSets { parts.append("\(s) 组") }
@@ -449,6 +507,7 @@ enum PlanWriteback {
             }
             // 顶组：最大重量统计 entry（递减组展开到 segment，nil 重量当 0）。
             guard let top = working.flatMap(\.statEntries).max(by: { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }) else { continue }
+            let isDropSetUnit = workout.dropSetExerciseIds.contains(ex.localId) || working.contains(where: \.isDropSet)
             let setCount = working.count
 
             if let target = supersetMemberTarget(for: ex, in: items) {
@@ -469,10 +528,16 @@ enum PlanWriteback {
             }
 
             // 匹配：planItemId 精确优先；缺失/找不到时，仅在 historyKey 命中唯一项时 fallback。
-            let matchIdx = matchIndex(for: ex, in: items)
+            let matchIdx = matchIndex(for: ex, in: items, isDropSetUnit: isDropSetUnit)
             let existingPrescriptions = matchIdx.map { items[$0].orderedSetPrescriptions } ?? []
-            let prescriptions = working.enumerated().map { idx, set in
-                prescription(from: set, orderIndex: idx, existing: existingPrescriptions.indices.contains(idx) ? existingPrescriptions[idx] : nil)
+            let prescriptions: [PlanSetPrescription]
+            if isDropSetUnit, let dropSet = working.first(where: \.isDropSet) {
+                let existing = existingPrescriptions.first(where: { $0.setType == .drop })
+                prescriptions = [prescription(from: dropSet, orderIndex: 0, existing: existing)]
+            } else {
+                prescriptions = working.enumerated().map { idx, set in
+                    prescription(from: set, orderIndex: idx, existing: existingPrescriptions.indices.contains(idx) ? existingPrescriptions[idx] : nil)
+                }
             }
 
             if let idx = matchIdx {
@@ -489,7 +554,18 @@ enum PlanWriteback {
                                           oldText: before, newText: after))
                 }
             } else {
-                let newItem = PlanItem(itemId: UUID(),
+                let newItem: PlanItem
+                if isDropSetUnit, let drop = prescriptions.first(where: { $0.setType == .drop }) {
+                    newItem = PlanItem.dropSet(orderIndex: nextOrder,
+                                               builtinExerciseCode: ex.builtinExerciseCode,
+                                               customExerciseId: ex.customExerciseId,
+                                               exerciseName: ex.exerciseName,
+                                               primaryMuscle: ex.primaryMuscle,
+                                               groupCount: setCount,
+                                               isWarmup: drop.isWarmup ?? false,
+                                               segments: drop.segments)
+                } else {
+                    newItem = PlanItem(itemId: UUID(),
                                        builtinExerciseCode: ex.builtinExerciseCode,
                                        customExerciseId: ex.customExerciseId,
                                        exerciseName: ex.exerciseName,
@@ -500,6 +576,7 @@ enum PlanWriteback {
                                        suggestedReps: top.reps,
                                        suggestedWeightKg: top.weightKg,
                                        setPrescriptions: prescriptions)
+                }
                 nextOrder += 1
                 items.append(newItem)
                 diffs.append(ItemDiff(kind: .added, exerciseName: ex.exerciseName,
@@ -516,11 +593,11 @@ enum PlanWriteback {
         return Result(newItems: items, diffs: diffs)
     }
 
-    private static func matchIndex(for ex: WorkoutExercise, in items: [PlanItem]) -> Int? {
-        if let pid = ex.planItemId, let exact = items.firstIndex(where: { $0.itemId == pid }) {
+    private static func matchIndex(for ex: WorkoutExercise, in items: [PlanItem], isDropSetUnit: Bool) -> Int? {
+        if let pid = ex.planItemId, let exact = items.firstIndex(where: { $0.itemId == pid && $0.isDropSet == isDropSetUnit && !$0.isSuperset }) {
             return exact
         }
-        let fallbackMatches = items.indices.filter { !items[$0].isSuperset && items[$0].historyKey == ex.historyKey }
+        let fallbackMatches = items.indices.filter { !items[$0].isSuperset && items[$0].isDropSet == isDropSetUnit && items[$0].historyKey == ex.historyKey }
         return fallbackMatches.count == 1 ? fallbackMatches[0] : nil
     }
 
@@ -550,13 +627,20 @@ enum PlanWriteback {
                                        orderIndex: orderIndex,
                                        weightKg: summary.weightKg,
                                        reps: summary.reps,
+                                       isWarmup: warmupPrescriptionValue(for: set, existing: existing),
                                        segments: segments)
         }
         return PlanSetPrescription(prescriptionId: existing?.prescriptionId ?? UUID(),
                                    setType: set.setType,
                                    orderIndex: orderIndex,
                                    weightKg: set.weightKg,
-                                   reps: set.reps)
+                                   reps: set.reps,
+                                   isWarmup: warmupPrescriptionValue(for: set, existing: existing))
+    }
+
+    private static func warmupPrescriptionValue(for set: WorkoutSet, existing: PlanSetPrescription?) -> Bool? {
+        if set.isWarmupEffective { return true }
+        return existing?.isWarmup == nil ? nil : false
     }
 }
 

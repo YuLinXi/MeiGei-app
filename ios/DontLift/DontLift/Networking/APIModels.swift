@@ -191,8 +191,10 @@ struct WorkoutSetDTO: Codable {
     var plannedRestSeconds: Int?
     /// 该组休息完成后的真实秒数；旧后端/旧数据缺失时为 nil。
     var actualRestSeconds: Int?
-    /// 组类型 raw（"working"/"warmup"）。解码缺失时由 SyncEngine 兜底 `working`，兼容旧后端/旧数据。
+    /// 组结构类型 raw（"working"/"drop"）。旧 `"warmup"` 由 SyncEngine 兜底迁移为 `isWarmup`。
     var setType: String?
+    /// 热身标记。旧后端/旧数据缺失时按 false，并兼容 `setType == "warmup"`。
+    var isWarmup: Bool?
     /// 递减组分段 JSON 字符串；旧后端/旧数据缺失时按空数组处理。
     var segments: String?
 }

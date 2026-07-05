@@ -41,6 +41,7 @@ struct PlanSetPrescription: Codable, Identifiable, Hashable {
     var orderIndex: Int
     var weightKg: Double?
     var reps: Int?
+    var isWarmup: Bool?
     var segments: [WorkoutSetSegment]
 
     var id: UUID { prescriptionId }
@@ -51,13 +52,15 @@ struct PlanSetPrescription: Codable, Identifiable, Hashable {
         orderIndex: Int,
         weightKg: Double? = nil,
         reps: Int? = nil,
+        isWarmup: Bool? = nil,
         segments: [WorkoutSetSegment] = []
     ) {
         self.prescriptionId = prescriptionId
-        self.setTypeRaw = setType.rawValue
+        self.setTypeRaw = setType == .warmup ? WorkoutSetType.working.rawValue : setType.rawValue
         self.orderIndex = orderIndex
         self.weightKg = weightKg
         self.reps = reps
+        self.isWarmup = isWarmup ?? (setType == .warmup ? true : nil)
         self.segments = segments
     }
 
@@ -69,10 +72,11 @@ struct PlanSetPrescription: Codable, Identifiable, Hashable {
 
 enum PlanUnitKind: String, Codable {
     case singleExercise
+    case dropSet
     case superset
 }
 
-/// 超级组计划成员。超级组统一轮数，成员只保存各自动作引用和每轮重量/次数。
+/// 超级组计划成员。超级组统一组数，成员只保存各自动作引用和每组重量/次数。
 struct PlanSupersetMember: Codable, Identifiable, Hashable {
     var memberId: UUID
     var builtinExerciseCode: String?
@@ -113,7 +117,7 @@ struct PlanSupersetMember: Codable, Identifiable, Hashable {
 /// 供编辑、Fork、diff 时定位。整体以 jsonb 文档随计划读写。
 struct PlanItem: Codable, Identifiable, Hashable {
     var itemId: UUID
-    /// nil/`singleExercise` 为旧单动作项；`superset` 表示一级超级组计划单元。
+    /// nil/`singleExercise` 为旧单动作项；`dropSet`/`superset` 表示一级结构计划单元。
     var unitKindRaw: String?
     /// 内置动作 code 或自定义动作引用，二选一。
     var builtinExerciseCode: String?
@@ -129,9 +133,9 @@ struct PlanItem: Codable, Identifiable, Hashable {
     var setPrescriptions: [PlanSetPrescription]?
     /// 超级组固定 2 个成员；非超级组为空。
     var supersetMembers: [PlanSupersetMember]?
-    /// 超级组统一轮数；非超级组为空。
+    /// 超级组统一组数；非超级组为空。
     var supersetRoundCount: Int?
-    /// 超级组轮后休息；创建时不要求填写，后续可从更多菜单设置。
+    /// 超级组组后休息；创建时不要求填写，后续可从更多菜单设置。
     var supersetRestAfterRoundSeconds: Int?
 
     var id: UUID { itemId }
@@ -180,6 +184,10 @@ extension PlanItem {
         unitKind == .superset && orderedSupersetMembers.count == 2
     }
 
+    var isDropSet: Bool {
+        unitKind == .dropSet
+    }
+
     var orderedSupersetMembers: [PlanSupersetMember] {
         (supersetMembers ?? []).sorted { $0.orderIndex < $1.orderIndex }
     }
@@ -195,7 +203,13 @@ extension PlanItem {
     }
 
     var unitDisplayName: String {
-        isSuperset ? supersetTitle : displayExerciseName
+        if isSuperset { return supersetTitle }
+        if isDropSet { return "递减组 · \(displayExerciseName)" }
+        return displayExerciseName
+    }
+
+    var dropSetPrescriptions: [PlanSetPrescription] {
+        orderedSetPrescriptions.filter { $0.setType == .drop }
     }
 
     static func superset(
@@ -227,6 +241,48 @@ extension PlanItem {
                     },
                  supersetRoundCount: max(1, roundCount),
                  supersetRestAfterRoundSeconds: restAfterRoundSeconds)
+    }
+
+    static func dropSet(
+        itemId: UUID = UUID(),
+        orderIndex: Int,
+        builtinExerciseCode: String? = nil,
+        customExerciseId: UUID? = nil,
+        exerciseName: String,
+        primaryMuscle: String? = nil,
+        equipmentType: String? = nil,
+        groupCount: Int = 1,
+        isWarmup: Bool = false,
+        segments: [WorkoutSetSegment]
+    ) -> PlanItem {
+        let normalizedSegments = segments
+            .sorted { $0.segmentIndex < $1.segmentIndex }
+            .enumerated()
+            .map { idx, segment in
+                WorkoutSetSegment(segmentId: segment.segmentId,
+                                  segmentIndex: idx,
+                                  weightKg: segment.weightKg,
+                                  reps: segment.reps)
+            }
+        let summary = summaryWeightReps(from: normalizedSegments)
+        let prescription = PlanSetPrescription(setType: .drop,
+                                               orderIndex: 0,
+                                               weightKg: summary.weightKg,
+                                               reps: summary.reps,
+                                               isWarmup: isWarmup,
+                                               segments: normalizedSegments)
+        return PlanItem(itemId: itemId,
+                        unitKind: .dropSet,
+                        builtinExerciseCode: builtinExerciseCode,
+                        customExerciseId: customExerciseId,
+                        exerciseName: exerciseName,
+                        primaryMuscle: primaryMuscle,
+                        equipmentType: equipmentType,
+                        orderIndex: orderIndex,
+                        suggestedSets: max(1, groupCount),
+                        suggestedReps: summary.reps,
+                        suggestedWeightKg: summary.weightKg,
+                        setPrescriptions: [prescription])
     }
 
     private var trimmedSnapshotName: String? {
@@ -281,8 +337,25 @@ extension PlanItem {
     }
 
     func manualSetPrescriptionsForEditing() -> [PlanSetPrescription] {
+        if isDropSet {
+            if let existing = dropSetPrescriptions.first {
+                return Self.normalizedManualSetPrescriptions([existing])
+            }
+            let segments = [
+                WorkoutSetSegment(segmentIndex: 0, weightKg: suggestedWeightKg, reps: suggestedReps ?? PlanDefaults.suggestedReps),
+                WorkoutSetSegment(segmentIndex: 1)
+            ]
+            return Self.normalizedManualSetPrescriptions([
+                PlanSetPrescription(setType: .drop,
+                                    orderIndex: 0,
+                                    weightKg: suggestedWeightKg,
+                                    reps: suggestedReps,
+                                    segments: segments)
+            ])
+        }
         let existing = orderedSetPrescriptions
-        if !existing.isEmpty { return Self.normalizedManualSetPrescriptions(existing) }
+        let workingOnly = existing.filter { $0.setType != .drop }
+        if !workingOnly.isEmpty { return Self.normalizedManualSetPrescriptions(workingOnly) }
         let count = max(1, suggestedSets ?? PlanDefaults.suggestedSets)
         return (0..<count).map {
             PlanSetPrescription(orderIndex: $0,
@@ -292,7 +365,38 @@ extension PlanItem {
     }
 
     mutating func applyManualSetPrescriptions(_ prescriptions: [PlanSetPrescription]) {
-        let normalized = Self.normalizedManualSetPrescriptions(prescriptions)
+        if isDropSet {
+            let source = prescriptions.first(where: { $0.setType == .drop }) ?? prescriptions.first
+            let dropSource = source.map {
+                $0.setType == .drop
+                    ? $0
+                    : PlanSetPrescription(prescriptionId: $0.prescriptionId,
+                                          setType: .drop,
+                                          orderIndex: 0,
+                                          weightKg: $0.weightKg,
+                                          reps: $0.reps,
+                                          isWarmup: $0.isWarmup,
+                                          segments: [
+                                            WorkoutSetSegment(segmentIndex: 0, weightKg: $0.weightKg, reps: $0.reps),
+                                            WorkoutSetSegment(segmentIndex: 1)
+                                          ])
+            } ?? PlanSetPrescription(setType: .drop,
+                                     orderIndex: 0,
+                                     reps: PlanDefaults.suggestedReps,
+                                     segments: [
+                                        WorkoutSetSegment(segmentIndex: 0, reps: PlanDefaults.suggestedReps),
+                                        WorkoutSetSegment(segmentIndex: 1)
+                                     ])
+            let normalized = Self.normalizedManualSetPrescriptions([dropSource])
+            let finalPrescription = normalized.first ?? dropSource
+            setPrescriptions = [finalPrescription]
+            suggestedSets = max(1, suggestedSets ?? 1)
+            let summary = Self.summaryWeightReps(from: finalPrescription.segments)
+            suggestedWeightKg = summary.weightKg
+            suggestedReps = summary.reps
+            return
+        }
+        let normalized = Self.normalizedManualSetPrescriptions(prescriptions.filter { $0.setType != .drop })
         let finalPrescriptions = normalized.isEmpty
             ? [PlanSetPrescription(orderIndex: 0, reps: PlanDefaults.suggestedReps)]
             : normalized
@@ -325,13 +429,15 @@ extension PlanItem {
                                            orderIndex: idx,
                                            weightKg: summary.weightKg,
                                            reps: summary.reps,
+                                           isWarmup: prescription.isWarmup,
                                            segments: segments)
             }
             return PlanSetPrescription(prescriptionId: prescription.prescriptionId,
                                        setType: .working,
                                        orderIndex: idx,
                                        weightKg: prescription.weightKg,
-                                       reps: prescription.reps)
+                                       reps: prescription.reps,
+                                       isWarmup: prescription.isWarmup)
         }
     }
 
@@ -465,6 +571,9 @@ extension WorkoutPlan {
         items.reduce(0) { total, item in
             if item.isSuperset {
                 return total + item.supersetRounds * item.orderedSupersetMembers.count
+            }
+            if item.isDropSet {
+                return total + max(1, item.suggestedSets ?? 1)
             }
             return total + (item.setPrescriptions?.count ?? item.suggestedSets ?? 0)
         }

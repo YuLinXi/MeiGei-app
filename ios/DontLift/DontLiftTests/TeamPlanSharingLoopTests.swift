@@ -184,7 +184,7 @@ struct TeamPlanSharingLoopTests {
         let summary = CheckinSummary(workout: workout)
         let set = summary.exercises.first?.sets.first
 
-        #expect(summary.totalSets == 1)
+        #expect(summary.totalSets == 2)
         #expect(summary.totalVolumeKg == 80 * 8 + 60 * 6)
         #expect(set?.setType == .drop)
         #expect(set?.segments?.map(\.weightKg) == [80, 60])

@@ -8,7 +8,7 @@ enum WorkoutRestPolicy {
                                    in exercise: WorkoutExercise,
                                    fallbackSeconds: Int) -> Int {
         guard let previous = previousDisplaySet(before: set, in: exercise),
-              previous.setType != .warmup,
+              !previous.isWarmupEffective,
               let planned = previous.plannedRestSeconds else {
             return fallbackSeconds
         }

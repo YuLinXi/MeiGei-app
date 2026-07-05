@@ -352,21 +352,18 @@ struct TeamCheckinDetailSheet: View {
             ForEach(units) { unit in
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                     HStack(spacing: 6) {
+                        if unit.kind == .dropSet {
+                            WorkoutStructureIcon(kind: .dropSet)
+                        } else if unit.kind == .superset {
+                            WorkoutStructureIcon(kind: .superset)
+                        }
                         Text(unit.title)
                             .font(Theme.Font.body(size: 15, weight: .bold))
                             .foregroundStyle(Theme.Color.fg)
                             .lineLimit(1)
-                        if unit.kind == .superset {
-                            Text("超级组")
-                                .font(Theme.Font.mono(size: 9, weight: .bold))
-                                .foregroundStyle(Theme.Color.accent)
-                                .padding(.horizontal, 6)
-                                .frame(height: 20)
-                                .background(Theme.Color.accentSoft, in: Capsule())
-                        }
                     }
                     if unit.kind == .superset, let rounds = unit.roundCount {
-                        Text("\(rounds) 轮 · \(rounds * unit.exercises.count) 组")
+                        Text("\(rounds) 组 · 共 \(rounds * unit.exercises.count) 组动作")
                             .font(Theme.Font.mono(size: 11, weight: .semibold))
                             .foregroundStyle(Theme.Color.muted)
                     }
@@ -396,12 +393,7 @@ struct TeamCheckinDetailSheet: View {
                     .foregroundStyle(Theme.Color.muted)
                     .frame(width: 34, alignment: .leading)
                 if set.setType == .drop {
-                    Text("递减组")
-                        .font(Theme.Font.body(size: 11, weight: .bold))
-                        .foregroundStyle(Theme.Color.accent)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(Theme.Color.accentSofter, in: Capsule())
+                    WorkoutStructureIcon(kind: .dropSet)
                 } else {
                     setValueLine(weightKg: set.weightKg, reps: set.reps)
                 }

@@ -39,6 +39,7 @@ struct CheckinSummary: Codable, Hashable, Identifiable {
         var weightKg: Double?
         var reps: Int?
         var setTypeRaw: String?
+        var isWarmup: Bool?
         var segments: [WorkoutSetSegment]?
 
         var setType: WorkoutSetType {
@@ -56,7 +57,7 @@ extension CheckinSummary {
         let summaries: [ExerciseSummary] = exs.map { ex in
             let sets = ex.sets.sorted { $0.setIndex < $1.setIndex }
             let statSets = sets.filter(\.countsForStats)
-            totalSets += statSets.count
+            totalSets += statSets.reduce(0) { $0 + $1.statEntries.count }
             for s in statSets {
                 volume += s.statEntries.reduce(0.0) { acc, entry in
                     acc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
@@ -69,6 +70,7 @@ extension CheckinSummary {
                     return SetSummary(weightKg: summary.weightKg,
                                       reps: summary.reps,
                                       setTypeRaw: $0.setTypeRaw,
+                                      isWarmup: $0.isWarmupEffective,
                                       segments: $0.segments)
                 })
         }
@@ -94,6 +96,13 @@ extension CheckinSummary {
         return workout.trainingUnits.map { unit in
             switch unit.kind {
             case .singleExercise:
+                let exercise = unit.singleExerciseId.flatMap { summaryByExerciseId[$0] }
+                return UnitSummary(unitId: unit.unitId,
+                                   kindRaw: unit.kindRaw,
+                                   title: exercise?.name ?? "动作",
+                                   roundCount: nil,
+                                   exercises: exercise.map { [$0] } ?? [])
+            case .dropSet:
                 let exercise = unit.singleExerciseId.flatMap { summaryByExerciseId[$0] }
                 return UnitSummary(unitId: unit.unitId,
                                    kindRaw: unit.kindRaw,

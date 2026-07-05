@@ -42,7 +42,7 @@ struct WorkoutWeeklyStatsTests {
         #expect(s.volumeKg == expectedVolume)
     }
 
-    @Test func dropSetCountsAsOneSetAndExpandsVolume() {
+    @Test func dropSetCountsEffectiveSegmentsAndExpandsVolume() {
         let now = Date()
         let w = Workout(startedAt: now, endedAt: now.addingTimeInterval(3600))
         let ex = WorkoutExercise(exerciseName: "测试动作", orderIndex: 0)
@@ -63,7 +63,7 @@ struct WorkoutWeeklyStatsTests {
         let s = WorkoutWeeklyStats.compute(workouts: [w], reference: now, calendar: mondayCalendar)
 
         #expect(s.sessionCount == 1)
-        #expect(s.setCount == 1)
+        #expect(s.setCount == 2)
         #expect(s.repCount == 14)
         #expect(s.volumeKg == 80 * 8 + 60 * 6)
     }

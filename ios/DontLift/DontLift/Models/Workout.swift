@@ -68,11 +68,12 @@ final class Workout: Syncable {
 
 enum WorkoutUnitKind: String, Codable {
     case singleExercise
+    case dropSet
     case superset
 }
 
 /// 训练记录中的一级训练单元。真实重量/次数仍由 `WorkoutExercise/WorkoutSet` 承载；
-/// 这里保存展示顺序、单动作/超级组边界和超级组轮后休息等结构信息。
+/// 这里保存展示顺序、普通组/递减组/超级组边界和超级组组后休息等结构信息。
 struct WorkoutUnit: Codable, Identifiable, Hashable {
     var unitId: UUID
     var kindRaw: String
@@ -104,11 +105,13 @@ struct WorkoutUnit: Codable, Identifiable, Hashable {
 struct WorkoutSupersetUnit: Codable, Hashable {
     var roundCount: Int
     var restAfterRoundSeconds: Int?
+    var note: String?
     var members: [WorkoutSupersetMember]
 
-    init(roundCount: Int, restAfterRoundSeconds: Int? = nil, members: [WorkoutSupersetMember]) {
+    init(roundCount: Int, restAfterRoundSeconds: Int? = nil, note: String? = nil, members: [WorkoutSupersetMember]) {
         self.roundCount = max(1, roundCount)
         self.restAfterRoundSeconds = restAfterRoundSeconds
+        self.note = note
         self.members = members.sorted { $0.orderIndex < $1.orderIndex }
     }
 }
@@ -156,23 +159,23 @@ extension Workout {
         }
 
         let exerciseIds = Set(exercises.map(\.localId))
-        let referencedIds = Set(decoded.flatMap { unit -> [UUID] in
-            switch unit.kind {
-            case .singleExercise:
-                return unit.singleExerciseId.map { [$0] } ?? []
-            case .superset:
-                return unit.superset?.members.map(\.exerciseId) ?? []
-            }
-        })
         let validUnits = decoded.filter { unit in
             switch unit.kind {
-            case .singleExercise:
+            case .singleExercise, .dropSet:
                 return unit.singleExerciseId.map { exerciseIds.contains($0) } ?? false
             case .superset:
                 return unit.superset?.members.count == 2
                     && unit.superset?.members.allSatisfy({ exerciseIds.contains($0.exerciseId) }) == true
             }
         }
+        let referencedIds = Set(validUnits.flatMap { unit -> [UUID] in
+            switch unit.kind {
+            case .singleExercise, .dropSet:
+                return unit.singleExerciseId.map { [$0] } ?? []
+            case .superset:
+                return unit.superset?.members.map(\.exerciseId) ?? []
+            }
+        })
         let unreferenced = exercises
             .filter { !referencedIds.contains($0.localId) }
             .sorted { $0.orderIndex < $1.orderIndex }
@@ -193,13 +196,36 @@ extension Workout {
         })
     }
 
+    var dropSetExerciseIds: Set<UUID> {
+        Set(trainingUnits.compactMap { unit in
+            guard unit.kind == .dropSet else { return nil }
+            return unit.singleExerciseId
+        })
+    }
+
     var totalExerciseCountForDisplay: Int {
         trainingUnits.reduce(0) { total, unit in
             switch unit.kind {
-            case .singleExercise:
+            case .singleExercise, .dropSet:
                 return total + 1
             case .superset:
                 return total + (unit.superset?.members.count ?? 0)
+            }
+        }
+    }
+
+    var completedStatEntryCount: Int {
+        exercises
+            .flatMap(\.sets)
+            .filter(\.countsForStats)
+            .count
+    }
+
+    var completedStatVolumeKg: Double {
+        exercises.flatMap(\.sets).reduce(0.0) { acc, set in
+            guard set.countsForStats else { return acc }
+            return acc + set.statEntries.reduce(0.0) { entryAcc, entry in
+                entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
             }
         }
     }
@@ -214,7 +240,27 @@ extension Workout {
 
     func appendSingleExerciseUnit(for exercise: WorkoutExercise) {
         var units = trainingUnits
+        if units.contains(where: { $0.singleExerciseId == exercise.localId }) {
+            updateTrainingUnits(units)
+            return
+        }
         units.append(WorkoutUnit(kind: .singleExercise,
+                                 orderIndex: (units.map(\.orderIndex).max() ?? -1) + 1,
+                                 singleExerciseId: exercise.localId))
+        updateTrainingUnits(units)
+    }
+
+    func appendDropSetUnit(for exercise: WorkoutExercise) {
+        var units = trainingUnits.filter { unit in
+            switch unit.kind {
+            case .singleExercise, .dropSet:
+                return unit.singleExerciseId != exercise.localId
+            case .superset:
+                let ids = unit.superset?.members.map(\.exerciseId) ?? []
+                return !ids.contains(exercise.localId)
+            }
+        }
+        units.append(WorkoutUnit(kind: .dropSet,
                                  orderIndex: (units.map(\.orderIndex).max() ?? -1) + 1,
                                  singleExerciseId: exercise.localId))
         updateTrainingUnits(units)
@@ -224,7 +270,17 @@ extension Workout {
                             second: WorkoutExercise,
                             roundCount: Int,
                             restAfterRoundSeconds: Int? = nil) {
-        var units = trainingUnits
+        let memberIds = Set([first.localId, second.localId])
+        var units = trainingUnits.filter { unit in
+            switch unit.kind {
+            case .singleExercise, .dropSet:
+                guard let id = unit.singleExerciseId else { return true }
+                return !memberIds.contains(id)
+            case .superset:
+                let ids = unit.superset?.members.map(\.exerciseId) ?? []
+                return ids.allSatisfy { !memberIds.contains($0) }
+            }
+        }
         let unit = WorkoutUnit(
             kind: .superset,
             orderIndex: (units.map(\.orderIndex).max() ?? -1) + 1,
@@ -244,7 +300,7 @@ extension Workout {
     func removeExerciseFromUnits(_ exerciseId: UUID) {
         let units = trainingUnits.compactMap { unit -> WorkoutUnit? in
             switch unit.kind {
-            case .singleExercise:
+            case .singleExercise, .dropSet:
                 return unit.singleExerciseId == exerciseId ? nil : unit
             case .superset:
                 guard unit.superset?.members.contains(where: { $0.exerciseId == exerciseId }) == false else { return nil }
@@ -361,11 +417,10 @@ final class WorkoutExercise {
     }
 }
 
-/// 组类型。`drop` 在 UI 中展示为「递减组」，内部只表示一个多段正式组，不校验重量方向。
-/// 统计判据为 `!= .warmup`，新增「正式类」case 无需改统计代码。
+/// 结构类型。`warmup` 仅作为旧数据/旧调用兼容 raw value；新代码用 `WorkoutSet.isWarmup` 表达热身。
 enum WorkoutSetType: String, Codable, CaseIterable {
     case working   // 正式组
-    case warmup    // 热身组
+    case warmup    // 旧热身 raw，仅兼容读取/旧测试
     case drop      // 递减组（多段正式组）
 }
 
@@ -409,6 +464,8 @@ final class WorkoutSet {
     var actualRestSeconds: Int?
     /// 组类型 raw（默认 "working"）。SwiftData 轻量迁移：存储属性声明带默认值，旧本地记录读出即 working。
     var setTypeRaw: String = WorkoutSetType.working.rawValue
+    /// 热身标记。新语义中热身独立于结构类型；旧 `setTypeRaw == "warmup"` 由 helper 兼容识别。
+    var isWarmup: Bool = false
     /// 递减组分段。普通组/热身组保持空数组；SwiftData 轻量迁移时旧记录读出即空。
     var segments: [WorkoutSetSegment] = []
 
@@ -424,6 +481,7 @@ final class WorkoutSet {
         plannedRestSeconds: Int? = nil,
         actualRestSeconds: Int? = nil,
         setType: WorkoutSetType = .working,
+        isWarmup: Bool? = nil,
         segments: [WorkoutSetSegment] = []
     ) {
         self.localId = localId
@@ -434,7 +492,8 @@ final class WorkoutSet {
         self.note = note
         self.plannedRestSeconds = plannedRestSeconds
         self.actualRestSeconds = actualRestSeconds
-        self.setTypeRaw = setType.rawValue
+        self.setTypeRaw = setType == .warmup ? WorkoutSetType.working.rawValue : setType.rawValue
+        self.isWarmup = isWarmup ?? (setType == .warmup)
         self.segments = segments
         syncDropSummaryFromSegments()
     }
@@ -444,14 +503,25 @@ final class WorkoutSet {
 extension WorkoutSet {
     /// 组类型枚举视图：get 未知值兜底 `.working`（跨版本安全），set 写回 raw。
     var setType: WorkoutSetType {
-        get { WorkoutSetType(rawValue: setTypeRaw) ?? .working }
-        set { setTypeRaw = newValue.rawValue }
+        get {
+            let type = WorkoutSetType(rawValue: setTypeRaw) ?? .working
+            return type == .warmup ? .working : type
+        }
+        set {
+            if newValue == .warmup {
+                isWarmup = true
+                setTypeRaw = WorkoutSetType.working.rawValue
+            } else {
+                setTypeRaw = newValue.rawValue
+            }
+        }
     }
 
-    /// 统计判据：正式组**且已完成**（`setType != .warmup && completed`）。
-    /// 「非 warmup」使将来新增的正式类组类型自动计入；「completed」保证落值后未打勾的
-    /// 预填残组不污染训练量/PR（design.md D2）。纯「热身/正式」展示判断应直接用 `setType`。
-    var countsForStats: Bool { setType != .warmup && completed }
+    /// 兼容旧 raw 值的热身判据。新写入使用 `isWarmup`，旧本地/同步数据可能仍为 `setTypeRaw == "warmup"`。
+    var isWarmupEffective: Bool { isWarmup || setTypeRaw == WorkoutSetType.warmup.rawValue }
+
+    /// 统计判据：已完成且非热身。递减组完成组数按外层组计，训练量/PR 仍由 `statEntries` 展开 segments。
+    var countsForStats: Bool { completed && !isWarmupEffective }
 
     var isDropSet: Bool { setType == .drop }
 
@@ -559,7 +629,7 @@ extension WorkoutExercise {
     /// 展示用排序：热身组吸顶（warmup 段在前），段内按 setIndex 稳定升序（design.md D4）。
     var displaySortedSets: [WorkoutSet] {
         sets.sorted {
-            let lw = $0.setType == .warmup, rw = $1.setType == .warmup
+            let lw = $0.isWarmupEffective, rw = $1.isWarmupEffective
             if lw != rw { return lw }      // warmup 段在前
             return $0.setIndex < $1.setIndex
         }
@@ -567,20 +637,28 @@ extension WorkoutExercise {
 
     /// 上一**正式**组重量（按 setIndex 取最后一个正式组），用于「加一组」预填源（热身组不作预填）。
     var lastWorkingWeight: Double? {
-        sets.filter { $0.setType != .warmup }.sorted { $0.setIndex < $1.setIndex }.last?.summaryWeightReps.weightKg
+        sets.filter { !$0.isWarmupEffective }.sorted { $0.setIndex < $1.setIndex }.last?.summaryWeightReps.weightKg
     }
 
     /// 上一**正式**组的重量与次数，用于新增正式组时继承输入值（热身组不作预填源）。
     var lastWorkingSetValues: (weightKg: Double?, reps: Int?) {
-        guard let last = sets.filter({ $0.setType != .warmup }).sorted(by: { $0.setIndex < $1.setIndex }).last else {
+        guard let last = sets.filter({ !$0.isWarmupEffective }).sorted(by: { $0.setIndex < $1.setIndex }).last else {
             return (nil, nil)
         }
         return last.summaryWeightReps
     }
 
-    /// 切换某组 working ⇄ warmup，并重排到对应段尾（赋最大 setIndex+1）。仅改模型，保存由调用方负责。
-    func toggleSetType(_ set: WorkoutSet) {
-        set.setType = (set.setType == .warmup) ? .working : .warmup
+    /// 切换某组正式 ⇄ 热身，并重排到对应段尾（赋最大 setIndex+1）。仅改模型，保存由调用方负责。
+    func toggleWarmup(_ set: WorkoutSet) {
+        set.isWarmup.toggle()
+        if set.setTypeRaw == WorkoutSetType.warmup.rawValue {
+            set.setTypeRaw = WorkoutSetType.working.rawValue
+        }
         set.setIndex = (sets.map(\.setIndex).max() ?? -1) + 1
+    }
+
+    /// 旧调用兼容入口。
+    func toggleSetType(_ set: WorkoutSet) {
+        toggleWarmup(set)
     }
 }

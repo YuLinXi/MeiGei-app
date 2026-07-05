@@ -4,8 +4,8 @@ import Foundation
 ///
 /// 「本周」= 本地时区当周周一 00:00 到次周一 00:00。
 /// 训练量：每组 `weightKg * reps` 求和（缺值视为 0）。
-/// 总组数：所有训练里全部 set 计数（不要求 completed，与现有 logging 视图一致）。
-/// 总次数：本周训练 session 数（按 startedAt 落入本周）。
+/// 总组数：已完成且非热身的统计 entry 数；递减组按有效 segments 展开。
+/// 总次数：已完成且非热身 entry 的 reps 总和。
 struct WeeklyStats: Equatable {
     var volumeKg: Double
     var sessionCount: Int
@@ -37,7 +37,7 @@ enum WorkoutWeeklyStats {
             for ex in w.exercises {
                 // 训练量/总组数/总次数仅统计正式组（热身组不计入），口径同 PR/曲线。
                 for s in ex.sets where s.countsForStats {
-                    stats.setCount += 1
+                    stats.setCount += s.statEntries.count
                     for entry in s.statEntries {
                         let kg = entry.weightKg ?? 0
                         let reps = entry.reps ?? 0

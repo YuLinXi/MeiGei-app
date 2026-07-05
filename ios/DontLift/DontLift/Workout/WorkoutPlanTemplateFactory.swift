@@ -18,6 +18,11 @@ extension Workout {
                       let ex = exercise(id: exerciseId),
                       let item = planItem(from: ex, orderIndex: items.count) else { continue }
                 items.append(item)
+            case .dropSet:
+                guard let exerciseId = unit.singleExerciseId,
+                      let ex = exercise(id: exerciseId),
+                      let item = dropSetPlanItem(from: ex, orderIndex: items.count) else { continue }
+                items.append(item)
             case .superset:
                 guard let superset = unit.superset,
                       superset.members.count == 2 else { continue }
@@ -64,6 +69,22 @@ extension Workout {
             )
     }
 
+    private func dropSetPlanItem(from ex: WorkoutExercise, orderIndex: Int) -> PlanItem? {
+        let dropSets = ex.sets.sorted(by: { $0.setIndex < $1.setIndex }).filter(\.isDropSet)
+        guard let set = dropSets.first,
+              !set.effectiveSegments.isEmpty else {
+            return nil
+        }
+        return PlanItem.dropSet(orderIndex: orderIndex,
+                                builtinExerciseCode: ex.builtinExerciseCode,
+                                customExerciseId: ex.customExerciseId,
+                                exerciseName: ex.exerciseName,
+                                primaryMuscle: ex.primaryMuscle,
+                                groupCount: max(1, dropSets.count),
+                                isWarmup: set.isWarmupEffective,
+                                segments: set.effectiveSegments)
+    }
+
     private func supersetMemberSummary(from ex: WorkoutExercise) -> (weightKg: Double?, reps: Int?)? {
         let sets = ex.sets.filter(\.countsForStats)
         guard !sets.isEmpty else { return nil }
@@ -84,11 +105,13 @@ extension Workout {
                                        orderIndex: orderIndex,
                                        weightKg: summary.weightKg,
                                        reps: summary.reps,
+                                       isWarmup: set.isWarmupEffective,
                                        segments: segments)
         }
         return PlanSetPrescription(setType: set.setType,
                                    orderIndex: orderIndex,
                                    weightKg: set.weightKg,
-                                   reps: set.reps)
+                                   reps: set.reps,
+                                   isWarmup: set.isWarmupEffective)
     }
 }

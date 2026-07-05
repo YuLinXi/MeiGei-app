@@ -5,6 +5,7 @@ import Photos
 struct WorkoutPosterData: Equatable {
     struct ExerciseLine: Identifiable, Equatable {
         let id: String
+        let structureKind: WorkoutStructureIconKind?
         let name: String
         let topSetText: String
     }
@@ -26,20 +27,20 @@ struct WorkoutPosterData: Equatable {
 
     init(workout: Workout, personalRecords: [PersonalRecord] = []) {
         let exercises = workout.exercises.sorted { $0.orderIndex < $1.orderIndex }
-        let completedSets = exercises.flatMap(\.sets).filter(\.completed)
-        let statSets = completedSets.filter(\.countsForStats)
+        let statSets = exercises.flatMap(\.sets).filter(\.countsForStats)
         let totalVolume = statSets.reduce(0.0) { acc, set in
             acc + set.statEntries.reduce(0.0) { entryAcc, entry in
                 entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
             }
         }
+        let statEntryCount = statSets.reduce(0) { $0 + $1.statEntries.count }
 
         self.title = Self.title(for: workout, exercises: exercises)
         self.dateText = Self.dateFormatter.string(from: workout.startedAt)
         self.durationText = Self.durationText(start: workout.timerStartedAt ?? workout.startedAt,
                                               end: workout.endedAt ?? workout.startedAt)
         self.volumeText = Self.volumeText(totalVolume)
-        self.setCountText = "\(statSets.count)"
+        self.setCountText = "\(statEntryCount)"
         self.exerciseCountText = "\(exercises.count)"
 
         let lines = Self.exerciseLines(workout: workout)
@@ -56,9 +57,16 @@ struct WorkoutPosterData: Equatable {
         let byId = Dictionary(uniqueKeysWithValues: exercises.map { ($0.localId, $0) })
         return workout.trainingUnits.enumerated().compactMap { index, unit in
             switch unit.kind {
-            case .singleExercise:
+            case .singleExercise, .dropSet:
                 guard let id = unit.singleExerciseId, let exercise = byId[id] else { return nil }
-                return Self.exerciseLine(exercise, index: index)
+                let line = Self.exerciseLine(exercise, index: index)
+                guard unit.kind == .dropSet else {
+                    return line
+                }
+                return ExerciseLine(id: line.id,
+                                    structureKind: .dropSet,
+                                    name: line.name,
+                                    topSetText: line.topSetText)
             case .superset:
                 let members = unit.superset?.members
                     .sorted { $0.orderIndex < $1.orderIndex }
@@ -66,8 +74,9 @@ struct WorkoutPosterData: Equatable {
                 guard members.count == 2 else { return nil }
                 let rounds = unit.superset?.roundCount ?? members.map { $0.sets.count }.min() ?? 0
                 return ExerciseLine(id: "\(index)-\(unit.unitId.uuidString)",
-                                    name: "超级组 · \(members[0].displayExerciseName) + \(members[1].displayExerciseName)",
-                                    topSetText: "\(rounds) 轮 · \(rounds * 2) 组")
+                                    structureKind: .superset,
+                                    name: "\(members[0].displayExerciseName) + \(members[1].displayExerciseName)",
+                                    topSetText: "\(rounds) 组 · 共 \(rounds * 2) 组动作")
             }
         }
     }
@@ -105,22 +114,24 @@ struct WorkoutPosterData: Equatable {
     private static func exerciseLine(_ exercise: WorkoutExercise, index: Int) -> ExerciseLine {
         let statSets = exercise.displaySortedSets.filter { $0.completed && $0.countsForStats }
         return ExerciseLine(id: "\(index)-\(exercise.localId.uuidString)",
+                            structureKind: nil,
                             name: exercise.displayExerciseName,
                             topSetText: topSetText(in: statSets))
     }
 
     private static func topSetText(in sets: [WorkoutSet]) -> String {
         guard !sets.isEmpty else { return "已完成" }
+        let count = sets.reduce(0) { $0 + $1.statEntries.count }
         if let weighted = topWeightedSet(in: sets) {
             if let reps = weighted.reps {
-                return "\(formatKg(weighted.weightKg))kg × \(reps)次 · 共\(sets.count)组"
+                return "\(formatKg(weighted.weightKg))kg × \(reps)次 · 共\(count)组"
             }
-            return "\(formatKg(weighted.weightKg))kg · 共\(sets.count)组"
+            return "\(formatKg(weighted.weightKg))kg · 共\(count)组"
         }
         if let reps = sets.flatMap(\.statEntries).compactMap(\.reps).max() {
-            return "\(reps)次 · 共\(sets.count)组"
+            return "\(reps)次 · 共\(count)组"
         }
-        return "共\(sets.count)组"
+        return "共\(count)组"
     }
 
     private static func topWeightedSet(in sets: [WorkoutSet]) -> (weightKg: Double, reps: Int?)? {
@@ -429,12 +440,17 @@ private struct WorkoutPosterVisualCardView: View {
         VStack(spacing: exerciseRowSpacing) {
             ForEach(data.exerciseLines) { line in
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(line.name)
-                        .font(Theme.Font.body(size: exerciseNameFontSize, weight: .semibold))
-                        .foregroundStyle(paper)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.76)
-                        .frame(width: exerciseNameColumnWidth, alignment: .leading)
+                    HStack(spacing: 6) {
+                        if let kind = line.structureKind {
+                            WorkoutStructureIcon(kind: kind, size: 18, symbolSize: 9)
+                        }
+                        Text(line.name)
+                            .font(Theme.Font.body(size: exerciseNameFontSize, weight: .semibold))
+                            .foregroundStyle(paper)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.76)
+                    }
+                    .frame(width: exerciseNameColumnWidth, alignment: .leading)
                     Text(line.topSetText)
                         .font(Theme.Font.mono(size: exerciseValueFontSize, weight: .bold))
                         .foregroundStyle(paper.opacity(0.82))

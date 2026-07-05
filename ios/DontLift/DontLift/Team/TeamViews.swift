@@ -2000,9 +2000,17 @@ private struct TeamPlanShareDetailView: View {
                 .frame(width: 22, height: 22)
                 .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.unitDisplayName)
-                    .font(Theme.Font.body(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg)
+                HStack(spacing: 6) {
+                    if item.isDropSet {
+                        WorkoutStructureIcon(kind: .dropSet)
+                    } else if item.isSuperset {
+                        WorkoutStructureIcon(kind: .superset)
+                    }
+                    Text(itemTitle(item))
+                        .font(Theme.Font.body(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.Color.fg)
+                        .lineLimit(1)
+                }
                 Text(itemPrescription(item))
                     .font(Theme.Font.mono(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.muted)
@@ -2078,7 +2086,7 @@ private struct TeamPlanShareDetailView: View {
 
     private func itemPrescription(_ item: PlanItem) -> String {
         if item.isSuperset {
-            return "\(item.supersetRounds) 轮 · \(item.supersetRounds * item.orderedSupersetMembers.count) 组"
+            return "\(item.supersetRounds) 组 · 共 \(item.supersetRounds * item.orderedSupersetMembers.count) 组动作"
         }
         let sets = max(1, item.suggestedSets ?? PlanDefaults.suggestedSets)
         if let reps = item.suggestedReps {
@@ -2087,9 +2095,14 @@ private struct TeamPlanShareDetailView: View {
         return "\(sets) 组"
     }
 
+    private func itemTitle(_ item: PlanItem) -> String {
+        if item.isSuperset { return item.supersetTitle }
+        return item.displayExerciseName
+    }
+
     private func itemMeta(_ item: PlanItem) -> String? {
         if item.isSuperset {
-            return "超级组 · " + item.orderedSupersetMembers.map(\.displayExerciseName).joined(separator: " + ")
+            return nil
         }
         return [item.resolvedPrimaryMuscle, item.resolvedEquipmentType]
             .compactMap { value in

@@ -80,13 +80,34 @@ struct AdaptivePlanTests {
     }
 
     @Test func strictModePrefillsDropSetPrescription() {
+        let item = PlanItem.dropSet(
+            orderIndex: 0,
+            builtinExerciseCode: "BB_BENCH",
+            exerciseName: "卧推",
+            segments: [
+                WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8),
+                WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6)
+            ]
+        )
+
+        let sets = PlanPrefill.sets(for: item, mode: .strict, history: [])
+
+        #expect(PlanPrefill.missingStrictRequiredItems(in: [item]).isEmpty)
+        #expect(sets.count == 1)
+        #expect(sets[0].setType == .drop)
+        #expect(!sets[0].completed)
+        #expect(sets[0].segments.map(\.weightKg) == [80, 60])
+        #expect(sets[0].segments.map(\.reps) == [8, 6])
+    }
+
+    @Test func normalPlanItemIgnoresNestedDropPrescription() {
         let item = PlanItem(
             builtinExerciseCode: "BB_BENCH",
             exerciseName: "卧推",
             orderIndex: 0,
-            suggestedSets: 1,
+            suggestedSets: 3,
             suggestedReps: 8,
-            suggestedWeightKg: 80,
+            suggestedWeightKg: 60,
             setPrescriptions: [
                 PlanSetPrescription(
                     setType: .drop,
@@ -101,25 +122,27 @@ struct AdaptivePlanTests {
 
         let sets = PlanPrefill.sets(for: item, mode: .strict, history: [])
 
-        #expect(PlanPrefill.missingStrictRequiredItems(in: [item]).isEmpty)
-        #expect(sets.count == 1)
-        #expect(sets[0].setType == .drop)
-        #expect(!sets[0].completed)
-        #expect(sets[0].segments.map(\.weightKg) == [80, 60])
-        #expect(sets[0].segments.map(\.reps) == [8, 6])
+        #expect(!item.isDropSet)
+        #expect(sets.count == 3)
+        #expect(sets.allSatisfy { $0.setType == .working })
+        #expect(sets.map(\.weightKg) == [60, 60, 60])
+        #expect(sets.map(\.reps) == [8, 8, 8])
     }
 
-    @Test func manualPrescriptionEditingWritesDropSetSummaryAndPrefill() {
-        var item = PlanItem(builtinExerciseCode: "BB_BENCH",
-                            exerciseName: "卧推",
-                            orderIndex: 0,
-                            suggestedSets: 4,
-                            suggestedReps: 10)
+    @Test func dropSetPrescriptionEditingWritesSummaryAndPrefill() {
+        var item = PlanItem.dropSet(
+            orderIndex: 0,
+            builtinExerciseCode: "BB_BENCH",
+            exerciseName: "卧推",
+            segments: [
+                WorkoutSetSegment(segmentIndex: 0, weightKg: 75, reps: 8),
+                WorkoutSetSegment(segmentIndex: 1, weightKg: 55, reps: 6)
+            ]
+        )
 
         item.applyManualSetPrescriptions([
-            PlanSetPrescription(setType: .working, orderIndex: 0, weightKg: 70, reps: 5),
             PlanSetPrescription(setType: .drop,
-                                orderIndex: 1,
+                                orderIndex: 0,
                                 segments: [
                                     WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8),
                                     WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6)
@@ -129,15 +152,14 @@ struct AdaptivePlanTests {
         #expect(item.suggestedSets == 2)
         #expect(item.suggestedWeightKg == 80)
         #expect(item.suggestedReps == 8)
-        #expect(item.setPrescriptions?.map(\.orderIndex) == [0, 1])
-        #expect(item.setPrescriptions?.last?.setType == .drop)
+        #expect(item.setPrescriptions?.map(\.orderIndex) == [0])
+        #expect(item.setPrescriptions?.first?.setType == .drop)
 
         let sets = PlanPrefill.sets(for: item, mode: .strict, history: [])
-        #expect(sets.count == 2)
-        #expect(sets[0].setType == .working)
-        #expect(sets[1].setType == .drop)
-        #expect(sets[1].segments.map(\.weightKg) == [80, 60])
-        #expect(sets[1].segments.map(\.reps) == [8, 6])
+        #expect(sets.count == 1)
+        #expect(sets[0].setType == .drop)
+        #expect(sets[0].segments.map(\.weightKg) == [80, 60])
+        #expect(sets[0].segments.map(\.reps) == [8, 6])
     }
 
     @Test func strictModeDoesNotCreateFallbackSetsWhenRequiredPresetMissing() {
@@ -220,23 +242,14 @@ struct AdaptivePlanTests {
                                        planItemId: planItemId)
         exercise.sets = [dropSet(segments: [(82.5, 7), (62.5, 6)])]
         workout.exercises = [exercise]
-        let item = PlanItem(
+        let item = PlanItem.dropSet(
             itemId: planItemId,
+            orderIndex: 0,
             builtinExerciseCode: key,
             exerciseName: "卧推",
-            orderIndex: 0,
-            suggestedSets: 1,
-            suggestedReps: 8,
-            suggestedWeightKg: 80,
-            setPrescriptions: [
-                PlanSetPrescription(
-                    setType: .drop,
-                    orderIndex: 0,
-                    segments: [
-                        WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8),
-                        WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6)
-                    ]
-                )
+            segments: [
+                WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8),
+                WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6)
             ]
         )
 
@@ -249,22 +262,13 @@ struct AdaptivePlanTests {
     }
 
     @Test func adaptiveFallsBackToDropPrescriptionWhenNoHistory() {
-        let item = PlanItem(
+        let item = PlanItem.dropSet(
+            orderIndex: 0,
             builtinExerciseCode: "BB_BENCH",
             exerciseName: "卧推",
-            orderIndex: 0,
-            suggestedSets: 1,
-            suggestedReps: 8,
-            suggestedWeightKg: 80,
-            setPrescriptions: [
-                PlanSetPrescription(
-                    setType: .drop,
-                    orderIndex: 0,
-                    segments: [
-                        WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8),
-                        WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6)
-                    ]
-                )
+            segments: [
+                WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8),
+                WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6)
             ]
         )
 
@@ -401,8 +405,14 @@ struct AdaptivePlanTests {
     @Test func mergeWritesDropSetPrescriptionAndTopSegmentSummary() {
         let key = "BB_BENCH"
         let itemId = UUID()
-        let plan = [PlanItem(itemId: itemId, builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 0,
-                             suggestedSets: 1, suggestedReps: 8, suggestedWeightKg: 75)]
+        let plan = [PlanItem.dropSet(itemId: itemId,
+                                     orderIndex: 0,
+                                     builtinExerciseCode: key,
+                                     exerciseName: "卧推",
+                                     segments: [
+                                        WorkoutSetSegment(segmentIndex: 0, weightKg: 75, reps: 8),
+                                        WorkoutSetSegment(segmentIndex: 1, weightKg: 55, reps: 6)
+                                     ])]
         let workout = Workout(startedAt: Date(timeIntervalSince1970: 2000),
                               endedAt: Date(timeIntervalSince1970: 5600))
         let exercise = WorkoutExercise(builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 0,
@@ -412,7 +422,7 @@ struct AdaptivePlanTests {
 
         let updated = PlanWriteback.merge(planItems: plan, workout: workout).newItems.first!
 
-        #expect(updated.suggestedSets == 1)
+        #expect(updated.suggestedSets == 2)
         #expect(updated.suggestedWeightKg == 80)
         #expect(updated.suggestedReps == 8)
         #expect(updated.setPrescriptions?.first?.setType == .drop)

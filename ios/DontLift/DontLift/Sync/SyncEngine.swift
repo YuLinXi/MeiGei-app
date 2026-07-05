@@ -460,6 +460,7 @@ final class SyncEngine {
                                          plannedRestSeconds: st.plannedRestSeconds,
                                          actualRestSeconds: st.actualRestSeconds,
                                          setType: st.setTypeRaw,
+                                         isWarmup: st.isWarmupEffective,
                                          segments: Self.encodeSegments(st.segments))
                 })
         }
@@ -504,11 +505,13 @@ final class SyncEngine {
                 // 解码缺失/未识别值兜底 working（兼容旧后端、旧数据、跨版本扩展类型）。
                 let type = $0.setType.flatMap(WorkoutSetType.init(rawValue:)) ?? .working
                 let segments = Self.decodeSegments($0.segments)
+                let isWarmup = ($0.isWarmup ?? false) || type == .warmup
                 return WorkoutSet(localId: $0.id, setIndex: $0.setIndex, weightKg: $0.weightKg,
                                   reps: $0.reps, completed: $0.completed ?? false, note: $0.note,
                                   plannedRestSeconds: $0.plannedRestSeconds,
                                   actualRestSeconds: $0.actualRestSeconds,
                                   setType: type,
+                                  isWarmup: isWarmup,
                                   segments: segments)
             }
             return ex

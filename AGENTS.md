@@ -2,6 +2,8 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
+Spend time on thinking; you do not need to use the commentary channel to report progress to me.
+
 ## 语言规范
 
 - 始终使用**简体中文**与用户交流、回答问题。

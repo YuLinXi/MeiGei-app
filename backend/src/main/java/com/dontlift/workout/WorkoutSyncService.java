@@ -164,9 +164,23 @@ public class WorkoutSyncService {
             }
             for (WorkoutSet s : node.sets()) {
                 s.setWorkoutExerciseId(e.getId());
+                normalizeSetTypeAndWarmup(s);
                 s.setSegments(normalizedSegments(s.getSegments()));
                 setMapper.insert(s);
             }
+        }
+    }
+
+    private void normalizeSetTypeAndWarmup(WorkoutSet set) {
+        if ("warmup".equals(set.getSetType())) {
+            set.setIsWarmup(true);
+            set.setSetType("working");
+        }
+        if (set.getSetType() == null || set.getSetType().isBlank()) {
+            set.setSetType("working");
+        }
+        if (set.getIsWarmup() == null) {
+            set.setIsWarmup(false);
         }
     }
 
