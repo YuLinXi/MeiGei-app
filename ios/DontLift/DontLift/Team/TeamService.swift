@@ -385,6 +385,26 @@ final class TeamService {
                     }
                 )
             }
+            if item.isDropSet {
+                let prescriptions = weightlessPrescriptions(item.dropSetPrescriptions) ?? [
+                    PlanSetPrescription(setType: .drop,
+                                        orderIndex: 0,
+                                        reps: item.suggestedReps,
+                                        segments: [WorkoutSetSegment(segmentIndex: 0, reps: item.suggestedReps)])
+                ]
+                return PlanItem(itemId: item.itemId,
+                                unitKind: .dropSet,
+                                builtinExerciseCode: item.builtinExerciseCode,
+                                customExerciseId: item.customExerciseId,
+                                exerciseName: item.exerciseName,
+                                primaryMuscle: item.primaryMuscle,
+                                equipmentType: item.equipmentType,
+                                orderIndex: item.orderIndex,
+                                suggestedSets: max(1, item.suggestedSets ?? prescriptions.count),
+                                suggestedReps: item.suggestedReps,
+                                suggestedWeightKg: nil,
+                                setPrescriptions: prescriptions)
+            }
             return PlanItem(itemId: item.itemId,
                             builtinExerciseCode: item.builtinExerciseCode,
                             customExerciseId: item.customExerciseId,
@@ -400,20 +420,28 @@ final class TeamService {
         return (try? String(data: JSONCoding.encoder.encode(items), encoding: .utf8)) ?? "[]"
     }
 
+    private static func weightlessSegments(_ segments: [WorkoutSetSegment]) -> [WorkoutSetSegment] {
+        segments
+            .sorted { $0.segmentIndex < $1.segmentIndex }
+            .enumerated()
+            .map { idx, segment in
+                WorkoutSetSegment(segmentId: segment.segmentId,
+                                  segmentIndex: idx,
+                                  weightKg: nil,
+                                  reps: segment.reps)
+            }
+    }
+
     private static func weightlessPrescriptions(_ prescriptions: [PlanSetPrescription]) -> [PlanSetPrescription]? {
         guard !prescriptions.isEmpty else { return nil }
         return prescriptions.map { prescription in
-            let segments = prescription.segments.map {
-                WorkoutSetSegment(segmentId: $0.segmentId,
-                                  segmentIndex: $0.segmentIndex,
-                                  weightKg: nil,
-                                  reps: $0.reps)
-            }
+            let segments = weightlessSegments(prescription.segments)
             return PlanSetPrescription(prescriptionId: prescription.prescriptionId,
                                        setType: prescription.setType,
                                        orderIndex: prescription.orderIndex,
                                        weightKg: nil,
                                        reps: prescription.reps,
+                                       isWarmup: prescription.isWarmupEffective,
                                        segments: segments)
         }
     }

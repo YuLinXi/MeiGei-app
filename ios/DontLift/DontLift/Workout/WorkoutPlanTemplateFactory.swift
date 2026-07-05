@@ -70,19 +70,26 @@ extension Workout {
     }
 
     private func dropSetPlanItem(from ex: WorkoutExercise, orderIndex: Int) -> PlanItem? {
-        let dropSets = ex.sets.sorted(by: { $0.setIndex < $1.setIndex }).filter(\.isDropSet)
+        let dropSets = ex.sets
+            .sorted(by: { $0.setIndex < $1.setIndex })
+            .filter { $0.isDropSet && $0.countsForStats }
         guard let set = dropSets.first,
               !set.effectiveSegments.isEmpty else {
             return nil
         }
-        return PlanItem.dropSet(orderIndex: orderIndex,
-                                builtinExerciseCode: ex.builtinExerciseCode,
-                                customExerciseId: ex.customExerciseId,
-                                exerciseName: ex.exerciseName,
-                                primaryMuscle: ex.primaryMuscle,
-                                groupCount: max(1, dropSets.count),
-                                isWarmup: set.isWarmupEffective,
-                                segments: set.effectiveSegments)
+        let top = dropSets.flatMap(\.statEntries).max { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
+        return PlanItem(unitKind: .dropSet,
+                        builtinExerciseCode: ex.builtinExerciseCode,
+                        customExerciseId: ex.customExerciseId,
+                        exerciseName: ex.exerciseName,
+                        primaryMuscle: ex.primaryMuscle,
+                        orderIndex: orderIndex,
+                        suggestedSets: dropSets.count,
+                        suggestedReps: top?.reps,
+                        suggestedWeightKg: top?.weightKg,
+                        setPrescriptions: dropSets.enumerated().map { idx, set in
+                            Self.planPrescription(from: set, orderIndex: idx)
+                        })
     }
 
     private func supersetMemberSummary(from ex: WorkoutExercise) -> (weightKg: Double?, reps: Int?)? {

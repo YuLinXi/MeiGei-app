@@ -898,8 +898,11 @@ struct WorkoutLoggingView: View {
     }
 
     private var workoutOrderItems: [ExerciseOrderItem] {
-        workout.exercises.sorted { $0.orderIndex < $1.orderIndex }.map {
-            ExerciseOrderItem(id: $0.localId, title: $0.exerciseName, subtitle: orderSubtitle(for: $0))
+        workout.trainingUnits.map { unit in
+            ExerciseOrderItem(id: unit.unitId,
+                              title: orderTitle(for: unit),
+                              subtitle: orderSubtitle(for: unit),
+                              structureKind: structureIconKind(for: unit))
         }
     }
 
@@ -1390,11 +1393,51 @@ struct WorkoutLoggingView: View {
         }
     }
 
+    private func orderTitle(for unit: WorkoutUnit) -> String {
+        switch unit.kind {
+        case .singleExercise, .dropSet:
+            guard let id = unit.singleExerciseId,
+                  let ex = workout.exercise(id: id) else { return "动作" }
+            return ex.displayExerciseName
+        case .superset:
+            guard let superset = unit.superset else { return "超级组" }
+            let names = superset.members
+                .sorted { $0.orderIndex < $1.orderIndex }
+                .compactMap { workout.exercise(id: $0.exerciseId)?.displayExerciseName }
+            return names.isEmpty ? "超级组" : names.joined(separator: " + ")
+        }
+    }
+
+    private func orderSubtitle(for unit: WorkoutUnit) -> String {
+        switch unit.kind {
+        case .singleExercise, .dropSet:
+            guard let id = unit.singleExerciseId,
+                  let ex = workout.exercise(id: id) else { return "" }
+            return orderSubtitle(for: ex)
+        case .superset:
+            guard let superset = unit.superset else { return "" }
+            let counts = superset.members.compactMap { member -> Int? in
+                guard let ex = workout.exercise(id: member.exerciseId) else { return nil }
+                return ex.sets.filter(\.completed).count
+            }
+            let done = counts.min() ?? 0
+            return "\(done) / \(superset.roundCount)"
+        }
+    }
+
     private func orderSubtitle(for ex: WorkoutExercise) -> String {
         let total = ex.sets.count
         let done = ex.sets.filter(\.completed).count
         if total == 0 { return "暂无组" }
         return "\(done) / \(total)"
+    }
+
+    private func structureIconKind(for unit: WorkoutUnit) -> WorkoutStructureIconKind? {
+        switch unit.kind {
+        case .singleExercise: return nil
+        case .dropSet: return .dropSet
+        case .superset: return .superset
+        }
     }
 
     /// 手风琴默认展开项：第一个仍有未完成 set 的动作，否则第一个动作。
@@ -2122,11 +2165,36 @@ struct WorkoutLoggingView: View {
     }
 
     private func applyWorkoutExerciseOrder(_ orderedIds: [UUID]) {
-        var byId = Dictionary(uniqueKeysWithValues: workout.exercises.map { ($0.localId, $0) })
-        var sorted = orderedIds.compactMap { byId.removeValue(forKey: $0) }
-        sorted.append(contentsOf: byId.values.sorted { $0.orderIndex < $1.orderIndex })
-        guard sorted.map(\.localId) != workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }).map(\.localId) else { return }
-        for (idx, ex) in sorted.enumerated() { ex.orderIndex = idx }
+        var byId = Dictionary(uniqueKeysWithValues: workout.trainingUnits.map { ($0.unitId, $0) })
+        var sortedUnits = orderedIds.compactMap { byId.removeValue(forKey: $0) }
+        sortedUnits.append(contentsOf: byId.values.sorted { $0.orderIndex < $1.orderIndex })
+        guard sortedUnits.map(\.unitId) != workout.trainingUnits.map(\.unitId) else { return }
+
+        sortedUnits = sortedUnits.enumerated().map { index, unit in
+            var copy = unit
+            copy.orderIndex = index
+            return copy
+        }
+        workout.updateTrainingUnits(sortedUnits)
+
+        var exerciseOrder = 0
+        for unit in workout.trainingUnits {
+            switch unit.kind {
+            case .singleExercise, .dropSet:
+                if let id = unit.singleExerciseId,
+                   let exercise = workout.exercise(id: id) {
+                    exercise.orderIndex = exerciseOrder
+                    exerciseOrder += 1
+                }
+            case .superset:
+                for member in unit.superset?.members.sorted(by: { $0.orderIndex < $1.orderIndex }) ?? [] {
+                    if let exercise = workout.exercise(id: member.exerciseId) {
+                        exercise.orderIndex = exerciseOrder
+                        exerciseOrder += 1
+                    }
+                }
+            }
+        }
         touch()
         Theme.Haptics.selection()
     }
@@ -2622,10 +2690,10 @@ struct WorkoutLoggingView: View {
         guard let cell = focused, let ex = exercise(containing: cell.setId) else { return }
         if workout.dropSetExerciseIds.contains(ex.localId) {
             Theme.Feedback.addSetTap()
-            let newSet = appendDropSet(to: ex)
+            let set = appendDropSet(to: ex)
             touch()
-            if let firstSegment = newSet.sortedSegments.first {
-                focus(.segmentWeight(setId: newSet.localId, segmentId: firstSegment.segmentId))
+            if let segment = set.sortedSegments.first {
+                focus(.segmentWeight(setId: set.localId, segmentId: segment.segmentId))
             }
             return
         }
@@ -2663,11 +2731,10 @@ struct WorkoutLoggingView: View {
     }
 
     private func appendDropSet(to exercise: WorkoutExercise) -> WorkoutSet {
-        let next = (exercise.sets.map(\.setIndex).max() ?? -1) + 1
         let previousDropSet = exercise.sets
             .filter(\.isDropSet)
             .max { $0.setIndex < $1.setIndex }
-        let set = WorkoutSet(setIndex: next,
+        let set = WorkoutSet(setIndex: (exercise.sets.map(\.setIndex).max() ?? -1) + 1,
                              setType: .drop,
                              segments: clonedDropSegments(from: previousDropSet))
         exercise.sets.append(set)

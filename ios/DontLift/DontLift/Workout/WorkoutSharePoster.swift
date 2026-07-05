@@ -33,14 +33,14 @@ struct WorkoutPosterData: Equatable {
                 entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
             }
         }
-        let statEntryCount = statSets.reduce(0) { $0 + $1.statEntries.count }
+        let statSetCount = statSets.count
 
         self.title = Self.title(for: workout, exercises: exercises)
         self.dateText = Self.dateFormatter.string(from: workout.startedAt)
         self.durationText = Self.durationText(start: workout.timerStartedAt ?? workout.startedAt,
                                               end: workout.endedAt ?? workout.startedAt)
         self.volumeText = Self.volumeText(totalVolume)
-        self.setCountText = "\(statEntryCount)"
+        self.setCountText = "\(statSetCount)"
         self.exerciseCountText = "\(exercises.count)"
 
         let lines = Self.exerciseLines(workout: workout)
@@ -72,11 +72,15 @@ struct WorkoutPosterData: Equatable {
                     .sorted { $0.orderIndex < $1.orderIndex }
                     .compactMap { byId[$0.exerciseId] } ?? []
                 guard members.count == 2 else { return nil }
-                let rounds = unit.superset?.roundCount ?? members.map { $0.sets.count }.min() ?? 0
+                let counts = members.map { member in
+                    member.sets.filter(\.countsForStats).count
+                }
+                let rounds = counts.min() ?? 0
+                let actionSets = counts.reduce(0, +)
                 return ExerciseLine(id: "\(index)-\(unit.unitId.uuidString)",
                                     structureKind: .superset,
                                     name: "\(members[0].displayExerciseName) + \(members[1].displayExerciseName)",
-                                    topSetText: "\(rounds) 组 · 共 \(rounds * 2) 组动作")
+                                    topSetText: "\(rounds) 组 · 共 \(actionSets) 组动作")
             }
         }
     }
@@ -121,7 +125,7 @@ struct WorkoutPosterData: Equatable {
 
     private static func topSetText(in sets: [WorkoutSet]) -> String {
         guard !sets.isEmpty else { return "已完成" }
-        let count = sets.reduce(0) { $0 + $1.statEntries.count }
+        let count = sets.count
         if let weighted = topWeightedSet(in: sets) {
             if let reps = weighted.reps {
                 return "\(formatKg(weighted.weightKg))kg × \(reps)次 · 共\(count)组"
@@ -354,7 +358,7 @@ private struct WorkoutPosterVisualCardView: View {
 
                 HStack(spacing: 8) {
                     visualMetric(data.durationText, "时长", unit: "min")
-                    visualMetric(data.volumeText, "训练量", unit: "kg")
+                    visualMetric(data.volumeText, "训练量", unit: "kg·rep")
                     visualMetric(data.setCountText, "组数")
                 }
                 .padding(.top, 24)

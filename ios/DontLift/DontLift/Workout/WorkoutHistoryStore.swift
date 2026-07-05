@@ -676,7 +676,7 @@ final class WorkoutHistoryStore {
             summary.hasPR = summary.hasPR || prByWorkoutId[workout.localId] != nil
             for exercise in workout.exercises {
                 for set in exercise.sets where set.countsForStats {
-                    summary.setCount += set.statEntries.count
+                    summary.setCount += 1
                     summary.volumeKg += set.statEntries.reduce(0.0) { acc, entry in
                         acc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
                     }

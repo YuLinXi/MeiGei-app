@@ -439,7 +439,7 @@ private struct ExerciseLogCard: View {
         let statSets = done.filter(\.countsForStats)
         let count = statSets.isEmpty
             ? sortedSets.count
-            : statSets.reduce(0) { $0 + $1.statEntries.count }
+            : statSets.count
         let vol = (statSets.isEmpty ? sortedSets : statSets).reduce(0.0) { acc, s in
             guard s.countsForStats else { return acc }
             return acc + s.statEntries.reduce(0.0) { entryAcc, entry in

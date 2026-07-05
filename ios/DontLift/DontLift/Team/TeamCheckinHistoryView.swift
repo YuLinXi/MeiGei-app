@@ -297,7 +297,7 @@ struct TeamCheckinDetailSheet: View {
             HStack(spacing: 8) {
                 statPill(title: "动作", value: summary.map { "\($0.exerciseCount)" } ?? "—")
                 statPill(title: "组数", value: summary.map { "\($0.totalSets)" } ?? "—")
-                statPill(title: "容量", value: summary.map { formatKg($0.totalVolumeKg) + "kg" } ?? "—")
+                statPill(title: "训练量", value: summary.map { formatKg($0.totalVolumeKg) + "kg·rep" } ?? "—")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

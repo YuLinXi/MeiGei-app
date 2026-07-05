@@ -161,24 +161,26 @@ enum PlanPrefill {
 
     private static func startPrescriptions(for item: PlanItem) -> [PlanSetPrescription] {
         if item.isDropSet {
-            guard let template = item.dropSetPrescriptions.first else { return [] }
-            let count = max(1, item.suggestedSets ?? 1)
+            let templates = item.dropSetPrescriptions
+            guard let firstTemplate = templates.first else { return [] }
+            let count = max(1, item.suggestedSets ?? templates.count, templates.count)
             return (0..<count).map { index in
-                PlanSetPrescription(prescriptionId: index == 0 ? template.prescriptionId : UUID(),
-                                    setType: .drop,
-                                    orderIndex: index,
-                                    weightKg: template.weightKg,
-                                    reps: template.reps,
-                                    isWarmup: template.isWarmup,
-                                    segments: template.segments
-                                        .sorted { $0.segmentIndex < $1.segmentIndex }
-                                        .enumerated()
-                                        .map { segmentIndex, segment in
-                                            WorkoutSetSegment(segmentId: index == 0 ? segment.segmentId : UUID(),
-                                                              segmentIndex: segmentIndex,
-                                                              weightKg: segment.weightKg,
-                                                              reps: segment.reps)
-                                        })
+                let template = templates.indices.contains(index) ? templates[index] : firstTemplate
+                return PlanSetPrescription(prescriptionId: templates.indices.contains(index) ? template.prescriptionId : UUID(),
+                                           setType: .drop,
+                                           orderIndex: index,
+                                           weightKg: template.weightKg,
+                                           reps: template.reps,
+                                           isWarmup: template.isWarmupEffective,
+                                           segments: template.segments
+                                            .sorted { $0.segmentIndex < $1.segmentIndex }
+                                            .enumerated()
+                                            .map { segmentIndex, segment in
+                                                WorkoutSetSegment(segmentId: templates.indices.contains(index) ? segment.segmentId : UUID(),
+                                                                  segmentIndex: segmentIndex,
+                                                                  weightKg: segment.weightKg,
+                                                                  reps: segment.reps)
+                                            })
             }
         }
         return item.orderedSetPrescriptions.filter { $0.setType != .drop }
@@ -198,7 +200,7 @@ enum PlanPrefill {
                               weightKg: prescription.weightKg,
                               reps: prescription.reps,
                               setType: type,
-                              isWarmup: prescription.isWarmup,
+                              isWarmup: prescription.isWarmupEffective,
                               segments: type == .drop ? segments : [])
         }
     }
@@ -378,9 +380,7 @@ struct PlanPrescriptionPreview {
     }
 
     private var previewSetCount: Int {
-        sets.reduce(0) { total, set in
-            total + (set.isDropSet ? max(1, set.effectiveSegments.count) : 1)
-        }
+        sets.count
     }
 
     static func make(for item: PlanItem, mode: WorkoutPlanMode, history: [Workout], planId: UUID? = nil) -> PlanPrescriptionPreview {
@@ -531,9 +531,13 @@ enum PlanWriteback {
             let matchIdx = matchIndex(for: ex, in: items, isDropSetUnit: isDropSetUnit)
             let existingPrescriptions = matchIdx.map { items[$0].orderedSetPrescriptions } ?? []
             let prescriptions: [PlanSetPrescription]
-            if isDropSetUnit, let dropSet = working.first(where: \.isDropSet) {
-                let existing = existingPrescriptions.first(where: { $0.setType == .drop })
-                prescriptions = [prescription(from: dropSet, orderIndex: 0, existing: existing)]
+            if isDropSetUnit {
+                let existingDrops = existingPrescriptions.filter { $0.setType == .drop }
+                prescriptions = working.filter(\.isDropSet).enumerated().map { idx, set in
+                    prescription(from: set,
+                                 orderIndex: idx,
+                                 existing: existingDrops.indices.contains(idx) ? existingDrops[idx] : nil)
+                }
             } else {
                 prescriptions = working.enumerated().map { idx, set in
                     prescription(from: set, orderIndex: idx, existing: existingPrescriptions.indices.contains(idx) ? existingPrescriptions[idx] : nil)
@@ -543,10 +547,15 @@ enum PlanWriteback {
             if let idx = matchIdx {
                 let before = summary(items[idx])
                 let beforePrescriptions = items[idx].setPrescriptions
-                items[idx].suggestedSets = max(items[idx].suggestedSets ?? 0, setCount)  // 组数只增不减
+                let targetSetCount = max(items[idx].suggestedSets ?? 0, setCount)
+                items[idx].suggestedSets = targetSetCount  // 组数只增不减
                 items[idx].suggestedWeightKg = top.weightKg                              // 重量如实
                 items[idx].suggestedReps = top.reps                                      // 次数如实
-                items[idx].setPrescriptions = prescriptions
+                items[idx].setPrescriptions = isDropSetUnit
+                    ? mergedDropPrescriptions(observed: prescriptions,
+                                              existing: existingPrescriptions.filter { $0.setType == .drop },
+                                              targetCount: targetSetCount)
+                    : prescriptions
                 touchedItemIds.insert(items[idx].itemId)
                 let after = summary(items[idx])
                 if after != before || beforePrescriptions != items[idx].setPrescriptions {
@@ -555,15 +564,19 @@ enum PlanWriteback {
                 }
             } else {
                 let newItem: PlanItem
-                if isDropSetUnit, let drop = prescriptions.first(where: { $0.setType == .drop }) {
-                    newItem = PlanItem.dropSet(orderIndex: nextOrder,
-                                               builtinExerciseCode: ex.builtinExerciseCode,
-                                               customExerciseId: ex.customExerciseId,
-                                               exerciseName: ex.exerciseName,
-                                               primaryMuscle: ex.primaryMuscle,
-                                               groupCount: setCount,
-                                               isWarmup: drop.isWarmup ?? false,
-                                               segments: drop.segments)
+                if isDropSetUnit {
+                    newItem = PlanItem(itemId: UUID(),
+                                       unitKind: .dropSet,
+                                       builtinExerciseCode: ex.builtinExerciseCode,
+                                       customExerciseId: ex.customExerciseId,
+                                       exerciseName: ex.exerciseName,
+                                       primaryMuscle: ex.primaryMuscle,
+                                       equipmentType: nil,
+                                       orderIndex: nextOrder,
+                                       suggestedSets: setCount,
+                                       suggestedReps: top.reps,
+                                       suggestedWeightKg: top.weightKg,
+                                       setPrescriptions: prescriptions)
                 } else {
                     newItem = PlanItem(itemId: UUID(),
                                        builtinExerciseCode: ex.builtinExerciseCode,
@@ -636,6 +649,59 @@ enum PlanWriteback {
                                    weightKg: set.weightKg,
                                    reps: set.reps,
                                    isWarmup: warmupPrescriptionValue(for: set, existing: existing))
+    }
+
+    private static func mergedDropPrescriptions(observed: [PlanSetPrescription],
+                                                existing: [PlanSetPrescription],
+                                                targetCount: Int) -> [PlanSetPrescription] {
+        guard targetCount > 0 else { return [] }
+        let fallback = observed.last ?? existing.last
+        return (0..<targetCount).compactMap { index in
+            if observed.indices.contains(index) {
+                return reindexedDropPrescription(observed[index], orderIndex: index)
+            }
+            if existing.indices.contains(index) {
+                return reindexedDropPrescription(existing[index], orderIndex: index)
+            }
+            guard let fallback else { return nil }
+            return clonedDropPrescription(fallback, orderIndex: index)
+        }
+    }
+
+    private static func reindexedDropPrescription(_ prescription: PlanSetPrescription,
+                                                  orderIndex: Int) -> PlanSetPrescription {
+        PlanSetPrescription(prescriptionId: prescription.prescriptionId,
+                            setType: .drop,
+                            orderIndex: orderIndex,
+                            weightKg: prescription.weightKg,
+                            reps: prescription.reps,
+                            isWarmup: prescription.isWarmupEffective,
+                            segments: prescription.segments
+                                .sorted { $0.segmentIndex < $1.segmentIndex }
+                                .enumerated()
+                                .map { idx, segment in
+                                    WorkoutSetSegment(segmentId: segment.segmentId,
+                                                      segmentIndex: idx,
+                                                      weightKg: segment.weightKg,
+                                                      reps: segment.reps)
+                                })
+    }
+
+    private static func clonedDropPrescription(_ prescription: PlanSetPrescription,
+                                               orderIndex: Int) -> PlanSetPrescription {
+        PlanSetPrescription(setType: .drop,
+                            orderIndex: orderIndex,
+                            weightKg: prescription.weightKg,
+                            reps: prescription.reps,
+                            isWarmup: prescription.isWarmupEffective,
+                            segments: prescription.segments
+                                .sorted { $0.segmentIndex < $1.segmentIndex }
+                                .enumerated()
+                                .map { idx, segment in
+                                    WorkoutSetSegment(segmentIndex: idx,
+                                                      weightKg: segment.weightKg,
+                                                      reps: segment.reps)
+                                })
     }
 
     private static func warmupPrescriptionValue(for set: WorkoutSet, existing: PlanSetPrescription?) -> Bool? {

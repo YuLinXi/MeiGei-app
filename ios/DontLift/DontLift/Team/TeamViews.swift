@@ -1451,7 +1451,7 @@ struct FeedItemCard: View {
             var sep = AttributedString(" · ")
             sep.foregroundColor = Theme.Color.fg2
             s.append(sep)
-            var vol = AttributedString("\(formatKg(summary.totalVolumeKg)) kg")
+            var vol = AttributedString("\(formatKg(summary.totalVolumeKg)) kg·rep")
             vol.foregroundColor = Theme.Color.fg
             s.append(vol)
         }

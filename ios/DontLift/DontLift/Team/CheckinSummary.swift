@@ -10,7 +10,7 @@ struct CheckinSummary: Codable, Hashable, Identifiable {
     var endedAt: Date?
     var exerciseCount: Int
     var totalSets: Int
-    /// 已完成组的总容量（Σ 重量×次数），kg。
+    /// 已完成组的总训练量（Σ 重量×次数），kg·rep。
     var totalVolumeKg: Double
     var exercises: [ExerciseSummary]
     var units: [UnitSummary]?
@@ -57,7 +57,7 @@ extension CheckinSummary {
         let summaries: [ExerciseSummary] = exs.map { ex in
             let sets = ex.sets.sorted { $0.setIndex < $1.setIndex }
             let statSets = sets.filter(\.countsForStats)
-            totalSets += statSets.reduce(0) { $0 + $1.statEntries.count }
+            totalSets += statSets.count
             for s in statSets {
                 volume += s.statEntries.reduce(0.0) { acc, entry in
                     acc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
@@ -117,7 +117,7 @@ extension CheckinSummary {
                 return UnitSummary(unitId: unit.unitId,
                                    kindRaw: unit.kindRaw,
                                    title: title.isEmpty ? "超级组" : title,
-                                   roundCount: unit.superset?.roundCount,
+                                   roundCount: exercises.map(\.sets.count).min(),
                                    exercises: exercises)
             }
         }
@@ -126,7 +126,7 @@ extension CheckinSummary {
     /// 列表行用的一句话摘要。
     var headline: String {
         var parts = ["\(exerciseCount)个动作", "\(totalSets)组"]
-        if totalVolumeKg > 0 { parts.append("\(formatKg(totalVolumeKg)) kg 容量") }
+        if totalVolumeKg > 0 { parts.append("\(formatKg(totalVolumeKg)) kg·rep") }
         return parts.joined(separator: " · ")
     }
 }

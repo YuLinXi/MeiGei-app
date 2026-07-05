@@ -310,21 +310,6 @@ extension Workout {
         updateTrainingUnits(units)
     }
 
-    func replaceSupersetWithSingles(_ unitId: UUID) {
-        var units = trainingUnits
-        guard let idx = units.firstIndex(where: { $0.unitId == unitId }),
-              let superset = units[idx].superset else { return }
-        let baseOrder = units[idx].orderIndex
-        let singles = superset.members.sorted { $0.orderIndex < $1.orderIndex }.enumerated().map { offset, member in
-            WorkoutUnit(kind: .singleExercise,
-                        orderIndex: baseOrder + offset,
-                        singleExerciseId: member.exerciseId)
-        }
-        units.remove(at: idx)
-        units.insert(contentsOf: singles, at: idx)
-        updateTrainingUnits(units)
-    }
-
     func updateSuperset(_ unit: WorkoutUnit) {
         var units = trainingUnits
         if let idx = units.firstIndex(where: { $0.unitId == unit.unitId }) {
@@ -356,8 +341,7 @@ extension Workout {
     }
 
     static func encodeUnits(_ units: [WorkoutUnit]) -> String? {
-        guard !units.isEmpty,
-              let data = try? JSONCoding.encoder.encode(units),
+        guard let data = try? JSONCoding.encoder.encode(units),
               let json = String(data: data, encoding: .utf8) else {
             return nil
         }
@@ -520,7 +504,7 @@ extension WorkoutSet {
     /// 兼容旧 raw 值的热身判据。新写入使用 `isWarmup`，旧本地/同步数据可能仍为 `setTypeRaw == "warmup"`。
     var isWarmupEffective: Bool { isWarmup || setTypeRaw == WorkoutSetType.warmup.rawValue }
 
-    /// 统计判据：已完成且非热身。递减组完成组数按外层组计，训练量/PR 仍由 `statEntries` 展开 segments。
+    /// 统计判据：已完成且非热身。递减组完成组数按父组计，训练量/PR 由 `statEntries` 展开 segments。
     var countsForStats: Bool { completed && !isWarmupEffective }
 
     var isDropSet: Bool { setType == .drop }

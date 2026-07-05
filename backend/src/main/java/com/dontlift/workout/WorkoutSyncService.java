@@ -150,6 +150,7 @@ public class WorkoutSyncService {
 
     /** 删旧子树（动作删除级联删组）后按上传内容重建。 */
     private void replaceChildren(UUID userId, UUID workoutId, List<WorkoutTree.ExerciseNode> nodes) {
+        Map<UUID, WorkoutSet> existingSetsById = existingSetsById(workoutId);
         exerciseMapper.deleteByWorkout(workoutId);
         if (nodes == null) {
             return;
@@ -164,14 +165,27 @@ public class WorkoutSyncService {
             }
             for (WorkoutSet s : node.sets()) {
                 s.setWorkoutExerciseId(e.getId());
-                normalizeSetTypeAndWarmup(s);
+                normalizeSetTypeAndWarmup(s, existingSetsById.get(s.getId()));
                 s.setSegments(normalizedSegments(s.getSegments()));
                 setMapper.insert(s);
             }
         }
     }
 
-    private void normalizeSetTypeAndWarmup(WorkoutSet set) {
+    private Map<UUID, WorkoutSet> existingSetsById(UUID workoutId) {
+        List<WorkoutExercise> exercises = exerciseMapper.findByWorkout(workoutId);
+        if (exercises.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> exerciseIds = exercises.stream().map(WorkoutExercise::getId).toList();
+        if (exerciseIds.isEmpty()) {
+            return Map.of();
+        }
+        return setMapper.findByExercises(exerciseIds).stream()
+                .collect(Collectors.toMap(WorkoutSet::getId, s -> s, (left, right) -> left));
+    }
+
+    private void normalizeSetTypeAndWarmup(WorkoutSet set, WorkoutSet existing) {
         if ("warmup".equals(set.getSetType())) {
             set.setIsWarmup(true);
             set.setSetType("working");
@@ -180,7 +194,7 @@ public class WorkoutSyncService {
             set.setSetType("working");
         }
         if (set.getIsWarmup() == null) {
-            set.setIsWarmup(false);
+            set.setIsWarmup(existing != null && Boolean.TRUE.equals(existing.getIsWarmup()));
         }
     }
 

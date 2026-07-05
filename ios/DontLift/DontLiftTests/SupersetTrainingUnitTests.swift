@@ -17,6 +17,13 @@ struct SupersetTrainingUnitTests {
         #expect(workout.storedUnits.count == 1)
     }
 
+    @Test func encodeUnitsKeepsExplicitEmptyArrayForSync() throws {
+        let json = try #require(Workout.encodeUnits([]))
+
+        #expect(json == "[]")
+        #expect(Workout.decodeUnits(json).isEmpty)
+    }
+
     @Test func invalidSupersetUnitsFallBackToSingleExerciseUnits() {
         let workout = Workout(title: "旧训练")
         let first = workoutExercise(name: "夹胸", orderIndex: 0)
@@ -133,26 +140,6 @@ struct SupersetTrainingUnitTests {
         #expect(set.segments.map(\.weightKg) == [80, 60])
         #expect(set.segments.map(\.reps) == [8, 6])
         #expect(workout.totalExerciseCountForDisplay == 1)
-    }
-
-    @Test func dissolveSupersetPreservesMemberSetDataAsSingleUnits() throws {
-        let workout = supersetWorkout(rounds: 2)
-        let unit = try #require(workout.trainingUnits.first)
-        let first = try #require(workout.exercises.first { $0.exerciseName == "夹胸" })
-        let second = try #require(workout.exercises.first { $0.exerciseName == "下斜卧推" })
-        first.sets.first?.note = "第一组"
-
-        workout.replaceSupersetWithSingles(unit.unitId)
-
-        let units = workout.trainingUnits
-        #expect(units.count == 2)
-        #expect(units.allSatisfy { $0.kind == .singleExercise })
-        #expect(units.map(\.singleExerciseId) == [first.localId, second.localId])
-        #expect(first.sets.count == 2)
-        #expect(second.sets.count == 2)
-        #expect(first.sets.first?.note == "第一组")
-        #expect(first.sets.allSatisfy { $0.completed })
-        #expect(second.sets.allSatisfy { $0.completed })
     }
 
     @Test func statsTeamSummaryPosterAndPRExpandSupersetMembers() throws {
@@ -294,6 +281,31 @@ struct SupersetTrainingUnitTests {
         #expect(shared.supersetRestAfterRoundSeconds == 90)
         #expect(shared.orderedSupersetMembers.map(\.suggestedWeightKg) == [Double?](arrayLiteral: nil, nil))
         #expect(shared.orderedSupersetMembers.map(\.suggestedReps) == [Int?](arrayLiteral: 12, 15))
+    }
+
+    @Test func teamPlanShareStripsDropSetWeightsButKeepsStructureAndSegments() throws {
+        let item = PlanItem.dropSet(
+            orderIndex: 0,
+            builtinExerciseCode: "BB_BENCH",
+            exerciseName: "卧推",
+            segments: [
+                WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8),
+                WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6)
+            ]
+        )
+        let plan = WorkoutPlan(name: "胸", items: [item])
+
+        let json = TeamService.weightlessItemsJSON(from: plan)
+        let decoded = try JSONCoding.decoder.decode([PlanItem].self, from: Data(json.utf8))
+        let shared = try #require(decoded.first)
+        let prescription = try #require(shared.setPrescriptions?.first)
+
+        #expect(shared.isDropSet)
+        #expect(shared.suggestedSets == 1)
+        #expect(shared.suggestedWeightKg == nil)
+        #expect(prescription.setType == .drop)
+        #expect(prescription.segments.map(\.weightKg) == [nil, nil])
+        #expect(prescription.segments.map(\.reps) == [8, 6])
     }
 
     private func supersetWorkout(rounds: Int) -> Workout {

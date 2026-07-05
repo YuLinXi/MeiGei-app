@@ -1203,31 +1203,33 @@ struct PlanDetailView: View {
             )
         }
         if item.isDropSet {
-            let prescription = item.dropSetPrescriptions.first
-            let sourceSegments = prescription?.segments ?? [
-                WorkoutSetSegment(segmentIndex: 0, reps: item.suggestedReps),
-                WorkoutSetSegment(segmentIndex: 1)
-            ]
-            return PlanItem.dropSet(
-                itemId: UUID(),
-                orderIndex: item.orderIndex,
-                builtinExerciseCode: item.builtinExerciseCode,
-                customExerciseId: item.customExerciseId,
-                exerciseName: item.displayExerciseName,
-                primaryMuscle: item.primaryMuscle,
-                equipmentType: item.equipmentType,
-                groupCount: item.suggestedSets ?? 1,
-                isWarmup: prescription?.isWarmup ?? false,
-                segments: sourceSegments
-                    .sorted { $0.segmentIndex < $1.segmentIndex }
-                    .enumerated()
-                    .map { idx, segment in
-                        WorkoutSetSegment(segmentId: UUID(),
-                                          segmentIndex: idx,
-                                          weightKg: nil,
-                                          reps: segment.reps)
-                    }
-            )
+            let prescriptions = item.dropSetPrescriptions.enumerated().map { idx, prescription in
+                PlanSetPrescription(setType: .drop,
+                                    orderIndex: idx,
+                                    weightKg: nil,
+                                    reps: prescription.reps,
+                                    isWarmup: prescription.isWarmupEffective,
+                                    segments: prescription.segments
+                                        .sorted { $0.segmentIndex < $1.segmentIndex }
+                                        .enumerated()
+                                        .map { segmentIndex, segment in
+                                            WorkoutSetSegment(segmentIndex: segmentIndex,
+                                                              weightKg: nil,
+                                                              reps: segment.reps)
+                                        })
+            }
+            return PlanItem(itemId: UUID(),
+                            unitKind: .dropSet,
+                            builtinExerciseCode: item.builtinExerciseCode,
+                            customExerciseId: item.customExerciseId,
+                            exerciseName: item.displayExerciseName,
+                            primaryMuscle: item.primaryMuscle,
+                            equipmentType: item.equipmentType,
+                            orderIndex: item.orderIndex,
+                            suggestedSets: max(1, item.suggestedSets ?? prescriptions.count),
+                            suggestedReps: item.suggestedReps,
+                            suggestedWeightKg: nil,
+                            setPrescriptions: prescriptions.isEmpty ? nil : prescriptions)
         }
         return PlanItem(itemId: UUID(),
                         builtinExerciseCode: item.builtinExerciseCode,
@@ -2118,8 +2120,8 @@ struct PlanItemEditorView: View {
     private func save() {
         var updated = original
         if original.isDropSet {
-            updated.applyManualSetPrescriptions(dropSetModels)
             updated.suggestedSets = dropOuterGroupCount
+            updated.applyManualSetPrescriptions(dropSetModels)
         } else {
             updated.applyManualSetPrescriptions(workingModels)
         }
@@ -2148,9 +2150,11 @@ struct PlanItemEditorView: View {
     private var workingModels: [PlanSetPrescription] {
         let source = prescriptions.first ?? .working(weight: "", reps: "\(PlanDefaults.suggestedReps)")
         return (0..<workingGroupCount).map { index in
-            EditablePlanPrescription.working(id: prescriptions.indices.contains(index) ? prescriptions[index].id : UUID(),
-                                             weight: source.weight,
-                                             reps: source.reps)
+            let prescription = prescriptions.indices.contains(index) ? prescriptions[index] : source
+            return EditablePlanPrescription.working(id: prescriptions.indices.contains(index) ? prescriptions[index].id : UUID(),
+                                             weight: prescription.weight,
+                                             reps: prescription.reps,
+                                             isWarmup: prescription.isWarmup)
                 .model(orderIndex: index)
         }
     }
@@ -2349,7 +2353,6 @@ struct PlanItemEditorView: View {
         }
         for index in prescriptions.indices {
             prescriptions[index].setType = .working
-            prescriptions[index].isWarmup = false
             prescriptions[index].segments = []
         }
     }
@@ -2374,13 +2377,11 @@ struct PlanItemEditorView: View {
         let source = prescriptions.first?.representativeText ?? (weight: "", reps: "\(PlanDefaults.suggestedReps)")
         if prescriptions.count < target {
             while prescriptions.count < target {
-                prescriptions.append(.working(weight: source.weight, reps: source.reps))
+                prescriptions.append(.working(weight: source.weight, reps: source.reps, isWarmup: false))
             }
         } else if prescriptions.count > target {
             prescriptions.removeLast(prescriptions.count - target)
         }
-        setWorkingWeight(source.weight)
-        setWorkingReps(source.reps)
     }
 
     private func ensureDropPrescription() {
@@ -2411,6 +2412,11 @@ struct PlanItemEditorView: View {
         }
     }
 
+    private func setDropOuterGroupCount(_ count: Int) {
+        let target = max(1, count)
+        dropOuterGroupCountText = "\(target)"
+    }
+
     private func setDropSegmentWeight(_ value: String, segmentId: UUID) {
         ensureDropPrescription()
         guard let index = prescriptions[0].segments.firstIndex(where: { $0.id == segmentId }) else { return }
@@ -2430,7 +2436,7 @@ struct PlanItemEditorView: View {
 
     private var focusSequence: [PlanItemEditorField] {
         if original.isDropSet {
-            return [.dropOuterGroupCount, .dropChildGroupCount] + dropSegments.flatMap {
+            return [.dropOuterGroupCount] + dropSegments.flatMap {
                 [PlanItemEditorField.dropSegmentWeight($0.id), .dropSegmentReps($0.id)]
             }
         }
@@ -2510,7 +2516,7 @@ struct PlanItemEditorView: View {
         case .workingWeight:
             setWorkingWeight(value)
         case .dropOuterGroupCount:
-            dropOuterGroupCountText = value.isEmpty ? "" : "\(max(1, intValue(value) ?? 1))"
+            setDropOuterGroupCount(intValue(value) ?? 1)
         case .dropChildGroupCount:
             setDropChildGroupCount(intValue(value) ?? 1)
         case .dropSegmentWeight(let id):
@@ -2534,7 +2540,7 @@ private struct EditablePlanPrescription: Identifiable, Hashable {
         setType = prescription.setType == .drop ? .drop : .working
         weight = prescription.weightKg.map { $0 == $0.rounded() ? String(Int($0)) : String($0) } ?? ""
         reps = prescription.reps.map(String.init) ?? ""
-        isWarmup = prescription.isWarmup ?? false
+        isWarmup = prescription.isWarmupEffective
         segments = prescription.segments
             .sorted { $0.segmentIndex < $1.segmentIndex }
             .map { segment in
@@ -2547,8 +2553,8 @@ private struct EditablePlanPrescription: Identifiable, Hashable {
         }
     }
 
-    static func working(id: UUID = UUID(), weight: String, reps: String) -> EditablePlanPrescription {
-        EditablePlanPrescription(id: id, setType: .working, weight: weight, reps: reps, isWarmup: false, segments: [])
+    static func working(id: UUID = UUID(), weight: String, reps: String, isWarmup: Bool = false) -> EditablePlanPrescription {
+        EditablePlanPrescription(id: id, setType: .working, weight: weight, reps: reps, isWarmup: isWarmup, segments: [])
     }
 
     static func drop(id: UUID = UUID(), firstWeight: String, firstReps: String) -> EditablePlanPrescription {

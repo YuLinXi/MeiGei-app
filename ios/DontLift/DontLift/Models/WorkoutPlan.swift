@@ -68,6 +68,10 @@ struct PlanSetPrescription: Codable, Identifiable, Hashable {
         get { WorkoutSetType(rawValue: setTypeRaw) ?? .working }
         set { setTypeRaw = newValue.rawValue }
     }
+
+    var isWarmupEffective: Bool {
+        isWarmup ?? (setTypeRaw == WorkoutSetType.warmup.rawValue)
+    }
 }
 
 enum PlanUnitKind: String, Codable {
@@ -265,12 +269,16 @@ extension PlanItem {
                                   reps: segment.reps)
             }
         let summary = summaryWeightReps(from: normalizedSegments)
-        let prescription = PlanSetPrescription(setType: .drop,
-                                               orderIndex: 0,
-                                               weightKg: summary.weightKg,
-                                               reps: summary.reps,
-                                               isWarmup: isWarmup,
-                                               segments: normalizedSegments)
+        let effectiveGroupCount = max(1, groupCount)
+        let template = PlanSetPrescription(setType: .drop,
+                                           orderIndex: 0,
+                                           weightKg: summary.weightKg,
+                                           reps: summary.reps,
+                                           isWarmup: isWarmup,
+                                           segments: normalizedSegments)
+        let prescriptions = dropPrescriptionClones(from: template,
+                                                    count: effectiveGroupCount,
+                                                    existing: [])
         return PlanItem(itemId: itemId,
                         unitKind: .dropSet,
                         builtinExerciseCode: builtinExerciseCode,
@@ -279,10 +287,10 @@ extension PlanItem {
                         primaryMuscle: primaryMuscle,
                         equipmentType: equipmentType,
                         orderIndex: orderIndex,
-                        suggestedSets: max(1, groupCount),
+                        suggestedSets: effectiveGroupCount,
                         suggestedReps: summary.reps,
                         suggestedWeightKg: summary.weightKg,
-                        setPrescriptions: [prescription])
+                        setPrescriptions: prescriptions)
     }
 
     private var trimmedSnapshotName: String? {
@@ -389,8 +397,11 @@ extension PlanItem {
                                      ])
             let normalized = Self.normalizedManualSetPrescriptions([dropSource])
             let finalPrescription = normalized.first ?? dropSource
-            setPrescriptions = [finalPrescription]
-            suggestedSets = max(1, suggestedSets ?? 1)
+            let groupCount = max(1, suggestedSets ?? dropSetPrescriptions.count)
+            setPrescriptions = Self.dropPrescriptionClones(from: finalPrescription,
+                                                           count: groupCount,
+                                                           existing: dropSetPrescriptions)
+            suggestedSets = groupCount
             let summary = Self.summaryWeightReps(from: finalPrescription.segments)
             suggestedWeightKg = summary.weightKg
             suggestedReps = summary.reps
@@ -429,7 +440,7 @@ extension PlanItem {
                                            orderIndex: idx,
                                            weightKg: summary.weightKg,
                                            reps: summary.reps,
-                                           isWarmup: prescription.isWarmup,
+                                           isWarmup: prescription.isWarmupEffective,
                                            segments: segments)
             }
             return PlanSetPrescription(prescriptionId: prescription.prescriptionId,
@@ -437,7 +448,7 @@ extension PlanItem {
                                        orderIndex: idx,
                                        weightKg: prescription.weightKg,
                                        reps: prescription.reps,
-                                       isWarmup: prescription.isWarmup)
+                                       isWarmup: prescription.isWarmupEffective)
         }
     }
 
@@ -451,6 +462,33 @@ extension PlanItem {
             return [(prescription.weightKg, prescription.reps)]
         }
         return summaryWeightReps(from: entries)
+    }
+
+    private static func dropPrescriptionClones(from template: PlanSetPrescription,
+                                               count: Int,
+                                               existing: [PlanSetPrescription]) -> [PlanSetPrescription] {
+        let templateSegments = template.segments
+            .sorted { $0.segmentIndex < $1.segmentIndex }
+        return (0..<max(1, count)).map { index in
+            let existingPrescription = existing.indices.contains(index) ? existing[index] : nil
+            let existingSegments = existingPrescription?.segments.sorted { $0.segmentIndex < $1.segmentIndex } ?? []
+            let segments = templateSegments.enumerated().map { segmentIndex, segment in
+                WorkoutSetSegment(segmentId: existingSegments.indices.contains(segmentIndex)
+                                  ? existingSegments[segmentIndex].segmentId
+                                  : (index == 0 ? segment.segmentId : UUID()),
+                                  segmentIndex: segmentIndex,
+                                  weightKg: segment.weightKg,
+                                  reps: segment.reps)
+            }
+            let summary = summaryWeightReps(from: segments)
+            return PlanSetPrescription(prescriptionId: existingPrescription?.prescriptionId ?? (index == 0 ? template.prescriptionId : UUID()),
+                                       setType: .drop,
+                                       orderIndex: index,
+                                       weightKg: summary.weightKg,
+                                       reps: summary.reps,
+                                       isWarmup: template.isWarmupEffective,
+                                       segments: segments)
+        }
     }
 
     private static func summaryWeightReps(from segments: [WorkoutSetSegment]) -> (weightKg: Double?, reps: Int?) {

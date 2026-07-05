@@ -63,7 +63,7 @@ struct WorkoutWeeklyStatsTests {
         let s = WorkoutWeeklyStats.compute(workouts: [w], reference: now, calendar: mondayCalendar)
 
         #expect(s.sessionCount == 1)
-        #expect(s.setCount == 2)
+        #expect(s.setCount == 1)
         #expect(s.repCount == 14)
         #expect(s.volumeKg == 80 * 8 + 60 * 6)
     }
