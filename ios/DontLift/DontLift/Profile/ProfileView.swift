@@ -34,6 +34,7 @@ struct ProfileView: View {
     @State private var legalURL: IdentifiableURL?
     @State private var healthAuthorized = false
     @State private var notificationsEnabled: Bool?
+    @State private var caloriePreferences = WorkoutCaloriePreferences.current()
 
     private var profile: UserProfile? { profiles.first(where: { $0.serverUserId == session.currentUserId }) }
 
@@ -71,6 +72,7 @@ struct ProfileView: View {
         .task {
             WorkoutPerformanceMonitor.event("profile.appear")
             healthAuthorized = healthKit.isAuthorized
+            caloriePreferences = .current()
             await refreshNotificationStatus()
         }
         .safariSheet(url: $legalURL)
@@ -345,6 +347,38 @@ struct ProfileView: View {
 
             rowDivider
 
+            HStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "flame")
+                    .foregroundStyle(Theme.Color.fg2)
+                    .frame(width: 24)
+                Text("消耗估算")
+                    .font(Theme.Font.body(size: 14))
+                    .foregroundStyle(Theme.Color.fg)
+                Spacer()
+                Toggle("", isOn: calorieEstimateEnabledBinding)
+                    .labelsHidden()
+                    .tint(Theme.Color.accent)
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .frame(height: 48)
+
+            rowDivider
+
+            HStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "scalemass")
+                    .foregroundStyle(Theme.Color.fg2)
+                    .frame(width: 24)
+                Text("估算体重")
+                    .font(Theme.Font.body(size: 14))
+                    .foregroundStyle(Theme.Color.fg)
+                Spacer()
+                calorieWeightStepper
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .frame(height: 48)
+
+            rowDivider
+
             // 震动开关
             HStack(spacing: Theme.Spacing.md) {
                 Image(systemName: "iphone.radiowaves.left.and.right").foregroundStyle(Theme.Color.fg2).frame(width: 24)
@@ -417,6 +451,50 @@ struct ProfileView: View {
             get: { restTimer.soundEnabled },
             set: { restTimer.soundEnabled = $0 }
         )
+    }
+
+    private var calorieEstimateEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { caloriePreferences.showsEstimates },
+            set: {
+                WorkoutCaloriePreferences.setShowsEstimates($0)
+                caloriePreferences = WorkoutCaloriePreferences.current()
+            }
+        )
+    }
+
+    private var calorieWeightStepper: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            if let kg = caloriePreferences.bodyWeightKg {
+                stepperButton("minus") {
+                    setCalorieBodyWeight(max(WorkoutCaloriePreferences.minBodyWeightKg, kg - 1))
+                }
+                Text("\(Int(kg.rounded()))kg")
+                    .font(Theme.Font.mono(size: 13))
+                    .foregroundStyle(Theme.Color.fg)
+                    .frame(minWidth: 52)
+                stepperButton("plus") {
+                    setCalorieBodyWeight(min(WorkoutCaloriePreferences.maxBodyWeightKg, kg + 1))
+                }
+            } else {
+                Button {
+                    setCalorieBodyWeight(WorkoutCaloriePreferences.defaultBodyWeightKg)
+                } label: {
+                    Text("设置")
+                        .font(Theme.Font.body(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.accent)
+                        .padding(.horizontal, 12)
+                        .frame(height: 30)
+                        .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1.5))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func setCalorieBodyWeight(_ value: Double) {
+        WorkoutCaloriePreferences.setBodyWeightKg(value)
+        caloriePreferences = WorkoutCaloriePreferences.current()
     }
 
     /// 休息时长加减器（步进 15s，范围 15…600s）。

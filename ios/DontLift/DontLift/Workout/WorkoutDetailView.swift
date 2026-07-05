@@ -64,6 +64,10 @@ struct WorkoutDetailView: View {
         workout.completedStatVolumeKg
     }
 
+    private var calorieEstimate: WorkoutCalorieEstimate? {
+        WorkoutCalorieEstimator.estimate(workout: workout)
+    }
+
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
@@ -71,6 +75,7 @@ struct WorkoutDetailView: View {
                 VStack(spacing: Theme.Spacing.md) {
                     summaryCard
                     triadStats
+                    if let calorieEstimate { calorieEstimateRow(calorieEstimate) }
                     if !personalRecords.isEmpty { prStrip }
                     logSection
                     Color.clear.frame(height: 24)
@@ -206,6 +211,29 @@ struct WorkoutDetailView: View {
 
     private var divider: some View {
         Rectangle().fill(Theme.Color.border).frame(width: 1)
+    }
+
+    private func calorieEstimateRow(_ estimate: WorkoutCalorieEstimate) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "flame.fill")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.Color.accent)
+            Text(estimate.fullText)
+                .font(Theme.Font.mono(size: 12, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .stroke(Theme.Color.border, lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(estimate.fullText)
     }
 
     /// 时长：≥1 小时显示 `H:MM`，否则 `M′`。
