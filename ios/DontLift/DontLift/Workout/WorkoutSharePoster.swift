@@ -48,8 +48,8 @@ struct WorkoutPosterData: Equatable {
         self.setCountText = "\(statSetCount)"
         self.exerciseCountText = "\(exercises.count)"
         self.calorieValueText = WorkoutCalorieEstimator
-            .estimate(workout: workout, preferences: caloriePreferences)?
-            .valueText
+            .estimate(workout: workout, preferences: caloriePreferences)
+            .map { String($0.kcal) }
 
         let lines = Self.exerciseLines(workout: workout)
         self.exerciseLines = lines
@@ -368,11 +368,10 @@ private struct WorkoutPosterVisualCardView: View {
 
                 HStack(spacing: 8) {
                     if let calorieValueText = data.calorieValueText {
-                        visualMetric(calorieValueText, "消耗", unit: "kcal", highlighted: true)
+                        calorieMetric(calorieValueText)
                     }
                     visualMetric(data.durationText, "时长", unit: "min")
                     visualMetric(data.volumeText, "训练量", unit: "kg·rep")
-                    visualMetric(data.setCountText, "组数")
                 }
                 .padding(.top, 24)
 
@@ -447,6 +446,30 @@ private struct WorkoutPosterVisualCardView: View {
                         .font(Theme.Font.mono(size: 7.2, weight: .bold))
                         .foregroundStyle(highlighted ? Theme.Color.accent.opacity(0.54) : paper.opacity(0.42))
                 }
+            }
+            .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func calorieMetric(_ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 1) {
+                Text("≈")
+                    .font(Theme.Font.number(size: 14, weight: .bold))
+                Text(value)
+                    .font(Theme.Font.number(size: 22, weight: .bold))
+            }
+            .foregroundStyle(Theme.Color.accent)
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text("消耗")
+                    .font(Theme.Font.mono(size: 9.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.accent.opacity(0.74))
+                Text("(kcal)")
+                    .font(Theme.Font.mono(size: 7.2, weight: .bold))
+                    .foregroundStyle(Theme.Color.accent.opacity(0.54))
             }
             .lineLimit(1)
         }

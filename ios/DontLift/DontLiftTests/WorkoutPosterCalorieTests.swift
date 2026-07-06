@@ -12,7 +12,7 @@ struct WorkoutPosterCalorieTests {
             caloriePreferences: WorkoutCaloriePreferences(showsEstimates: true, bodyWeightKg: 70)
         )
 
-        #expect(data.calorieValueText == "约 331")
+        #expect(data.calorieValueText == "204")
     }
 
     @Test func posterDataHidesCaloriesWithoutBodyWeight() {

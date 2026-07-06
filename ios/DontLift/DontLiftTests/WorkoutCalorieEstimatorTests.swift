@@ -13,8 +13,8 @@ struct WorkoutCalorieEstimatorTests {
         ))
 
         #expect(estimate.intensity == .moderate)
-        #expect(estimate.kcal == 331)
-        #expect(estimate.fullText == "约 331 kcal · 常规强度")
+        #expect(estimate.kcal == 204)
+        #expect(estimate.fullText == "约 204 kcal · 常规强度")
     }
 
     @Test func highDensityEstimateUsesHighIntensity() throws {
@@ -26,7 +26,7 @@ struct WorkoutCalorieEstimatorTests {
         ))
 
         #expect(estimate.intensity == .high)
-        #expect(estimate.kcal == 426)
+        #expect(estimate.kcal == 331)
     }
 
     @Test func lowDensityEstimateUsesLowIntensity() throws {
@@ -38,10 +38,10 @@ struct WorkoutCalorieEstimatorTests {
         ))
 
         #expect(estimate.intensity == .low)
-        #expect(estimate.kcal == 257)
+        #expect(estimate.kcal == 138)
     }
 
-    @Test func supersetEstimateUsesHighIntensity() throws {
+    @Test func supersetEstimateAddsDensityWithoutForcingHighIntensity() throws {
         let estimate = try #require(WorkoutCalorieEstimator.estimate(
             durationSeconds: 45 * 60,
             bodyWeightKg: 70,
@@ -49,7 +49,7 @@ struct WorkoutCalorieEstimatorTests {
             containsSuperset: true
         ))
 
-        #expect(estimate.intensity == .high)
+        #expect(estimate.intensity == .moderate)
     }
 
     @Test func missingBodyWeightReturnsNil() {

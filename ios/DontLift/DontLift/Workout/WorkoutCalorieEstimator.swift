@@ -7,9 +7,9 @@ enum WorkoutCalorieIntensity: Equatable {
 
     var met: Double {
         switch self {
-        case .low: return 3.5
-        case .moderate: return 4.5
-        case .high: return 5.8
+        case .low: return 2.6
+        case .moderate: return 3.3
+        case .high: return 4.5
         }
     }
 
@@ -86,6 +86,9 @@ enum WorkoutCalorieEstimator {
                                   completedSetCount: completedSetCount,
                                   containsSuperset: containsSuperset)
         let kcal = intensity.met * 3.5 * bodyWeightKg / 200 * durationMinutes
+            * densityFactor(durationMinutes: durationMinutes,
+                            completedSetCount: completedSetCount,
+                            containsSuperset: containsSuperset)
         return WorkoutCalorieEstimate(kcal: max(1, Int(kcal.rounded())), intensity: intensity)
     }
 
@@ -107,11 +110,36 @@ enum WorkoutCalorieEstimator {
         containsSuperset: Bool
     ) -> WorkoutCalorieIntensity {
         guard durationMinutes > 0 else { return .moderate }
-        if containsSuperset { return .high }
 
-        let setDensity = Double(max(0, completedSetCount)) / durationMinutes
+        let setDensity = adjustedSetDensity(durationMinutes: durationMinutes,
+                                            completedSetCount: completedSetCount,
+                                            containsSuperset: containsSuperset)
         if setDensity >= 0.35 { return .high }
         if durationMinutes >= 30, setDensity < 0.12 { return .low }
         return .moderate
+    }
+
+    private static func densityFactor(
+        durationMinutes: Double,
+        completedSetCount: Int,
+        containsSuperset: Bool
+    ) -> Double {
+        let setDensity = adjustedSetDensity(durationMinutes: durationMinutes,
+                                            completedSetCount: completedSetCount,
+                                            containsSuperset: containsSuperset)
+        if setDensity >= 0.35 { return 1.0 }
+        if setDensity >= 0.22 { return 0.92 }
+        if setDensity >= 0.12 { return 0.84 }
+        return 0.72
+    }
+
+    private static func adjustedSetDensity(
+        durationMinutes: Double,
+        completedSetCount: Int,
+        containsSuperset: Bool
+    ) -> Double {
+        guard durationMinutes > 0 else { return 0 }
+        let supersetBonus = containsSuperset ? 0.08 : 0
+        return Double(max(0, completedSetCount)) / durationMinutes + supersetBonus
     }
 }
