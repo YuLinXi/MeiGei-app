@@ -222,6 +222,7 @@ struct ExerciseLibraryView: View {
         .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
             floatingAddButton
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .rootTabTopScrim()
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingCreate) { CustomExerciseEditorView() }
@@ -344,6 +345,7 @@ private struct ExerciseLibraryContentView: View {
                 rightArea
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .paperConfirmDialog(
             isPresented: Binding(
                 get: { pendingDeleteCustom != nil },
@@ -1301,6 +1303,7 @@ struct ExercisePickerView: View {
         )
         .padding(.top, 14)
         .background(Theme.Color.bg.ignoresSafeArea())
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
