@@ -366,14 +366,8 @@ private struct WorkoutPosterVisualCardView: View {
                     .minimumScaleFactor(0.74)
                     .padding(.top, 7)
 
-                HStack(spacing: 8) {
-                    if let calorieValueText = data.calorieValueText {
-                        calorieMetric(calorieValueText)
-                    }
-                    visualMetric(data.durationText, "时长", unit: "min")
-                    visualMetric(data.volumeText, "训练量", unit: "kg·rep")
-                }
-                .padding(.top, 24)
+                metricRow
+                    .padding(.top, 24)
 
                 exerciseList
                     .padding(.top, 22)
@@ -430,6 +424,20 @@ private struct WorkoutPosterVisualCardView: View {
         .accessibilityHidden(true)
     }
 
+    private var metricRow: some View {
+        HStack(alignment: .top, spacing: metricSpacing) {
+            if let calorieValueText = data.calorieValueText {
+                calorieMetric(calorieValueText)
+                    .frame(width: calorieMetricWidth, alignment: .leading)
+            }
+            visualMetric(data.durationText, "时长", unit: "min")
+                .frame(width: durationMetricWidth, alignment: .leading)
+            visualMetric(data.volumeText, "训练量", unit: "kg·rep")
+                .frame(width: volumeMetricWidth, alignment: .leading)
+        }
+        .frame(width: blackContentWidth, alignment: .leading)
+    }
+
     private func visualMetric(_ value: String, _ label: String, unit: String? = nil, highlighted: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(value)
@@ -448,8 +456,8 @@ private struct WorkoutPosterVisualCardView: View {
                 }
             }
             .lineLimit(1)
+            .minimumScaleFactor(0.76)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func calorieMetric(_ value: String) -> some View {
@@ -472,8 +480,8 @@ private struct WorkoutPosterVisualCardView: View {
                     .foregroundStyle(Theme.Color.accent.opacity(0.54))
             }
             .lineLimit(1)
+            .minimumScaleFactor(0.76)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var exerciseList: some View {
@@ -517,6 +525,25 @@ private struct WorkoutPosterVisualCardView: View {
 
     private var exerciseNameColumnWidth: CGFloat {
         min(86, blackContentWidth * 0.38)
+    }
+
+    private var metricSpacing: CGFloat {
+        min(24, max(12, blackContentWidth * 0.055))
+    }
+
+    private var calorieMetricWidth: CGFloat {
+        min(78, blackContentWidth * 0.34)
+    }
+
+    private var durationMetricWidth: CGFloat {
+        min(62, blackContentWidth * 0.24)
+    }
+
+    private var volumeMetricWidth: CGFloat {
+        let calorieWidth = data.calorieValueText == nil ? 0 : calorieMetricWidth
+        let spacingCount: CGFloat = data.calorieValueText == nil ? 1 : 2
+        let remaining = blackContentWidth - calorieWidth - durationMetricWidth - metricSpacing * spacingCount
+        return max(48, min(106, remaining))
     }
 
     private var blackContentWidth: CGFloat {
