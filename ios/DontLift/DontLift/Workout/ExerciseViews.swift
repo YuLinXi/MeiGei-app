@@ -242,7 +242,6 @@ struct ExerciseLibraryView: View {
 private struct ExerciseLibraryContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SyncEngine.self) private var syncEngine
-    @Environment(WorkoutHistoryStore.self) private var historyStore
     @Query(sort: \CustomExercise.updatedAt, order: .reverse) private var custom: [CustomExercise]
 
     @State private var query = ""
@@ -414,10 +413,10 @@ private struct ExerciseLibraryContentView: View {
                 Color.clear.frame(height: 24)
             }
             .padding(.vertical, 8)
-            .padding(.leading, 8)
-            .padding(.trailing, 4)
+            .padding(.leading, 6)
+            .padding(.trailing, 2)
         }
-        .frame(width: 104)
+        .frame(width: 92)
     }
 
     /// L2/L3 子行（手风琴展开）。
@@ -462,7 +461,7 @@ private struct ExerciseLibraryContentView: View {
                          dimmed: Bool, chevron: Chevron = .none,
                          action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 3) {
+            HStack(spacing: 2) {
                 Text(title)
                     .font(Theme.Font.body(size: level == 0 ? 16 : (level == 1 ? 14 : 13),
                                           weight: selected ? .bold : (level == 0 ? .semibold : .regular)))
@@ -476,9 +475,9 @@ private struct ExerciseLibraryContentView: View {
                 case .down:  Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.Color.accent)
                 }
             }
-            .padding(.leading, CGFloat(level) * 9)
+            .padding(.leading, CGFloat(level) * 7)
             .padding(.vertical, 7)
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(selected ? Theme.Color.accentSoft : .clear,
                         in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
@@ -567,7 +566,6 @@ private struct ExerciseLibraryContentView: View {
     // MARK: 右侧动作区（右侧器械快速筛选 + 按树层级分段，逐行懒加载 + 返回顶部）
 
     private var rightArea: some View {
-        let prWeights = historyStore.exercisePRs.mapValues(\.weightKg)
         let rowPage = libraryRowPage
         return ScrollViewReader { proxy in
             ZStack(alignment: .trailing) {
@@ -578,7 +576,7 @@ private struct ExerciseLibraryContentView: View {
                             emptyState
                         } else {
                             ForEach(Array(rowPage.rows.enumerated()), id: \.element.id) { idx, row in
-                                libRowView(row, prWeights: prWeights, isFirst: idx == 0)
+                                libRowView(row, isFirst: idx == 0)
                             }
                             if rowPage.hasMore {
                                 loadMoreLibraryRowsTrigger(totalExerciseCount: rowPage.totalExerciseCount)
@@ -759,21 +757,21 @@ private struct ExerciseLibraryContentView: View {
     }
 
     @ViewBuilder
-    private func libRowView(_ row: LibRow, prWeights: [String: Double], isFirst: Bool) -> some View {
+    private func libRowView(_ row: LibRow, isFirst: Bool) -> some View {
         switch row {
         case .header(let title):
             sectionHeader(title, topGap: isFirst ? 2 : 14)
         case .builtin(let ex, let first, let last):
-            Button { selectBuiltin(ex) } label: { builtinRow(ex, prWeights: prWeights) }
+            Button { selectBuiltin(ex) } label: { builtinRow(ex) }
                 .buttonStyle(.plain)
                 .modifier(RowCardSlice(first: first, last: last))
         case .custom(let ex, let first, let last):
             if isPicking {
-                Button { selectCustom(ex) } label: { customRow(ex, prWeights: prWeights) }
+                Button { selectCustom(ex) } label: { customRow(ex) }
                     .buttonStyle(.plain)
                     .modifier(RowCardSlice(first: first, last: last))
             } else {
-                customBrowseRow(ex, first: first, last: last, prWeights: prWeights)
+                customBrowseRow(ex, first: first, last: last)
             }
         }
     }
@@ -822,8 +820,8 @@ private struct ExerciseLibraryContentView: View {
         syncEngine.scheduleSyncAll()
     }
 
-    private func customBrowseRow(_ ex: CustomExercise, first: Bool, last: Bool, prWeights: [String: Double]) -> some View {
-        customRow(ex, prWeights: prWeights)
+    private func customBrowseRow(_ ex: CustomExercise, first: Bool, last: Bool) -> some View {
+        customRow(ex)
             .modifier(RowCardSlice(first: first, last: last))
             .contentShape(Rectangle())
             .onLongPressGesture(minimumDuration: 0.5) {
@@ -943,7 +941,7 @@ private struct ExerciseLibraryContentView: View {
             .padding(.leading, 2)
     }
 
-    private func builtinRow(_ ex: BuiltinExercise, prWeights: [String: Double]) -> some View {
+    private func builtinRow(_ ex: BuiltinExercise) -> some View {
         let muscle = displayMuscleName(for: ex)
         let sub = [muscle, ex.subcategory].compactMap { $0 }.joined(separator: " · ")
         let meta = sub.isEmpty ? "\(ex.category) · \(ex.equipmentType)" : "\(ex.category) · \(sub) · \(ex.equipmentType)"
@@ -954,13 +952,14 @@ private struct ExerciseLibraryContentView: View {
                     .font(Theme.Font.body(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                 Text(meta)
                     .font(Theme.Font.body(size: 12))
                     .foregroundStyle(Theme.Color.muted)
                     .lineLimit(1)
             }
-            Spacer(minLength: 8)
-            if let w = prWeights[ex.code] { prPill("PR \(formatKg(w))") }
+            .layoutPriority(1)
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 11)
@@ -1084,7 +1083,7 @@ private struct ExerciseLibraryContentView: View {
         return nil
     }
 
-    private func customRow(_ ex: CustomExercise, prWeights: [String: Double]) -> some View {
+    private func customRow(_ ex: CustomExercise) -> some View {
         return HStack(spacing: 12) {
             avatar(String(ex.name.prefix(1)))
             VStack(alignment: .leading, spacing: 2) {
@@ -1092,12 +1091,14 @@ private struct ExerciseLibraryContentView: View {
                     .font(Theme.Font.body(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                 Text("\(ex.primaryMuscle ?? "—") · \(ex.equipmentType ?? "—")")
                     .font(Theme.Font.body(size: 12))
                     .foregroundStyle(Theme.Color.muted)
+                    .lineLimit(1)
             }
-            Spacer(minLength: 8)
-            if let w = prWeights[ex.localId.uuidString] { selfTag("\(formatKg(w)) kg") }
+            .layoutPriority(1)
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 11)
@@ -1113,24 +1114,6 @@ private struct ExerciseLibraryContentView: View {
             .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
     }
 
-    private func prPill(_ text: String) -> some View {
-        Text(text)
-            .font(Theme.Font.mono(size: 9, weight: .bold))
-            .tracking(0.04 * 9)
-            .foregroundStyle(Color.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(Theme.Color.accent, in: Capsule())
-    }
-
-    private func selfTag(_ text: String) -> some View {
-        Text(text)
-            .font(Theme.Font.mono(size: 9, weight: .bold))
-            .foregroundStyle(Theme.Color.accent)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1))
-    }
 }
 
 // MARK: - 自定义动作创建
@@ -1344,7 +1327,10 @@ struct ExerciseDetailView: View {
         .background(Theme.Color.bg.ignoresSafeArea())
         // 子页统一导航栏：纸感圆形返回钮（标题留空，动作名在内容区大字呈现）。
         .paperToolbar(onBack: { dismiss() })
-        .onAppear { WorkoutPerformanceMonitor.event("exercise.detail.appear") }
+        .onAppear {
+            WorkoutPerformanceMonitor.event("exercise.detail.appear")
+            historyStore.ensureLoaded(reason: .manual)
+        }
     }
 
     // MARK: 训练部位（正背肌群图）

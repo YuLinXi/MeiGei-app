@@ -918,7 +918,6 @@ struct WorkoutLoggingView: View {
     // 休息全屏弹窗开/关：渐显/渐隐（配合 RestTimerSheet 的 .opacity 过渡）。
     private var sheetAnim: Animation { .easeInOut(duration: reduceMotion ? 0.2 : 0.3) }
 
-    /// 下一组提示：找第一个未完成 set 所属动作 + setIndex。
     /// PR 庆祝弹窗副标题：`title · N 动作 · N 组 · N 分钟`（title 为空则省略首段；
     /// 「组」用总 set 数，与训练列表口径一致；「分钟」由 startedAt→endedAt 算）。
     private var prSummary: String {
@@ -934,30 +933,24 @@ struct WorkoutLoggingView: View {
     }
 
     /// 下一组提示（对齐原型文案「下一组 · **动作名** 第 N 组」，动作名用 markdown 加粗）。
-    private var nextHint: String? {
-        for ex in workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }) {
-            if let next = ex.sets.sorted(by: { $0.setIndex < $1.setIndex })
-                .first(where: { !$0.completed }) {
-                return "下一组 · **\(ex.exerciseName)** 第 \(next.setIndex + 1) 组"
-            }
-        }
-        return nil
+    private func nextHint(after setId: UUID?) -> String? {
+        guard let candidate = nextSetCandidate(after: setId) else { return nil }
+        return "下一组 · **\(candidate.exerciseName)** 第 \(candidate.setIndex) 组"
     }
 
     /// 下一组结构化摘要：供 Live Activity / 灵动岛展示动作、第几组、重量和次数。
-    private var nextSetSummary: RestActivityAttributes.NextSet? {
-        for ex in workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }) {
-            if let next = ex.sets.sorted(by: { $0.setIndex < $1.setIndex })
-                .first(where: { !$0.completed }) {
-                return RestActivityAttributes.NextSet(
-                    exerciseName: ex.exerciseName,
-                    setIndex: next.setIndex + 1,
-                    weightText: next.summaryWeightReps.weightKg.map { "\(formatKg($0)) kg" },
-                    repsText: next.summaryWeightReps.reps.map { "\($0) 次" }
-                )
-            }
-        }
-        return nil
+    private func nextSetSummary(after setId: UUID?) -> RestActivityAttributes.NextSet? {
+        guard let candidate = nextSetCandidate(after: setId) else { return nil }
+        return RestActivityAttributes.NextSet(
+            exerciseName: candidate.exerciseName,
+            setIndex: candidate.setIndex,
+            weightText: candidate.weightKg.map { "\(formatKg($0)) kg" },
+            repsText: candidate.reps.map { "\($0) 次" }
+        )
+    }
+
+    private func nextSetCandidate(after setId: UUID?) -> WorkoutRestPolicy.NextSetCandidate? {
+        WorkoutRestPolicy.nextSet(afterCompletedSetId: setId, in: workout)
     }
 
     var body: some View {
@@ -984,7 +977,7 @@ struct WorkoutLoggingView: View {
                             }
                             exerciseSectionHeader
                             exerciseList
-                            Color.clear.frame(height: 80)
+                            Color.clear.frame(height: canShowWorkoutAddBar ? 12 : 80)
                         }
                         .frame(width: viewport.size.width - Theme.Spacing.lg * 2, alignment: .top)
                         .padding(.horizontal, Theme.Spacing.lg)
@@ -1044,7 +1037,11 @@ struct WorkoutLoggingView: View {
             // 不侵占键盘激活区。本屏无 Tab Bar，默认贴右下角。全屏休息弹窗已上提到全局 overlay。
             if restTimer.isRunning && !restTimer.isExpanded {
                 GeometryReader { geo in
-                    restFAB
+                    ZStack { restFAB }
+                        .frame(width: Self.fabRadius * 2, height: Self.fabRadius * 2)
+                        .transaction { transaction in
+                            transaction.animation = nil
+                        }
                         .position(fabPosition(in: geo))
                         // 键盘顶边变化时平滑被顶上去/落回（与键盘升降同一条弹簧）；拖动由手势驱动，不经此动画。
                         .animation(.spring(response: 0.45, dampingFraction: 0.92), value: keypadTopY)
@@ -1069,6 +1066,11 @@ struct WorkoutLoggingView: View {
                         .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
                 }
                 .coordinateSpace(name: "fabSpace")
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if canShowWorkoutAddBar {
+                workoutAddBottomBar
             }
         }
         // 键盘升降统一用近临界阻尼弹簧：面板下滑 + inset 收起 + 上方内容回流 + FAB 共用一条曲线，贴近 iOS 原生键盘的平滑。
@@ -1458,31 +1460,43 @@ struct WorkoutLoggingView: View {
             ForEach(units) { unit in
                 unitBlock(unit, activeId: activeId)
             }
-            // 只读（已完成且未进入编辑态）时隐藏「添加动作」入口。
-            if canEdit {
-                HStack(spacing: 10) {
-                    WorkoutStructureMenuButton(
-                        accessibilityLabel: "添加结构组",
-                        onAddDropSet: {
-                            prepareForPresentation()
-                            pendingExerciseUnitKind = .dropSet
-                            pickingExercise = true
-                        },
-                        onAddSuperset: {
-                            prepareForPresentation()
-                            creatingSuperset = true
-                        }
-                    )
+        }
+        .frame(maxWidth: .infinity)
+    }
 
-                    addWorkoutUnitButton(title: "添加动作", systemImage: "plus", compact: false) {
-                        prepareForPresentation()
-                        pendingExerciseUnitKind = .singleExercise
-                        pickingExercise = true
-                    }
+    private var canShowWorkoutAddBar: Bool {
+        canEdit && focused == nil && restEditingTarget == nil
+    }
+
+    private var workoutAddBottomBar: some View {
+        HStack(spacing: 10) {
+            WorkoutStructureMenuButton(
+                accessibilityLabel: "添加结构组",
+                onAddDropSet: {
+                    prepareForPresentation()
+                    pendingExerciseUnitKind = .dropSet
+                    pickingExercise = true
+                },
+                onAddSuperset: {
+                    prepareForPresentation()
+                    creatingSuperset = true
                 }
+            )
+
+            addWorkoutUnitButton(title: "添加动作", systemImage: "plus", compact: false) {
+                prepareForPresentation()
+                pendingExerciseUnitKind = .singleExercise
+                pickingExercise = true
             }
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.vertical, 12)
+        .background(Theme.Color.bg)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.Color.border).frame(height: 1)
+        }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     @ViewBuilder
@@ -1851,7 +1865,7 @@ struct WorkoutLoggingView: View {
     /// FAB 半径（直径 58）。
     private static let fabRadius: CGFloat = 29
 
-    /// 把落点钳制在安全区内：四周留边；键盘升起时下界抬到键盘顶之上，FAB 不侵占键盘激活区。
+    /// 把落点钳制在屏幕内；只在键盘升起时上抬，底部工具栏交给用户自行避让。
     private func clampedFabPoint(_ p: CGPoint, in geo: GeometryProxy) -> CGPoint {
         let r = Self.fabRadius
         let margin: CGFloat = 12
@@ -1867,11 +1881,12 @@ struct WorkoutLoggingView: View {
         return CGPoint(x: min(max(p.x, minX), maxX), y: min(max(p.y, minY), maxY))
     }
 
-    /// FAB 默认位置：右下角（贴 lg 右距、28 下距）。
+    /// FAB 默认位置：右下角；底部添加栏可见时上移避让。
     private func fabDefault(in geo: GeometryProxy) -> CGPoint {
         let r = Self.fabRadius
+        let bottomOffset: CGFloat = canShowWorkoutAddBar ? 112 : 28
         return CGPoint(x: geo.size.width - Theme.Spacing.lg - r,
-                       y: geo.size.height - 28 - r)
+                       y: geo.size.height - bottomOffset - r)
     }
 
     /// FAB 当前位置：锚点（或默认右下角）+ 实时拖动位移，统一过钳制（含键盘顶上界）。
@@ -1903,6 +1918,7 @@ struct WorkoutLoggingView: View {
                 .shadow(color: Theme.Color.accent.opacity(0.22), radius: 9, x: 0, y: 4)
                 .shadow(color: Theme.Color.fg.opacity(Theme.ShadowLevel.md.opacity), radius: Theme.ShadowLevel.md.radius, x: 0, y: Theme.ShadowLevel.md.y)
             }
+        .compositingGroup()
         // 整圆为命中区；VoiceOver 以按钮呈现，默认动作 = 展开休息弹窗。
         .contentShape(Circle())
         .accessibilityAddTraits(.isButton)
@@ -1943,13 +1959,13 @@ struct WorkoutLoggingView: View {
         if secs > 0 {
             recordActiveRestIfNeeded()
             continuedRestBaseBySet[set.localId] = nil
-            let nextSet = nextSetSummary
+            let nextSet = nextSetSummary(after: set.localId)
             workoutLiveActivity.syncWorkout(workout)
             restTimer.start(duration: TimeInterval(secs),
                             label: nextSet?.exerciseName ?? ex.exerciseName,
                             nextSet: nextSet,
                             setId: set.localId)
-            restTimer.nextHint = nextHint
+            restTimer.nextHint = nextHint(after: set.localId)
         }
     }
 
@@ -1972,13 +1988,13 @@ struct WorkoutLoggingView: View {
         if secs > 0 {
             recordActiveRestIfNeeded()
             continuedRestBaseBySet[anchorSet.localId] = nil
-            let nextSet = nextSetSummary
+            let nextSet = nextSetSummary(after: anchorSet.localId)
             workoutLiveActivity.syncWorkout(workout)
             restTimer.start(duration: TimeInterval(secs),
                             label: nextSet?.exerciseName ?? "超级组",
                             nextSet: nextSet,
                             setId: anchorSet.localId)
-            restTimer.nextHint = nextHint
+            restTimer.nextHint = nextHint(after: anchorSet.localId)
         }
     }
 
@@ -2331,12 +2347,12 @@ struct WorkoutLoggingView: View {
         startTimerIfNeeded()
         workoutLiveActivity.syncWorkout(workout)
         continuedRestBaseBySet[set.localId] = accumulated
-        let nextSet = nextSetSummary
+        let nextSet = nextSetSummary(after: set.localId)
         restTimer.start(duration: Self.continuedRestDuration,
                         label: nextSet?.exerciseName,
                         nextSet: nextSet,
                         setId: set.localId)
-        restTimer.nextHint = nextHint
+        restTimer.nextHint = nextHint(after: set.localId)
         Theme.Haptics.impact(.light)
     }
 

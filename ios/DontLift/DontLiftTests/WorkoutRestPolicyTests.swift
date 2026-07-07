@@ -131,4 +131,113 @@ struct WorkoutRestPolicyTests {
 
         #expect(seconds == 90)
     }
+
+    @Test func nextSetAfterSkippedEarlierExerciseContinuesWithinCurrentExercise() throws {
+        let skipped = workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
+        let current = workoutExercise(name: "坐姿划船", orderIndex: 1, completed: [true, false])
+        let workout = workout(exercises: [skipped, current])
+
+        let next = try #require(WorkoutRestPolicy.nextSet(
+            afterCompletedSetId: current.sets[0].localId,
+            in: workout
+        ))
+
+        #expect(next.exerciseName == "坐姿划船")
+        #expect(next.setIndex == 2)
+        #expect(next.setId == current.sets[1].localId)
+    }
+
+    @Test func nextSetAfterCurrentExerciseFinishedMovesForward() throws {
+        let skipped = workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
+        let current = workoutExercise(name: "坐姿划船", orderIndex: 1, completed: [true])
+        let nextExercise = workoutExercise(name: "高位下拉", orderIndex: 2, completed: [false])
+        let workout = workout(exercises: [skipped, current, nextExercise])
+
+        let next = try #require(WorkoutRestPolicy.nextSet(
+            afterCompletedSetId: current.sets[0].localId,
+            in: workout
+        ))
+
+        #expect(next.exerciseName == "高位下拉")
+        #expect(next.setIndex == 1)
+        #expect(next.setId == nextExercise.sets[0].localId)
+    }
+
+    @Test func nextSetWrapsBackToSkippedEarlierExerciseWhenNoForwardSetExists() throws {
+        let skipped = workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
+        let current = workoutExercise(name: "坐姿划船", orderIndex: 1, completed: [true])
+        let workout = workout(exercises: [skipped, current])
+
+        let next = try #require(WorkoutRestPolicy.nextSet(
+            afterCompletedSetId: current.sets[0].localId,
+            in: workout
+        ))
+
+        #expect(next.exerciseName == "杠铃卧推")
+        #expect(next.setIndex == 1)
+        #expect(next.setId == skipped.sets[0].localId)
+    }
+
+    @Test func nextSetFallbackWithoutAnchorUsesFirstIncompleteSet() throws {
+        let first = workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
+        let second = workoutExercise(name: "坐姿划船", orderIndex: 1, completed: [false])
+        let workout = workout(exercises: [first, second])
+
+        let next = try #require(WorkoutRestPolicy.nextSet(afterCompletedSetId: nil, in: workout))
+
+        #expect(next.exerciseName == "杠铃卧推")
+        #expect(next.setId == first.sets[0].localId)
+    }
+
+    @Test func nextSetAfterSupersetRoundContinuesToNextRoundBeforeSkippedEarlierExercise() throws {
+        let skipped = workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
+        let firstMember = workoutExercise(name: "夹胸", orderIndex: 1, completed: [true, false])
+        let secondMember = workoutExercise(name: "下斜卧推", orderIndex: 2, completed: [true, false])
+        let workout = workout(exercises: [skipped, firstMember, secondMember])
+        workout.updateTrainingUnits([
+            WorkoutUnit(kind: .singleExercise,
+                        orderIndex: 0,
+                        singleExerciseId: skipped.localId),
+            WorkoutUnit(kind: .superset,
+                        orderIndex: 1,
+                        superset: WorkoutSupersetUnit(
+                            roundCount: 2,
+                            members: [
+                                WorkoutSupersetMember(exerciseId: firstMember.localId, orderIndex: 0),
+                                WorkoutSupersetMember(exerciseId: secondMember.localId, orderIndex: 1)
+                            ]
+                        ))
+        ])
+
+        let next = try #require(WorkoutRestPolicy.nextSet(
+            afterCompletedSetId: secondMember.sets[0].localId,
+            in: workout
+        ))
+
+        #expect(next.exerciseName == "夹胸")
+        #expect(next.setIndex == 2)
+        #expect(next.setId == firstMember.sets[1].localId)
+    }
+
+    private func workout(exercises: [WorkoutExercise]) -> Workout {
+        let workout = Workout(exercises: exercises)
+        workout.updateTrainingUnits(exercises.enumerated().map { index, exercise in
+            WorkoutUnit(kind: .singleExercise,
+                        orderIndex: index,
+                        singleExerciseId: exercise.localId)
+        })
+        return workout
+    }
+
+    private func workoutExercise(name: String, orderIndex: Int, completed: [Bool]) -> WorkoutExercise {
+        let exercise = WorkoutExercise(exerciseName: name, orderIndex: orderIndex)
+        exercise.sets = completed.enumerated().map { index, isCompleted in
+            WorkoutSet(setIndex: index,
+                       weightKg: 60 + Double(index) * 2.5,
+                       reps: 10 - index,
+                       completed: isCompleted,
+                       setType: .working)
+        }
+        return exercise
+    }
 }
