@@ -441,7 +441,7 @@ final class TeamService {
                                        orderIndex: prescription.orderIndex,
                                        weightKg: nil,
                                        reps: prescription.reps,
-                                       isWarmup: prescription.isWarmupEffective,
+                                       isWarmup: prescription.setType == .drop ? false : prescription.isWarmupEffective,
                                        segments: segments)
         }
     }

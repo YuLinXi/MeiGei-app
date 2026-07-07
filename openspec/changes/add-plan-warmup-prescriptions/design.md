@@ -91,16 +91,16 @@ PlanItem(unitKind = singleExercise)
 
 ## Risks / Trade-offs
 
-- [Risk] 自适应历史预填如果仍只读 `countsForStats`，热身组会被丢失。  
+- [Risk] 自适应历史预填如果仍只读 `countsForStats`，热身组会被丢失。
   Mitigation：为普通动作新增包含热身的执行处方读取路径，并用测试覆盖。
 
-- [Risk] 计划总组数如果直接数全部 `setPrescriptions`，会把热身算进强度摘要。  
+- [Risk] 计划总组数如果直接数全部 `setPrescriptions`，会把热身算进强度摘要。
   Mitigation：计划主摘要和 `totalSuggestedSets` 明确只统计正式组；热身组单独展示。
 
-- [Risk] 递减组历史里可能已有 `isWarmup` 数据。  
+- [Risk] 递减组历史里可能已有 `isWarmup` 数据。
   Mitigation：计划侧保存和回写递减组时忽略热身标记，训练历史仍按原始记录保留。
 
-- [Risk] Team 去重量递归清理漏掉热身处方重量。  
+- [Risk] Team 去重量递归清理漏掉热身处方重量。
   Mitigation：复用现有递归清理，并补充热身组处方测试。
 
 ## Migration Plan

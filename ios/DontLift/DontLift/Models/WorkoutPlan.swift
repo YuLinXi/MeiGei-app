@@ -274,7 +274,7 @@ extension PlanItem {
                                            orderIndex: 0,
                                            weightKg: summary.weightKg,
                                            reps: summary.reps,
-                                           isWarmup: isWarmup,
+                                           isWarmup: false,
                                            segments: normalizedSegments)
         let prescriptions = dropPrescriptionClones(from: template,
                                                     count: effectiveGroupCount,
@@ -344,6 +344,42 @@ extension PlanItem {
         (setPrescriptions ?? []).sorted { $0.orderIndex < $1.orderIndex }
     }
 
+    var regularSetPrescriptions: [PlanSetPrescription] {
+        guard unitKind == .singleExercise else { return [] }
+        return orderedSetPrescriptions.filter { $0.setType != .drop }
+    }
+
+    var warmupSetPrescriptions: [PlanSetPrescription] {
+        regularSetPrescriptions.filter(\.isWarmupEffective)
+    }
+
+    var formalSetPrescriptions: [PlanSetPrescription] {
+        regularSetPrescriptions.filter { !$0.isWarmupEffective }
+    }
+
+    var formalSetCount: Int {
+        if isSuperset {
+            return supersetRounds * orderedSupersetMembers.count
+        }
+        if isDropSet {
+            return max(1, suggestedSets ?? dropSetPrescriptions.count)
+        }
+        if !formalSetPrescriptions.isEmpty { return formalSetPrescriptions.count }
+        return suggestedSets ?? 0
+    }
+
+    var warmupSummaryText: String? {
+        let warmups = warmupSetPrescriptions
+        guard !warmups.isEmpty else { return nil }
+        let details = warmups.prefix(3).map { prescription in
+            let weight = prescription.weightKg.map(formatKg) ?? "-"
+            let reps = prescription.reps.map(String.init) ?? "-"
+            return "\(weight)×\(reps)"
+        }.joined(separator: " / ")
+        let suffix = warmups.count > 3 ? " …" : ""
+        return "热身 \(warmups.count) 组 · \(details)\(suffix)"
+    }
+
     func manualSetPrescriptionsForEditing() -> [PlanSetPrescription] {
         if isDropSet {
             if let existing = dropSetPrescriptions.first {
@@ -361,9 +397,8 @@ extension PlanItem {
                                     segments: segments)
             ])
         }
-        let existing = orderedSetPrescriptions
-        let workingOnly = existing.filter { $0.setType != .drop }
-        if !workingOnly.isEmpty { return Self.normalizedManualSetPrescriptions(workingOnly) }
+        let existing = regularSetPrescriptions
+        if !existing.isEmpty { return Self.normalizedManualSetPrescriptions(existing) }
         let count = max(1, suggestedSets ?? PlanDefaults.suggestedSets)
         return (0..<count).map {
             PlanSetPrescription(orderIndex: $0,
@@ -383,7 +418,7 @@ extension PlanItem {
                                           orderIndex: 0,
                                           weightKg: $0.weightKg,
                                           reps: $0.reps,
-                                          isWarmup: $0.isWarmup,
+                                          isWarmup: false,
                                           segments: [
                                             WorkoutSetSegment(segmentIndex: 0, weightKg: $0.weightKg, reps: $0.reps),
                                             WorkoutSetSegment(segmentIndex: 1)
@@ -410,10 +445,11 @@ extension PlanItem {
         let normalized = Self.normalizedManualSetPrescriptions(prescriptions.filter { $0.setType != .drop })
         let finalPrescriptions = normalized.isEmpty
             ? [PlanSetPrescription(orderIndex: 0, reps: PlanDefaults.suggestedReps)]
-            : normalized
+            : Self.reindexRegularPrescriptions(normalized)
         setPrescriptions = finalPrescriptions
-        suggestedSets = finalPrescriptions.count
-        let summary = Self.summaryWeightReps(from: finalPrescriptions)
+        let formal = finalPrescriptions.filter { !$0.isWarmupEffective }
+        suggestedSets = formal.count
+        let summary = Self.summaryWeightReps(from: formal)
         suggestedWeightKg = summary.weightKg
         suggestedReps = summary.reps
     }
@@ -440,7 +476,7 @@ extension PlanItem {
                                            orderIndex: idx,
                                            weightKg: summary.weightKg,
                                            reps: summary.reps,
-                                           isWarmup: prescription.isWarmupEffective,
+                                           isWarmup: false,
                                            segments: segments)
             }
             return PlanSetPrescription(prescriptionId: prescription.prescriptionId,
@@ -448,8 +484,32 @@ extension PlanItem {
                                        orderIndex: idx,
                                        weightKg: prescription.weightKg,
                                        reps: prescription.reps,
-                                       isWarmup: prescription.isWarmupEffective)
+                                       isWarmup: Self.normalizedWarmupValue(for: prescription))
         }
+    }
+
+    static func reindexRegularPrescriptions(_ prescriptions: [PlanSetPrescription]) -> [PlanSetPrescription] {
+        let ordered = prescriptions
+            .filter { $0.setType != .drop }
+            .sorted {
+                if $0.isWarmupEffective != $1.isWarmupEffective {
+                    return $0.isWarmupEffective && !$1.isWarmupEffective
+                }
+                return $0.orderIndex < $1.orderIndex
+            }
+        return ordered.enumerated().map { idx, prescription in
+            PlanSetPrescription(prescriptionId: prescription.prescriptionId,
+                                setType: .working,
+                                orderIndex: idx,
+                                weightKg: prescription.weightKg,
+                                reps: prescription.reps,
+                                isWarmup: normalizedWarmupValue(for: prescription))
+        }
+    }
+
+    private static func normalizedWarmupValue(for prescription: PlanSetPrescription) -> Bool? {
+        if prescription.isWarmupEffective { return true }
+        return prescription.isWarmup == nil ? nil : false
     }
 
     private static func summaryWeightReps(from prescriptions: [PlanSetPrescription]) -> (weightKg: Double?, reps: Int?) {
@@ -486,7 +546,7 @@ extension PlanItem {
                                        orderIndex: index,
                                        weightKg: summary.weightKg,
                                        reps: summary.reps,
-                                       isWarmup: template.isWarmupEffective,
+                                       isWarmup: false,
                                        segments: segments)
         }
     }
@@ -610,10 +670,7 @@ extension WorkoutPlan {
             if item.isSuperset {
                 return total + item.supersetRounds * item.orderedSupersetMembers.count
             }
-            if item.isDropSet {
-                return total + max(1, item.suggestedSets ?? 1)
-            }
-            return total + (item.setPrescriptions?.count ?? item.suggestedSets ?? 0)
+            return total + item.formalSetCount
         }
     }
 

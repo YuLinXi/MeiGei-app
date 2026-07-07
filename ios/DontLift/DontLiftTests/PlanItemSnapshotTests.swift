@@ -60,4 +60,31 @@ struct PlanItemSnapshotTests {
         #expect(broken.map(\.builtinExerciseCode) == ["FUTURE_BUILTIN"])
         #expect(PlanItem.unstartableMessage(for: broken).contains("FUTURE_BUILTIN"))
     }
+
+    @Test func missingWarmupFlagDecodesAsFormalPrescription() throws {
+        let json = """
+        [{
+          "itemId": "\(UUID().uuidString)",
+          "builtinExerciseCode": "BB_BENCH",
+          "exerciseName": "卧推",
+          "orderIndex": 0,
+          "suggestedSets": 1,
+          "suggestedReps": 8,
+          "setPrescriptions": [{
+            "prescriptionId": "\(UUID().uuidString)",
+            "setTypeRaw": "working",
+            "orderIndex": 0,
+            "weightKg": 60,
+            "reps": 8,
+            "segments": []
+          }]
+        }]
+        """
+
+        let item = try #require(JSONCoding.decoder.decode([PlanItem].self, from: Data(json.utf8)).first)
+
+        #expect(item.warmupSetPrescriptions.isEmpty)
+        #expect(item.formalSetPrescriptions.count == 1)
+        #expect(item.formalSetCount == 1)
+    }
 }

@@ -901,17 +901,32 @@ struct PlanDetailView: View {
     private func planItemRow(_ item: PlanItem) -> some View {
         // 序号按当前顺序推出（动作数极少，firstIndex 开销可忽略）。
         let index = (orderedItems.firstIndex { $0.itemId == item.itemId } ?? 0) + 1
+        let summary = planItemSummary(item)
         return HStack(spacing: 11) {
             Text(String(format: "%02d", index))
                 .font(Theme.Font.mono(size: 12, weight: .bold))
                 .foregroundStyle(Theme.Color.muted)
                 .frame(width: 18)
             planItemKindIcon(item)
-            Text(planItemTitle(item))
-                .font(Theme.Font.body(size: 15, weight: .semibold))
-                .foregroundStyle(Theme.Color.fg)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(planItemTitle(item))
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(summary.main)
+                    .font(Theme.Font.body(size: 12))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if let warmup = summary.warmup {
+                    Text(warmup)
+                        .font(Theme.Font.body(size: 11.5))
+                        .foregroundStyle(Theme.Color.muted)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+            }
                 .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 0)
             editItemButton(item)
@@ -951,6 +966,17 @@ struct PlanDetailView: View {
             }
         }.joined(separator: " / ")
         return "\(memberText) × \(item.supersetRounds)组"
+    }
+
+    private func planItemSummary(_ item: PlanItem) -> (main: String, warmup: String?) {
+        if item.isSuperset {
+            return (supersetPrescriptionSummary(item), nil)
+        }
+        let preview = PlanPrescriptionPreview.make(for: item,
+                                                   mode: plan.mode,
+                                                   lookup: historyStore.planLookup,
+                                                   planId: plan.localId)
+        return (preview.summaryText, preview.warmupSummaryText)
     }
 
     private func editPlanItem(_ item: PlanItem) {
@@ -1139,9 +1165,10 @@ struct PlanDetailView: View {
         if item.isSuperset { return supersetPrescriptionSummary(item) }
         // 对齐原型 .pm：「3 组 × 10 · 60 kg」/「3 组 × 12」；重量可空时仅显示组×次。
         var parts: [String] = []
-        if let s = item.suggestedSets, let r = item.suggestedReps { parts.append("\(s) 组 × \(r)") }
-        else if let s = item.suggestedSets { parts.append("\(s) 组") }
+        if let r = item.suggestedReps { parts.append("\(item.formalSetCount) 组 × \(r)") }
+        else if item.formalSetCount > 0 { parts.append("\(item.formalSetCount) 组") }
         if let w = item.suggestedWeightKg { parts.append("\(formatKg(w)) kg") }
+        if let warmup = item.warmupSummaryText { parts.append(warmup) }
         return parts.isEmpty ? "未设建议" : parts.joined(separator: " · ")
     }
 
@@ -1176,10 +1203,18 @@ struct PlanDetailView: View {
                                items: plan.items.map(weightlessCopyForDuplicate(_:)),
                                mode: .adaptive,
                                forkedFrom: plan.localId,
-                               groupId: plan.groupId,
-                               sortOrder: plan.sortOrder + 1)
+                               groupId: nil,
+                               sortOrder: nextSortOrder(in: nil))
         modelContext.insert(copy)
         try? modelContext.save()
+    }
+
+    private func nextSortOrder(in groupId: UUID?) -> Int {
+        let descriptor = FetchDescriptor<WorkoutPlan>(
+            predicate: #Predicate { $0.deletedAt == nil }
+        )
+        let sameGroup = (try? modelContext.fetch(descriptor))?.filter { $0.groupId == groupId } ?? []
+        return (sameGroup.map(\.sortOrder).max() ?? -1) + 1
     }
 
     private func weightlessCopyForDuplicate(_ item: PlanItem) -> PlanItem {
@@ -1208,7 +1243,7 @@ struct PlanDetailView: View {
                                     orderIndex: idx,
                                     weightKg: nil,
                                     reps: prescription.reps,
-                                    isWarmup: prescription.isWarmupEffective,
+                                    isWarmup: false,
                                     segments: prescription.segments
                                         .sorted { $0.segmentIndex < $1.segmentIndex }
                                         .enumerated()
@@ -1241,7 +1276,7 @@ struct PlanDetailView: View {
                         suggestedSets: item.suggestedSets,
                         suggestedReps: item.suggestedReps,
                         suggestedWeightKg: nil,
-                        setPrescriptions: item.orderedSetPrescriptions.map {
+                        setPrescriptions: PlanItem.reindexRegularPrescriptions(item.regularSetPrescriptions).map {
                             PlanSetPrescription(prescriptionId: UUID(),
                                                 setType: $0.setType,
                                                 orderIndex: $0.orderIndex,
@@ -2030,10 +2065,12 @@ struct PlanMoveGroupSheet: View {
 
 // MARK: - 单个动作项的建议参数编辑（保留原 Form，sheet 内）
 
-private enum PlanItemEditorField: Equatable {
+private enum PlanItemEditorField: Hashable {
     case workingGroupCount
     case workingReps
     case workingWeight
+    case warmupWeight(UUID)
+    case warmupReps(UUID)
     case dropOuterGroupCount
     case dropChildGroupCount
     case dropSegmentWeight(UUID)
@@ -2041,9 +2078,9 @@ private enum PlanItemEditorField: Equatable {
 
     var allowsDecimal: Bool {
         switch self {
-        case .workingWeight, .dropSegmentWeight:
+        case .workingWeight, .warmupWeight, .dropSegmentWeight:
             return true
-        case .workingGroupCount, .workingReps, .dropOuterGroupCount, .dropChildGroupCount, .dropSegmentReps:
+        case .workingGroupCount, .workingReps, .warmupReps, .dropOuterGroupCount, .dropChildGroupCount, .dropSegmentReps:
             return false
         }
     }
@@ -2052,6 +2089,8 @@ private enum PlanItemEditorField: Equatable {
 struct PlanItemEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var prescriptions: [EditablePlanPrescription]
+    @State private var warmupPrescriptions: [EditablePlanPrescription]
+    @State private var isWarmupExpanded = false
     @State private var focusedField: PlanItemEditorField?
     @State private var replaceOnInput = false
     @State private var dropOuterGroupCountText: String
@@ -2062,7 +2101,14 @@ struct PlanItemEditorView: View {
     init(item: PlanItem, onSave: @escaping (PlanItem) -> Void) {
         self.original = item
         self.onSave = onSave
-        _prescriptions = State(initialValue: item.manualSetPrescriptionsForEditing().map(EditablePlanPrescription.init))
+        let editable = item.manualSetPrescriptionsForEditing().map(EditablePlanPrescription.init)
+        let formal = editable.filter { !$0.isWarmup }
+        let warmups = editable.filter(\.isWarmup)
+        _prescriptions = State(initialValue: item.isDropSet || !formal.isEmpty ? (item.isDropSet ? editable : formal) : [
+            .working(weight: item.suggestedWeightKg.map { $0 == $0.rounded() ? String(Int($0)) : String($0) } ?? "",
+                     reps: item.suggestedReps.map(String.init) ?? "\(PlanDefaults.suggestedReps)")
+        ])
+        _warmupPrescriptions = State(initialValue: item.isDropSet ? [] : warmups)
         _dropOuterGroupCountText = State(initialValue: "\(max(1, item.suggestedSets ?? 1))")
     }
 
@@ -2077,16 +2123,24 @@ struct PlanItemEditorView: View {
                 onConfirm: save
             )
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    editorTitle
-                    prescriptionEditor
-                    Color.clear.frame(height: focusedField == nil ? 18 : 250)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                        editorTitle
+                        prescriptionEditor
+                        Color.clear.frame(height: focusedField == nil ? 18 : 250)
+                    }
+                    .padding(Theme.Spacing.lg)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                .padding(Theme.Spacing.lg)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .background(Theme.Color.bg)
+                .onChange(of: focusedField) { _, field in
+                    scrollFocusedField(field, with: proxy)
+                }
+                .onChange(of: isWarmupExpanded) { _, _ in
+                    scrollFocusedField(focusedField, with: proxy)
+                }
             }
-            .background(Theme.Color.bg)
             if focusedField != nil {
                 NumericFormKeypad(decimalEnabled: focusedField?.allowsDecimal == true,
                                   onDigit: keypadDigit,
@@ -2123,7 +2177,7 @@ struct PlanItemEditorView: View {
             updated.suggestedSets = dropOuterGroupCount
             updated.applyManualSetPrescriptions(dropSetModels)
         } else {
-            updated.applyManualSetPrescriptions(workingModels)
+            updated.applyManualSetPrescriptions(warmupModels + workingModels)
         }
         onSave(updated)
         dismiss()
@@ -2131,7 +2185,12 @@ struct PlanItemEditorView: View {
 
     private var prescriptionEditor: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            original.isDropSet ? AnyView(dropSetPrescriptionCard) : AnyView(workingPrescriptionCard)
+            if original.isDropSet {
+                dropSetPrescriptionCard
+            } else {
+                workingPrescriptionCard
+                warmupPrescriptionSection
+            }
         }
     }
 
@@ -2154,8 +2213,18 @@ struct PlanItemEditorView: View {
             return EditablePlanPrescription.working(id: prescriptions.indices.contains(index) ? prescriptions[index].id : UUID(),
                                              weight: prescription.weight,
                                              reps: prescription.reps,
-                                             isWarmup: prescription.isWarmup)
+                                             isWarmup: false)
                 .model(orderIndex: index)
+        }
+    }
+
+    private var warmupModels: [PlanSetPrescription] {
+        warmupPrescriptions.enumerated().map { idx, prescription in
+            EditablePlanPrescription.working(id: prescription.id,
+                                             weight: prescription.weight,
+                                             reps: prescription.reps,
+                                             isWarmup: true)
+                .model(orderIndex: idx)
         }
     }
 
@@ -2187,8 +2256,63 @@ struct PlanItemEditorView: View {
                 valueField(title: "重量（可选）", placeholder: "kg", text: workingWeightBinding.wrappedValue, focused: focusedField == .workingWeight) {
                     focus(.workingWeight)
                 }
+                .id(PlanItemEditorField.workingWeight)
                 valueField(title: "次数", placeholder: "次", text: workingRepsBinding.wrappedValue, focused: focusedField == .workingReps) {
                     focus(.workingReps)
+                }
+                .id(PlanItemEditorField.workingReps)
+            }
+        }
+        .cardStyle(padding: 12, cornerRadius: Theme.Radius.md)
+    }
+
+    private var warmupPrescriptionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Button {
+                    isWarmupExpanded.toggle()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: isWarmupExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .frame(width: 16)
+                        Text("热身组")
+                            .font(Theme.Font.body(size: 13, weight: .bold))
+                        Text("\(warmupPrescriptions.count) 组")
+                            .font(Theme.Font.mono(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.Color.muted)
+                    }
+                    .foregroundStyle(Theme.Color.fg)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    addWarmupPrescription()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.Color.accent)
+                        .frame(width: 30, height: 30)
+                        .background(Theme.Color.accentSoft, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("添加热身组")
+            }
+
+            if isWarmupExpanded {
+                if warmupPrescriptions.isEmpty {
+                    Text("未添加热身组")
+                        .font(Theme.Font.body(size: 12))
+                        .foregroundStyle(Theme.Color.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
+                } else {
+                    Rectangle().fill(Theme.Color.border).frame(height: 1)
+                    ForEach(Array(warmupPrescriptions.enumerated()), id: \.element.id) { index, prescription in
+                        warmupPrescriptionRow(prescription, index: index)
+                    }
                 }
             }
         }
@@ -2207,6 +2331,47 @@ struct PlanItemEditorView: View {
                       width: nil) {
                 focus(.workingGroupCount)
             }
+            .id(PlanItemEditorField.workingGroupCount)
+        }
+    }
+
+    private func warmupPrescriptionRow(_ prescription: EditablePlanPrescription, index: Int) -> some View {
+        let controlTopOffset: CGFloat = 16
+        return HStack(spacing: 8) {
+            Text("热\(index + 1)")
+                .font(Theme.Font.mono(size: 11, weight: .bold))
+                .foregroundStyle(Theme.Color.accent)
+                .frame(width: 28, height: 30, alignment: .leading)
+                .padding(.top, controlTopOffset)
+            valueField(title: "重量（可选）",
+                       placeholder: "kg",
+                       text: prescription.weight,
+                       focused: focusedField == .warmupWeight(prescription.id)) {
+                focus(.warmupWeight(prescription.id))
+            }
+            .id(PlanItemEditorField.warmupWeight(prescription.id))
+            Text("×")
+                .font(Theme.Font.mono(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.top, controlTopOffset)
+            valueField(title: "次数",
+                       placeholder: "次",
+                       text: prescription.reps,
+                       focused: focusedField == .warmupReps(prescription.id)) {
+                focus(.warmupReps(prescription.id))
+            }
+            .id(PlanItemEditorField.warmupReps(prescription.id))
+            Button {
+                removeWarmupPrescription(prescription.id)
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.danger)
+                    .frame(width: 28, height: 30)
+            }
+            .padding(.top, controlTopOffset)
+            .buttonStyle(.plain)
+            .accessibilityLabel("删除热身组")
         }
     }
 
@@ -2234,6 +2399,7 @@ struct PlanItemEditorView: View {
                       width: nil) {
                 focus(.dropOuterGroupCount)
             }
+            .id(PlanItemEditorField.dropOuterGroupCount)
         }
     }
 
@@ -2284,6 +2450,7 @@ struct PlanItemEditorView: View {
                        focused: focusedField == .dropSegmentWeight(segment.id)) {
                 focus(.dropSegmentWeight(segment.id))
             }
+            .id(PlanItemEditorField.dropSegmentWeight(segment.id))
             Text("×")
                 .font(Theme.Font.mono(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.Color.muted)
@@ -2293,6 +2460,7 @@ struct PlanItemEditorView: View {
                        focused: focusedField == .dropSegmentReps(segment.id)) {
                 focus(.dropSegmentReps(segment.id))
             }
+            .id(PlanItemEditorField.dropSegmentReps(segment.id))
         }
     }
 
@@ -2328,23 +2496,30 @@ struct PlanItemEditorView: View {
         .accessibilityLabel(display)
     }
 
-    @ViewBuilder
-    private func warmupButton(for index: Int) -> some View {
-        if prescriptions.indices.contains(index) {
-            let isWarmup = prescriptions[index].isWarmup
-            Button {
-                prescriptions[index].isWarmup.toggle()
-            } label: {
-                Label("热身", systemImage: isWarmup ? "flame.fill" : "flame")
-                    .font(Theme.Font.body(size: 11.5, weight: .semibold))
-                    .foregroundStyle(isWarmup ? Theme.Color.accent : Theme.Color.fg2)
-                    .padding(.horizontal, 9)
-                    .frame(height: 28)
-                    .overlay(Capsule().stroke(Theme.Color.border2, lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(isWarmup ? "取消热身组" : "标记为热身组")
+    private func addWarmupPrescription() {
+        let source = warmupPrescriptions.last?.representativeText ?? (weight: "", reps: "")
+        warmupPrescriptions.append(.working(weight: source.weight, reps: source.reps, isWarmup: true))
+        isWarmupExpanded = true
+    }
+
+    private func removeWarmupPrescription(_ id: UUID) {
+        warmupPrescriptions.removeAll { $0.id == id }
+        if case .warmupWeight(let focusedId) = focusedField, focusedId == id {
+            focusedField = nil
         }
+        if case .warmupReps(let focusedId) = focusedField, focusedId == id {
+            focusedField = nil
+        }
+    }
+
+    private func setWarmupWeight(_ value: String, id: UUID) {
+        guard let index = warmupPrescriptions.firstIndex(where: { $0.id == id }) else { return }
+        warmupPrescriptions[index].weight = value
+    }
+
+    private func setWarmupReps(_ value: String, id: UUID) {
+        guard let index = warmupPrescriptions.firstIndex(where: { $0.id == id }) else { return }
+        warmupPrescriptions[index].reps = value
     }
 
     private func ensureWorkingPrescription() {
@@ -2430,8 +2605,27 @@ struct PlanItemEditorView: View {
     }
 
     private func focus(_ field: PlanItemEditorField) {
+        switch field {
+        case .warmupWeight, .warmupReps:
+            isWarmupExpanded = true
+        default:
+            break
+        }
         focusedField = field
         replaceOnInput = true
+    }
+
+    private func scrollFocusedField(_ field: PlanItemEditorField?, with proxy: ScrollViewProxy) {
+        guard let field else { return }
+        withAnimation(.easeOut(duration: 0.18)) {
+            proxy.scrollTo(field, anchor: .center)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            guard focusedField == field else { return }
+            withAnimation(.easeOut(duration: 0.18)) {
+                proxy.scrollTo(field, anchor: .center)
+            }
+        }
     }
 
     private var focusSequence: [PlanItemEditorField] {
@@ -2440,7 +2634,9 @@ struct PlanItemEditorView: View {
                 [PlanItemEditorField.dropSegmentWeight($0.id), .dropSegmentReps($0.id)]
             }
         }
-        return [.workingGroupCount, .workingWeight, .workingReps]
+        return [.workingGroupCount, .workingWeight, .workingReps] + warmupPrescriptions.flatMap {
+            [PlanItemEditorField.warmupWeight($0.id), .warmupReps($0.id)]
+        }
     }
 
     private func focusPreviousField() {
@@ -2496,6 +2692,10 @@ struct PlanItemEditorView: View {
             return workingRepsBinding.wrappedValue
         case .workingWeight:
             return workingWeightBinding.wrappedValue
+        case .warmupWeight(let id):
+            return warmupPrescriptions.first(where: { $0.id == id })?.weight ?? ""
+        case .warmupReps(let id):
+            return warmupPrescriptions.first(where: { $0.id == id })?.reps ?? ""
         case .dropOuterGroupCount:
             return dropOuterGroupCountText
         case .dropChildGroupCount:
@@ -2515,6 +2715,10 @@ struct PlanItemEditorView: View {
             setWorkingReps(value)
         case .workingWeight:
             setWorkingWeight(value)
+        case .warmupWeight(let id):
+            setWarmupWeight(value, id: id)
+        case .warmupReps(let id):
+            setWarmupReps(value, id: id)
         case .dropOuterGroupCount:
             setDropOuterGroupCount(intValue(value) ?? 1)
         case .dropChildGroupCount:

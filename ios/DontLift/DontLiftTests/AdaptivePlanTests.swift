@@ -79,6 +79,29 @@ struct AdaptivePlanTests {
         #expect(sets.allSatisfy { $0.weightKg == 60 && $0.reps == 8 && !$0.completed })
     }
 
+    @Test func strictModePrefillsWarmupAndFormalPrescriptions() {
+        let item = PlanItem(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0,
+                            suggestedSets: 4, suggestedReps: 8, suggestedWeightKg: 60,
+                            setPrescriptions: [
+                                PlanSetPrescription(orderIndex: 0, weightKg: 20, reps: 10, isWarmup: true),
+                                PlanSetPrescription(orderIndex: 1, weightKg: 40, reps: 5, isWarmup: true),
+                                PlanSetPrescription(orderIndex: 2, weightKg: 60, reps: 8),
+                                PlanSetPrescription(orderIndex: 3, weightKg: 60, reps: 8),
+                                PlanSetPrescription(orderIndex: 4, weightKg: 60, reps: 8),
+                                PlanSetPrescription(orderIndex: 5, weightKg: 60, reps: 8)
+                            ])
+
+        let sets = PlanPrefill.sets(for: item, mode: .strict, history: [])
+
+        #expect(PlanPrefill.missingStrictRequiredItems(in: [item]).isEmpty)
+        #expect(sets.count == 6)
+        #expect(sets.prefix(2).allSatisfy { $0.isWarmupEffective })
+        #expect(sets.dropFirst(2).allSatisfy { !$0.isWarmupEffective })
+        #expect(sets.map(\.completed).allSatisfy { !$0 })
+        #expect(sets.map(\.weightKg) == [20, 40, 60, 60, 60, 60])
+        #expect(item.formalSetCount == 4)
+    }
+
     @Test func strictModePrefillsDropSetPrescription() {
         let item = PlanItem.dropSet(
             orderIndex: 0,
@@ -209,6 +232,16 @@ struct AdaptivePlanTests {
         #expect(PlanPrefill.sets(for: missingReps, mode: .strict, history: []).isEmpty)
     }
 
+    @Test func strictModeRequiresFormalPrescriptionNotWarmupOnly() {
+        let item = PlanItem(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0,
+                            suggestedSets: nil, suggestedReps: nil,
+                            setPrescriptions: [
+                                PlanSetPrescription(orderIndex: 0, weightKg: 20, reps: 10, isWarmup: true)
+                            ])
+
+        #expect(PlanPrefill.missingStrictRequiredItems(in: [item]).map(\.itemId) == [item.itemId])
+    }
+
     @Test func adaptivePrefillsFromHistoryFirst() {
         let key = "BB_BENCH"
         let history = [makeWorkout(historyKey: key, startedAt: Date(timeIntervalSince1970: 1000),
@@ -219,6 +252,60 @@ struct AdaptivePlanTests {
         #expect(sets.count == 3)
         #expect(sets[0].weightKg == 62.5 && sets[0].reps == 8)   // 历史优先，非计划 60
         #expect(sets[2].reps == 7)                                // 逐组对位
+    }
+
+    @Test func adaptivePrefillsWarmupAndFormalSetsFromHistory() {
+        let key = "BB_BENCH"
+        let itemId = UUID()
+        let history = [makeWorkout(historyKey: key,
+                                   startedAt: Date(timeIntervalSince1970: 1000),
+                                   sets: [
+                                    (20, 10, true, .warmup),
+                                    (40, 5, true, .warmup),
+                                    (65, 8, true, .working),
+                                    (65, 7, true, .working)
+                                   ],
+                                   planItemId: itemId)]
+        let item = PlanItem(itemId: itemId, builtinExerciseCode: key, exerciseName: "卧推",
+                            orderIndex: 0, suggestedSets: 4, suggestedReps: 8, suggestedWeightKg: 60)
+
+        let sets = PlanPrefill.sets(for: item, mode: .adaptive, history: history)
+        let preview = PlanPrescriptionPreview.make(for: item, mode: .adaptive, history: history)
+
+        #expect(sets.count == 4)
+        #expect(sets.prefix(2).allSatisfy { $0.isWarmupEffective })
+        #expect(sets.dropFirst(2).allSatisfy { !$0.isWarmupEffective })
+        #expect(sets.map(\.weightKg) == [20, 40, 65, 65])
+        #expect(preview.summaryText == "下次 2 正式组 · 65 kg × 8")
+        #expect(preview.warmupSummaryText == "热身 2 组 · 20×10 / 40×5")
+    }
+
+    @Test func adaptiveWarmupOnlyHistoryFallsBackToPlanPrescription() {
+        let key = "BB_BENCH"
+        let itemId = UUID()
+        let history = [makeWorkout(historyKey: key,
+                                   startedAt: Date(timeIntervalSince1970: 1000),
+                                   sets: [(20, 12, true, .warmup)],
+                                   planItemId: itemId)]
+        let item = PlanItem(itemId: itemId, builtinExerciseCode: key, exerciseName: "卧推",
+                            orderIndex: 0, suggestedSets: 3, suggestedReps: 8, suggestedWeightKg: 60,
+                            setPrescriptions: [
+                                PlanSetPrescription(orderIndex: 0, weightKg: 20, reps: 12, isWarmup: true),
+                                PlanSetPrescription(orderIndex: 1, weightKg: 60, reps: 8),
+                                PlanSetPrescription(orderIndex: 2, weightKg: 60, reps: 8),
+                                PlanSetPrescription(orderIndex: 3, weightKg: 60, reps: 8)
+                            ])
+
+        let sets = PlanPrefill.sets(for: item, mode: .adaptive, history: history)
+        let preview = PlanPrescriptionPreview.make(for: item, mode: .adaptive, history: history)
+
+        #expect(sets.count == 4)
+        #expect(sets.first?.isWarmupEffective == true)
+        #expect(sets.dropFirst().allSatisfy { !$0.isWarmupEffective })
+        #expect(sets.map(\.weightKg) == [20, 60, 60, 60])
+        #expect(preview.source == .planPreset)
+        #expect(preview.summaryText == "下次 3 正式组 · 60 kg × 8")
+        #expect(preview.warmupSummaryText == "热身 1 组 · 20×12")
     }
 
     @Test func adaptivePrefillMergesAliasHistoryKeys() {
@@ -416,6 +503,52 @@ struct AdaptivePlanTests {
         #expect(result.changed)
     }
 
+    @Test func mergeWritesWarmupPrescriptionButUsesFormalTopSetForSummary() {
+        let key = "BB_BENCH"
+        let itemId = UUID()
+        let plan = [PlanItem(itemId: itemId, builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 0,
+                             suggestedSets: 3, suggestedReps: 8, suggestedWeightKg: 60)]
+        let w = makeWorkout(historyKey: key, startedAt: Date(timeIntervalSince1970: 2000),
+                            sets: [(100, 1, true, .warmup), (80, 8, true, .working)],
+                            planItemId: itemId)
+
+        let updated = PlanWriteback.merge(planItems: plan, workout: w).newItems.first { $0.itemId == itemId }!
+        let prescriptions = updated.setPrescriptions ?? []
+
+        #expect(updated.suggestedSets == 3)
+        #expect(updated.suggestedWeightKg == 80)
+        #expect(updated.suggestedReps == 8)
+        #expect(prescriptions.count == 2)
+        #expect(prescriptions[0].isWarmupEffective)
+        #expect(!prescriptions[1].isWarmupEffective)
+        #expect(prescriptions[0].weightKg == 100)
+    }
+
+    @Test func mergeDoesNotDeleteExistingWarmupsWhenSkippedThisTime() {
+        let key = "BB_BENCH"
+        let itemId = UUID()
+        let plan = [PlanItem(itemId: itemId, builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 0,
+                             suggestedSets: 2, suggestedReps: 8, suggestedWeightKg: 60,
+                             setPrescriptions: [
+                                PlanSetPrescription(orderIndex: 0, weightKg: 20, reps: 10, isWarmup: true),
+                                PlanSetPrescription(orderIndex: 1, weightKg: 60, reps: 8),
+                                PlanSetPrescription(orderIndex: 2, weightKg: 60, reps: 8)
+                             ])]
+        let w = makeWorkout(historyKey: key, startedAt: Date(timeIntervalSince1970: 2000),
+                            sets: [(65, 6, true, .working), (65, 6, true, .working)],
+                            planItemId: itemId)
+
+        let updated = PlanWriteback.merge(planItems: plan, workout: w).newItems.first { $0.itemId == itemId }!
+        let prescriptions = updated.setPrescriptions ?? []
+
+        #expect(prescriptions.count == 3)
+        #expect(prescriptions[0].isWarmupEffective)
+        #expect(prescriptions[0].weightKg == 20)
+        #expect(prescriptions.dropFirst().allSatisfy { !$0.isWarmupEffective })
+        #expect(updated.suggestedWeightKg == 65)
+        #expect(updated.suggestedSets == 2)
+    }
+
     /// 本次实绩与计划建议完全一致时，不应标脏回写或弹更新回执。
     @Test func mergeDoesNotMarkChangedWhenValuesAreUnchanged() {
         let key = "BB_BENCH"
@@ -470,6 +603,36 @@ struct AdaptivePlanTests {
         #expect(updated.setPrescriptions?.first?.segments.map(\.reps) == [8, 6])
     }
 
+    @Test func dropSetWritebackDropsWarmupMarkers() {
+        let key = "BB_BENCH"
+        let itemId = UUID()
+        let plan = [PlanItem.dropSet(itemId: itemId,
+                                     orderIndex: 0,
+                                     builtinExerciseCode: key,
+                                     exerciseName: "卧推",
+                                     segments: [
+                                        WorkoutSetSegment(segmentIndex: 0, weightKg: 75, reps: 8),
+                                        WorkoutSetSegment(segmentIndex: 1, weightKg: 55, reps: 6)
+                                     ])]
+        let workout = Workout(startedAt: Date(timeIntervalSince1970: 2000),
+                              endedAt: Date(timeIntervalSince1970: 5600))
+        let exercise = WorkoutExercise(builtinExerciseCode: key, exerciseName: "卧推", orderIndex: 0,
+                                       planItemId: itemId)
+        let warmupDrop = dropSet(setIndex: 0, segments: [(40, 10), (30, 8)])
+        warmupDrop.isWarmup = true
+        exercise.sets = [
+            warmupDrop,
+            dropSet(setIndex: 1, segments: [(80, 8), (60, 6)])
+        ]
+        workout.exercises = [exercise]
+
+        let updated = PlanWriteback.merge(planItems: plan, workout: workout).newItems.first!
+
+        #expect(updated.setPrescriptions?.count == 1)
+        #expect(updated.setPrescriptions?.allSatisfy { !$0.isWarmupEffective } == true)
+        #expect(updated.setPrescriptions?.first?.segments.map(\.weightKg) == [80, 60])
+    }
+
     /// deload：重量可降（如实），但组数不降。
     @Test func mergeWeightCanDecreaseSetsCannot() {
         let key = "BB_BENCH"
@@ -499,8 +662,8 @@ struct AdaptivePlanTests {
         #expect(result.diffs.contains { $0.kind == .kept && $0.exerciseName == "杠铃深蹲" })
     }
 
-    /// 仅热身/未完成组的动作不回写。
-    @Test func mergeSkipsExerciseWithoutCompletedWorkingSets() {
+    /// 仅完成热身时保留热身处方，但不刷新正式强度摘要。
+    @Test func mergeWarmupOnlyKeepsIntensitySummaryUnchanged() {
         let itemId = UUID()
         let plan = [PlanItem(itemId: itemId, builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0,
                              suggestedSets: 3, suggestedReps: 8, suggestedWeightKg: 60)]
@@ -510,7 +673,9 @@ struct AdaptivePlanTests {
         let item = result.newItems.first { $0.itemId == itemId }!
         #expect(item.suggestedWeightKg == 60)   // 未变（无 completed 正式组）
         #expect(item.suggestedSets == 3)
-        #expect(!result.changed)                // 无实际改动
+        #expect(item.setPrescriptions?.count == 1)
+        #expect(item.setPrescriptions?.first?.isWarmupEffective == true)
+        #expect(result.changed)
     }
 
     /// 去重：训练中新增动作的 historyKey 命中已有计划项时，认作更新而非重复新增。
