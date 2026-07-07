@@ -1,16 +1,17 @@
 # 发版操作清单：别练了 1.0 (build 18)
 
 > 生成于 2026-07-07 23:19 CST，分支 `codex/fix-exercise-library-keyboard`。
+> TestFlight 状态更新于 2026-07-07 23:34 CST，用户确认 `1.0 (18)` 已安装并完成回归。
 > 本次发版功能介绍见 [`release-1.0-b18-feature-intro.md`](./release-1.0-b18-feature-intro.md)。
 
 ## 0. 本次发版摘要
 
 - 版本号：`MARKETING_VERSION = 1.0`，`CURRENT_PROJECT_VERSION = 18`。
 - 后端部署：本次无需部署；生产当前 health 为 `UP`，Flyway 最新为 `V18 workout set is warmup success=true`。
-- iOS 状态：已准备 `1.0 (18)`，TestFlight 尚未上传。
+- iOS 状态：TestFlight `1.0 (18)` 已安装并完成回归，用户已确认。
 - iOS 重点：临时修复训练/计划里「添加动作」动作库抽屉点击搜索框后，真机键盘弹起导致顶部输入框被遮挡的问题。
 - 发布顺序：本次可直接上传 iOS TestFlight；后端仅需保持生产健康。
-- Tag 策略：仅在 TestFlight `1.0 (18)` 上传、处理完成、可安装并通过主流程回归后，创建并推送 `v1.0-b18`。
+- Tag 策略：TestFlight `1.0 (18)` 已可安装并通过主流程回归，本次发布创建并推送 `v1.0-b18`。
 
 ## 1. 已完成准备
 
@@ -25,9 +26,9 @@
 - [x] 生产 health 当前为 `UP`。
 - [x] 生产 dev token 当前返回 `404`，确认关闭。
 - [x] 生产 Flyway 当前最新记录已查询：`18  workout set is warmup  success=true`。
-- [ ] TestFlight `1.0 (18)` 已上传。
-- [ ] TestFlight `1.0 (18)` 已处理完成并可安装。
-- [ ] TestFlight 真机主流程回归已完成。
+- [x] TestFlight `1.0 (18)` 已上传。
+- [x] TestFlight `1.0 (18)` 已处理完成并可安装。
+- [x] TestFlight 真机主流程回归已完成，2026-07-07 23:34 CST 由用户确认。
 - [ ] hotfix 分支已合并回 `main`。
 - [ ] `v1.0-b18` tag 已创建并推送。
 
@@ -99,7 +100,7 @@ curl -s -o /tmp/dontlift_dev_token_status.txt -w '%{http_code}\n' \
 
 ## 5. 合并、Tag 与推送
 
-> 仅在 TestFlight 可安装、主流程回归通过后执行。本次不需要等待后端部署。
+> TestFlight `1.0 (18)` 已可安装并通过主流程回归。本次不需要等待后端部署。
 
 - [ ] 确认工作区只包含 build 18 与本次 hotfix 预期改动。
 - [ ] 推送 hotfix 分支：

@@ -2,7 +2,7 @@
 
 > 适用版本：`1.0 (build 18)`
 > 后端状态：本次无后端运行时代码和数据库迁移变更，无需重新部署；生产 health 已于 2026-07-07 23:13 CST 确认为 `UP`，Flyway 最新仍为 `V18 workout set is warmup success=true`。
-> iOS 状态：已准备 `1.0 (18)`，TestFlight 尚未上传。
+> iOS 状态：TestFlight `1.0 (18)` 已安装并完成回归，2026-07-07 23:34 CST 由用户确认。
 
 ## 一句话摘要
 
@@ -27,7 +27,7 @@
 - build 18 只影响 iOS 客户端 UI 布局，不改变同步数据、后端接口、Team 分享、训练记录或计划数据结构。
 - 未升级用户仍可能在真机上遇到 build 17 的添加动作搜索框键盘遮挡问题。
 - 后端继续沿用 build 16/17 已部署的 `V18` schema，无需发布后端。
-- TestFlight `1.0 (18)` 仍待上传；上传完成并确认可安装、真机回归通过后，再合并与创建 `v1.0-b18` tag。
+- TestFlight `1.0 (18)` 已安装并完成回归，本次发布可以合并并创建 `v1.0-b18` tag。
 
 ## 已完成验证
 
@@ -40,6 +40,7 @@
 - 生产 health 已确认：`curl -fsS https://dontlift.peipadada.com/actuator/health` 返回 `{"status":"UP","groups":["liveness","readiness"]}`。
 - 生产 dev token 已确认关闭：`POST https://dontlift.peipadada.com/auth/dev/token` 返回 `404`。
 - 生产 Flyway 已确认最新为 `18  workout set is warmup  success=true`，并包含 `17  workout units  success=true`。
+- TestFlight `1.0 (18)` 已安装并完成回归，2026-07-07 23:34 CST 由用户确认。
 
 ## TestFlight 回归重点
 
