@@ -1276,16 +1276,19 @@ struct ExercisePickerView: View {
     let onPick: (ExercisePick) -> Void
 
     var body: some View {
-        ExerciseLibraryContentView(
-            mode: .pick { pick in
-                onPick(pick)
-                dismiss()
-            },
-            emptyHint: "试试其他关键词，或切换分类。",
-            emptyPlainHint: "切换分类查看其它动作。"
-        )
-        .padding(.top, 14)
-        .background(Theme.Color.bg.ignoresSafeArea())
+        ZStack(alignment: .top) {
+            Theme.Color.bg.ignoresSafeArea()
+            ExerciseLibraryContentView(
+                mode: .pick { pick in
+                    onPick(pick)
+                    dismiss()
+                },
+                emptyHint: "试试其他关键词，或切换分类。",
+                emptyPlainHint: "切换分类查看其它动作。"
+            )
+            .safeAreaPadding(.top, 14)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
