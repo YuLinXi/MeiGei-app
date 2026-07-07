@@ -2,6 +2,7 @@
 
 > 生成于 2026-07-07 22:34 CST，分支 `feature/v1.0-b17`。
 > TestFlight 状态更新于 2026-07-07 22:43 CST，用户确认 `1.0 (17)` 已发布并完成回归。
+> 合并与 tag 状态更新于 2026-07-07 22:45 CST。
 > 本次发版功能介绍见 [`release-1.0-b17-feature-intro.md`](./release-1.0-b17-feature-intro.md)。
 
 ## 0. 本次发版摘要
@@ -11,7 +12,7 @@
 - iOS 状态：TestFlight `1.0 (17)` 已发布并完成回归，用户已确认。
 - iOS 重点：计划热身处方、计划详情动作卡片精简、Team 计划详情结构图标与动作跳转、编辑动作键盘滚动、休息提示和分享/kcal 细节修正。
 - 发布顺序：本次可直接上传 iOS TestFlight；后端仅需保持生产健康。
-- Tag 策略：TestFlight `1.0 (17)` 已可安装并通过主流程回归，本次发布创建并推送 `v1.0-b17`。
+- Tag 策略：TestFlight `1.0 (17)` 已可安装并通过主流程回归，本次发布合并回 `main` 后创建并推送 `v1.0-b17`。
 
 ## 1. 已完成准备
 
@@ -30,8 +31,8 @@
 - [x] TestFlight `1.0 (17)` 已上传。
 - [x] TestFlight `1.0 (17)` 已处理完成并可安装。
 - [x] TestFlight 真机主流程回归已完成，2026-07-07 22:43 CST 由用户确认。
-- [ ] `feature/v1.0-b17` 已合并回 `main`。
-- [ ] `v1.0-b17` tag 已创建并推送。
+- [x] `feature/v1.0-b17` 已合并回 `main`。
+- [x] `v1.0-b17` tag 已创建并推送。
 
 ## 2. 后端生产状态
 
@@ -111,27 +112,27 @@ curl -s -o /tmp/dontlift_dev_token_status.txt -w '%{http_code}\n' \
 
 > TestFlight `1.0 (17)` 已可安装并通过主流程回归。本次不需要等待后端部署。
 
-- [ ] 确认工作区只包含 build 17 与发版文档预期改动。
-- [ ] 推送发版分支：
+- [x] 确认工作区只包含 build 17 与发版文档预期改动。
+- [x] 推送发版分支：
 
 ```bash
 git push origin feature/v1.0-b17
 ```
 
-- [ ] 切换并更新 `main`：
+- [x] 切换并更新 `main`：
 
 ```bash
 git switch main
 git pull --ff-only origin main
 ```
 
-- [ ] 合并发版分支：
+- [x] 合并发版分支：
 
 ```bash
 git merge --no-ff feature/v1.0-b17
 ```
 
-- [ ] 创建并推送 tag：
+- [x] 创建并推送 tag：
 
 ```bash
 git tag v1.0-b17

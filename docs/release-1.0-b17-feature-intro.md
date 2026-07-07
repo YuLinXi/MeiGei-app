@@ -3,6 +3,7 @@
 > 适用版本：`1.0 (build 17)`
 > 后端状态：本次无后端运行时代码和数据库迁移变更，无需重新部署；生产 health 已于 2026-07-07 22:32 CST 确认为 `UP`，Flyway 最新仍为 `V18 workout set is warmup success=true`。
 > iOS 状态：TestFlight `1.0 (17)` 已发布并完成回归，2026-07-07 22:43 CST 由用户确认。
+> 合并与 tag 状态：2026-07-07 22:45 CST 完成 `main` 合并，并创建 `v1.0-b17` tag。
 
 ## 一句话摘要
 
@@ -38,7 +39,7 @@
 - 未升级 iOS 的用户不会看到计划热身处方、Team 计划详情精简和新的计划详情跳转体验。
 - 新版客户端读取旧计划时，会把缺失 `isWarmup` 的处方按正式组处理，旧计划可继续开始训练。
 - Team 共享计划仍会清空重量字段；热身次数和结构信息会保留，方便队友按同样结构训练。
-- TestFlight `1.0 (17)` 已发布并完成回归，本次发布可以合并并创建 `v1.0-b17` tag。
+- TestFlight `1.0 (17)` 已发布并完成回归，本次发布合并到 `main` 后创建 `v1.0-b17` tag。
 
 ## 已完成验证
 
@@ -53,6 +54,7 @@
 - 生产 dev token 已确认关闭：`POST https://dontlift.peipadada.com/auth/dev/token` 返回 `404`。
 - 生产 Flyway 已确认最新为 `18  workout set is warmup  success=true`，并包含 `17  workout units  success=true`。
 - TestFlight `1.0 (17)` 已发布并完成回归，2026-07-07 22:43 CST 由用户确认。
+- `feature/v1.0-b17` 已合并回 `main`，并创建 `v1.0-b17` tag。
 
 ## TestFlight 回归重点
 
