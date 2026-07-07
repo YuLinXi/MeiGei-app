@@ -2,6 +2,7 @@
 
 > 生成于 2026-07-07 23:19 CST，分支 `codex/fix-exercise-library-keyboard`。
 > TestFlight 状态更新于 2026-07-07 23:34 CST，用户确认 `1.0 (18)` 已安装并完成回归。
+> 合并与 tag 状态更新于 2026-07-07 23:35 CST。
 > 本次发版功能介绍见 [`release-1.0-b18-feature-intro.md`](./release-1.0-b18-feature-intro.md)。
 
 ## 0. 本次发版摘要
@@ -11,7 +12,7 @@
 - iOS 状态：TestFlight `1.0 (18)` 已安装并完成回归，用户已确认。
 - iOS 重点：临时修复训练/计划里「添加动作」动作库抽屉点击搜索框后，真机键盘弹起导致顶部输入框被遮挡的问题。
 - 发布顺序：本次可直接上传 iOS TestFlight；后端仅需保持生产健康。
-- Tag 策略：TestFlight `1.0 (18)` 已可安装并通过主流程回归，本次发布创建并推送 `v1.0-b18`。
+- Tag 策略：TestFlight `1.0 (18)` 已可安装并通过主流程回归，本次发布合并回 `main` 后创建并推送 `v1.0-b18`。
 
 ## 1. 已完成准备
 
@@ -29,8 +30,8 @@
 - [x] TestFlight `1.0 (18)` 已上传。
 - [x] TestFlight `1.0 (18)` 已处理完成并可安装。
 - [x] TestFlight 真机主流程回归已完成，2026-07-07 23:34 CST 由用户确认。
-- [ ] hotfix 分支已合并回 `main`。
-- [ ] `v1.0-b18` tag 已创建并推送。
+- [x] hotfix 分支已合并回 `main`。
+- [x] `v1.0-b18` tag 已创建并推送。
 
 ## 2. 后端生产状态
 
@@ -102,27 +103,27 @@ curl -s -o /tmp/dontlift_dev_token_status.txt -w '%{http_code}\n' \
 
 > TestFlight `1.0 (18)` 已可安装并通过主流程回归。本次不需要等待后端部署。
 
-- [ ] 确认工作区只包含 build 18 与本次 hotfix 预期改动。
-- [ ] 推送 hotfix 分支：
+- [x] 确认工作区只包含 build 18 与本次 hotfix 预期改动。
+- [x] 推送 hotfix 分支：
 
 ```bash
 git push origin codex/fix-exercise-library-keyboard
 ```
 
-- [ ] 切换并更新 `main`：
+- [x] 切换并更新 `main`：
 
 ```bash
 git switch main
 git pull --ff-only origin main
 ```
 
-- [ ] 合并 hotfix 分支：
+- [x] 合并 hotfix 分支：
 
 ```bash
 git merge --no-ff codex/fix-exercise-library-keyboard
 ```
 
-- [ ] 创建并推送 tag：
+- [x] 创建并推送 tag：
 
 ```bash
 git tag v1.0-b18
