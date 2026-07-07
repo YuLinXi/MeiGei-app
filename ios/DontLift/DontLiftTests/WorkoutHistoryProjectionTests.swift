@@ -161,6 +161,46 @@ struct WorkoutHistoryProjectionTests {
         #expect(lookup.latestSets(for: unknownItem).first?.weightKg == 55)
     }
 
+    @Test func planHistoryLookupDoesNotTreatWarmupOnlyAsCompletedSource() {
+        let key = "BB_BENCH_PRESS"
+        let planId = UUID()
+        let itemId = UUID()
+        let startedAt = Date(timeIntervalSince1970: 2_000)
+        let workout = Workout(
+            planId: planId,
+            title: "训练",
+            startedAt: startedAt,
+            timerStartedAt: startedAt,
+            endedAt: startedAt.addingTimeInterval(3600)
+        )
+        let exercise = WorkoutExercise(
+            builtinExerciseCode: key,
+            exerciseName: "杠铃卧推",
+            primaryMuscle: "胸",
+            orderIndex: 0,
+            planItemId: itemId
+        )
+        exercise.sets = [
+            WorkoutSet(setIndex: 0, weightKg: 20, reps: 12, completed: true, setType: .warmup)
+        ]
+        workout.exercises = [exercise]
+
+        let lookup = PlanHistoryLookup.build(from: [workout])
+        let item = PlanItem(
+            itemId: itemId,
+            builtinExerciseCode: key,
+            exerciseName: "杠铃卧推",
+            orderIndex: 0,
+            suggestedSets: 3,
+            suggestedReps: 8,
+            suggestedWeightKg: 60
+        )
+
+        #expect(lookup.latestSets(for: item).isEmpty)
+        #expect(lookup.latestDate(for: item) == nil)
+        #expect(lookup.keptDate(for: item, planId: planId) == startedAt)
+    }
+
     @Test func chartPointsAreCappedToRecent120Points() {
         let points = (0..<160).map { idx in
             ExerciseHistoryPoint(

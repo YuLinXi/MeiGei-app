@@ -49,21 +49,27 @@ extension Workout {
     }
 
     private func planItem(from ex: WorkoutExercise, orderIndex: Int) -> PlanItem? {
-            let sets = ex.sets
-                .filter(\.countsForStats)
-                .sorted { $0.setIndex < $1.setIndex }
-            guard !sets.isEmpty else { return nil }
-            let top = sets.flatMap(\.statEntries).max { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
+            let executionSets = ex.sets
+                .filter { $0.completed && !$0.isDropSet }
+                .sorted {
+                    if $0.isWarmupEffective != $1.isWarmupEffective {
+                        return $0.isWarmupEffective && !$1.isWarmupEffective
+                    }
+                    return $0.setIndex < $1.setIndex
+                }
+            let formalSets = executionSets.filter { !$0.isWarmupEffective }
+            guard !formalSets.isEmpty else { return nil }
+            let top = formalSets.flatMap(\.statEntries).max { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
             return PlanItem(
                 builtinExerciseCode: ex.builtinExerciseCode,
                 customExerciseId: ex.customExerciseId,
                 exerciseName: ex.exerciseName,
                 primaryMuscle: ex.primaryMuscle,
                 orderIndex: orderIndex,
-                suggestedSets: sets.count,
+                suggestedSets: formalSets.count,
                 suggestedReps: top?.reps,
                 suggestedWeightKg: top?.weightKg,
-                setPrescriptions: sets.enumerated().map { idx, set in
+                setPrescriptions: executionSets.enumerated().map { idx, set in
                     Self.planPrescription(from: set, orderIndex: idx)
                 }
             )
@@ -112,7 +118,7 @@ extension Workout {
                                        orderIndex: orderIndex,
                                        weightKg: summary.weightKg,
                                        reps: summary.reps,
-                                       isWarmup: set.isWarmupEffective,
+                                       isWarmup: false,
                                        segments: segments)
         }
         return PlanSetPrescription(setType: set.setType,

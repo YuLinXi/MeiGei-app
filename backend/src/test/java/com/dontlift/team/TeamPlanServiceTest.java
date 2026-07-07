@@ -246,6 +246,52 @@ class TeamPlanServiceTest {
     }
 
     @Test
+    void forkVersion_preservesWarmupOrderAndRepsWhileStrippingWeights() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        UUID teamId = UUID.randomUUID();
+        UUID shareId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        TeamPlanShare share = share(shareId, teamId, ownerId, UUID.randomUUID());
+        TeamPlanShareVersion version = version(versionId, shareId);
+        version.setItems("""
+                [{
+                  "itemId":"%s",
+                  "unitKind":"singleExercise",
+                  "exerciseName":"卧推",
+                  "orderIndex":0,
+                  "suggestedSets":2,
+                  "suggestedReps":8,
+                  "suggestedWeightKg":100,
+                  "setPrescriptions":[
+                    {"prescriptionId":"%s","setType":"regular","orderIndex":0,"isWarmup":true,"weightKg":40,"reps":10},
+                    {"prescriptionId":"%s","setType":"regular","orderIndex":1,"isWarmup":false,"weight":80,"reps":8}
+                  ]
+                }]
+                """.formatted(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()));
+        when(versionMapper.selectById(versionId)).thenReturn(version);
+        when(shareMapper.selectById(shareId)).thenReturn(share);
+        when(planMapper.nextUngroupedSortOrder(userId)).thenReturn(4);
+
+        service.forkVersion(userId, versionId);
+
+        ArgumentCaptor<WorkoutPlan> planCaptor = ArgumentCaptor.forClass(WorkoutPlan.class);
+        verify(planMapper).insert(planCaptor.capture());
+        JsonNode item = objectMapper.readTree(planCaptor.getValue().getItems()).get(0);
+        JsonNode warmup = item.get("setPrescriptions").get(0);
+        JsonNode formal = item.get("setPrescriptions").get(1);
+        assertThat(item.has("suggestedWeightKg")).isFalse();
+        assertThat(warmup.get("isWarmup").asBoolean()).isTrue();
+        assertThat(warmup.get("orderIndex").asInt()).isEqualTo(0);
+        assertThat(warmup.get("reps").asInt()).isEqualTo(10);
+        assertThat(warmup.has("weightKg")).isFalse();
+        assertThat(formal.get("isWarmup").asBoolean()).isFalse();
+        assertThat(formal.get("orderIndex").asInt()).isEqualTo(1);
+        assertThat(formal.get("reps").asInt()).isEqualTo(8);
+        assertThat(formal.has("weight")).isFalse();
+    }
+
+    @Test
     void recordCompleteEvent_validatesWorkoutAndStoresMinimalEvent() {
         UUID userId = UUID.randomUUID();
         UUID teamId = UUID.randomUUID();

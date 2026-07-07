@@ -1908,6 +1908,7 @@ struct TeamPlansView: View {
 
 private struct TeamPlanShareDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedExercise: BuiltinExercise?
 
     let share: TeamPlanShareCardDTO
     let isOwnShare: Bool
@@ -1935,8 +1936,8 @@ private struct TeamPlanShareDetailView: View {
                         .font(Theme.Font.mono(size: 10, weight: .bold))
                         .foregroundStyle(Theme.Color.muted)
                         .textCase(.uppercase)
-                    ForEach(Array(orderedItems.enumerated()), id: \.element.itemId) { index, item in
-                        itemRow(item, index: index + 1)
+                    ForEach(orderedItems, id: \.itemId) { item in
+                        itemRow(item)
                     }
                     Color.clear.frame(height: 96)
                 }
@@ -1952,6 +1953,9 @@ private struct TeamPlanShareDetailView: View {
                                accessibilityLabel: "计划操作")
                     .disabled(isDeleting)
             }
+        }
+        .navigationDestination(item: $selectedExercise) { exercise in
+            ExerciseDetailView(exercise: exercise)
         }
     }
 
@@ -1992,13 +1996,23 @@ private struct TeamPlanShareDetailView: View {
         .cardStyle()
     }
 
-    private func itemRow(_ item: PlanItem, index: Int) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text("\(index)")
-                .font(Theme.Font.mono(size: 12, weight: .bold))
-                .foregroundStyle(Theme.Color.muted)
-                .frame(width: 22, height: 22)
-                .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
+    @ViewBuilder
+    private func itemRow(_ item: PlanItem) -> some View {
+        if let exercise = exerciseDetail(for: item) {
+            Button {
+                selectedExercise = exercise
+            } label: {
+                itemRowContent(item, canOpenDetail: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("查看动作库详情")
+        } else {
+            itemRowContent(item, canOpenDetail: false)
+        }
+    }
+
+    private func itemRowContent(_ item: PlanItem, canOpenDetail: Bool) -> some View {
+        HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     if item.isDropSet {
@@ -2014,15 +2028,17 @@ private struct TeamPlanShareDetailView: View {
                 Text(itemPrescription(item))
                     .font(Theme.Font.mono(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.muted)
-                if let meta = itemMeta(item) {
-                    Text(meta)
-                        .font(Theme.Font.mono(size: 10))
-                        .foregroundStyle(Theme.Color.muted)
-                }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
+            if canOpenDetail {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .accessibilityHidden(true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
         .cardStyle()
     }
 
@@ -2088,7 +2104,7 @@ private struct TeamPlanShareDetailView: View {
         if item.isSuperset {
             return "\(item.supersetRounds) 组 · 共 \(item.supersetRounds * item.orderedSupersetMembers.count) 组动作"
         }
-        let sets = max(1, item.suggestedSets ?? PlanDefaults.suggestedSets)
+        let sets = max(1, item.formalSetCount)
         if let reps = item.suggestedReps {
             return "\(sets) 组 × \(reps) 次"
         }
@@ -2100,16 +2116,8 @@ private struct TeamPlanShareDetailView: View {
         return item.displayExerciseName
     }
 
-    private func itemMeta(_ item: PlanItem) -> String? {
-        if item.isSuperset {
-            return nil
-        }
-        return [item.resolvedPrimaryMuscle, item.resolvedEquipmentType]
-            .compactMap { value in
-                let text = value?.trimmingCharacters(in: .whitespacesAndNewlines)
-                return text?.isEmpty == false ? text : nil
-            }
-            .joined(separator: " · ")
-            .nilIfEmpty
+    private func exerciseDetail(for item: PlanItem) -> BuiltinExercise? {
+        guard !item.isSuperset, item.customExerciseId == nil else { return nil }
+        return ExerciseLibrary.resolve(code: item.builtinExerciseCode, name: item.exerciseName)
     }
 }

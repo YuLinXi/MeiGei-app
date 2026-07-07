@@ -38,7 +38,9 @@ struct WorkoutPlanTemplateFactoryTests {
         #expect(items[0].suggestedSets == 2)
         #expect(items[0].suggestedReps == 6)
         #expect(items[0].suggestedWeightKg == 82.5)
-        #expect(items[0].setPrescriptions?.count == 2)
+        #expect(items[0].setPrescriptions?.count == 3)
+        #expect(items[0].setPrescriptions?.first?.isWarmupEffective == true)
+        #expect(items[0].setPrescriptions?.dropFirst().allSatisfy { !$0.isWarmupEffective } == true)
     }
 
     @Test func planTemplateItemsPreserveCompletedDropSetPrescription() {

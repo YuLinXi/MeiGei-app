@@ -85,6 +85,40 @@ struct TeamPlanSharingLoopTests {
         #expect(prescription.segments.map(\.reps) == [8, 6])
     }
 
+    @Test func shareSnapshotKeepsWarmupPrescriptionRepsButStripsWeights() throws {
+        let plan = WorkoutPlan(
+            name: "热身胸推",
+            items: [
+                PlanItem(
+                    builtinExerciseCode: "BB_BENCH_PRESS",
+                    exerciseName: "杠铃卧推",
+                    orderIndex: 0,
+                    suggestedSets: 2,
+                    suggestedReps: 8,
+                    suggestedWeightKg: 80,
+                    setPrescriptions: [
+                        PlanSetPrescription(orderIndex: 0, weightKg: 20, reps: 10, isWarmup: true),
+                        PlanSetPrescription(orderIndex: 1, weightKg: 40, reps: 5, isWarmup: true),
+                        PlanSetPrescription(orderIndex: 2, weightKg: 80, reps: 8),
+                        PlanSetPrescription(orderIndex: 3, weightKg: 80, reps: 8)
+                    ]
+                )
+            ],
+            mode: .adaptive
+        )
+
+        let json = TeamService.weightlessItemsJSON(from: plan)
+        let item = try #require(JSONCoding.decoder.decode([PlanItem].self, from: Data(json.utf8)).first)
+        let prescriptions = try #require(item.setPrescriptions)
+
+        #expect(item.suggestedWeightKg == nil)
+        #expect(item.suggestedSets == 2)
+        #expect(prescriptions.map(\.weightKg) == [nil, nil, nil, nil])
+        #expect(prescriptions.map(\.reps) == [10, 5, 8, 8])
+        #expect(prescriptions.prefix(2).allSatisfy { $0.isWarmupEffective })
+        #expect(prescriptions.dropFirst(2).allSatisfy { !$0.isWarmupEffective })
+    }
+
     @Test func teamPlanShareCardUsesTotalCompletionAndLegacyFallbackCounts() throws {
         let shareId = UUID()
         let versionId = UUID()
@@ -217,6 +251,8 @@ struct TeamPlanSharingLoopTests {
         #expect(templateItems[0].suggestedSets == 2)
         #expect(templateItems[0].suggestedReps == 5)
         #expect(templateItems[0].suggestedWeightKg == 105)
+        #expect(templateItems[0].setPrescriptions?.count == 3)
+        #expect(templateItems[0].setPrescriptions?.first?.isWarmupEffective == true)
     }
 
     @Test func confirmDialogRunsActionBeforeOptionalStateIsCleared() {

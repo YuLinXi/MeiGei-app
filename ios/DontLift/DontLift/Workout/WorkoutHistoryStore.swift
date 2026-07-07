@@ -704,18 +704,9 @@ extension PlanHistoryLookup {
             var completedPlanItemIds = Set<UUID>()
             var completedHistoryKeys = Set<String>()
             for ex in workout.exercises {
-                let done = ex.sets
-                    .filter(\.countsForStats)
-                    .sorted { $0.setIndex < $1.setIndex }
+                let done = completedExecutionSets(from: ex)
                 guard !done.isEmpty else { continue }
-                let snapshots = done.map {
-                    let summary = $0.summaryWeightReps
-                    return SetSnapshot(weightKg: summary.weightKg,
-                                       reps: summary.reps,
-                                       setTypeRaw: $0.setTypeRaw,
-                                       isWarmup: $0.isWarmupEffective,
-                                       segments: $0.segments)
-                }
+                let snapshots = done.map(PlanPrefill.snapshot(from:))
 
                 if let planItemId = ex.planItemId {
                     completedPlanItemIds.insert(planItemId)
@@ -751,5 +742,23 @@ extension PlanHistoryLookup {
             latestByHistoryKey: latestByHistoryKey,
             lastWorkoutByPlanId: lastWorkoutByPlanId
         )
+    }
+
+    private static func completedExecutionSets(from exercise: WorkoutExercise) -> [WorkoutSet] {
+        let completed = exercise.sets.filter(\.completed)
+        let dropSets = completed
+            .filter { $0.isDropSet && !$0.isWarmupEffective }
+            .sorted { $0.setIndex < $1.setIndex }
+        if !dropSets.isEmpty { return dropSets }
+        let regular = completed
+            .filter { !$0.isDropSet }
+            .sorted {
+                if $0.isWarmupEffective != $1.isWarmupEffective {
+                    return $0.isWarmupEffective && !$1.isWarmupEffective
+                }
+                return $0.setIndex < $1.setIndex
+            }
+        guard regular.contains(where: { !$0.isWarmupEffective }) else { return [] }
+        return regular
     }
 }

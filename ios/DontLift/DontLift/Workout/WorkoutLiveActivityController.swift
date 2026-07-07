@@ -171,18 +171,13 @@ final class WorkoutLiveActivityController {
     }
 
     private func nextSetSummary(for workout: Workout) -> RestActivityAttributes.NextSet? {
-        for ex in workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }) {
-            if let next = ex.sets.sorted(by: { $0.setIndex < $1.setIndex })
-                .first(where: { !$0.completed }) {
-                return RestActivityAttributes.NextSet(
-                    exerciseName: ex.exerciseName,
-                    setIndex: next.setIndex + 1,
-                    weightText: next.summaryWeightReps.weightKg.map { "\(formatKg($0)) kg" },
-                    repsText: next.summaryWeightReps.reps.map { "\($0) 次" }
-                )
-            }
-        }
-        return nil
+        guard let candidate = WorkoutRestPolicy.nextSet(afterCompletedSetId: nil, in: workout) else { return nil }
+        return RestActivityAttributes.NextSet(
+            exerciseName: candidate.exerciseName,
+            setIndex: candidate.setIndex,
+            weightText: candidate.weightKg.map { "\(formatKg($0)) kg" },
+            repsText: candidate.reps.map { "\($0) 次" }
+        )
     }
 
     private func upsert(attributes: RestActivityAttributes,
