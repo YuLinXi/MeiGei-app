@@ -4,6 +4,7 @@
 > 生成时间：2026-07-09 00:10 CST。
 > 后端状态：本次无后端运行时代码和数据库迁移变更，无需重新部署；生产 health 已确认为 `UP`，Flyway 最新仍为 `V18 workout set is warmup success=true`。
 > iOS 状态：已完成本地 build/test 验证；TestFlight `1.0 (19)` 已上传并完成真机回归，2026-07-09 00:13 CST 由用户确认。
+> 合并与 tag 状态：2026-07-09 00:16 CST 完成 `main` 合并，并创建 `v1.0-b19` tag。
 
 ## 一句话摘要
 
@@ -33,6 +34,7 @@
 - 首页 Hero 的连续训练天数只由本地已完成训练记录派生；不会写入同步字段，也不会影响历史训练数据。
 - 动作库搜索框稳定性仍需 TestFlight 真机重点回归，尤其是中文输入法候选栏、Dynamic Island、返回上个 App 状态栏场景。
 - TestFlight `1.0 (19)` 已完成真机回归，用户未反馈首页 Hero 或动作库搜索框异常；具体设备和 iOS 版本未提供。
+- TestFlight `1.0 (19)` 已可用并完成回归，本次发布合并到 `main` 后创建 `v1.0-b19` tag。
 
 ## 已完成验证
 
@@ -45,6 +47,7 @@
 - 生产 dev token 已确认关闭：`POST /auth/dev/token` 返回 `404`。
 - 生产 Flyway 已确认最新记录为 `18  workout set is warmup  success=true`。
 - TestFlight `1.0 (19)` 已上传并完成真机回归，2026-07-09 00:13 CST 由用户确认。
+- `feature/v1.0-b19` 已合并回 `main`，并创建 `v1.0-b19` tag。
 
 ## TestFlight 回归重点
 
