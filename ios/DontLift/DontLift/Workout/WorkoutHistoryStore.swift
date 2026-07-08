@@ -58,6 +58,8 @@ struct HomeWorkoutSnapshot: Equatable {
     var currentWeekStats: WeeklyStats
     var weekWorkouts: [WorkoutRowSummary]
     var weekTrainingDays: [WeekTrainingDayStatus]
+    var todayCompletedWorkoutCount: Int
+    var currentTrainingStreakDays: Int
     var recentPlanIds: Set<UUID>
     var activePlanId: UUID?
     var prByWorkoutId: [UUID: PRBadge]
@@ -66,6 +68,8 @@ struct HomeWorkoutSnapshot: Equatable {
         currentWeekStats: .empty,
         weekWorkouts: [],
         weekTrainingDays: WorkoutWeeklyStats.dayStatuses(workouts: [], reference: .now, calendar: .currentMondayFirst),
+        todayCompletedWorkoutCount: 0,
+        currentTrainingStreakDays: 0,
         recentPlanIds: [],
         activePlanId: nil,
         prByWorkoutId: [:]
@@ -561,7 +565,8 @@ final class WorkoutHistoryStore {
         }
 
         let now = Date.now
-        let weekBounds = WorkoutWeeklyStats.weekBounds(for: now, calendar: .currentMondayFirst)
+        let calendar = Calendar.currentMondayFirst
+        let weekBounds = WorkoutWeeklyStats.weekBounds(for: now, calendar: calendar)
         func rowSummary(for w: Workout) -> WorkoutRowSummary {
             let duration = w.endedAt.map { $0.timeIntervalSince(w.timerStartedAt ?? w.startedAt) }
             let volume = w.exercises.flatMap(\.sets).reduce(0.0) { acc, set in
@@ -587,7 +592,15 @@ final class WorkoutHistoryStore {
         let calendarDays = buildCalendarDays(
             from: finishedDesc,
             prByWorkoutId: prByWorkoutId,
-            rowSummary: rowSummary
+            rowSummary: rowSummary,
+            calendar: calendar
+        )
+        let today = calendar.startOfDay(for: now)
+        let todayCompletedWorkoutCount = calendarDays[today]?.workoutCount ?? 0
+        let currentTrainingStreakDays = currentTrainingStreakDays(
+            in: finishedDesc,
+            reference: now,
+            calendar: calendar
         )
 
         let cutoff = Date.now.addingTimeInterval(-14 * 86_400)
@@ -601,14 +614,16 @@ final class WorkoutHistoryStore {
             currentWeekStats: WorkoutWeeklyStats.compute(
                 workouts: finishedDesc,
                 reference: now,
-                calendar: .currentMondayFirst
+                calendar: calendar
             ),
             weekWorkouts: Array(weekWorkouts),
             weekTrainingDays: WorkoutWeeklyStats.dayStatuses(
                 workouts: finishedDesc,
                 reference: now,
-                calendar: .currentMondayFirst
+                calendar: calendar
             ),
+            todayCompletedWorkoutCount: todayCompletedWorkoutCount,
+            currentTrainingStreakDays: currentTrainingStreakDays,
             recentPlanIds: recentPlanIds,
             activePlanId: activePlanId,
             prByWorkoutId: prByWorkoutId
@@ -685,6 +700,22 @@ final class WorkoutHistoryStore {
             days[day] = summary
         }
         return days
+    }
+
+    private static func currentTrainingStreakDays(
+        in workouts: [Workout],
+        reference: Date,
+        calendar: Calendar
+    ) -> Int {
+        let completedDays = Set(workouts.map { calendar.startOfDay(for: $0.startedAt) })
+        var cursor = calendar.startOfDay(for: reference)
+        var count = 0
+        while completedDays.contains(cursor) {
+            count += 1
+            guard let previous = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
+            cursor = previous
+        }
+        return count
     }
 
     private func logDataScaleIfNeeded(_ scale: DataScale) {

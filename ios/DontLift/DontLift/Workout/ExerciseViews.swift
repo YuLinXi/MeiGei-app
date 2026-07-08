@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 /// 选择动作的结果：内置 code 或自定义 id 二选一。
 struct ExercisePick: Identifiable, Hashable {
@@ -204,22 +205,28 @@ private enum MuscleThumbnailAssetKey: String {
 
 /// 动作库 · Tab 根页：不展示顶部标题，仅保留右上自定义动作创建入口。
 struct ExerciseLibraryView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(SyncEngine.self) private var syncEngine
     @State private var showingCreate = false
     @State private var selectedExercise: BuiltinExercise?
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             Theme.Color.bg.ignoresSafeArea()
-            VStack(spacing: 0) {
-                ExerciseLibraryContentView(
+            KeyboardStableHost {
+                ExerciseLibraryShell(
                     mode: .browse { selectedExercise = $0 },
                     emptyHint: "试试其他关键词，或点右下 + 添加自定义动作。",
-                    emptyPlainHint: "切换部位，或点右下 + 添加自定义动作。"
+                    emptyPlainHint: "切换部位，或点右下 + 添加自定义动作。",
+                    topPadding: Theme.Spacing.md
                 )
-                .padding(.top, Theme.Spacing.md)
+                .modelContext(modelContext)
+                .environment(syncEngine)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .overlay(alignment: .bottomTrailing) {
             floatingAddButton
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -238,13 +245,90 @@ struct ExerciseLibraryView: View {
     }
 }
 
+private struct KeyboardStableHost<Content: View>: UIViewControllerRepresentable {
+    var content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    func makeUIViewController(context: Context) -> UIHostingController<Content> {
+        let controller = UIHostingController(rootView: content)
+        controller.view.backgroundColor = .clear
+        controller.safeAreaRegions = .container
+        return controller
+    }
+
+    func updateUIViewController(_ controller: UIHostingController<Content>, context: Context) {
+        controller.rootView = content
+        controller.view.backgroundColor = .clear
+        controller.safeAreaRegions = .container
+    }
+}
+
+private struct ExerciseLibraryShell: View {
+    @State private var query = ""
+
+    let mode: ExerciseLibraryContentMode
+    let emptyHint: String
+    let emptyPlainHint: String
+    let topPadding: CGFloat
+
+    var body: some View {
+        VStack(spacing: 0) {
+            searchBar
+                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.bottom, 8)
+            ExerciseLibraryContentView(
+                query: $query,
+                mode: mode,
+                emptyHint: emptyHint,
+                emptyPlainHint: emptyPlainHint
+            )
+        }
+        .safeAreaPadding(.top, topPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(Theme.Color.muted)
+            TextField("", text: $query,
+                      prompt: Text("搜索动作").foregroundColor(Theme.Color.muted))
+                .font(Theme.Font.body(size: 14))
+                .foregroundStyle(Theme.Color.fg)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.Color.muted)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("清除搜索")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .strokeBorder(Theme.Color.border2, lineWidth: 1)
+        )
+    }
+}
+
 /// 可复用动作库主体：不包含顶部标题、右上创建入口或导航外壳，可嵌入 Tab 或底部抽屉。
 private struct ExerciseLibraryContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SyncEngine.self) private var syncEngine
     @Query(sort: \CustomExercise.updatedAt, order: .reverse) private var custom: [CustomExercise]
 
-    @State private var query = ""
+    @Binding var query: String
     @State private var selection: LibrarySelection = .all
     /// 手风琴展开态：展开中的 L1、展开中的 L2（单开）。
     @State private var expandedCat: String? = nil
@@ -336,13 +420,10 @@ private struct ExerciseLibraryContentView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            searchBar.padding(.horizontal, Theme.Spacing.lg).padding(.bottom, 8)
-            HStack(spacing: 0) {
-                leftRail
-                Rectangle().fill(Theme.Color.border).frame(width: 1)
-                rightArea
-            }
+        HStack(spacing: 0) {
+            leftRail
+            Rectangle().fill(Theme.Color.border).frame(width: 1)
+            rightArea
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .paperConfirmDialog(
@@ -358,37 +439,6 @@ private struct ExerciseLibraryContentView: View {
                     deleteCustom(ex)
                 }
             }
-        )
-    }
-
-    private var searchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(Theme.Color.muted)
-            TextField("", text: $query,
-                      prompt: Text("搜索动作").foregroundColor(Theme.Color.muted))
-                .font(Theme.Font.body(size: 14))
-                .foregroundStyle(Theme.Color.fg)
-                .submitLabel(.search)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-            if !query.isEmpty {
-                Button { query = "" } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.Color.muted)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("清除搜索")
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                .strokeBorder(Theme.Color.border2, lineWidth: 1)
         )
     }
 
@@ -1272,21 +1322,28 @@ struct CustomExerciseEditorView: View {
 
 /// 添加动作抽屉：复用动作库主体，不提供标题栏或创建自定义动作入口。
 struct ExercisePickerView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(SyncEngine.self) private var syncEngine
     @Environment(\.dismiss) private var dismiss
     let onPick: (ExercisePick) -> Void
 
     var body: some View {
         ZStack(alignment: .top) {
             Theme.Color.bg.ignoresSafeArea()
-            ExerciseLibraryContentView(
-                mode: .pick { pick in
-                    onPick(pick)
-                    dismiss()
-                },
-                emptyHint: "试试其他关键词，或切换分类。",
-                emptyPlainHint: "切换分类查看其它动作。"
-            )
-            .safeAreaPadding(.top, 14)
+            KeyboardStableHost {
+                ExerciseLibraryShell(
+                    mode: .pick { pick in
+                        onPick(pick)
+                        dismiss()
+                    },
+                    emptyHint: "试试其他关键词，或切换分类。",
+                    emptyPlainHint: "切换分类查看其它动作。",
+                    topPadding: 14
+                )
+                .modelContext(modelContext)
+                .environment(syncEngine)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea(.keyboard, edges: .bottom)
