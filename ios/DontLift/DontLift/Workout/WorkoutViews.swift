@@ -3,6 +3,17 @@ import SwiftData
 
 // MARK: - 训练首页（设计稿 01）
 
+private struct HomeHeroModel: Equatable {
+    var imageName: String
+    var eyebrow: String
+    var title: String
+    var message: String
+
+    var accessibilityLabel: String {
+        "\(eyebrow)，\(title)，\(message)"
+    }
+}
+
 /// 训练首页：本周 hero + 本周节奏 + 本周训练列表 + 悬浮 CTA。
 struct WorkoutListView: View {
     @Environment(\.modelContext) private var modelContext
@@ -133,42 +144,85 @@ struct WorkoutListView: View {
 
     // MARK: Hero
 
-    @ViewBuilder private var heroSection: some View {
-        if weeklyDoneCount == 0 {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("本周").eyebrowStyle()
-                Text("准备好了吗？")
-                    .font(Theme.Font.display(size: 32, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Text("本周还没开始 · 现在开始第 1 次训练")
-                    .font(Theme.Font.body(size: 13))
-                    .foregroundStyle(Theme.Color.fg2)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .cardStyle()
-        } else {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("本周训练量").eyebrowStyle()
-                HStack(alignment: .lastTextBaseline, spacing: 6) {
-                    Text(formatTons(stats.volumeKg)).numStyle(size: 56)
-                        .foregroundStyle(Theme.Color.accent)
+    private var heroSection: some View {
+        let model = homeHeroModel
+        return GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Image(model.imageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .clipped()
+                    .accessibilityHidden(true)
+
+                LinearGradient(
+                    colors: [
+                        Theme.Color.surface.opacity(0.96),
+                        Theme.Color.surface.opacity(0.72),
+                        Theme.Color.surface.opacity(0.0)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(model.eyebrow).eyebrowStyle()
+                    Text(model.title)
+                        .font(Theme.Font.display(size: 22, weight: .heavy))
+                        .foregroundStyle(Theme.Color.fg)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    Text("t").numStyle(size: 22).foregroundStyle(Theme.Color.fg2)
+                        .minimumScaleFactor(0.78)
+                    Text(model.message)
+                        .font(Theme.Font.body(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.Color.fg2)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
                 }
-                Text("本周第 \(weeklyDoneCount) 次训练")
-                    .font(Theme.Font.l4)
-                    .foregroundStyle(Theme.Color.fg2)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                .frame(width: min(180, proxy.size.width * 0.48), alignment: .leading)
+                .padding(.leading, 18)
+                .padding(.vertical, 18)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .cardStyle()
         }
+        .frame(height: 164)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .stroke(Theme.Color.border.opacity(0.7), lineWidth: 1)
+        )
+        .paperShadow(.sm, cornerRadius: Theme.Radius.lg)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(homeHeroModel.accessibilityLabel)
+    }
+
+    private var homeHeroModel: HomeHeroModel {
+        let home = historyStore.home
+        if home.todayCompletedWorkoutCount > 0, home.currentTrainingStreakDays >= 3 {
+            return HomeHeroModel(imageName: "homeHeroStreak",
+                                 eyebrow: "连续训练",
+                                 title: "已坚持 \(home.currentTrainingStreakDays) 天",
+                                 message: heroProgressText)
+        }
+        if home.todayCompletedWorkoutCount > 0 {
+            return HomeHeroModel(imageName: "homeHeroDone",
+                                 eyebrow: "今日完成",
+                                 title: "训练已归档",
+                                 message: heroProgressText)
+        }
+        return HomeHeroModel(imageName: "homeHeroPending",
+                             eyebrow: "今日待完成",
+                             title: "先练一组",
+                             message: weeklyDoneCount == 0 ? "本周还没记录，从今天开始" : "今天还差一次，保持节奏")
+    }
+
+    private var heroProgressText: String {
+        if stats.volumeKg > 0 {
+            return "本周第 \(weeklyDoneCount) 次 · \(formatTons(stats.volumeKg)) t"
+        }
+        if stats.setCount > 0 {
+            return "本周第 \(weeklyDoneCount) 次 · \(stats.setCount) 组"
+        }
+        return "本周第 \(weeklyDoneCount) 次"
     }
 
     // MARK: 一周训练勾选
@@ -239,7 +293,7 @@ struct WorkoutListView: View {
     // MARK: 本周训练
 
     private var weekTrainingSection: some View {
-        // 仅展示已完成训练，进行中会话由顶部横幅承载，不混入常规行。
+        // 仅展示已完成训练，进行中会话由全局浮层承载，不混入常规行。
         let weekWorkouts = historyStore.home.weekWorkouts
         return VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             HStack(spacing: 8) {
@@ -1672,7 +1726,13 @@ struct WorkoutLoggingView: View {
         let current = currentRestSeconds(for: target)
         let editingCustom = restEditingTarget == restTarget
         let isCustom = current > 0 && !Self.restOptions.contains(current)
-        let customText = editingCustom ? restEditBuffer : (isCustom ? "\(current)" : "")
+        let customHighlighted = editingCustom || isCustom
+        let customValueText = editingCustom
+            ? (restEditBuffer.isEmpty ? "输入秒数" : "\(restEditBuffer)s")
+            : (isCustom ? "\(current)s" : "")
+        let customAccessibilityValue = editingCustom && !restEditBuffer.isEmpty
+            ? "当前 \(restEditBuffer) 秒"
+            : (isCustom ? "当前 \(current) 秒" : "未设置")
         let noteExists = actionMenuNoteExists(for: target)
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
@@ -1692,8 +1752,8 @@ struct WorkoutLoggingView: View {
                             Text(opt == 0 ? "关" : "\(opt)")
                                 .font(Theme.Font.mono(size: 14, weight: .bold))
                                 .foregroundStyle(on ? .white : Theme.Color.fg2)
-                                .frame(width: 42)
-                                .frame(height: 40)
+                                .frame(width: 40)
+                                .frame(height: 44)
                                 .background(on ? Theme.Color.accent : Theme.Color.bg,
                                             in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                                 .overlay(
@@ -1705,32 +1765,39 @@ struct WorkoutLoggingView: View {
                     Button {
                         beginRestDurationEditing(for: restTarget, current: current, isCustom: isCustom)
                     } label: {
-                        HStack(spacing: 2) {
-                            if customText.isEmpty {
+                        VStack(spacing: 2) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 8, weight: .bold))
                                 Text("自定义")
-                                    .font(Theme.Font.body(size: 12, weight: .bold))
+                                    .font(Theme.Font.body(size: 10.5, weight: .bold))
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
-                            } else {
-                                Text(customText)
-                                    .font(Theme.Font.mono(size: 13, weight: .bold))
-                                Text("秒")
-                                    .font(Theme.Font.body(size: 10, weight: .semibold))
+                            }
+                            if !customValueText.isEmpty {
+                                Text(customValueText)
+                                    .font(customValueText == "输入秒数"
+                                          ? Theme.Font.body(size: 10, weight: .semibold)
+                                          : Theme.Font.mono(size: 13, weight: .bold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.72)
                             }
                         }
-                        .foregroundStyle(customText.isEmpty ? Theme.Color.muted : Theme.Color.fg)
-                        .frame(width: 60)
-                        .frame(height: 40)
-                        .background(editingCustom ? Theme.Color.accentSoft : Theme.Color.bg,
+                        .foregroundStyle(customHighlighted ? Theme.Color.fg : Theme.Color.muted)
+                        .frame(width: 68)
+                        .frame(height: 44)
+                        .background(customHighlighted ? Theme.Color.accentSoft : Theme.Color.bg,
                                     in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .stroke(editingCustom ? Theme.Color.accent : Theme.Color.border,
-                                        lineWidth: editingCustom ? 1.5 : 1)
+                                .stroke(customHighlighted ? Theme.Color.accentSofter : Theme.Color.border,
+                                        lineWidth: customHighlighted ? 1.5 : 1)
                         )
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("自定义组间休息秒数")
+                    .accessibilityValue(customAccessibilityValue)
+                    .accessibilityHint("双击编辑自定义秒数")
                 }
                 Text(restDescription(for: target, seconds: current))
                     .font(Theme.Font.l4).foregroundStyle(Theme.Color.muted)
