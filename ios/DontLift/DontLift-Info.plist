@@ -16,6 +16,17 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.yulinxi.app.DontLift</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>dontlift</string>
+			</array>
+		</dict>
+	</array>
 	<!-- 仅用系统标准加密（HTTPS/Keychain），属豁免范围；声明后每次上传 TestFlight 免答出口合规问卷。 -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
