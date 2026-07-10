@@ -30,8 +30,8 @@ struct ProfileView: View {
     @State private var deleting = false
     @State private var deleteError: String?
 
-    // 法律页 / HealthKit / 通知态
-    @State private var legalURL: IdentifiableURL?
+    // Sheet / HealthKit / 通知态
+    @State private var profileSheet: ProfileSheet?
     @State private var healthAuthorized = false
     @State private var notificationsEnabled: Bool?
     @State private var caloriePreferences = WorkoutCaloriePreferences.current()
@@ -75,7 +75,9 @@ struct ProfileView: View {
             caloriePreferences = .current()
             await refreshNotificationStatus()
         }
-        .safariSheet(url: $legalURL)
+        .sheet(item: $profileSheet) { sheet in
+            profileSheetView(sheet)
+        }
         .paperConfirmDialog(
             isPresented: $confirmLogout,
             title: "退出登录?",
@@ -333,49 +335,15 @@ struct ProfileView: View {
 
     private var trainingPrefsGroup: some View {
         groupCard(title: "训练偏好") {
-            // 默认休息时长
-            HStack(spacing: Theme.Spacing.md) {
-                Image(systemName: "timer").foregroundStyle(Theme.Color.fg2).frame(width: 24)
-                Text("默认休息时长")
-                    .font(Theme.Font.body(size: 14))
-                    .foregroundStyle(Theme.Color.fg)
-                Spacer()
-                durationStepper(value: restTimerDefaultDurationBinding)
-            }
-            .padding(.horizontal, Theme.Spacing.md)
-            .frame(height: 48)
+            defaultRestDurationRow
 
             rowDivider
 
-            HStack(spacing: Theme.Spacing.md) {
-                Image(systemName: "flame")
-                    .foregroundStyle(Theme.Color.fg2)
-                    .frame(width: 24)
-                Text("消耗估算")
-                    .font(Theme.Font.body(size: 14))
-                    .foregroundStyle(Theme.Color.fg)
-                Spacer()
-                Toggle("", isOn: calorieEstimateEnabledBinding)
-                    .labelsHidden()
-                    .tint(Theme.Color.accent)
-            }
-            .padding(.horizontal, Theme.Spacing.md)
-            .frame(height: 48)
+            calorieEstimateToggleRow
 
             rowDivider
 
-            HStack(spacing: Theme.Spacing.md) {
-                Image(systemName: "scalemass")
-                    .foregroundStyle(Theme.Color.fg2)
-                    .frame(width: 24)
-                Text("估算体重")
-                    .font(Theme.Font.body(size: 14))
-                    .foregroundStyle(Theme.Color.fg)
-                Spacer()
-                calorieWeightStepper
-            }
-            .padding(.horizontal, Theme.Spacing.md)
-            .frame(height: 48)
+            calorieBodyWeightRow
 
             rowDivider
 
@@ -432,11 +400,24 @@ struct ProfileView: View {
         }
     }
 
-    private var restTimerDefaultDurationBinding: Binding<TimeInterval> {
-        Binding(
-            get: { restTimer.defaultDuration },
-            set: { restTimer.defaultDuration = $0 }
-        )
+    private var defaultRestDurationRow: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "timer").foregroundStyle(Theme.Color.fg2).frame(width: 24)
+            Text("默认休息时长")
+                .font(Theme.Font.body(size: 14))
+                .foregroundStyle(Theme.Color.fg)
+            Spacer()
+            Text(profileRestDurationText(restTimer.defaultDuration))
+                .font(Theme.Font.mono(size: 12))
+                .foregroundStyle(Theme.Color.fg)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+        }
+        .padding(.horizontal, Theme.Spacing.md)
+        .frame(height: 48)
+        .contentShape(Rectangle())
+        .onTapGesture { profileSheet = .restDuration }
     }
 
     private var restTimerHapticsBinding: Binding<Bool> {
@@ -455,73 +436,107 @@ struct ProfileView: View {
 
     private var calorieEstimateEnabledBinding: Binding<Bool> {
         Binding(
-            get: { caloriePreferences.showsEstimates },
+            get: { calorieEstimatesEnabled },
             set: {
-                WorkoutCaloriePreferences.setShowsEstimates($0)
-                caloriePreferences = WorkoutCaloriePreferences.current()
+                setCalorieEstimatesEnabled($0)
             }
         )
     }
 
-    private var calorieWeightStepper: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            if let kg = caloriePreferences.bodyWeightKg {
-                stepperButton("minus") {
-                    setCalorieBodyWeight(max(WorkoutCaloriePreferences.minBodyWeightKg, kg - 1))
-                }
-                Text("\(Int(kg.rounded()))kg")
-                    .font(Theme.Font.mono(size: 13))
-                    .foregroundStyle(Theme.Color.fg)
-                    .frame(minWidth: 52)
-                stepperButton("plus") {
-                    setCalorieBodyWeight(min(WorkoutCaloriePreferences.maxBodyWeightKg, kg + 1))
-                }
-            } else {
-                Button {
-                    setCalorieBodyWeight(WorkoutCaloriePreferences.defaultBodyWeightKg)
-                } label: {
-                    Text("设置")
-                        .font(Theme.Font.body(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.accent)
-                        .padding(.horizontal, 12)
-                        .frame(height: 30)
-                        .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1.5))
-                }
-                .buttonStyle(.plain)
-            }
+    private var calorieEstimatesEnabled: Bool {
+        caloriePreferences.showsEstimates && caloriePreferences.bodyWeightKg != nil
+    }
+
+    private var calorieEstimateToggleRow: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "flame")
+                .foregroundStyle(Theme.Color.fg2)
+                .frame(width: 24)
+            Text("消耗估算")
+                .font(Theme.Font.body(size: 14))
+                .foregroundStyle(Theme.Color.fg)
+            Spacer()
+            Toggle("", isOn: calorieEstimateEnabledBinding)
+                .labelsHidden()
+                .tint(Theme.Color.accent)
+        }
+        .padding(.horizontal, Theme.Spacing.md)
+        .frame(height: 48)
+    }
+
+    private var calorieBodyWeightRow: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "scalemass")
+                .foregroundStyle(Theme.Color.fg2)
+                .frame(width: 24)
+            Text("估算体重")
+                .font(Theme.Font.body(size: 14))
+                .foregroundStyle(Theme.Color.fg)
+            Spacer()
+            Text(calorieBodyWeightText)
+                .font(Theme.Font.mono(size: 12))
+                .foregroundStyle(calorieBodyWeightColor)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+        }
+        .padding(.horizontal, Theme.Spacing.md)
+        .frame(height: 48)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            profileSheet = .calorieWeight(enableAfterSave: caloriePreferences.showsEstimates)
         }
     }
 
-    private func setCalorieBodyWeight(_ value: Double) {
-        WorkoutCaloriePreferences.setBodyWeightKg(value)
+    private var calorieBodyWeightText: String {
+        guard let kg = caloriePreferences.bodyWeightKg else {
+            return caloriePreferences.showsEstimates ? "必填" : "未设置"
+        }
+        return "\(formatKg(kg))kg"
+    }
+
+    private var calorieBodyWeightColor: Color {
+        caloriePreferences.bodyWeightKg == nil && caloriePreferences.showsEstimates
+            ? Theme.Color.danger
+            : Theme.Color.fg
+    }
+
+    private func setCalorieEstimatesEnabled(_ enabled: Bool) {
+        if enabled, caloriePreferences.bodyWeightKg == nil {
+            profileSheet = .calorieWeight(enableAfterSave: true)
+            return
+        }
+        WorkoutCaloriePreferences.setShowsEstimates(enabled)
         caloriePreferences = WorkoutCaloriePreferences.current()
     }
 
-    /// 休息时长加减器（步进 15s，范围 15…600s）。
-    private func durationStepper(value: Binding<TimeInterval>) -> some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            stepperButton("minus") {
-                value.wrappedValue = max(15, value.wrappedValue - 15)
-            }
-            Text("\(Int(value.wrappedValue))s")
-                .font(Theme.Font.mono(size: 13))
-                .foregroundStyle(Theme.Color.fg)
-                .frame(minWidth: 44)
-            stepperButton("plus") {
-                value.wrappedValue = min(600, value.wrappedValue + 15)
-            }
+    private func saveCalorieBodyWeight(_ kg: Double, enableAfterSave: Bool) {
+        WorkoutCaloriePreferences.setBodyWeightKg(kg)
+        if enableAfterSave {
+            WorkoutCaloriePreferences.setShowsEstimates(true)
         }
+        caloriePreferences = WorkoutCaloriePreferences.current()
+        Theme.Haptics.selection()
     }
 
-    private func stepperButton(_ icon: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(Theme.Color.accent)
-                .frame(width: 30, height: 30)
-                .overlay(Circle().stroke(Theme.Color.accentSofter, lineWidth: 1.5))
+    @ViewBuilder
+    private func profileSheetView(_ sheet: ProfileSheet) -> some View {
+        switch sheet {
+        case .legal(let url):
+            SafariView(url: url)
+                .ignoresSafeArea()
+        case .calorieWeight(let enableAfterSave):
+            CalorieBodyWeightSheet(
+                currentWeight: caloriePreferences.bodyWeightKg,
+                enableAfterSave: enableAfterSave,
+                onSave: saveCalorieBodyWeight
+            )
+        case .restDuration:
+            RestDurationEditorSheet(initialDuration: restTimer.defaultDuration) {
+                restTimer.defaultDuration = $0
+                Theme.Haptics.selection()
+            }
         }
-        .buttonStyle(.plain)
     }
 
     private var notificationStatusText: String {
@@ -572,7 +587,7 @@ struct ProfileView: View {
         .padding(.horizontal, Theme.Spacing.md)
         .frame(height: 48)
         .contentShape(Rectangle())
-        .onTapGesture { legalURL = IdentifiableURL(url: url) }
+        .onTapGesture { profileSheet = .legal(url) }
     }
 
     // MARK: - 账号
@@ -702,6 +717,236 @@ struct ProfileView: View {
             || settings.authorizationStatus == .provisional
             || settings.authorizationStatus == .ephemeral
     }
+}
+
+private enum ProfileSheet: Identifiable {
+    case legal(URL)
+    case calorieWeight(enableAfterSave: Bool)
+    case restDuration
+
+    var id: String {
+        switch self {
+        case .legal(let url): return "legal:\(url.absoluteString)"
+        case .calorieWeight(let enableAfterSave): return enableAfterSave ? "calorieWeight.enable" : "calorieWeight.edit"
+        case .restDuration: return "restDuration"
+        }
+    }
+}
+
+private struct CalorieBodyWeightSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var weightFocused: Bool
+
+    let enableAfterSave: Bool
+    let onSave: (Double, Bool) -> Void
+
+    @State private var weightText: String
+
+    init(currentWeight: Double?, enableAfterSave: Bool, onSave: @escaping (Double, Bool) -> Void) {
+        self.enableAfterSave = enableAfterSave
+        self.onSave = onSave
+        _weightText = State(initialValue: currentWeight.map(formatKg) ?? "")
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PaperSheetHeader(
+                title: enableAfterSave ? "开启消耗估算" : "估算体重",
+                cancelTitle: "取消",
+                confirmTitle: "完成",
+                confirmEnabled: parsedWeight != nil,
+                background: Theme.Color.bg,
+                onCancel: { dismiss() },
+                onConfirm: save
+            )
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                Text("体重")
+                    .eyebrowStyle()
+
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    TextField("30–250", text: $weightText)
+                        .font(Theme.Font.number(size: 30, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg)
+                        .keyboardType(.decimalPad)
+                        .focused($weightFocused)
+                    Text("kg")
+                        .font(Theme.Font.body(size: 14, weight: .bold))
+                        .foregroundStyle(Theme.Color.muted)
+                }
+                .padding(.horizontal, Theme.Spacing.md)
+                .frame(height: 68)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                        .stroke(inputBorderColor, lineWidth: 1)
+                )
+
+                Text(helperText)
+                    .font(Theme.Font.mono(size: 11))
+                    .foregroundStyle(helperColor)
+            }
+            .padding(Theme.Spacing.lg)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .presentationBackground(Theme.Color.bg)
+        .presentationDetents([.height(260), .medium])
+        .onAppear { weightFocused = true }
+    }
+
+    private var parsedWeight: Double? {
+        let text = weightText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+        guard let value = Double(text) else { return nil }
+        return WorkoutCaloriePreferences.normalizedBodyWeight(value)
+    }
+
+    private var inputBorderColor: Color {
+        weightText.isEmpty || parsedWeight != nil ? Theme.Color.border : Theme.Color.danger
+    }
+
+    private var helperText: String {
+        if weightText.isEmpty {
+            return enableAfterSave ? "开启前必须填写体重" : "范围 30–250 kg"
+        }
+        return parsedWeight == nil ? "请输入 30–250 kg" : "仅用于本机 kcal 估算"
+    }
+
+    private var helperColor: Color {
+        !weightText.isEmpty && parsedWeight == nil ? Theme.Color.danger : Theme.Color.muted
+    }
+
+    private func save() {
+        guard let parsedWeight else { return }
+        onSave(parsedWeight, enableAfterSave)
+        dismiss()
+    }
+}
+
+private struct RestDurationEditorSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var focusedField: DurationField?
+
+    let onSave: (TimeInterval) -> Void
+
+    @State private var minuteText: String
+    @State private var secondText: String
+
+    init(initialDuration: TimeInterval, onSave: @escaping (TimeInterval) -> Void) {
+        self.onSave = onSave
+        let parts = Self.durationParts(initialDuration)
+        _minuteText = State(initialValue: "\(parts.minutes)")
+        _secondText = State(initialValue: "\(parts.seconds)")
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PaperSheetHeader(
+                title: "默认休息时长",
+                cancelTitle: "取消",
+                confirmTitle: "完成",
+                confirmEnabled: parsedDuration != nil,
+                background: Theme.Color.bg,
+                onCancel: { dismiss() },
+                onConfirm: save
+            )
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                Text("时长")
+                    .font(Theme.Font.body(size: 16, weight: .bold))
+                    .foregroundStyle(Theme.Color.fg2)
+
+                VStack(spacing: Theme.Spacing.md) {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        durationField(title: "分钟", text: $minuteText, field: .minutes)
+                        durationField(title: "秒", text: $secondText, field: .seconds)
+                    }
+                }
+                .padding(Theme.Spacing.md)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                        .stroke(Theme.Color.border, lineWidth: 1)
+                )
+            }
+            .padding(Theme.Spacing.lg)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .presentationBackground(Theme.Color.bg)
+        .presentationDetents([.height(260), .medium])
+        .onAppear { focusedField = .minutes }
+    }
+
+    private func save() {
+        guard let parsedDuration else { return }
+        onSave(parsedDuration)
+        dismiss()
+    }
+
+    private var parsedDuration: TimeInterval? {
+        guard let minutes = parsedNumber(minuteText),
+              let seconds = parsedNumber(secondText),
+              seconds <= 59
+        else { return nil }
+
+        let total = minutes * 60 + seconds
+        guard total >= 15, total <= 600 else { return nil }
+        return TimeInterval(total)
+    }
+
+    private func parsedNumber(_ text: String) -> Int? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return 0 }
+        guard trimmed.allSatisfy(\.isNumber) else { return nil }
+        return Int(trimmed)
+    }
+
+    private func durationField(title: String, text: Binding<String>, field: DurationField) -> some View {
+        ZStack(alignment: .bottomTrailing) {
+            TextField("0", text: text)
+                .font(Theme.Font.number(size: 28, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.center)
+                .focused($focusedField, equals: field)
+                .padding(.horizontal, Theme.Spacing.md)
+                .padding(.bottom, 12)
+            Text(title)
+                .font(Theme.Font.body(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.trailing, 12)
+                .padding(.bottom, 9)
+        }
+        .frame(height: 68)
+        .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                .stroke(Theme.Color.border, lineWidth: 1)
+        )
+    }
+
+    private static func durationParts(_ value: TimeInterval) -> (minutes: Int, seconds: Int) {
+        let seconds = Int(min(600, max(15, value)).rounded())
+        return (seconds / 60, seconds % 60)
+    }
+
+    private enum DurationField: Hashable {
+        case minutes
+        case seconds
+    }
+}
+
+private func profileRestDurationText(_ duration: TimeInterval) -> String {
+    let seconds = Int(duration.rounded())
+    if seconds >= 60 {
+        let minutes = seconds / 60
+        let remainder = seconds % 60
+        return remainder == 0 ? "\(minutes) 分钟" : "\(minutes) 分 \(remainder) 秒"
+    }
+    return "\(seconds) 秒"
 }
 
 // MARK: - 同步行（带 SyncEngine 状态）

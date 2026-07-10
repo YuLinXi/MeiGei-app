@@ -177,6 +177,7 @@ struct MainTabView: View {
         .onChange(of: planWriteback.receipt != nil) { _, _ in presentNextRootSheetIfNeeded() }
         .onChange(of: prCelebration.records != nil) { _, _ in presentNextRootSheetIfNeeded() }
         .onChange(of: teamShare.draft != nil) { _, _ in presentNextRootSheetIfNeeded() }
+        .onOpenURL { handleDeepLink($0) }
         .task(id: session.currentUserId) {
             if let userId = session.currentUserId {
                 let hasPendingShare = !teamService.pendingShareWorkoutIds(userId: userId).isEmpty
@@ -223,8 +224,19 @@ struct MainTabView: View {
 
     private func refreshActiveSession() {
         activeSession = WorkoutSession.activeSession(in: modelContext)
+        WorkoutWidgetSnapshotWriter.update(home: historyStore.home, activeWorkout: activeSession)
         workoutPresentation.reconcile(activeWorkout: activeSession)
         workoutLiveActivity.reconcile(activeWorkout: activeSession)
+    }
+
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == "dontlift",
+              url.host == "workout" else { return }
+        selectedTab = .workout
+        refreshActiveSession()
+        if url.pathComponents.contains("live"), let activeSession {
+            workoutPresentation.present(activeSession)
+        }
     }
 
     private func retryReadyPendingShares() async {

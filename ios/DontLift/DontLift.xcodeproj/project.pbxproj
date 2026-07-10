@@ -16,6 +16,9 @@
 		BB00000000000000000000D0 /* RestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B2 /* RestActivityAttributes.swift */; };
 		BB00000000000000000000D1 /* EndRestIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B3 /* EndRestIntent.swift */; };
 		BB00000000000000000000E1 /* DontLiftWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000A2 /* DontLiftWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BB0000000000000000000100 /* WorkoutSummaryWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000110 /* WorkoutSummaryWidget.swift */; };
+		BB0000000000000000000101 /* WorkoutWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000111 /* WorkoutWidgetSnapshot.swift */; };
+		BB0000000000000000000102 /* WorkoutWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000111 /* WorkoutWidgetSnapshot.swift */; };
 		BB000000000000000000F2 /* MuscleMap in Frameworks */ = {isa = PBXBuildFile; productRef = BB000000000000000000F1 /* MuscleMap */; };
 /* End PBXBuildFile section */
 
@@ -69,6 +72,9 @@
 		BB00000000000000000000B4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BB00000000000000000000B5 /* DontLiftIslandIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = DontLiftIslandIcon.png; sourceTree = "<group>"; };
 		BB00000000000000000000B6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BB0000000000000000000110 /* WorkoutSummaryWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSummaryWidget.swift; sourceTree = "<group>"; };
+		BB0000000000000000000111 /* WorkoutWidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutWidgetSnapshot.swift; sourceTree = "<group>"; };
+		BB0000000000000000000112 /* DontLiftWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = DontLiftWidgets.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -151,7 +157,10 @@
 				BB00000000000000000000B1 /* RestTimerLiveActivity.swift */,
 				BB00000000000000000000B2 /* RestActivityAttributes.swift */,
 				BB00000000000000000000B3 /* EndRestIntent.swift */,
+				BB0000000000000000000110 /* WorkoutSummaryWidget.swift */,
+				BB0000000000000000000111 /* WorkoutWidgetSnapshot.swift */,
 				BB00000000000000000000B4 /* Info.plist */,
+				BB0000000000000000000112 /* DontLiftWidgets.entitlements */,
 				BB00000000000000000000B6 /* Assets.xcassets */,
 				BB00000000000000000000B5 /* DontLiftIslandIcon.png */,
 			);
@@ -342,6 +351,7 @@
 			files = (
 				BB00000000000000000000D0 /* RestActivityAttributes.swift in Sources */,
 				BB00000000000000000000D1 /* EndRestIntent.swift in Sources */,
+				BB0000000000000000000102 /* WorkoutWidgetSnapshot.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -367,6 +377,8 @@
 				BB00000000000000000000C1 /* RestTimerLiveActivity.swift in Sources */,
 				BB00000000000000000000C2 /* RestActivityAttributes.swift in Sources */,
 				BB00000000000000000000C3 /* EndRestIntent.swift in Sources */,
+				BB0000000000000000000100 /* WorkoutSummaryWidget.swift in Sources */,
+				BB0000000000000000000101 /* WorkoutWidgetSnapshot.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -519,7 +531,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DontLift/DontLift.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -560,7 +572,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DontLift/DontLift.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -599,7 +611,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.4;
@@ -621,7 +633,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.4;
@@ -642,7 +654,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -662,7 +674,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -681,8 +693,9 @@
 		BB00000000000000000000A4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = DontLiftWidgets/DontLiftWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DontLiftWidgets/Info.plist;
@@ -709,8 +722,9 @@
 		BB00000000000000000000A5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = DontLiftWidgets/DontLiftWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEVELOPMENT_TEAM = D566UZ8QG4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DontLiftWidgets/Info.plist;
