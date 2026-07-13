@@ -789,9 +789,11 @@ private struct CalorieBodyWeightSheet: View {
             .padding(Theme.Spacing.lg)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .background(Theme.Color.bg.ignoresSafeArea())
         .presentationBackground(Theme.Color.bg)
-        .presentationDetents([.height(260), .medium])
+        .presentationDetents([.height(260)])
         .onAppear { weightFocused = true }
     }
 
@@ -874,9 +876,11 @@ private struct RestDurationEditorSheet: View {
             .padding(Theme.Spacing.lg)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .background(Theme.Color.bg.ignoresSafeArea())
         .presentationBackground(Theme.Color.bg)
-        .presentationDetents([.height(260), .medium])
+        .presentationDetents([.height(260)])
         .onAppear { focusedField = .minutes }
     }
 
