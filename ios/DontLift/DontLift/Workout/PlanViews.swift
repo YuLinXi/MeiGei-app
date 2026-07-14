@@ -620,11 +620,8 @@ struct PlanDetailView: View {
     @State private var confirmingDelete = false
     @State private var decodeError: String?
     @State private var pendingEditAfterPick: PlanItem?
-    /// 待删除动作行（左滑删除二次确认）+ 该行全局坐标，供确认卡定位于其正下方。
+    /// 待删除动作行；由原生 swipe action 触发，再走统一纸感二次确认。
     @State private var pendingDeleteItem: PlanItem?
-    @State private var deleteRect: CGRect = .zero
-    /// 左滑删除协调器：同一时刻仅一张展开，点击别处自动收回（详见 SwipeDeleteList）。
-    @State private var swipe = SwipeRowCoordinator()
     /// 显式动作排序面板。
     @State private var showingOrderEditor = false
     /// 单一活跃会话守卫：冲突态 + 待新建闭包。
@@ -656,8 +653,8 @@ struct PlanDetailView: View {
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
-            ScrollView {
-                // 对齐原型 .scroll：children gap 11、横向 17、顶部 4。
+            List {
+                // 标题区作为单个原生 List 行，内部继续沿用原有 11pt 纸感版式。
                 VStack(alignment: .leading, spacing: 11) {
                     header
                     statRow
@@ -668,30 +665,44 @@ struct PlanDetailView: View {
                         decodeErrorCard(err)
                     } else if orderedItems.isEmpty {
                         emptyExercisesCard
-                    } else {
-                        // 与首页「本周训练」一致：每行独立卡片（带间距/描边/阴影）+ 统一左滑交互。
-                        SwipeDeleteList(
-                            data: orderedItems,
-                            id: \.itemId,
-                            coordinator: swipe,
-                            onTap: { editPlanItem($0) },
-                            onDelete: { item, rect in
-                                deleteRect = rect
+                    }
+                }
+                .listRowInsets(EdgeInsets(top: 4, leading: 17, bottom: 5.5, trailing: 17))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+
+                if decodeError == nil, !orderedItems.isEmpty {
+                    ForEach(orderedItems, id: \.itemId) { item in
+                        planItemRow(item)
+                            .contentShape(Rectangle())
+                            .onTapGesture { editPlanItem(item) }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    pendingDeleteItem = item
+                                } label: {
+                                    Label("删除", systemImage: "trash")
+                                }
+                                .tint(Theme.Color.danger)
+                            }
+                            .accessibilityAction(named: "删除") {
                                 pendingDeleteItem = item
                             }
-                        ) { item in
-                            planItemRow(item)
-                        }
+                            .listRowInsets(EdgeInsets(top: 5.5, leading: 17, bottom: 5.5, trailing: 17))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                     }
-
-                    addExerciseCTA
                 }
-                .padding(.horizontal, 17)
-                .padding(.top, 4)
-                .padding(.bottom, 12)
-                // 点击列表任意其它区域（含列表下方空白）：收回当前展开的左滑动作行。
-                .collapseSwipeOnTap(swipe)
+
+                addExerciseCTA
+                    .listRowInsets(EdgeInsets(top: 5.5, leading: 17, bottom: 12, trailing: 17))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
             }
+            .listStyle(.plain)
+            .listRowSpacing(0)
+            .scrollContentBackground(.hidden)
+            .contentMargins(.vertical, 0, for: .scrollContent)
+            .environment(\.defaultMinListRowHeight, 1)
         }
         // 对齐原型 .footer：scroll 与 footer 为兄弟（内容不穿底栏），底栏实底 + 顶部分隔线。
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
@@ -709,24 +720,22 @@ struct PlanDetailView: View {
             confirmTitle: "删除计划",
             onConfirm: { delete() }
         )
-        // 删除动作二次确认：复用首页「本周训练」的透明浮层 + 锚定卡片，文案改「删除动作」。
-        .fullScreenCover(isPresented: Binding(
-            get: { pendingDeleteItem != nil },
-            set: { if !$0 { pendingDeleteItem = nil } })) {
-            if let item = pendingDeleteItem {
-                DeleteConfirmCover(
-                    anchorRect: deleteRect,
-                    confirmTitle: "删除动作",
-                    onConfirm: {
-                        Theme.Haptics.notification(.warning)
-                        deleteItem(item)
-                    },
-                    onClose: { pendingDeleteItem = nil }
-                )
-                .presentationBackground(.clear)
+        .paperConfirmDialog(
+            isPresented: Binding(
+                get: { pendingDeleteItem != nil },
+                set: { if !$0 { pendingDeleteItem = nil } }
+            ),
+            title: "删除动作?",
+            message: pendingDeleteItem.map {
+                "将从计划中删除「\(planItemTitle($0))」，此操作不可撤销。"
+            } ?? "",
+            confirmTitle: "删除动作",
+            onConfirm: {
+                guard let item = pendingDeleteItem else { return }
+                Theme.Haptics.notification(.warning)
+                deleteItem(item)
             }
-        }
-        .transaction(value: pendingDeleteItem != nil) { $0.disablesAnimations = true }
+        )
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in
                 var items = plan.items
@@ -882,7 +891,6 @@ struct PlanDetailView: View {
             Spacer(minLength: 8)
             if orderedItems.count > 1 {
                 Button {
-                    swipe.collapseAll()
                     showingOrderEditor = true
                 } label: {
                     Label("排序", systemImage: "arrow.up.arrow.down")
@@ -896,8 +904,7 @@ struct PlanDetailView: View {
         .padding(.horizontal, 2)
     }
 
-    // 动作行（独立卡片，与训练首页「本周训练」统一观感与左滑交互）。
-    // 行外层卡片与左滑交互由 `SwipeDeleteList` 统一装配，此处只产出卡片内容。点击行或编辑图标进入建议参数编辑。
+    // 动作行保持独立纸感卡片；外层原生 List 统一处理滚动与左滑删除。
     private func planItemRow(_ item: PlanItem) -> some View {
         // 序号按当前顺序推出（动作数极少，firstIndex 开销可忽略）。
         let index = (orderedItems.firstIndex { $0.itemId == item.itemId } ?? 0) + 1
@@ -980,7 +987,6 @@ struct PlanDetailView: View {
     }
 
     private func editPlanItem(_ item: PlanItem) {
-        swipe.collapseAll()
         if item.isSuperset {
             editingSupersetItem = item
         } else {
