@@ -3550,7 +3550,7 @@ private struct ExerciseBlock: View {
         }
     }
 
-    /// 切换组类型 working ⇄ warmup：复用模型方法（切类型 + 段尾重排），随后重算编号并落盘。
+    /// 切换正式 ⇄ 热身：复用模型方法保留稳定组序，展示层自动分段并重算编号，随后落盘。
     private func toggleType(_ set: WorkoutSet) {
         exercise.toggleSetType(set)
         Theme.Haptics.impact(.light)
