@@ -410,4 +410,5 @@ struct CheckInRequest: Encodable {
     let checkinDate: String  // "yyyy-MM-dd"
     let summary: CheckinSummary
     let teamIds: [UUID]
+    let suppressNotification: Bool
 }

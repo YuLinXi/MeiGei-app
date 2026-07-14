@@ -28,7 +28,8 @@ public final class TeamRequests {
             @NotNull UUID workoutId,
             @NotNull LocalDate checkinDate,
             @NotNull JsonNode summary,
-            @NotEmpty List<UUID> teamIds
+            @NotEmpty List<UUID> teamIds,
+            boolean suppressNotification
     ) {
     }
 

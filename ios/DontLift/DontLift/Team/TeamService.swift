@@ -225,7 +225,9 @@ final class TeamService {
         let body = CheckInRequest(workoutId: draft.workoutId,
                                   checkinDate: draft.checkinDate,
                                   summary: draft.summary,
-                                  teamIds: teamIds)
+                                  teamIds: teamIds,
+                                  suppressNotification: Self.shouldSuppressCheckinNotification(
+                                    checkinDate: draft.checkinDate))
         // 幂等键含 updatedAt：首次打卡去重；编辑训练后 updatedAt 变化 → 新键穿透幂等过滤，
         // 后端按 (team,user,workout) 更新摘要快照。
         return try await api.send("POST", "/checkins", body: body,
@@ -346,6 +348,10 @@ final class TeamService {
 
     static func dateOnly(_ date: Date) -> String { dateOnlyFormatter.string(from: date) }
 
+    static func shouldSuppressCheckinNotification(checkinDate: String, now: Date = .now) -> Bool {
+        checkinDate != dateOnly(now)
+    }
+
     private static let monthOnlyFormatter: DateFormatter = {
         let f = DateFormatter()
         f.calendar = Calendar(identifier: .gregorian)
@@ -450,7 +456,9 @@ final class TeamService {
         let body = CheckInRequest(workoutId: intent.workoutId,
                                   checkinDate: intent.checkinDate,
                                   summary: intent.summary,
-                                  teamIds: intent.teamIds)
+                                  teamIds: intent.teamIds,
+                                  suppressNotification: Self.shouldSuppressCheckinNotification(
+                                    checkinDate: intent.checkinDate))
         return try await api.send("POST", "/checkins", body: body,
                                   idempotencyKey: intent.idempotencyKey)
     }
