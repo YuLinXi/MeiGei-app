@@ -2466,6 +2466,8 @@ struct WorkoutLoggingView: View {
     /// 再置 endedAt + HealthKit 写入，最后统一重算派生数据。
     private func finish() {
         Theme.Haptics.notification(.success)
+        _ = restTimer.completeForWorkoutFinish()
+        consumeRestCompletionIfNeeded()
         restTimer.stop()   // 结束训练即停止进行中的休息计时全套，避免倒计时/灵动岛残留。
         let endedAt = Date.now
         workout.endedAt = endedAt

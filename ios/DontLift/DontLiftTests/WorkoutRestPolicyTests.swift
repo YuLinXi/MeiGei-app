@@ -132,6 +132,18 @@ struct WorkoutRestPolicyTests {
         #expect(seconds == 90)
     }
 
+    @Test func workoutFinishUsesRunningRestTargetDuration() throws {
+        let restTimer = RestTimerController()
+        let setId = UUID()
+        restTimer.start(duration: 120, setId: setId)
+        defer { restTimer.stop() }
+
+        let event = try #require(restTimer.completeForWorkoutFinish())
+
+        #expect(event.setId == setId)
+        #expect(event.elapsedSeconds == 120)
+    }
+
     @Test func nextSetAfterSkippedEarlierExerciseContinuesWithinCurrentExercise() throws {
         let skipped = workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
         let current = workoutExercise(name: "坐姿划船", orderIndex: 1, completed: [true, false])
