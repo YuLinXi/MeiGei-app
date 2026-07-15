@@ -80,6 +80,12 @@ struct WorkoutUnit: Codable, Identifiable, Hashable {
     var orderIndex: Int
     var singleExerciseId: UUID?
     var superset: WorkoutSupersetUnit?
+    /// 含备选的普通动作保存“默认 + 备选”完整候选，供离线/重启后临场切换。
+    var exerciseOptions: [PlanExerciseOption]?
+    /// 备选落值需要复用来源计划模式；仅含备选的普通动作写入。
+    var planModeRaw: String?
+    /// 本次训练创建时默认动作的逐组落值，严格模式切回默认时可完整恢复。
+    var defaultSetSnapshots: [SetSnapshot]?
 
     var id: UUID { unitId }
 
@@ -88,17 +94,27 @@ struct WorkoutUnit: Codable, Identifiable, Hashable {
         kind: WorkoutUnitKind,
         orderIndex: Int,
         singleExerciseId: UUID? = nil,
-        superset: WorkoutSupersetUnit? = nil
+        superset: WorkoutSupersetUnit? = nil,
+        exerciseOptions: [PlanExerciseOption]? = nil,
+        planModeRaw: String? = nil,
+        defaultSetSnapshots: [SetSnapshot]? = nil
     ) {
         self.unitId = unitId
         self.kindRaw = kind.rawValue
         self.orderIndex = orderIndex
         self.singleExerciseId = singleExerciseId
         self.superset = superset
+        self.exerciseOptions = exerciseOptions
+        self.planModeRaw = planModeRaw
+        self.defaultSetSnapshots = defaultSetSnapshots
     }
 
     var kind: WorkoutUnitKind {
         WorkoutUnitKind(rawValue: kindRaw) ?? .singleExercise
+    }
+
+    var planMode: WorkoutPlanMode {
+        WorkoutPlanMode(rawValue: planModeRaw ?? "") ?? .adaptive
     }
 }
 
@@ -238,15 +254,24 @@ extension Workout {
         storedUnits = normalizedUnits(units)
     }
 
-    func appendSingleExerciseUnit(for exercise: WorkoutExercise) {
+    func appendSingleExerciseUnit(for exercise: WorkoutExercise,
+                                  exerciseOptions: [PlanExerciseOption]? = nil,
+                                  planMode: WorkoutPlanMode? = nil,
+                                  defaultSetSnapshots: [SetSnapshot]? = nil) {
         var units = trainingUnits
-        if units.contains(where: { $0.singleExerciseId == exercise.localId }) {
+        if let index = units.firstIndex(where: { $0.singleExerciseId == exercise.localId }) {
+            units[index].exerciseOptions = exerciseOptions
+            units[index].planModeRaw = planMode?.rawValue
+            units[index].defaultSetSnapshots = defaultSetSnapshots
             updateTrainingUnits(units)
             return
         }
         units.append(WorkoutUnit(kind: .singleExercise,
                                  orderIndex: (units.map(\.orderIndex).max() ?? -1) + 1,
-                                 singleExerciseId: exercise.localId))
+                                 singleExerciseId: exercise.localId,
+                                 exerciseOptions: exerciseOptions,
+                                 planModeRaw: planMode?.rawValue,
+                                 defaultSetSnapshots: defaultSetSnapshots))
         updateTrainingUnits(units)
     }
 

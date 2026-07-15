@@ -745,6 +745,12 @@ private enum WorkoutActionMenuTarget {
     case superset(unit: WorkoutUnit, first: WorkoutExercise, second: WorkoutExercise)
 }
 
+private struct PendingExerciseOptionSwitch: Identifiable {
+    let id = UUID()
+    let exerciseId: UUID
+    let option: PlanExerciseOption
+}
+
 private func clonedDropSegments(from set: WorkoutSet?) -> [WorkoutSetSegment] {
     let source = set?.sortedSegments ?? []
     guard !source.isEmpty else {
@@ -840,6 +846,9 @@ struct WorkoutLoggingView: View {
     @State private var showingPosterPreview = false
     @State private var lastDetectedRecords: [PersonalRecord] = []
     @State private var creatingSuperset = false
+    /// 当前展示候选 sheet 的动作，以及待用户确认的实际切换。
+    @State private var switchingExerciseId: UUID?
+    @State private var pendingExerciseOptionSwitch: PendingExerciseOptionSwitch?
 
     private static let continuedRestDuration: TimeInterval = 30
     private static let exerciseNoteLimit = 200
@@ -902,6 +911,19 @@ struct WorkoutLoggingView: View {
         }
     }
 
+    private var exerciseSwitchConfirmMessage: String {
+        guard let pending = pendingExerciseOptionSwitch,
+              let exercise = workout.exercise(id: pending.exerciseId),
+              let unit = switchableUnit(for: exercise) else { return "" }
+        let weightRule = unit.planMode == .strict
+            ? "备选动作会保留组数、次数和热身结构，并清空重量。"
+            : "系统会优先使用这个备选在当前计划项中的历史；没有历史时保留结构并清空重量。"
+        let noteRule = exercise.note?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? "当前动作备注也会清空。"
+            : ""
+        return "将改为「\(pending.option.displayExerciseName)」。未完成组会重新生成，当前输入会被替换。\(weightRule)\(noteRule)"
+    }
+
     private var activeActionMenuTarget: WorkoutActionMenuTarget? {
         if let id = menuExerciseId, let ex = workout.exercise(id: id) {
             return .exercise(ex)
@@ -915,6 +937,59 @@ struct WorkoutLoggingView: View {
             return .superset(unit: unit, first: first, second: second)
         }
         return nil
+    }
+
+    private func switchableUnit(for exercise: WorkoutExercise) -> WorkoutUnit? {
+        workout.trainingUnits.first { unit in
+            unit.kind == .singleExercise
+                && unit.singleExerciseId == exercise.localId
+                && (unit.exerciseOptions?.count ?? 0) > 1
+                && unit.defaultSetSnapshots?.isEmpty == false
+        }
+    }
+
+    private func canSwitchExercise(_ exercise: WorkoutExercise) -> Bool {
+        canEdit
+            && switchableUnit(for: exercise) != nil
+            && exercise.sets.allSatisfy { !$0.completed }
+    }
+
+    private func beginExerciseOptionSwitch(_ exercise: WorkoutExercise) {
+        guard switchableUnit(for: exercise) != nil else { return }
+        prepareForPresentation()
+        menuExerciseId = nil
+        switchingExerciseId = exercise.localId
+    }
+
+    private func confirmExerciseOptionSwitch() {
+        guard let pending = pendingExerciseOptionSwitch,
+              let exercise = workout.exercise(id: pending.exerciseId),
+              let unit = switchableUnit(for: exercise),
+              let planItemId = exercise.planItemId,
+              canSwitchExercise(exercise) else { return }
+
+        let replacementSets = PlanPrefill.replacementSets(planItemId: planItemId,
+                                                          option: pending.option,
+                                                          unit: unit,
+                                                          lookup: historyStore.planLookup)
+        guard !replacementSets.isEmpty else { return }
+
+        prepareForPresentation()
+        for set in exercise.sets {
+            continuedRestBaseBySet[set.localId] = nil
+            modelContext.delete(set)
+        }
+        exercise.builtinExerciseCode = pending.option.builtinExerciseCode
+        exercise.customExerciseId = pending.option.customExerciseId
+        exercise.exerciseName = pending.option.displayExerciseName
+        exercise.primaryMuscle = pending.option.resolvedPrimaryMuscle
+        exercise.note = nil
+        exercise.sets = replacementSets
+        pendingExerciseOptionSwitch = nil
+        accordion = .expanded(unit.unitId)
+        touch()
+        workoutLiveActivity.syncWorkout(workout)
+        Theme.Haptics.notification(.success)
     }
 
     private var completedSetCount: Int {
@@ -1211,6 +1286,16 @@ struct WorkoutLoggingView: View {
             confirmTitle: "删除",
             onConfirm: { [target = confirmDeleteTarget] in if let target { delete(target) } }
         )
+        .paperConfirmDialog(
+            isPresented: Binding(
+                get: { pendingExerciseOptionSwitch != nil },
+                set: { if !$0 { pendingExerciseOptionSwitch = nil } }
+            ),
+            title: "更换本次动作?",
+            message: exerciseSwitchConfirmMessage,
+            confirmTitle: "更换动作",
+            onConfirm: confirmExerciseOptionSwitch
+        )
         .sheet(isPresented: $pickingExercise) {
             ExercisePickerView { pick in addExercise(pick, kind: pendingExerciseUnitKind) }
         }
@@ -1241,6 +1326,24 @@ struct WorkoutLoggingView: View {
                     onClear: clearExerciseNote,
                     onSave: saveExerciseNote
                 )
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { switchingExerciseId != nil },
+            set: { if !$0 { switchingExerciseId = nil } }
+        )) {
+            if let exerciseId = switchingExerciseId,
+               let exercise = workout.exercise(id: exerciseId),
+               let unit = switchableUnit(for: exercise),
+               let options = unit.exerciseOptions {
+                ExerciseOptionPickerSheet(options: options,
+                                          currentHistoryKey: exercise.historyKey) { option in
+                    switchingExerciseId = nil
+                    pendingExerciseOptionSwitch = PendingExerciseOptionSwitch(
+                        exerciseId: exerciseId,
+                        option: option
+                    )
+                }
             }
         }
         .onAppear {
@@ -1616,6 +1719,7 @@ struct WorkoutLoggingView: View {
                                      activeId: UUID?,
                                      isDropSetUnit: Bool = false) -> some View {
         let fallbackRestSeconds = restByExercise[ex.localId] ?? Int(restTimer.defaultDuration)
+        let alternativeCount = max(0, (switchableUnit(for: ex)?.exerciseOptions?.count ?? 1) - 1)
         return ExerciseBlock(exercise: ex,
                              isDropSetUnit: isDropSetUnit,
                              readOnly: !canEdit,
@@ -1639,6 +1743,11 @@ struct WorkoutLoggingView: View {
                              },
                              onEditNote: {
                                  beginNoteEditing(for: ex)
+                             },
+                             alternativeCount: alternativeCount,
+                             canChooseAlternative: canSwitchExercise(ex),
+                             onChooseAlternative: {
+                                 beginExerciseOptionSwitch(ex)
                              },
                              onMoreSet: { set in
                                  prepareForPresentation()
@@ -1804,6 +1913,27 @@ struct WorkoutLoggingView: View {
             }
             .padding(16)
             Rectangle().fill(Theme.Color.border).frame(height: 1)
+            if case .exercise(let exercise) = target,
+               let unit = switchableUnit(for: exercise),
+               let options = unit.exerciseOptions,
+               options.count > 1 {
+                Button {
+                    beginExerciseOptionSwitch(exercise)
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text(canSwitchExercise(exercise) ? "更换动作 · \(options.count - 1) 个备选" : "已有完成组，不能更换")
+                            .font(Theme.Font.l2)
+                        Spacer()
+                    }
+                    .foregroundStyle(canSwitchExercise(exercise) ? Theme.Color.fg : Theme.Color.muted)
+                    .padding(.horizontal, 16).padding(.vertical, 14)
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSwitchExercise(exercise))
+                Rectangle().fill(Theme.Color.border).frame(height: 1)
+            }
             Button {
                 beginNoteEditing(for: noteTarget(for: target))
             } label: {
@@ -3288,6 +3418,85 @@ private struct WorkoutInlineNoteStrip: View {
     }
 }
 
+private struct ExerciseOptionPickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let options: [PlanExerciseOption]
+    let currentHistoryKey: String
+    let onSelect: (PlanExerciseOption) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PaperSheetHeader(title: "选择本次动作",
+                             background: Theme.Color.bg,
+                             onCancel: { dismiss() })
+            ScrollView {
+                VStack(spacing: 10) {
+                    ForEach(Array(options.enumerated()), id: \.element.id) { index, option in
+                        let isCurrent = option.historyKey == currentHistoryKey
+                        Button {
+                            onSelect(option)
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 7) {
+                                        Text(option.displayExerciseName)
+                                            .font(Theme.Font.body(size: 15, weight: .semibold))
+                                            .foregroundStyle(Theme.Color.fg)
+                                        if index == 0 {
+                                            Text("默认")
+                                                .font(Theme.Font.body(size: 10, weight: .bold))
+                                                .foregroundStyle(Theme.Color.muted)
+                                                .padding(.horizontal, 6)
+                                                .frame(height: 20)
+                                                .background(Theme.Color.bg, in: Capsule())
+                                        }
+                                    }
+                                    if let detail = option.resolvedEquipmentType ?? option.resolvedPrimaryMuscle {
+                                        Text(detail)
+                                            .font(Theme.Font.l4)
+                                            .foregroundStyle(Theme.Color.muted)
+                                    }
+                                }
+                                Spacer()
+                                if isCurrent {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundStyle(Theme.Color.accent)
+                                } else {
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Theme.Color.muted)
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 58)
+                            .background(Theme.Color.surface,
+                                        in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                    .stroke(isCurrent ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isCurrent)
+                    }
+
+                    Text("更换只影响本次训练；已有完成组后不能更换。")
+                        .font(Theme.Font.l4)
+                        .foregroundStyle(Theme.Color.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 2)
+                }
+                .padding(Theme.Spacing.lg)
+            }
+        }
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .presentationBackground(Theme.Color.bg)
+        .presentationDetents([.medium, .large])
+    }
+}
+
 private struct ExerciseBlock: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var exercise: WorkoutExercise
@@ -3311,6 +3520,9 @@ private struct ExerciseBlock: View {
     var onToggleExpand: () -> Void = {}
     var onMoreTap: () -> Void = {}
     var onEditNote: () -> Void = {}
+    var alternativeCount: Int = 0
+    var canChooseAlternative: Bool = false
+    var onChooseAlternative: () -> Void = {}
     /// 点击某组的「更多操作」⋯：由父视图打开该组的菜单浮层。
     var onMoreSet: (WorkoutSet) -> Void = { _ in }
     let onChange: () -> Void
@@ -3421,6 +3633,24 @@ private struct ExerciseBlock: View {
                 .foregroundStyle(isAllDone ? Theme.Color.muted : Theme.Color.fg)
                 .lineLimit(1)
                 .truncationMode(.tail)
+            if !readOnly, alternativeCount > 0 {
+                Button(action: onChooseAlternative) {
+                    Text("备选 · \(alternativeCount)")
+                        .font(Theme.Font.body(size: 10.5, weight: .bold))
+                        .foregroundStyle(canChooseAlternative ? Theme.Color.accent : Theme.Color.muted)
+                        .padding(.horizontal, 8)
+                        .frame(height: 26)
+                        .background(canChooseAlternative ? Theme.Color.accentSoft : Theme.Color.bg,
+                                    in: Capsule())
+                        .overlay(
+                            Capsule().stroke(canChooseAlternative ? Theme.Color.accentSofter : Theme.Color.border,
+                                             lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!canChooseAlternative)
+                .accessibilityLabel("选择备选动作，共 \(alternativeCount) 个")
+            }
             Spacer()
             if isExpanded {
                 if isDropSetUnit {

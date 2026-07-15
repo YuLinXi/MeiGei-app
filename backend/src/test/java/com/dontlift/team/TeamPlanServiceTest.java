@@ -167,6 +167,39 @@ class TeamPlanServiceTest {
     }
 
     @Test
+    void shareToTeam_preservesAlternativeExerciseSnapshotsAndStripsNestedWeights() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID teamId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        when(versionMapper.nextVersionNumber(any())).thenReturn(1);
+        SharePlan req = new SharePlan(planId, "备选动作计划", """
+                [{
+                  "itemId":"%s",
+                  "exerciseName":"杠铃卧推",
+                  "orderIndex":0,
+                  "alternatives":[{
+                    "builtinExerciseCode":"DB_BENCH_PRESS",
+                    "exerciseName":"哑铃卧推",
+                    "primaryMuscle":"胸",
+                    "equipmentType":"哑铃",
+                    "weightKg":30
+                  }]
+                }]
+                """.formatted(UUID.randomUUID()));
+
+        service.shareToTeam(userId, teamId, req);
+
+        ArgumentCaptor<TeamPlanShareVersion> versionCaptor = ArgumentCaptor.forClass(TeamPlanShareVersion.class);
+        verify(versionMapper).insert(versionCaptor.capture());
+        JsonNode alternative = objectMapper.readTree(versionCaptor.getValue().getItems())
+                .get(0).get("alternatives").get(0);
+        assertThat(alternative.get("builtinExerciseCode").asText()).isEqualTo("DB_BENCH_PRESS");
+        assertThat(alternative.get("exerciseName").asText()).isEqualTo("哑铃卧推");
+        assertThat(alternative.get("equipmentType").asText()).isEqualTo("哑铃");
+        assertThat(alternative.has("weightKg")).isFalse();
+    }
+
+    @Test
     void shareToTeam_rejectsMalformedPlanItemsInsteadOfLeakingRawJson() {
         UUID userId = UUID.randomUUID();
         UUID teamId = UUID.randomUUID();

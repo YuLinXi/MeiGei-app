@@ -2028,6 +2028,12 @@ private struct TeamPlanShareDetailView: View {
                 Text(itemPrescription(item))
                     .font(Theme.Font.mono(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.muted)
+                if !item.usableAlternatives.isEmpty {
+                    Text("备选：\(item.usableAlternatives.map(\.displayExerciseName).joined(separator: "、"))")
+                        .font(Theme.Font.body(size: 11.5))
+                        .foregroundStyle(Theme.Color.muted)
+                        .lineLimit(1)
+                }
             }
             Spacer(minLength: 8)
             if canOpenDetail {

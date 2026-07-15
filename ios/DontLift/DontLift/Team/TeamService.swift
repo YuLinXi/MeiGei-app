@@ -421,7 +421,8 @@ final class TeamService {
                             suggestedSets: item.suggestedSets,
                             suggestedReps: item.suggestedReps,
                             suggestedWeightKg: nil,
-                            setPrescriptions: weightlessPrescriptions(item.orderedSetPrescriptions))
+                            setPrescriptions: weightlessPrescriptions(item.orderedSetPrescriptions),
+                            alternatives: item.alternatives)
         }
         return (try? String(data: JSONCoding.encoder.encode(items), encoding: .utf8)) ?? "[]"
     }

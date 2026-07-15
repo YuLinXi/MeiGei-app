@@ -933,6 +933,13 @@ struct PlanDetailView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
+                if !item.usableAlternatives.isEmpty {
+                    Text("备选：\(item.usableAlternatives.map(\.displayExerciseName).joined(separator: "、"))")
+                        .font(Theme.Font.body(size: 11.5))
+                        .foregroundStyle(Theme.Color.muted)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
             }
                 .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 0)
@@ -1295,7 +1302,8 @@ struct PlanDetailView: View {
                                                                       weightKg: nil,
                                                                       reps: $0.reps)
                                                 })
-                        })
+                        },
+                        alternatives: item.alternatives)
     }
 
     /// 单一活跃会话守卫：存在进行中会话时弹「继续 / 丢弃」，否则新建并进入。
@@ -2100,6 +2108,9 @@ struct PlanItemEditorView: View {
     @State private var focusedField: PlanItemEditorField?
     @State private var replaceOnInput = false
     @State private var dropOuterGroupCountText: String
+    @State private var alternatives: [PlanExerciseOption]
+    @State private var pickingAlternative = false
+    @State private var alternativeError: String?
     private let original: PlanItem
     let onSave: (PlanItem) -> Void
 
@@ -2116,6 +2127,7 @@ struct PlanItemEditorView: View {
         ])
         _warmupPrescriptions = State(initialValue: item.isDropSet ? [] : warmups)
         _dropOuterGroupCountText = State(initialValue: "\(max(1, item.suggestedSets ?? 1))")
+        _alternatives = State(initialValue: item.usableAlternatives)
     }
 
     var body: some View {
@@ -2134,6 +2146,9 @@ struct PlanItemEditorView: View {
                     VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                         editorTitle
                         prescriptionEditor
+                        if !original.isDropSet {
+                            alternativeEditor
+                        }
                         Color.clear.frame(height: focusedField == nil ? 18 : 250)
                     }
                     .padding(Theme.Spacing.lg)
@@ -2161,6 +2176,17 @@ struct PlanItemEditorView: View {
         .presentationBackground(Theme.Color.bg)
         .presentationDetents([.large])
         .animation(.spring(response: 0.32, dampingFraction: 0.88), value: focusedField)
+        .sheet(isPresented: $pickingAlternative) {
+            ExercisePickerView(onPick: addAlternative)
+        }
+        .alert("无法添加备选动作", isPresented: Binding(
+            get: { alternativeError != nil },
+            set: { if !$0 { alternativeError = nil } }
+        )) {
+            Button("知道了", role: .cancel) { alternativeError = nil }
+        } message: {
+            Text(alternativeError ?? "")
+        }
     }
 
     private var editorTitle: some View {
@@ -2184,6 +2210,7 @@ struct PlanItemEditorView: View {
             updated.applyManualSetPrescriptions(dropSetModels)
         } else {
             updated.applyManualSetPrescriptions(warmupModels + workingModels)
+            updated.alternatives = alternatives.isEmpty ? nil : alternatives
         }
         onSave(updated)
         dismiss()
@@ -2198,6 +2225,91 @@ struct PlanItemEditorView: View {
                 warmupPrescriptionSection
             }
         }
+    }
+
+    private var alternativeEditor: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            HStack {
+                Text("备选动作")
+                    .font(Theme.Font.l2)
+                    .foregroundStyle(Theme.Color.fg)
+                Spacer()
+                Text("每次只练其中一个")
+                    .font(Theme.Font.l4)
+                    .foregroundStyle(Theme.Color.muted)
+            }
+
+            if !alternatives.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(Array(alternatives.enumerated()), id: \.element.id) { index, option in
+                        HStack(spacing: 10) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(option.displayExerciseName)
+                                    .font(Theme.Font.body(size: 14, weight: .semibold))
+                                    .foregroundStyle(Theme.Color.fg)
+                                if let equipment = option.resolvedEquipmentType {
+                                    Text(equipment)
+                                        .font(Theme.Font.l4)
+                                        .foregroundStyle(Theme.Color.muted)
+                                }
+                            }
+                            Spacer()
+                            Button(role: .destructive) {
+                                alternatives.remove(at: index)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Theme.Color.danger)
+                                    .frame(width: 34, height: 34)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("移除备选动作\(option.displayExerciseName)")
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        if index < alternatives.count - 1 {
+                            Rectangle().fill(Theme.Color.border).frame(height: 1)
+                        }
+                    }
+                }
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                        .stroke(Theme.Color.border, lineWidth: 1)
+                )
+            }
+
+            Button {
+                focusedField = nil
+                pickingAlternative = true
+            } label: {
+                Label("添加备选动作", systemImage: "arrow.triangle.branch")
+                    .font(Theme.Font.body(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.accent)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 42)
+                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                            .stroke(Theme.Color.accentSofter, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func addAlternative(_ pick: ExercisePick) {
+        let option = PlanExerciseOption(builtinExerciseCode: pick.builtinCode,
+                                        customExerciseId: pick.customId,
+                                        exerciseName: pick.name,
+                                        primaryMuscle: pick.primaryMuscle,
+                                        equipmentType: pick.equipmentType)
+        let usedKeys = Set([original.historyKey] + alternatives.map(\.historyKey))
+        guard !usedKeys.contains(option.historyKey) else {
+            alternativeError = "该动作已经是默认动作或备选动作。"
+            return
+        }
+        alternatives.append(option)
     }
 
     private var workingGroupCount: Int {

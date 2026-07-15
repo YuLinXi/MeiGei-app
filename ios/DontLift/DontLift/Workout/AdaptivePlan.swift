@@ -49,7 +49,9 @@ enum PlanPrefill {
 
     static func lastCompletedSnapshots(for item: PlanItem, in history: [Workout]) -> [SetSnapshot] {
         let exact = lastCompletedSets(in: history, for: item) {
-            $0.planItemId == item.itemId && matchesPlanUnitKind($0, item: item)
+            $0.planItemId == item.itemId
+                && $0.historyKey == item.historyKey
+                && matchesPlanUnitKind($0, item: item)
         }
         if !exact.isEmpty { return exact }
         return lastCompletedSets(in: history, for: item) {
@@ -134,7 +136,9 @@ enum PlanPrefill {
     /// 历史里某动作最近一次 completed 正式组所在训练日期；供计划详情展示来源说明。
     static func lastCompletedWorkoutDate(for item: PlanItem, in history: [Workout]) -> Date? {
         if let exact = lastCompletedWorkoutDate(in: history, for: item, matching: {
-            $0.planItemId == item.itemId && matchesPlanUnitKind($0, item: item)
+            $0.planItemId == item.itemId
+                && $0.historyKey == item.historyKey
+                && matchesPlanUnitKind($0, item: item)
         }) {
             return exact
         }
@@ -203,6 +207,23 @@ enum PlanPrefill {
         return legacySets(for: item, count: count)
     }
 
+    /// 训练中切换候选的落值：严格模式不读历史；自适应仅读同动作位下该实际动作的历史。
+    static func replacementSets(planItemId: UUID,
+                                option: PlanExerciseOption,
+                                unit: WorkoutUnit,
+                                lookup: PlanHistoryLookup) -> [WorkoutSet] {
+        let defaults = unit.defaultSetSnapshots ?? []
+        guard !defaults.isEmpty else { return [] }
+        let isDefault = unit.exerciseOptions?.first?.historyKey == option.historyKey
+
+        if unit.planMode == .adaptive {
+            let last = lookup.latestSets(planItemId: planItemId, historyKey: option.historyKey)
+            if !last.isEmpty { return sets(from: last) }
+        }
+
+        return sets(from: isDefault ? defaults : weightless(defaults))
+    }
+
     private static func startPrescriptions(for item: PlanItem) -> [PlanSetPrescription] {
         if item.isDropSet {
             let templates = item.dropSetPrescriptions
@@ -266,7 +287,7 @@ enum PlanPrefill {
         }
     }
 
-    private static func sets(from snapshots: [SetSnapshot]) -> [WorkoutSet] {
+    static func sets(from snapshots: [SetSnapshot]) -> [WorkoutSet] {
         snapshots.enumerated().map { idx, snapshot in
             let type = WorkoutSetType(rawValue: snapshot.setTypeRaw) ?? .working
             let segments = normalizedSegments(snapshot.segments)
@@ -276,6 +297,21 @@ enum PlanPrefill {
                               setType: type,
                               isWarmup: snapshot.isWarmup,
                               segments: type == .drop ? segments : [])
+        }
+    }
+
+    private static func weightless(_ snapshots: [SetSnapshot]) -> [SetSnapshot] {
+        snapshots.map { snapshot in
+            SetSnapshot(weightKg: nil,
+                        reps: snapshot.reps,
+                        setTypeRaw: snapshot.setTypeRaw,
+                        isWarmup: snapshot.isWarmup,
+                        segments: snapshot.segments.map { segment in
+                            WorkoutSetSegment(segmentId: segment.segmentId,
+                                              segmentIndex: segment.segmentIndex,
+                                              weightKg: nil,
+                                              reps: segment.reps)
+                        })
         }
     }
 
@@ -323,7 +359,15 @@ enum PlanWorkoutBuilder {
             if item.isDropSet {
                 workout.appendDropSetUnit(for: exercise)
             } else {
-                workout.appendSingleExerciseUnit(for: exercise)
+                let options = item.exerciseOptions
+                workout.appendSingleExerciseUnit(
+                    for: exercise,
+                    exerciseOptions: options.isEmpty ? nil : options,
+                    planMode: options.isEmpty ? nil : mode,
+                    defaultSetSnapshots: options.isEmpty ? nil : exercise.sets
+                        .sorted { $0.setIndex < $1.setIndex }
+                        .map(PlanPrefill.snapshot(from:))
+                )
             }
             exerciseOrder += 1
         }
@@ -603,6 +647,16 @@ enum PlanWriteback {
 
             // 匹配：planItemId 精确优先；缺失/找不到时，仅在 historyKey 命中唯一项时 fallback。
             let matchIdx = matchIndex(for: ex, in: items, isDropSetUnit: isDropSetUnit)
+
+            // 来自计划的实际动作与当前默认动作不同时，说明本次使用了备选（或计划在训练中被改过）。
+            // 实绩由训练历史自然保留，但不得把另一动作的重量/次数覆盖到默认处方。
+            if let idx = matchIdx,
+               ex.planItemId != nil,
+               ex.historyKey != items[idx].historyKey {
+                guard !working.isEmpty else { continue }
+                touchedItemIds.insert(items[idx].itemId)
+                continue
+            }
             let existingPrescriptions = matchIdx.map { items[$0].orderedSetPrescriptions } ?? []
 
             if isDropSetUnit {
