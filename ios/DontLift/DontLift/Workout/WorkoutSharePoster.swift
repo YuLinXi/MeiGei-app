@@ -72,6 +72,16 @@ enum WorkoutPosterBackground: String, Identifiable, Hashable {
         }
     }
 
+    var visibleExerciseLimit: Int { 6 }
+
+    var receiptOpacity: Double {
+        switch layoutKind {
+        case .topCompact: return 0.80
+        case .upperCenter: return 0.82
+        case .centerReceipt: return 0.84
+        }
+    }
+
     static func resolve(rawValue: String?) -> Self {
         rawValue.flatMap(Self.init(rawValue:)) ?? .equipmentWreath
     }
@@ -276,6 +286,7 @@ struct WorkoutPosterPreviewSheet: View {
     let personalRecords: [PersonalRecord]
 
     @Environment(GlobalMessageCenter.self) private var globalMessage
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var shareItem: WorkoutPosterShareItem?
     @State private var isSaving = false
     @State private var hasSavedPoster = false
@@ -303,13 +314,10 @@ struct WorkoutPosterPreviewSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(spacing: 18) {
-                    posterPreview
-                    backgroundPicker
-                }
+                posterPager
                 .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.top, posterPreviewTopPadding)
-                .padding(.bottom, posterPreviewBottomPadding)
+                .padding(.top, Theme.Spacing.md)
+                .padding(.bottom, Theme.Spacing.lg)
                 .frame(maxWidth: .infinity)
             }
 
@@ -322,92 +330,200 @@ struct WorkoutPosterPreviewSheet: View {
         .sheet(item: $shareItem) { item in
             ActivityView(activityItems: [item.image])
         }
+        .onChange(of: selectedBackground) { oldBackground, newBackground in
+            guard oldBackground != newBackground else { return }
+            Theme.Haptics.selection()
+            hasSavedPoster = false
+        }
     }
 
-    private var posterPreview: some View {
-        WorkoutPosterCanvas(data: data, background: selectedBackground)
-            .frame(maxWidth: 320)
-            .aspectRatio(WorkoutPosterLayout.aspectRatio, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-            .paperShadow(.md, cornerRadius: Theme.Radius.lg)
-            .frame(maxWidth: .infinity)
-            .accessibilityLabel("训练海报预览")
-    }
-
-    private var backgroundPicker: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("海报背景")
-                    .font(Theme.Font.body(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg)
-                Spacer()
-                Text(selectedBackground.title)
-                    .font(Theme.Font.mono(size: 11, weight: .bold))
-                    .foregroundStyle(Theme.Color.muted)
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(WorkoutPosterBackground.catalog) { background in
-                        backgroundOption(background)
-                    }
-                }
-            }
+    private var posterPager: some View {
+        VStack(spacing: 10) {
+            posterPagerHeader
+            backgroundPreviewStrip
+            posterPages
+            currentPageCaption
         }
         .frame(maxWidth: 320)
     }
 
-    private func backgroundOption(_ background: WorkoutPosterBackground) -> some View {
+    private var posterPagerHeader: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("海报版式")
+                    .font(Theme.Font.body(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.fg)
+                Text(selectedBackground.title)
+                    .font(Theme.Font.mono(size: 10.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            Text("\(selectedBackgroundIndex + 1) / \(WorkoutPosterBackground.catalog.count)")
+                .font(Theme.Font.mono(size: 11, weight: .heavy))
+                .foregroundStyle(Theme.Color.accent)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(Theme.Color.accentSoft, in: Capsule())
+                .accessibilityLabel("第 \(selectedBackgroundIndex + 1) 个版式，共 \(WorkoutPosterBackground.catalog.count) 个")
+        }
+    }
+
+    private var backgroundPreviewStrip: some View {
+        HStack(spacing: 6) {
+            ForEach(WorkoutPosterBackground.catalog) { background in
+                backgroundPreviewButton(background)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func backgroundPreviewButton(_ background: WorkoutPosterBackground) -> some View {
         let isSelected = selectedBackground == background
         let isRecommended = recommendedBackground == background
         return Button {
-            guard !isSelected else { return }
-            Theme.Haptics.selection()
-            selectedBackground = background
-            hasSavedPoster = false
+            selectBackground(background)
         } label: {
-            VStack(spacing: 6) {
-                Image(background.assetName)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 58, height: 88)
-                    .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                            .stroke(isSelected ? Theme.Color.accent : Theme.Color.border, lineWidth: isSelected ? 2 : 1)
-                    )
-                Text(background.title)
-                    .font(Theme.Font.body(size: 10.5, weight: .semibold))
-                    .foregroundStyle(isSelected ? Theme.Color.accent : Theme.Color.fg2)
-                    .lineLimit(1)
-                Text(isRecommended ? "推荐" : " ")
-                    .font(Theme.Font.mono(size: 8.5, weight: .bold))
-                    .foregroundStyle(isRecommended ? Theme.Color.accent : .clear)
-            }
-            .padding(6)
-            .background(
-                isSelected ? Theme.Color.accentSoft : Theme.Color.surface,
-                in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-            )
+            Image(background.assetName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 38, height: 56)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(isSelected ? Theme.Color.accent : Theme.Color.border,
+                                lineWidth: isSelected ? 2.5 : 1)
+                }
+                .overlay(alignment: .topLeading) {
+                    if isRecommended {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 7.5, weight: .bold))
+                            .foregroundStyle(Theme.Color.accent)
+                            .frame(width: 17, height: 17)
+                            .background(Theme.Color.surface.opacity(0.92), in: Circle())
+                            .offset(x: -4, y: -4)
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Theme.Color.accent)
+                            .background(Theme.Color.surface, in: Circle())
+                            .offset(x: 5, y: -5)
+                    }
+                }
+                .frame(minWidth: 48, minHeight: 62)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(background.title)背景")
+        .accessibilityLabel("\(background.title)版式")
         .accessibilityValue([isSelected ? "已选择" : "未选择", isRecommended ? "系统推荐" : nil]
             .compactMap { $0 }
             .joined(separator: "，"))
     }
 
+    private var posterPages: some View {
+        ZStack {
+            TabView(selection: $selectedBackground) {
+                ForEach(WorkoutPosterBackground.catalog) { background in
+                    WorkoutPosterCanvas(data: data, background: background)
+                        .frame(width: posterPageWidth, height: posterPageHeight)
+                        .tag(background)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(background.title)训练海报预览")
+                        .accessibilityHidden(selectedBackground != background)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(width: posterPageWidth, height: posterPageHeight)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+            .paperShadow(.md, cornerRadius: Theme.Radius.lg)
+
+            HStack {
+                pageButton(direction: -1,
+                           systemImage: "chevron.left",
+                           accessibilityLabel: "上一个海报版式")
+                Spacer()
+                pageButton(direction: 1,
+                           systemImage: "chevron.right",
+                           accessibilityLabel: "下一个海报版式")
+            }
+            .frame(width: posterPageWidth - 8)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func pageButton(direction: Int,
+                            systemImage: String,
+                            accessibilityLabel: String) -> some View {
+        let target = adjacentBackground(direction: direction)
+        return Button {
+            guard let target else { return }
+            selectBackground(target)
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .heavy))
+                .foregroundStyle(target == nil ? Theme.Color.muted : Theme.Color.fg)
+                .frame(width: 44, height: 44)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().stroke(.white.opacity(0.72), lineWidth: 1))
+                .shadow(color: .black.opacity(0.12), radius: 5, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
+        .disabled(target == nil)
+        .opacity(target == nil ? 0.38 : 1)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var currentPageCaption: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(Theme.Color.accent)
+            Text("当前版式用于保存与分享")
+                .font(Theme.Font.body(size: 11.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg2)
+            Spacer(minLength: 4)
+            if selectedBackground == recommendedBackground {
+                Text("系统推荐")
+                    .font(Theme.Font.mono(size: 9, weight: .bold))
+                    .foregroundStyle(Theme.Color.accent)
+            }
+        }
+    }
+
+    private var selectedBackgroundIndex: Int {
+        WorkoutPosterBackground.catalog.firstIndex(of: selectedBackground) ?? 0
+    }
+
+    private func adjacentBackground(direction: Int) -> WorkoutPosterBackground? {
+        let targetIndex = selectedBackgroundIndex + direction
+        guard WorkoutPosterBackground.catalog.indices.contains(targetIndex) else { return nil }
+        return WorkoutPosterBackground.catalog[targetIndex]
+    }
+
+    private func selectBackground(_ background: WorkoutPosterBackground) {
+        guard selectedBackground != background else { return }
+        if accessibilityReduceMotion {
+            selectedBackground = background
+        } else {
+            withAnimation(.easeInOut(duration: 0.22)) {
+                selectedBackground = background
+            }
+        }
+    }
+
+    private var posterPageWidth: CGFloat { 286 }
+
+    private var posterPageHeight: CGFloat {
+        posterPageWidth / WorkoutPosterLayout.aspectRatio
+    }
+
     private var recommendedBackground: WorkoutPosterBackground {
         WorkoutPosterBackground.recommended(for: data.context)
-    }
-
-    private var posterPreviewTopPadding: CGFloat {
-        Theme.Spacing.xl + Theme.Spacing.lg
-    }
-
-    private var posterPreviewBottomPadding: CGFloat {
-        Theme.Spacing.lg
     }
 
     private var actions: some View {
@@ -573,7 +689,7 @@ private struct WorkoutPosterVisualCardView: View {
     }
 
     private var receipt: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Text(data.dateText)
                     .font(Theme.Font.mono(size: 9.5, weight: .bold))
@@ -586,7 +702,7 @@ private struct WorkoutPosterVisualCardView: View {
             }
 
             Text(data.title)
-                .font(Theme.Font.display(size: 25, weight: .heavy))
+                .font(Theme.Font.display(size: 23, weight: .heavy))
                 .foregroundStyle(warmInk)
                 .lineLimit(2)
                 .minimumScaleFactor(0.76)
@@ -607,14 +723,14 @@ private struct WorkoutPosterVisualCardView: View {
                         .padding(.vertical, 3)
                         .background(coral, in: Capsule())
                     Text("\(firstPR.name) \(firstPR.weightText)")
-                        .font(Theme.Font.body(size: 11.5, weight: .bold))
+                        .font(Theme.Font.body(size: 10.5, weight: .bold))
                         .foregroundStyle(warmInk)
                         .lineLimit(1)
                     Spacer(minLength: 0)
                 }
             }
         }
-        .padding(14)
+        .padding(12)
         .background(
             receiptPaper.opacity(receiptOpacity),
             in: RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -682,7 +798,7 @@ private struct WorkoutPosterVisualCardView: View {
     }
 
     private var exerciseSummary: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 3.5) {
             if visibleExerciseLines.isEmpty {
                 Text("本次训练已完成")
                     .font(Theme.Font.body(size: 11.5, weight: .semibold))
@@ -697,13 +813,13 @@ private struct WorkoutPosterVisualCardView: View {
                                 .frame(width: 12)
                         }
                         Text(line.name)
-                            .font(Theme.Font.body(size: 11.5, weight: .semibold))
+                            .font(Theme.Font.body(size: 10.5, weight: .semibold))
                             .foregroundStyle(warmInk)
                             .lineLimit(1)
                             .minimumScaleFactor(0.76)
                         Spacer(minLength: 6)
                         Text(line.topSetText)
-                            .font(Theme.Font.mono(size: 10, weight: .bold))
+                            .font(Theme.Font.mono(size: 9.2, weight: .bold))
                             .foregroundStyle(warmInk.opacity(0.72))
                             .lineLimit(1)
                             .minimumScaleFactor(0.68)
@@ -713,7 +829,7 @@ private struct WorkoutPosterVisualCardView: View {
 
             if hiddenExerciseCount > 0 {
                 Text("另有 \(hiddenExerciseCount) 个动作")
-                    .font(Theme.Font.mono(size: 9, weight: .bold))
+                    .font(Theme.Font.mono(size: 8.5, weight: .bold))
                     .foregroundStyle(coral)
             }
         }
@@ -728,7 +844,7 @@ private struct WorkoutPosterVisualCardView: View {
     }
 
     private var maxExerciseLines: Int {
-        background.layoutKind == .centerReceipt ? 4 : 3
+        background.visibleExerciseLimit
     }
 
     private var receiptWidth: CGFloat {
@@ -748,11 +864,7 @@ private struct WorkoutPosterVisualCardView: View {
     }
 
     private var receiptOpacity: Double {
-        switch background.layoutKind {
-        case .topCompact: return 0.88
-        case .upperCenter: return 0.90
-        case .centerReceipt: return 0.92
-        }
+        background.receiptOpacity
     }
 
     private var brandSignature: some View {

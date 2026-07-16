@@ -22,6 +22,11 @@ struct WorkoutPosterBackgroundTests {
         ])
     }
 
+    @Test func everyLayoutSupportsSixExerciseLinesWithMoreTransparentReceipt() {
+        #expect(WorkoutPosterBackground.catalog.allSatisfy { $0.visibleExerciseLimit >= 6 })
+        #expect(WorkoutPosterBackground.catalog.allSatisfy { (0.80...0.84).contains($0.receiptOpacity) })
+    }
+
     @Test func recommendationFollowsSemanticPriority() throws {
         let workoutId = try #require(UUID(uuidString: "019f6633-a0e0-74e0-a85f-ad7be94af459"))
 
@@ -111,14 +116,21 @@ struct WorkoutPosterBackgroundTests {
             timerStartedAt: startedAt,
             endedAt: startedAt.addingTimeInterval(3_600)
         )
-        let exercise = WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0)
-        exercise.sets = [WorkoutSet(setIndex: 0, weightKg: 80, reps: 8, completed: true)]
-        workout.exercises = [exercise]
+        workout.exercises = (0..<8).map { index in
+            let exercise = WorkoutExercise(exerciseName: "动作 \(index + 1)", orderIndex: index)
+            exercise.sets = [WorkoutSet(setIndex: 0,
+                                        weightKg: Double(80 - index),
+                                        reps: 8 + index,
+                                        completed: true)]
+            return exercise
+        }
         let data = WorkoutPosterData(
             workout: workout,
             caloriePreferences: WorkoutCaloriePreferences(showsEstimates: false)
         )
         let originalData = data
+
+        #expect(data.exerciseLines.count == 8)
 
         var exportedData: [Data] = []
         for background in WorkoutPosterBackground.catalog {

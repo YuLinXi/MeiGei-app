@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: 海报背景推荐与选择
-系统 SHALL 提供完成庆典台、能量环游轨迹、迷你综合训练场、伙伴击掌、训练装备花环共 5 张随 App 打包的插画背景。系统 SHALL 根据 PR、Team 分享来源、训练时长、训练量、组数、动作数和复杂训练结构推荐初始背景，并 SHALL 允许用户在海报预览中从全部 5 张背景里手动切换。手动选择仅在当前预览会话有效，MUST NOT 写入训练记录、SwiftData 或同步协议。
+系统 SHALL 提供完成庆典台、能量环游轨迹、迷你综合训练场、伙伴击掌、训练装备花环共 5 张随 App 打包的插画背景。系统 SHALL 根据 PR、Team 分享来源、训练时长、训练量、组数、动作数和复杂训练结构推荐初始背景，并 SHALL 允许用户在首屏可见的海报分页器中从全部 5 张背景里手动切换。手动选择仅在当前预览会话有效，MUST NOT 写入训练记录、SwiftData 或同步协议。
 
 #### Scenario: PR 训练使用庆典背景
 - **WHEN** 本次训练产生至少一项 PR
@@ -22,13 +22,15 @@
 - **WHEN** 训练未命中更高优先级的语义条件
 - **THEN** 系统 SHALL 推荐训练装备花环背景
 
-#### Scenario: 手动切换真实背景
-- **WHEN** 用户点击任意一张背景缩略图
-- **THEN** 系统 SHALL 立即使用对应插画重新展示同一份训练内容
+#### Scenario: 在海报区域切换真实背景
+- **WHEN** 用户左右滑动大海报、点击海报左右按钮或点击紧邻海报的小版式预览
+- **THEN** 系统 SHALL 立即将对应插画切换为当前页并重新展示同一份训练内容
 - **AND** 训练标题、指标、动作摘要和 PR SHALL 保持不变
+- **AND** 当前页、页码、小版式预览选中态 SHALL 保持同步
+- **AND** 保存与分享 SHALL 使用当前页对应的版式
 
 ### Requirement: 训练海报视觉融合
-系统 SHALL 使用固定 9:16 全画幅插画作为背景，并 SHALL 将训练信息放入暖白半透明训练凭证中。系统 SHALL 根据背景的 `topCompact`、`upperCenter` 或 `centerReceipt` safe zone 放置凭证，MUST NOT 遮挡主要人物或器械。海报 MUST NOT 继续展示旧黑红侧栏、假 QR 或固定口号。
+系统 SHALL 使用固定 9:16 全画幅插画作为背景，并 SHALL 将训练信息放入更通透但保持文字可读的暖白半透明训练凭证中。系统 SHALL 根据背景的 `topCompact`、`upperCenter` 或 `centerReceipt` safe zone 放置凭证，MUST NOT 遮挡主要人物或器械。海报 MUST NOT 继续展示旧黑红侧栏、假 QR 或固定口号。
 
 #### Scenario: 背景使用适配布局
 - **WHEN** 系统渲染任意一张内置背景
@@ -37,8 +39,10 @@
 - **AND** 底部 SHALL 只保留简洁品牌签名
 
 #### Scenario: 长动作列表保持可读
-- **WHEN** 训练动作数超过凭证可展示上限
-- **THEN** 系统 SHALL 展示可容纳的动作摘要和剩余动作数量
+- **WHEN** 训练包含不少于 6 个动作
+- **THEN** 系统 SHALL 在凭证中至少展示前 6 个动作摘要
+- **WHEN** 训练动作数超过 6 个
+- **THEN** 系统 SHALL 同时展示剩余动作数量
 - **AND** 凭证 SHALL 保持在背景安全区内
 
 ### Requirement: 图片保存与系统分享
