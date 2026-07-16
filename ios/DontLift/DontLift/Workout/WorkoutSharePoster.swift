@@ -313,13 +313,10 @@ struct WorkoutPosterPreviewSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                posterPager
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.top, Theme.Spacing.md)
-                .padding(.bottom, Theme.Spacing.lg)
-                .frame(maxWidth: .infinity)
-            }
+            posterPager
+                .padding(.top, Theme.Spacing.lg)
+                .padding(.bottom, Theme.Spacing.sm)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             actions
         }
@@ -338,37 +335,11 @@ struct WorkoutPosterPreviewSheet: View {
     }
 
     private var posterPager: some View {
-        VStack(spacing: 10) {
-            posterPagerHeader
+        VStack(spacing: Theme.Spacing.sm) {
             backgroundPreviewStrip
             posterPages
-            currentPageCaption
         }
-        .frame(maxWidth: 320)
-    }
-
-    private var posterPagerHeader: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("海报版式")
-                    .font(Theme.Font.body(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg)
-                Text(selectedBackground.title)
-                    .font(Theme.Font.mono(size: 10.5, weight: .bold))
-                    .foregroundStyle(Theme.Color.muted)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 8)
-
-            Text("\(selectedBackgroundIndex + 1) / \(WorkoutPosterBackground.catalog.count)")
-                .font(Theme.Font.mono(size: 11, weight: .heavy))
-                .foregroundStyle(Theme.Color.accent)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(Theme.Color.accentSoft, in: Capsule())
-                .accessibilityLabel("第 \(selectedBackgroundIndex + 1) 个版式，共 \(WorkoutPosterBackground.catalog.count) 个")
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var backgroundPreviewStrip: some View {
@@ -421,40 +392,51 @@ struct WorkoutPosterPreviewSheet: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(background.title)版式")
-        .accessibilityValue([isSelected ? "已选择" : "未选择", isRecommended ? "系统推荐" : nil]
-            .compactMap { $0 }
-            .joined(separator: "，"))
+        .accessibilityValue(isSelected ? "已选择" : "未选择")
     }
 
     private var posterPages: some View {
-        ZStack {
-            TabView(selection: $selectedBackground) {
-                ForEach(WorkoutPosterBackground.catalog) { background in
-                    WorkoutPosterCanvas(data: data, background: background)
-                        .frame(width: posterPageWidth, height: posterPageHeight)
-                        .tag(background)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("\(background.title)训练海报预览")
-                        .accessibilityHidden(selectedBackground != background)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(width: posterPageWidth, height: posterPageHeight)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-            .paperShadow(.md, cornerRadius: Theme.Radius.lg)
+        GeometryReader { proxy in
+            let availablePageWidth = max(0, proxy.size.width - 88)
+            // 页码与海报同处预览区，计算海报高度时先为页码和间距预留空间。
+            let availablePageHeight = max(0, proxy.size.height - 32)
+            let heightLimitedWidth = availablePageHeight * WorkoutPosterLayout.aspectRatio
+            let pageWidth = min(availablePageWidth, heightLimitedWidth)
+            let pageHeight = pageWidth / WorkoutPosterLayout.aspectRatio
 
-            HStack {
-                pageButton(direction: -1,
-                           systemImage: "chevron.left",
-                           accessibilityLabel: "上一个海报版式")
-                Spacer()
-                pageButton(direction: 1,
-                           systemImage: "chevron.right",
-                           accessibilityLabel: "下一个海报版式")
+            VStack(spacing: Theme.Spacing.sm) {
+                HStack(spacing: 0) {
+                    pageButton(direction: -1,
+                               systemImage: "chevron.left",
+                               accessibilityLabel: "上一个海报版式")
+
+                    TabView(selection: $selectedBackground) {
+                        ForEach(WorkoutPosterBackground.catalog) { background in
+                            WorkoutPosterCanvas(data: data, background: background)
+                                .frame(width: pageWidth, height: pageHeight)
+                                .tag(background)
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel("\(background.title)训练海报预览")
+                                .accessibilityHidden(selectedBackground != background)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .frame(width: pageWidth, height: pageHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                    .paperShadow(.md, cornerRadius: Theme.Radius.lg)
+
+                    pageButton(direction: 1,
+                               systemImage: "chevron.right",
+                               accessibilityLabel: "下一个海报版式")
+                }
+                .frame(maxWidth: .infinity)
+
+                currentPageCaption
+
+                Spacer(minLength: 0)
             }
-            .frame(width: posterPageWidth - 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .frame(maxWidth: .infinity)
     }
 
     private func pageButton(direction: Int,
@@ -466,12 +448,14 @@ struct WorkoutPosterPreviewSheet: View {
             selectBackground(target)
         } label: {
             Image(systemName: systemImage)
-                .font(.system(size: 15, weight: .heavy))
+                .font(.system(size: 12, weight: .heavy))
                 .foregroundStyle(target == nil ? Theme.Color.muted : Theme.Color.fg)
-                .frame(width: 44, height: 44)
+                .frame(width: 32, height: 32)
                 .background(.ultraThinMaterial, in: Circle())
                 .overlay(Circle().stroke(.white.opacity(0.72), lineWidth: 1))
                 .shadow(color: .black.opacity(0.12), radius: 5, x: 0, y: 2)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(target == nil)
@@ -480,19 +464,13 @@ struct WorkoutPosterPreviewSheet: View {
     }
 
     private var currentPageCaption: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(Theme.Color.accent)
-            Text("当前版式用于保存与分享")
-                .font(Theme.Font.body(size: 11.5, weight: .semibold))
-                .foregroundStyle(Theme.Color.fg2)
-            Spacer(minLength: 4)
-            if selectedBackground == recommendedBackground {
-                Text("系统推荐")
-                    .font(Theme.Font.mono(size: 9, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
-            }
-        }
+        Text("\(selectedBackgroundIndex + 1) / \(WorkoutPosterBackground.catalog.count)")
+            .font(Theme.Font.mono(size: 11, weight: .heavy))
+            .foregroundStyle(Theme.Color.accent)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Theme.Color.accentSoft, in: Capsule())
+            .accessibilityLabel("第 \(selectedBackgroundIndex + 1) 个版式，共 \(WorkoutPosterBackground.catalog.count) 个")
     }
 
     private var selectedBackgroundIndex: Int {
@@ -514,12 +492,6 @@ struct WorkoutPosterPreviewSheet: View {
                 selectedBackground = background
             }
         }
-    }
-
-    private var posterPageWidth: CGFloat { 286 }
-
-    private var posterPageHeight: CGFloat {
-        posterPageWidth / WorkoutPosterLayout.aspectRatio
     }
 
     private var recommendedBackground: WorkoutPosterBackground {
