@@ -20,7 +20,7 @@
 
 ### Requirement: 队友今日状态分组
 
-“拍一拍队友” sheet SHALL 只展示当前 Team 中允许接收拍一拍的其他成员，并分开展示今天尚无 Team 动态的队友和今天已有 Team 动态的队友。当前用户本人和已关闭当前 Team 拍一拍接收偏好的成员 MUST NOT 出现在列表中。页面只能描述 Team 可见状态，MUST NOT 将没有 Team checkin 表达为“没训练”“还没练”或“偷懒”。
+“拍一拍队友” sheet SHALL 只展示当前 Team 中允许接收 Team 消息的其他成员，并分开展示今天尚无 Team 动态的队友和今天已有 Team 动态的队友。当前用户本人和已关闭当前 Team 消息的成员 MUST NOT 出现在列表中。页面只能描述 Team 可见状态，MUST NOT 将没有 Team checkin 表达为“没训练”“还没练”或“偷懒”。
 
 #### Scenario: 队友没有 Team checkin
 - **WHEN** 某队友今天尚未向当前 Team 分享 checkin
@@ -35,8 +35,8 @@
 - **THEN** 列表只展示其他 Team 成员
 - **AND** 当前用户本人不出现在任何分组中
 
-#### Scenario: 列表排除关闭接收的成员
-- **WHEN** 某队友已关闭当前 Team 的拍一拍接收偏好
+#### Scenario: 列表排除关闭 Team 消息的成员
+- **WHEN** 某队友已关闭当前 Team 的 Team 消息
 - **THEN** 该成员不出现在“拍一拍队友” sheet 的任何分组中
 
 ### Requirement: 拍一拍即时反馈
@@ -53,22 +53,33 @@
 - **THEN** 页面从乐观的“已拍”回滚为“拍一拍”
 - **AND** 页面展示错误信息，用户可在条件允许时重试
 
-### Requirement: Team 拍一拍接收偏好
+### Requirement: Team 消息偏好
 
-`TeamDetailView` SHALL 在 sheet 外提供“接收这个 Team 的拍一拍”开关，并与“训练完成后自动分享”作为同级设置相邻展示。开关 SHALL 乐观更新；保存失败时 SHALL 恢复旧值并显示错误。该开关只影响当前 Team。
+`TeamDetailView` SHALL 在 sheet 外提供“Team消息”开关，并与“分享动态”作为同级设置相邻展示。该开关统一控制当前 Team 的拍一拍、队友打卡和表情回应推送，MUST NOT 再提供仅控制拍一拍的独立开关。开关 SHALL 乐观更新；保存失败时 SHALL 恢复旧值并显示错误。该开关只影响当前 Team，默认 SHALL 为开启。
 
-#### Scenario: 关闭当前 Team 提醒
-- **WHEN** 用户关闭“接收这个 Team 的拍一拍”且服务端保存成功
-- **THEN** 当前 Team 的开关保持关闭，其他 Team 的设置不变
+#### Scenario: 关闭当前 Team 消息
+- **WHEN** 用户关闭“Team消息”且服务端保存成功
+- **THEN** 当前 Team 的开关保持关闭，来自该 Team 的拍一拍、队友打卡和表情回应推送均不再发送
+- **AND** 其他 Team 的设置不变
 
 #### Scenario: 两项 Team 设置并列展示
 - **WHEN** 用户进入 Team 详情页
-- **THEN** “训练完成后自动分享”和“接收这个 Team 的拍一拍”在主页面相邻展示
-- **AND** 成员拍一拍 sheet 中不再展示接收偏好开关
+- **THEN** “分享动态”和“Team消息”在主页面相邻展示
+- **AND** 成员拍一拍 sheet 中不再展示单独的拍一拍接收开关
 
 #### Scenario: 保存偏好失败
-- **WHEN** 用户切换接收偏好但请求失败
+- **WHEN** 用户切换 Team 消息偏好但请求失败
 - **THEN** 开关恢复到切换前状态并展示错误
+
+#### Scenario: 保存成功后保持新状态
+- **WHEN** 用户切换 Team 消息偏好且服务端保存成功
+- **THEN** 成功响应 MUST 返回本次已经保存的新值，客户端开关保持该值
+- **AND** 服务端 MUST NOT 因事务内旧状态缓存返回切换前的值，导致开关立即回跳
+
+#### Scenario: 保存期间保持开关布局稳定
+- **WHEN** 用户切换 Team 消息偏好且保存请求仍在进行中
+- **THEN** 页面保持原 `Toggle` 的位置、尺寸和乐观状态不变，并临时禁止重复操作
+- **AND** 页面 MUST NOT 用 `ProgressView` 替换 `Toggle`，造成设置卡内容抖动
 
 ### Requirement: 拍一拍推送刷新与打开 Team
 

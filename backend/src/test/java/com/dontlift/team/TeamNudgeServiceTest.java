@@ -3,6 +3,7 @@ package com.dontlift.team;
 import com.dontlift.common.web.AppException;
 import com.dontlift.push.PushService;
 import com.dontlift.team.dto.TeamMemberView;
+import com.dontlift.team.dto.TeamNudgeResponses.TodayState;
 import com.dontlift.team.entity.Team;
 import com.dontlift.team.entity.TeamMember;
 import com.dontlift.team.entity.TeamNudge;
@@ -10,6 +11,7 @@ import com.dontlift.team.mapper.TeamCheckinMapper;
 import com.dontlift.team.mapper.TeamMapper;
 import com.dontlift.team.mapper.TeamMemberMapper;
 import com.dontlift.team.mapper.TeamNudgeMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -164,21 +166,31 @@ class TeamNudgeServiceTest {
 
         assertThat(state.nudgedRecipientUserIds()).containsExactly(recipientId);
         assertThat(state.receivableRecipientUserIds()).containsExactly(recipientId, receivableId);
-        assertThat(state.receiveWorkoutNudges()).isTrue();
+        assertThat(state.receiveTeamNotifications()).isTrue();
         assertThat(state.date()).isEqualTo(service.today());
     }
 
     @Test
-    void updatePreference_updatesOnlyCurrentTeamAndReturnsNewState() {
-        TeamMember before = member(true);
-        TeamMember after = member(false);
-        when(teamService.requireMember(teamId, senderId)).thenReturn(before, after);
+    void updatePreference_returnsSavedValueInsteadOfCachedPreviousState() {
+        TeamMember cachedPreviousState = member(false);
+        when(teamService.requireMember(teamId, senderId)).thenReturn(cachedPreviousState);
+        when(memberMapper.updateReceiveTeamNotifications(teamId, senderId, true)).thenReturn(1);
         when(nudgeMapper.findRecipientIds(teamId, senderId, service.today())).thenReturn(List.of());
 
-        var state = service.updatePreference(senderId, teamId, false);
+        var state = service.updatePreference(senderId, teamId, true);
 
-        verify(memberMapper).updateReceiveWorkoutNudges(teamId, senderId, false);
-        assertThat(state.receiveWorkoutNudges()).isFalse();
+        verify(memberMapper).updateReceiveTeamNotifications(teamId, senderId, true);
+        assertThat(state.receiveTeamNotifications()).isTrue();
+    }
+
+    @Test
+    void todayState_serializesCurrentAndLegacyPreferenceNames() throws Exception {
+        var state = new TodayState(service.today(), List.of(), List.of(), false);
+
+        String json = new ObjectMapper().findAndRegisterModules().writeValueAsString(state);
+
+        assertThat(json).contains("\"receiveTeamNotifications\":false");
+        assertThat(json).contains("\"receiveWorkoutNudges\":false");
     }
 
     private void givenEligibleMembers(boolean recipientEnabled) {
@@ -196,7 +208,7 @@ class TeamNudgeServiceTest {
 
     private TeamMember member(boolean enabled) {
         TeamMember member = new TeamMember();
-        member.setReceiveWorkoutNudges(enabled);
+        member.setReceiveTeamNotifications(enabled);
         return member;
     }
 

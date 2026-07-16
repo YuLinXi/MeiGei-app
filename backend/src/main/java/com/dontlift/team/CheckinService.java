@@ -199,6 +199,10 @@ public class CheckinService {
         if (checkin.getUserId().equals(reactorUserId)) {
             return false;
         }
+        TeamMember recipient = memberMapper.findByTeamAndUser(checkin.getTeamId(), checkin.getUserId());
+        if (recipient == null || !recipient.isReceiveTeamNotifications()) {
+            return false;
+        }
         return reactionMapper.insertPushReceiptIfAbsent(Uuid7.generate(), checkinId, reactorUserId, now) == 1;
     }
 
@@ -213,7 +217,7 @@ public class CheckinService {
 
     private void notifyOtherMembers(UUID teamId, UUID actorUserId, String title, String body) {
         for (TeamMember m : memberMapper.findByTeam(teamId)) {
-            if (!m.getUserId().equals(actorUserId)) {
+            if (!m.getUserId().equals(actorUserId) && m.isReceiveTeamNotifications()) {
                 pushService.sendToUser(m.getUserId(), title, body, Map.of("teamId", teamId.toString()));
             }
         }

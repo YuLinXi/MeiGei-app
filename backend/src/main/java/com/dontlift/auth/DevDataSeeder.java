@@ -164,7 +164,7 @@ public class DevDataSeeder {
                               UUID userId,
                               UUID memberId,
                               String role,
-                              boolean receiveWorkoutNudges) {
+                              boolean receiveTeamNotifications) {
         TeamMember existing = memberMapper.findByTeamAndUser(teamId, userId);
         if (existing == null) {
             TeamMember member = new TeamMember();
@@ -174,7 +174,7 @@ public class DevDataSeeder {
             member.setRole(role);
             member.setJoinedAt(OffsetDateTime.now(DEV_OFFSET).minusDays("owner".equals(role) ? 60 : 14));
             member.setAutoShareWorkouts(true);
-            member.setReceiveWorkoutNudges(receiveWorkoutNudges);
+            member.setReceiveTeamNotifications(receiveTeamNotifications);
             memberMapper.insert(member);
             return;
         }
@@ -183,7 +183,7 @@ public class DevDataSeeder {
         }
         // 每次 dev token 登录恢复默认开启基线，便于反复验证开关成功/失败回滚。
         memberMapper.updateAutoShareWorkouts(teamId, userId, true);
-        memberMapper.updateReceiveWorkoutNudges(teamId, userId, receiveWorkoutNudges);
+        memberMapper.updateReceiveTeamNotifications(teamId, userId, receiveTeamNotifications);
     }
 
     private void ensureWorkout(LocalDate today, SeedWorkout seed) {

@@ -663,7 +663,7 @@ struct TeamDetailView: View {
     @State private var showingTodayMembers = false
     @State private var nudgeState: TeamNudgeTodayDTO?
     @State private var nudgeBusyRecipientIds: Set<UUID> = []
-    @State private var nudgePreferenceBusy = false
+    @State private var teamNotificationPreferenceBusy = false
 
     private enum ConfirmKind: Identifiable { case leave, dissolve; var id: Int { hashValue } }
 
@@ -681,7 +681,7 @@ struct TeamDetailView: View {
                         }
                         headerCard
                         autoSharePreferenceCard
-                        receiveNudgePreferenceCard
+                        teamNotificationPreferenceCard
                         planEntry
 
                         todayFeedSection
@@ -861,16 +861,18 @@ struct TeamDetailView: View {
     }
 
     private var autoSharePreferenceCard: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Text("训练完成后自动分享")
-                .font(Theme.Font.body(size: 15, weight: .bold))
-                .foregroundStyle(Theme.Color.fg)
-            Spacer(minLength: 8)
+        Group {
             if autoSharePreferenceBusy {
-                ProgressView()
-                    .frame(width: 44, height: 31)
+                HStack(alignment: .center, spacing: 12) {
+                    Text("分享动态")
+                        .font(Theme.Font.body(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg)
+                    Spacer(minLength: 8)
+                    ProgressView()
+                        .frame(width: 44, height: 31)
+                }
             } else {
-                Toggle("", isOn: Binding(
+                Toggle(isOn: Binding(
                     get: { autoShareWorkouts },
                     set: { enabled in
                         if enabled {
@@ -879,34 +881,46 @@ struct TeamDetailView: View {
                             Task { await setAutoShareWorkouts(false) }
                         }
                     }
-                ))
-                .labelsHidden()
+                )) {
+                    Text("分享动态")
+                        .font(Theme.Font.body(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg)
+                }
                 .tint(Theme.Color.accent)
             }
         }
+        .frame(maxWidth: .infinity)
         .cardStyle()
     }
 
-    private var receiveNudgePreferenceCard: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Text("接收这个 Team 的拍一拍")
-                .font(Theme.Font.body(size: 15, weight: .bold))
-                .foregroundStyle(Theme.Color.fg)
-            Spacer(minLength: 8)
-            if nudgePreferenceBusy || nudgeState == nil {
-                ProgressView()
-                    .frame(width: 44, height: 31)
+    private var teamNotificationPreferenceCard: some View {
+        Group {
+            if nudgeState == nil {
+                HStack(alignment: .center, spacing: 12) {
+                    Text("Team消息")
+                        .font(Theme.Font.body(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg)
+                    Spacer(minLength: 8)
+                    ProgressView()
+                        .frame(width: 44, height: 31)
+                }
             } else {
-                Toggle("", isOn: Binding(
-                    get: { nudgeState?.receiveWorkoutNudges ?? true },
+                Toggle(isOn: Binding(
+                    get: { nudgeState?.receiveTeamNotifications ?? true },
                     set: { enabled in
-                        Task { await setReceiveWorkoutNudges(enabled) }
+                        Task { await setReceiveTeamNotifications(enabled) }
                     }
-                ))
-                .labelsHidden()
+                )) {
+                    Text("Team消息")
+                        .font(Theme.Font.body(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg)
+                }
                 .tint(Theme.Color.accent)
+                .disabled(teamNotificationPreferenceBusy)
+                .accessibilityHint("控制当前 Team 的拍一拍、队友打卡和表情回应推送")
             }
         }
+        .frame(maxWidth: .infinity)
         .cardStyle()
     }
 
@@ -1392,15 +1406,15 @@ struct TeamDetailView: View {
         }
     }
 
-    private func setReceiveWorkoutNudges(_ enabled: Bool) async {
-        guard var optimistic = nudgeState, !nudgePreferenceBusy else { return }
+    private func setReceiveTeamNotifications(_ enabled: Bool) async {
+        guard var optimistic = nudgeState, !teamNotificationPreferenceBusy else { return }
         let previous = optimistic
-        optimistic.receiveWorkoutNudges = enabled
+        optimistic.receiveTeamNotifications = enabled
         nudgeState = optimistic
-        nudgePreferenceBusy = true
-        defer { nudgePreferenceBusy = false }
+        teamNotificationPreferenceBusy = true
+        defer { teamNotificationPreferenceBusy = false }
         do {
-            nudgeState = try await teamService.updateNudgePreference(teamId: team.id, enabled: enabled)
+            nudgeState = try await teamService.updateTeamNotificationPreference(teamId: team.id, enabled: enabled)
         } catch {
             nudgeState = previous
             guard !error.isCancellationError else { return }

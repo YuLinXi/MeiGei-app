@@ -11,7 +11,8 @@ import com.dontlift.team.dto.TeamRequests.JoinTeam;
 import com.dontlift.team.dto.TeamRequests.SharePlan;
 import com.dontlift.team.dto.TeamRequests.SharePlanEvent;
 import com.dontlift.team.dto.TeamRequests.UpdateSharePreference;
-import com.dontlift.team.dto.TeamRequests.UpdateNudgePreference;
+import com.dontlift.team.dto.TeamRequests.UpdateLegacyNudgePreference;
+import com.dontlift.team.dto.TeamRequests.UpdateTeamNotificationPreference;
 import com.dontlift.team.entity.Team;
 import com.dontlift.team.entity.TeamPlanShareEvent;
 import com.dontlift.team.entity.TeamPlanShareVersion;
@@ -86,10 +87,23 @@ public class TeamController {
         return teamNudgeService.send(SecurityUtils.currentUserId(), teamId, recipientUserId);
     }
 
+    @PatchMapping("/{teamId}/members/me/notification-preferences")
+    public TodayState updateTeamNotificationPreference(
+            @PathVariable UUID teamId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @Valid @RequestBody UpdateTeamNotificationPreference req) {
+        requireIdempotencyKey(idempotencyKey);
+        return teamNudgeService.updatePreference(
+                SecurityUtils.currentUserId(), teamId, req.receiveTeamNotifications());
+    }
+
+    /** 兼容尚未升级的客户端；与 Team 消息偏好共用同一份状态。 */
+    @Deprecated
     @PatchMapping("/{teamId}/members/me/nudge-preferences")
-    public TodayState updateNudgePreference(@PathVariable UUID teamId,
-                                            @RequestHeader("Idempotency-Key") String idempotencyKey,
-                                            @Valid @RequestBody UpdateNudgePreference req) {
+    public TodayState updateLegacyNudgePreference(
+            @PathVariable UUID teamId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @Valid @RequestBody UpdateLegacyNudgePreference req) {
         requireIdempotencyKey(idempotencyKey);
         return teamNudgeService.updatePreference(
                 SecurityUtils.currentUserId(), teamId, req.receiveWorkoutNudges());

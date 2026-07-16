@@ -1,5 +1,7 @@
 package com.dontlift.team.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -15,8 +17,13 @@ public final class TeamNudgeResponses {
             LocalDate date,
             List<UUID> nudgedRecipientUserIds,
             List<UUID> receivableRecipientUserIds,
-            boolean receiveWorkoutNudges
+            boolean receiveTeamNotifications
     ) {
+        /** 兼容尚未升级的客户端；不是独立偏好。 */
+        @JsonProperty("receiveWorkoutNudges")
+        public boolean legacyReceiveWorkoutNudges() {
+            return receiveTeamNotifications;
+        }
     }
 
     public record SendResult(

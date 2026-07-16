@@ -42,7 +42,7 @@ class TeamServiceTest {
         TeamMember member = captor.getValue();
         assertThat(member.getTeamId()).isEqualTo(created.getId());
         assertThat(member.isAutoShareWorkouts()).isTrue();
-        assertThat(member.isReceiveWorkoutNudges()).isTrue();
+        assertThat(member.isReceiveTeamNotifications()).isTrue();
     }
 
     @Test

@@ -289,7 +289,23 @@ struct TeamNudgeTodayDTO: Decodable, Hashable {
     var date: String
     var nudgedRecipientUserIds: [UUID]
     var receivableRecipientUserIds: [UUID]
-    var receiveWorkoutNudges: Bool
+    var receiveTeamNotifications: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case date, nudgedRecipientUserIds, receivableRecipientUserIds
+        case receiveTeamNotifications
+        case receiveWorkoutNudges
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = try c.decode(String.self, forKey: .date)
+        nudgedRecipientUserIds = try c.decode([UUID].self, forKey: .nudgedRecipientUserIds)
+        receivableRecipientUserIds = try c.decode([UUID].self, forKey: .receivableRecipientUserIds)
+        let currentPreference = try c.decodeIfPresent(Bool.self, forKey: .receiveTeamNotifications)
+        let legacyPreference = try c.decodeIfPresent(Bool.self, forKey: .receiveWorkoutNudges)
+        receiveTeamNotifications = currentPreference ?? legacyPreference ?? true
+    }
 }
 
 struct TeamNudgeSendResultDTO: Decodable, Hashable {
@@ -407,7 +423,7 @@ struct CreateTeamRequest: Encodable { let name: String }
 struct JoinTeamRequest: Encodable { let inviteCode: String }
 struct ReactRequest: Encodable { let emoji: String }
 struct UpdateTeamSharePreferenceRequest: Encodable { let autoShareWorkouts: Bool }
-struct UpdateTeamNudgePreferenceRequest: Encodable { let receiveWorkoutNudges: Bool }
+struct UpdateTeamNotificationPreferenceRequest: Encodable { let receiveTeamNotifications: Bool }
 struct SharePlanRequest: Encodable {
     let sourcePlanId: UUID
     let planNameSnapshot: String?

@@ -71,12 +71,12 @@ final class TeamService {
     }
 
     @discardableResult
-    func updateNudgePreference(teamId: UUID, enabled: Bool) async throws -> TeamNudgeTodayDTO {
+    func updateTeamNotificationPreference(teamId: UUID, enabled: Bool) async throws -> TeamNudgeTodayDTO {
         try await api.send(
             "PATCH",
-            "/teams/\(teamId)/members/me/nudge-preferences",
-            body: UpdateTeamNudgePreferenceRequest(receiveWorkoutNudges: enabled),
-            idempotencyKey: "team-nudge-preference-\(teamId.uuidString):\(enabled):\(UUID().uuidString)"
+            "/teams/\(teamId)/members/me/notification-preferences",
+            body: UpdateTeamNotificationPreferenceRequest(receiveTeamNotifications: enabled),
+            idempotencyKey: "team-notification-preference-\(teamId.uuidString):\(enabled):\(UUID().uuidString)"
         )
     }
 

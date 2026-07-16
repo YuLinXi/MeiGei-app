@@ -53,17 +53,23 @@
 - **WHEN** 多个拍一拍请求并发命中同一发送者或接收者的当日边界
 - **THEN** 系统串行化相关配额检查，最终记录和 APNs 数量不得突破上限
 
-### Requirement: 接收偏好按 Team 隔离
+### Requirement: Team 消息偏好按 Team 隔离
 
-每个 Team 成员 SHALL 可独立设置是否接收该 Team 的拍一拍，默认值 SHALL 为开启。偏好写接口 MUST 要求 `Idempotency-Key`。关闭后，系统 MUST 拒绝来自该 Team 的新 nudge，且 MUST NOT 向发送者暴露“关闭偏好”这一具体原因。
+每个 Team 成员 SHALL 可独立设置是否接收该 Team 的 Team 消息，默认值 SHALL 为开启。该偏好 SHALL 统一控制拍一拍、队友打卡和表情回应 APNs，系统 MUST NOT 再维护仅控制拍一拍的独立偏好。偏好写接口 MUST 要求 `Idempotency-Key`。关闭后，系统 MUST 拒绝来自该 Team 的新 nudge，抑制该 Team 的打卡与表情回应推送，且 MUST NOT 向发送者暴露“关闭偏好”这一具体原因。
 
-#### Scenario: 新成员默认接收拍一拍
+#### Scenario: 新成员默认接收 Team 消息
 - **WHEN** 用户创建或加入一个 Team
-- **THEN** 该 Team 的接收拍一拍偏好默认为开启
+- **THEN** 该 Team 的 Team 消息偏好默认为开启
 
-#### Scenario: 关闭某个 Team 的拍一拍
-- **WHEN** 用户在 Team A 关闭接收拍一拍，但在 Team B 保持开启
+#### Scenario: 关闭某个 Team 的消息
+- **WHEN** 用户在 Team A 关闭 Team 消息，但在 Team B 保持开启
 - **THEN** Team A 的成员暂时无法拍该用户，Team B 的成员仍可按规则发送
+- **AND** Team A 不再向该用户发送队友打卡或表情回应 APNs
+
+#### Scenario: 兼容旧物理列保存的开启状态
+- **WHEN** 成员的 Team 消息开启状态保存在兼容旧客户端的 `receive_workout_nudges` 物理列
+- **THEN** 服务端读取成员和锁定成员时均将其映射为已开启的 `receiveTeamNotifications`
+- **AND** 当日状态不错误显示为关闭，符合其他资格的拍一拍不因字段映射丢失而被拒绝
 
 #### Scenario: 发送者尝试拍已关闭接收的成员
 - **WHEN** 接收者已关闭当前 Team 的拍一拍
@@ -72,11 +78,11 @@
 
 ### Requirement: 当日状态可拉取
 
-系统 SHALL 向当前 Team 成员提供当日 nudge 状态，包含服务端日期、当前用户今日在该 Team 已拍过的接收者 ID、当前 Team 中允许接收拍一拍的其他成员 ID，以及当前用户自己的接收偏好。响应 MUST NOT 包含其他成员的具体偏好值、被拍次数、发送者名单或历史记录。
+系统 SHALL 向当前 Team 成员提供当日 nudge 状态，包含服务端日期、当前用户今日在该 Team 已拍过的接收者 ID、当前 Team 中允许接收拍一拍的其他成员 ID，以及当前用户自己的 Team 消息偏好。响应 MUST NOT 包含其他成员的具体偏好值、被拍次数、发送者名单或历史记录。
 
 #### Scenario: 拉取自己的当日拍一拍状态
 - **WHEN** 当前成员进入 Team 详情并请求当日 nudge 状态
-- **THEN** 系统返回该用户在当前 Team 今日已拍过的接收者 ID、允许接收拍一拍的其他成员 ID 和本人的接收偏好
+- **THEN** 系统返回该用户在当前 Team 今日已拍过的接收者 ID、允许接收拍一拍的其他成员 ID 和本人的 Team 消息偏好
 - **AND** 系统不返回其他成员的具体偏好值或被拍统计
 
 ### Requirement: 拍一拍 APNs 内容与路由

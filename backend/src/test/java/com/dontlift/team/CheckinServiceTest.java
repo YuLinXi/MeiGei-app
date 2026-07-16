@@ -81,6 +81,22 @@ class CheckinServiceTest {
     }
 
     @Test
+    void checkIn_notifiesOnlyMembersWithTeamMessagesEnabled() {
+        givenShareableWorkout();
+        UUID enabledMemberId = UUID.randomUUID();
+        UUID disabledMemberId = UUID.randomUUID();
+        when(memberMapper.findByTeam(teamId)).thenReturn(List.of(
+                teamMember(userId),
+                teamMember(enabledMemberId),
+                teamMember(disabledMemberId, false)));
+
+        service.checkIn(userId, workoutId, today, "{}", List.of(teamId), false);
+
+        verify(pushService).sendToUser(eq(enabledMemberId), any(), any(), any());
+        verify(pushService, never()).sendToUser(eq(disabledMemberId), any(), any(), any());
+    }
+
+    @Test
     void checkIn_suppressedHistoricalCheckinIsCreatedWithoutMemberQueryOrPush() {
         givenShareableWorkout();
         LocalDate yesterday = today.minusDays(1);
@@ -182,6 +198,7 @@ class CheckinServiceTest {
         when(reactionMapper.insertPushReceiptIfAbsent(
                 any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
                 .thenReturn(1);
+        when(memberMapper.findByTeamAndUser(teamId, ownerId)).thenReturn(teamMember(ownerId));
 
         CheckinReaction result = service.react(reactorId, checkinId, "fire");
 
@@ -205,6 +222,7 @@ class CheckinServiceTest {
         when(reactionMapper.insertPushReceiptIfAbsent(
                 any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
                 .thenReturn(0);
+        when(memberMapper.findByTeamAndUser(teamId, ownerId)).thenReturn(teamMember(ownerId));
 
         CheckinReaction result = service.react(reactorId, checkinId, "muscle");
 
@@ -245,6 +263,7 @@ class CheckinServiceTest {
         when(reactionMapper.insertPushReceiptIfAbsent(
                 any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
                 .thenReturn(0);
+        when(memberMapper.findByTeamAndUser(teamId, ownerId)).thenReturn(teamMember(ownerId));
 
         CheckinReaction result = service.react(reactorId, checkinId, "heart");
 
@@ -284,12 +303,32 @@ class CheckinServiceTest {
         when(reactionMapper.insertPushReceiptIfAbsent(
                 any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
                 .thenReturn(0);
+        when(memberMapper.findByTeamAndUser(teamId, ownerId)).thenReturn(teamMember(ownerId));
 
         CheckinReaction result = service.react(reactorId, checkinId, "fire");
 
         assertThat(result).isSameAs(concurrent);
         verify(reactionMapper, never()).deleteById(any(UUID.class));
         verify(reactionMapper, never()).updateById(any(CheckinReaction.class));
+        verify(pushService, never()).sendToUser(any(), any(), any(), any());
+    }
+
+    @Test
+    void react_doesNotPushWhenCheckinOwnerDisabledTeamMessages() {
+        UUID ownerId = UUID.randomUUID();
+        UUID reactorId = UUID.randomUUID();
+        UUID checkinId = UUID.randomUUID();
+        TeamCheckin checkin = checkinForReaction(checkinId, ownerId);
+        when(checkinMapper.selectById(checkinId)).thenReturn(checkin);
+        when(reactionMapper.findByCheckinAndUser(checkinId, reactorId)).thenReturn(null);
+        when(reactionMapper.insertReactionIfAbsent(any(CheckinReaction.class))).thenReturn(1);
+        when(memberMapper.findByTeamAndUser(teamId, ownerId)).thenReturn(teamMember(ownerId, false));
+
+        CheckinReaction result = service.react(reactorId, checkinId, "heart");
+
+        assertThat(result.getEmoji()).isEqualTo("heart");
+        verify(reactionMapper, never()).insertPushReceiptIfAbsent(
+                any(UUID.class), any(UUID.class), any(UUID.class), any(OffsetDateTime.class));
         verify(pushService, never()).sendToUser(any(), any(), any(), any());
     }
 
@@ -344,9 +383,14 @@ class CheckinServiceTest {
     }
 
     private TeamMember teamMember(UUID memberUserId) {
+        return teamMember(memberUserId, true);
+    }
+
+    private TeamMember teamMember(UUID memberUserId, boolean receiveTeamNotifications) {
         TeamMember member = new TeamMember();
         member.setTeamId(teamId);
         member.setUserId(memberUserId);
+        member.setReceiveTeamNotifications(receiveTeamNotifications);
         return member;
     }
 

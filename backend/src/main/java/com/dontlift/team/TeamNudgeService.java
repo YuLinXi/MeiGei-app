@@ -53,20 +53,26 @@ public class TeamNudgeService {
 
     public TodayState todayState(UUID userId, UUID teamId) {
         TeamMember member = teamService.requireMember(teamId, userId);
+        return todayState(userId, teamId, member.isReceiveTeamNotifications());
+    }
+
+    private TodayState todayState(UUID userId, UUID teamId, boolean receiveTeamNotifications) {
         LocalDate date = today();
         return new TodayState(
                 date,
                 nudgeMapper.findRecipientIds(teamId, userId, date),
                 memberMapper.findReceivableNudgeUserIds(teamId, userId),
-                member.isReceiveWorkoutNudges()
+                receiveTeamNotifications
         );
     }
 
     @Transactional
     public TodayState updatePreference(UUID userId, UUID teamId, boolean enabled) {
         teamService.requireMember(teamId, userId);
-        memberMapper.updateReceiveWorkoutNudges(teamId, userId, enabled);
-        return todayState(userId, teamId);
+        if (memberMapper.updateReceiveTeamNotifications(teamId, userId, enabled) != 1) {
+            throw AppException.conflict("Team 消息设置已变化，请重试");
+        }
+        return todayState(userId, teamId, enabled);
     }
 
     @Transactional
@@ -92,7 +98,7 @@ public class TeamNudgeService {
         if (existing != null) {
             return toResult(existing);
         }
-        if (!recipient.isReceiveWorkoutNudges()) {
+        if (!recipient.isReceiveTeamNotifications()) {
             throw AppException.conflict("暂时无法拍一拍该成员");
         }
         if (checkinMapper.existsByTeamUserDate(teamId, recipientUserId, date)) {
