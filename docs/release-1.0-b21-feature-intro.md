@@ -4,7 +4,7 @@
 > 对比基线：已发布版本 `v1.0-b20` 与当前 `feature/v1.0-b21` 候选版本的最终状态。
 > 生成时间：2026-07-16 22:12 CST。
 > 后端状态：已于 2026-07-16 22:21 CST 部署生产，Flyway `V19/V20` 已应用，production smoke 通过。
-> iOS 状态：Simulator build/test 已通过；TestFlight `1.0 (21)` 尚未上传。
+> iOS 状态：Simulator build/test 已通过；TestFlight `1.0 (21)` 已为 `VALID` 并完成真机回归，2026-07-16 22:28 CST 由用户确认。
 
 ## 一句话摘要
 
@@ -40,7 +40,7 @@
 - 已有 Team 成员的分享和消息偏好保持原值；默认开启只作用于新建或新加入的成员关系。
 - 计划备选字段为 optional，旧计划和旧训练记录可以继续解码；海报和计划详情改动主要在新版 iOS 客户端生效。
 - 真实拍一拍、队友打卡和表情回应通知仍依赖生产 APNs 配置、系统通知权限及至少两个真实账号。
-- TestFlight `1.0 (21)` 尚未上传，处理完成并真机回归前不要创建 `v1.0-b21` tag。
+- TestFlight `1.0 (21)` 已为 `VALID` 并完成真机回归，满足合并 `main` 和创建 `v1.0-b21` tag 的客户端门禁。
 
 ## 已完成验证
 
@@ -53,9 +53,12 @@
 - 生产发布前备份已生成：`/opt/DontLift-app/backend/backups/dontlift_2026-07-16_222004.sql.gz`，大小 `449K`。
 - 生产后端容器重建成功；Flyway 已成功应用 `V19 team workout nudges` 与 `V20 team member preferences default enabled`，当前 schema 为 `V20`。
 - 独立 production smoke 通过：health 连续 3 次返回 `UP`，`POST /auth/dev/token`=`404`，`/privacy`=`200`，`/terms`=`200`，启动后日志扫描 `recent_errors=0`。
+- TestFlight `1.0 (21)` 已处理为 `VALID` 并完成真机回归，2026-07-16 22:28 CST 由用户确认，未报告阻塞问题。
 - iOS 测试编译存在 Swift 6 actor-isolation 兼容性 warning，但当前 Swift 模式下不阻塞 build/test；本次没有测试失败。
 
 ## TestFlight 回归重点
+
+> 以下回归重点已完成，2026-07-16 22:28 CST 由用户确认通过；具体设备与 iOS 版本未提供。
 
 - 后端 health 与 Flyway `V19/V20` 已通过；开始 build 21 回归前，再用旧 build 20 快速确认 Apple 登录、训练同步和既有 Team 功能兼容。
 - 使用两个真实账号验证拍一拍：队友分组、发送成功、重复发送、已有 Team 动态不可拍、系统通知展示及点击后进入对应 Team。
