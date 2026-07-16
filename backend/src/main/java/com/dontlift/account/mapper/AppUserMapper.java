@@ -16,10 +16,7 @@ public interface AppUserMapper extends BaseMapper<AppUser> {
 
     @Update("""
             UPDATE app_user
-            SET display_name = CASE
-                    WHEN display_name IS NULL OR btrim(display_name) = '' THEN #{displayName}
-                    ELSE display_name
-                END,
+            SET display_name = #{displayName},
                 first_login_email = COALESCE(first_login_email, #{email}),
                 sex = COALESCE(sex, #{sex}),
                 deleted_at = NULL,

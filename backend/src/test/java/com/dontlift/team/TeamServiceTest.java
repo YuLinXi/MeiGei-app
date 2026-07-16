@@ -8,6 +8,7 @@ import com.dontlift.team.mapper.TeamMapper;
 import com.dontlift.team.mapper.TeamMemberMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,6 +32,18 @@ class TeamServiceTest {
 
     private final UUID userId = UUID.randomUUID();
     private final UUID teamId = UUID.randomUUID();
+
+    @Test
+    void createTeam_defaultsMemberPreferencesToEnabled() {
+        Team created = service.createTeam(userId, "默认偏好 Team");
+
+        ArgumentCaptor<TeamMember> captor = ArgumentCaptor.forClass(TeamMember.class);
+        verify(memberMapper).insert(captor.capture());
+        TeamMember member = captor.getValue();
+        assertThat(member.getTeamId()).isEqualTo(created.getId());
+        assertThat(member.isAutoShareWorkouts()).isTrue();
+        assertThat(member.isReceiveWorkoutNudges()).isTrue();
+    }
 
     @Test
     void listMySharePreferences_returnsCurrentUsersActiveMemberships() {

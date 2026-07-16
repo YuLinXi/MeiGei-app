@@ -8,6 +8,10 @@ extension Notification.Name {
     static let dontliftCheckinReceived = Notification.Name("dontlift.push.checkin")
     /// 收到「表情回应」推送（userInfo 含 checkinId/emoji）。
     static let dontliftReactionReceived = Notification.Name("dontlift.push.reaction")
+    /// 收到拍一拍推送，Team 详情据 teamId 刷新。
+    static let dontliftTeamNudgeReceived = Notification.Name("dontlift.push.teamNudge")
+    /// 用户点击拍一拍通知，主界面切换并打开对应 Team。
+    static let dontliftTeamNudgeOpened = Notification.Name("dontlift.push.teamNudge.opened")
 }
 
 /// APNs 注册、token 上报与下行推送路由（2.9）。
@@ -20,6 +24,8 @@ final class PushManager: NSObject {
     private var deviceTokenHex: String?
     /// 当前是否已登录（由 App 注入），决定能否上报 token。
     var isLoggedIn: () -> Bool = { false }
+    /// 冷启动点击拍一拍通知时暂存目标，等 Team tab 建立后消费。
+    private(set) var pendingOpenedTeamId: UUID?
 
     /// 请求通知权限并注册 APNs。
     func requestAuthorizationAndRegister() {
@@ -51,12 +57,25 @@ final class PushManager: NSObject {
     }
 
     /// 路由下行推送到对应通知，供 Team 页拉取最新数据（design.md D6）。
-    func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) {
-        if userInfo["emoji"] != nil || userInfo["checkinId"] != nil {
+    func handleRemoteNotification(_ userInfo: [AnyHashable: Any], opened: Bool = false) {
+        if userInfo["type"] as? String == "team_nudge" {
+            NotificationCenter.default.post(name: .dontliftTeamNudgeReceived, object: nil, userInfo: userInfo)
+            if opened {
+                if let rawTeamId = userInfo["teamId"] as? String {
+                    pendingOpenedTeamId = UUID(uuidString: rawTeamId)
+                }
+                NotificationCenter.default.post(name: .dontliftTeamNudgeOpened, object: nil, userInfo: userInfo)
+            }
+        } else if userInfo["emoji"] != nil || userInfo["checkinId"] != nil {
             NotificationCenter.default.post(name: .dontliftReactionReceived, object: nil, userInfo: userInfo)
         } else if userInfo["teamId"] != nil {
             NotificationCenter.default.post(name: .dontliftCheckinReceived, object: nil, userInfo: userInfo)
         }
+    }
+
+    func consumePendingOpenedTeamId() -> UUID? {
+        defer { pendingOpenedTeamId = nil }
+        return pendingOpenedTeamId
     }
 
     #if DEBUG
@@ -122,7 +141,7 @@ extension PushManager: UNUserNotificationCenterDelegate {
 
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse) async {
-        handleRemoteNotification(response.notification.request.content.userInfo)
+        handleRemoteNotification(response.notification.request.content.userInfo, opened: true)
         if response.notification.request.identifier == RestTimerController.notificationId {
             RestTimerController.clearDeliveredRestNotification()
         }

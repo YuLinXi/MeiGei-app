@@ -24,6 +24,9 @@ public final class TeamRequests {
     public record UpdateSharePreference(@NotNull Boolean autoShareWorkouts) {
     }
 
+    public record UpdateNudgePreference(@NotNull Boolean receiveWorkoutNudges) {
+    }
+
     public record CheckIn(
             @NotNull UUID workoutId,
             @NotNull LocalDate checkinDate,

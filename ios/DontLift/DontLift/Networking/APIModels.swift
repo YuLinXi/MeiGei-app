@@ -229,7 +229,7 @@ struct TeamMemberDTO: Decodable, Identifiable, Hashable {
     var joinedAt: Date?
     /// 后端 join app_user.display_name 得到；用户未设名时为 nil，前端兜底。
     var displayName: String?
-    /// 当前用户在某个 Team 的训练完成自动分享偏好。旧后端未返回时按 false 处理。
+    /// 当前用户在某个 Team 的训练完成自动分享偏好。旧后端未返回时按新成员默认值 true 处理。
     var autoShareWorkouts: Bool
 
     enum CodingKeys: String, CodingKey {
@@ -244,7 +244,7 @@ struct TeamMemberDTO: Decodable, Identifiable, Hashable {
         role = try c.decode(String.self, forKey: .role)
         joinedAt = try c.decodeIfPresent(Date.self, forKey: .joinedAt)
         displayName = try c.decodeIfPresent(String.self, forKey: .displayName)
-        autoShareWorkouts = try c.decodeIfPresent(Bool.self, forKey: .autoShareWorkouts) ?? false
+        autoShareWorkouts = try c.decodeIfPresent(Bool.self, forKey: .autoShareWorkouts) ?? true
     }
 }
 
@@ -283,6 +283,19 @@ struct CheckinReactionDTO: Decodable, Identifiable, Hashable {
 struct TeamCheckinFeedDTO: Decodable {
     var checkins: [TeamCheckinDTO]
     var reactions: [CheckinReactionDTO]
+}
+
+struct TeamNudgeTodayDTO: Decodable, Hashable {
+    var date: String
+    var nudgedRecipientUserIds: [UUID]
+    var receivableRecipientUserIds: [UUID]
+    var receiveWorkoutNudges: Bool
+}
+
+struct TeamNudgeSendResultDTO: Decodable, Hashable {
+    var recipientUserId: UUID
+    var date: String
+    var createdAt: Date
 }
 
 /// 服务端计划模板（Team 内浏览/Fork 用，items 同为 jsonb 字符串）。
@@ -394,6 +407,7 @@ struct CreateTeamRequest: Encodable { let name: String }
 struct JoinTeamRequest: Encodable { let inviteCode: String }
 struct ReactRequest: Encodable { let emoji: String }
 struct UpdateTeamSharePreferenceRequest: Encodable { let autoShareWorkouts: Bool }
+struct UpdateTeamNudgePreferenceRequest: Encodable { let receiveWorkoutNudges: Bool }
 struct SharePlanRequest: Encodable {
     let sourcePlanId: UUID
     let planNameSnapshot: String?

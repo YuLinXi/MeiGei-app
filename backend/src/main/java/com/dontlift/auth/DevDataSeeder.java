@@ -1,15 +1,18 @@
 package com.dontlift.auth;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dontlift.account.entity.AppUser;
 import com.dontlift.account.mapper.AppUserMapper;
 import com.dontlift.team.entity.CheckinReaction;
 import com.dontlift.team.entity.Team;
 import com.dontlift.team.entity.TeamCheckin;
 import com.dontlift.team.entity.TeamMember;
+import com.dontlift.team.entity.TeamNudge;
 import com.dontlift.team.mapper.CheckinReactionMapper;
 import com.dontlift.team.mapper.TeamCheckinMapper;
 import com.dontlift.team.mapper.TeamMapper;
 import com.dontlift.team.mapper.TeamMemberMapper;
+import com.dontlift.team.mapper.TeamNudgeMapper;
 import com.dontlift.workout.entity.Workout;
 import com.dontlift.workout.entity.WorkoutExercise;
 import com.dontlift.workout.entity.WorkoutSet;
@@ -49,12 +52,22 @@ public class DevDataSeeder {
 
     private static final UUID TEAMMATE_USER_ID = id("user:dev-teammate");
     private static final UUID TEAMMATE_TWO_USER_ID = id("user:dev-teammate-two");
+    private static final UUID NUDGED_USER_ID = id("user:dev-nudged");
+    private static final UUID DISABLED_USER_ID = id("user:dev-nudge-disabled");
+    private static final UUID ELIGIBLE_USER_ID = id("user:dev-nudge-eligible");
     private static final UUID TEAM_ID = id("team:local-simulator");
+    private static final UUID NUDGE_TEAM_ID = id("team:nudge-validation");
     private static final String DEV_USER_NAME = "本地测试账号";
     private static final String TEAMMATE_NAME = "测试队友";
     private static final String TEAMMATE_TWO_NAME = "测试成员阿凯";
+    private static final String NUDGED_USER_NAME = "老周";
+    private static final String DISABLED_USER_NAME = "小满";
+    private static final String ELIGIBLE_USER_NAME = "阿岳";
     private static final String TEAM_NAME = "本地测试 Team";
+    private static final String NUDGE_TEAM_NAME = "拍一拍验收 Team";
     private static final String INVITE_CODE = "DEVGYM";
+    private static final String NUDGE_INVITE_CODE = "NUDGE1";
+    private static final ZoneId DEV_ZONE = ZoneId.of("Asia/Shanghai");
     private static final ZoneOffset DEV_OFFSET = ZoneOffset.ofHours(8);
 
     private final AppUserMapper appUserMapper;
@@ -65,22 +78,37 @@ public class DevDataSeeder {
     private final WorkoutSetMapper setMapper;
     private final TeamCheckinMapper checkinMapper;
     private final CheckinReactionMapper reactionMapper;
+    private final TeamNudgeMapper nudgeMapper;
     private final ObjectMapper objectMapper;
 
     @Transactional
     public SeedResult seed() {
-        LocalDate today = LocalDate.now(ZoneId.systemDefault());
+        LocalDate today = LocalDate.now(DEV_ZONE);
         boolean created = ensureUser(DEV_USER_ID, DEV_USER_NAME, "dev@dontlift.local", "male");
         ensureUser(TEAMMATE_USER_ID, TEAMMATE_NAME, "teammate@dontlift.local", "female");
         ensureUser(TEAMMATE_TWO_USER_ID, TEAMMATE_TWO_NAME, "teammate2@dontlift.local", "male");
-        ensureTeam(today);
-        ensureMember(DEV_USER_ID, memberId("owner"), "owner");
-        ensureMember(TEAMMATE_USER_ID, memberId("teammate"), "member");
-        ensureMember(TEAMMATE_TWO_USER_ID, memberId("teammate-two"), "member");
+        ensureUser(NUDGED_USER_ID, NUDGED_USER_NAME, "nudged@dontlift.local", "male");
+        ensureUser(DISABLED_USER_ID, DISABLED_USER_NAME, "nudge-disabled@dontlift.local", "female");
+        ensureUser(ELIGIBLE_USER_ID, ELIGIBLE_USER_NAME, "nudge-eligible@dontlift.local", "male");
 
-        for (SeedWorkout workout : seedWorkouts()) {
+        ensureTeam(TEAM_ID, TEAM_NAME, INVITE_CODE, teamCreatedAt(today, 60));
+        ensureMember(TEAM_ID, DEV_USER_ID, memberId("owner"), "owner", true);
+        ensureMember(TEAM_ID, TEAMMATE_USER_ID, memberId("teammate"), "member", true);
+        ensureMember(TEAM_ID, TEAMMATE_TWO_USER_ID, memberId("teammate-two"), "member", true);
+
+        ensureTeam(NUDGE_TEAM_ID, NUDGE_TEAM_NAME, NUDGE_INVITE_CODE, teamCreatedAt(today, 14));
+        ensureMember(NUDGE_TEAM_ID, DEV_USER_ID, memberId("nudge:owner"), "owner", true);
+        ensureMember(NUDGE_TEAM_ID, TEAMMATE_USER_ID, memberId("nudge:shared"), "member", true);
+        ensureMember(NUDGE_TEAM_ID, TEAMMATE_TWO_USER_ID, memberId("nudge:available-one"), "member", true);
+        ensureMember(NUDGE_TEAM_ID, NUDGED_USER_ID, memberId("nudge:already"), "member", true);
+        ensureMember(NUDGE_TEAM_ID, DISABLED_USER_ID, memberId("nudge:disabled"), "member", false);
+        ensureMember(NUDGE_TEAM_ID, ELIGIBLE_USER_ID, memberId("nudge:available-two"), "member", true);
+
+        List<SeedWorkout> workouts = seedWorkouts();
+        for (SeedWorkout workout : workouts) {
             ensureWorkout(today, workout);
         }
+        ensureNudgeValidationData(today, workouts);
 
         return new SeedResult(DEV_USER_ID, created);
     }
@@ -97,7 +125,7 @@ public class DevDataSeeder {
             return true;
         }
         if (existing.getDeletedAt() != null
-                || isBlank(existing.getDisplayName())
+                || !displayName.equals(existing.getDisplayName())
                 || existing.getFirstLoginEmail() == null
                 || existing.getSex() == null) {
             appUserMapper.restoreDevProfile(userId, displayName, email, sex);
@@ -105,15 +133,14 @@ public class DevDataSeeder {
         return false;
     }
 
-    private void ensureTeam(LocalDate today) {
-        OffsetDateTime createdAt = teamCreatedAt(today);
-        Team existing = teamMapper.findByIdIncludingDeleted(TEAM_ID);
+    private void ensureTeam(UUID teamId, String teamName, String inviteCode, OffsetDateTime createdAt) {
+        Team existing = teamMapper.findByIdIncludingDeleted(teamId);
         if (existing == null) {
             Team team = new Team();
-            team.setId(TEAM_ID);
-            team.setName(TEAM_NAME);
+            team.setId(teamId);
+            team.setName(teamName);
             team.setOwnerUserId(DEV_USER_ID);
-            team.setInviteCode(INVITE_CODE);
+            team.setInviteCode(inviteCode);
             team.setCreatedAt(createdAt);
             team.setUpdatedAt(createdAt);
             teamMapper.insert(team);
@@ -121,33 +148,42 @@ public class DevDataSeeder {
         }
         if (existing.getDeletedAt() != null
                 || !DEV_USER_ID.equals(existing.getOwnerUserId())
-                || !INVITE_CODE.equals(existing.getInviteCode())
+                || !inviteCode.equals(existing.getInviteCode())
+                || !teamName.equals(existing.getName())
                 || existing.getCreatedAt() == null
                 || existing.getCreatedAt().isAfter(createdAt)) {
-            teamMapper.restoreDevTeam(TEAM_ID, TEAM_NAME, DEV_USER_ID, INVITE_CODE, createdAt);
+            teamMapper.restoreDevTeam(teamId, teamName, DEV_USER_ID, inviteCode, createdAt);
         }
     }
 
-    private OffsetDateTime teamCreatedAt(LocalDate today) {
-        return OffsetDateTime.of(today.minusDays(60), LocalTime.of(9, 0), DEV_OFFSET);
+    private OffsetDateTime teamCreatedAt(LocalDate today, int daysAgo) {
+        return OffsetDateTime.of(today.minusDays(daysAgo), LocalTime.of(9, 0), DEV_OFFSET);
     }
 
-    private void ensureMember(UUID userId, UUID memberId, String role) {
-        TeamMember existing = memberMapper.findByTeamAndUser(TEAM_ID, userId);
+    private void ensureMember(UUID teamId,
+                              UUID userId,
+                              UUID memberId,
+                              String role,
+                              boolean receiveWorkoutNudges) {
+        TeamMember existing = memberMapper.findByTeamAndUser(teamId, userId);
         if (existing == null) {
             TeamMember member = new TeamMember();
             member.setId(memberId);
-            member.setTeamId(TEAM_ID);
+            member.setTeamId(teamId);
             member.setUserId(userId);
             member.setRole(role);
             member.setJoinedAt(OffsetDateTime.now(DEV_OFFSET).minusDays("owner".equals(role) ? 60 : 14));
-            member.setAutoShareWorkouts(false);
+            member.setAutoShareWorkouts(true);
+            member.setReceiveWorkoutNudges(receiveWorkoutNudges);
             memberMapper.insert(member);
             return;
         }
         if (!role.equals(existing.getRole())) {
-            memberMapper.updateRole(TEAM_ID, userId, role);
+            memberMapper.updateRole(teamId, userId, role);
         }
+        // 每次 dev token 登录恢复默认开启基线，便于反复验证开关成功/失败回滚。
+        memberMapper.updateAutoShareWorkouts(teamId, userId, true);
+        memberMapper.updateReceiveWorkoutNudges(teamId, userId, receiveWorkoutNudges);
     }
 
     private void ensureWorkout(LocalDate today, SeedWorkout seed) {
@@ -176,6 +212,65 @@ public class DevDataSeeder {
         UUID checkinId = ensureCheckin(seed, workoutId, date, endedAt.plusMinutes(2),
                 summaryJson(seed, startedAt, endedAt));
         ensureReaction(seed, checkinId, endedAt.plusMinutes(8));
+    }
+
+    /**
+     * 恢复拍一拍手工验收的固定基线：本人无动态、两人已分享、
+     * 一人已拍、一人关闭接收、一人可拍。仅作用于独立的本地验收 Team。
+     */
+    private void ensureNudgeValidationData(LocalDate today, List<SeedWorkout> workouts) {
+        checkinMapper.delete(new LambdaQueryWrapper<TeamCheckin>()
+                .eq(TeamCheckin::getTeamId, NUDGE_TEAM_ID)
+                .notIn(TeamCheckin::getUserId, List.of(TEAMMATE_USER_ID, TEAMMATE_TWO_USER_ID)));
+        nudgeMapper.delete(new LambdaQueryWrapper<TeamNudge>()
+                .eq(TeamNudge::getTeamId, NUDGE_TEAM_ID)
+                .eq(TeamNudge::getSenderUserId, DEV_USER_ID)
+                .eq(TeamNudge::getNudgeDate, today));
+
+        SeedWorkout teammateWorkout = workouts.stream()
+                .filter(workout -> "teammate-upper-current".equals(workout.key()))
+                .findFirst()
+                .orElseThrow();
+        SeedWorkout teammateTwoWorkout = workouts.stream()
+                .filter(workout -> "teammate-two-conditioning-current".equals(workout.key()))
+                .findFirst()
+                .orElseThrow();
+        ensureNudgeTeamCheckin(today, teammateWorkout);
+        ensureNudgeTeamCheckin(today, teammateTwoWorkout);
+
+        TeamNudge nudge = new TeamNudge();
+        nudge.setId(id("team-nudge:nudge-validation:" + today));
+        nudge.setTeamId(NUDGE_TEAM_ID);
+        nudge.setSenderUserId(DEV_USER_ID);
+        nudge.setRecipientUserId(NUDGED_USER_ID);
+        nudge.setNudgeDate(today);
+        nudge.setCreatedAt(OffsetDateTime.now(DEV_OFFSET).minusMinutes(5));
+        nudgeMapper.insert(nudge);
+    }
+
+    private void ensureNudgeTeamCheckin(LocalDate today, SeedWorkout seed) {
+        OffsetDateTime startedAt = OffsetDateTime.of(today, seed.startTime(), DEV_OFFSET);
+        OffsetDateTime endedAt = startedAt.plusMinutes(seed.durationMinutes());
+        UUID workoutId = workoutId(seed.key());
+        String summary = summaryJson(seed, startedAt, endedAt);
+        TeamCheckin existing = checkinMapper.findByTeamUserWorkout(
+                NUDGE_TEAM_ID, seed.userId(), workoutId);
+        if (existing == null) {
+            TeamCheckin checkin = new TeamCheckin();
+            checkin.setId(id("team-checkin:nudge-validation:" + seed.key()));
+            checkin.setTeamId(NUDGE_TEAM_ID);
+            checkin.setUserId(seed.userId());
+            checkin.setWorkoutId(workoutId);
+            checkin.setCheckinDate(today);
+            checkin.setSummary(summary);
+            checkin.setCreatedAt(endedAt.plusMinutes(2));
+            checkinMapper.insert(checkin);
+            return;
+        }
+        existing.setCheckinDate(today);
+        existing.setSummary(summary);
+        existing.setCreatedAt(endedAt.plusMinutes(2));
+        checkinMapper.updateById(existing);
     }
 
     private void ensureWorkoutChildren(SeedWorkout seed, UUID workoutId) {

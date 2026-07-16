@@ -57,7 +57,13 @@ struct TeamListView: View {
         .overlay(alignment: .top) { resultToast }
         .task { await reload() }
         .refreshable { await reload() }
-        .onAppear { consumePendingToast() }
+        .onAppear {
+            consumePendingToast()
+            openPendingNudgeIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dontliftTeamNudgeOpened)) { notification in
+            Task { await openTeamFromNudge(notification) }
+        }
         .alert("出错了", isPresented: .constant(error != nil)) {
             Button("好") { error = nil }
         } message: { Text(error ?? "") }
@@ -325,6 +331,25 @@ struct TeamListView: View {
             guard !error.isCancellationError else { return }
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
+    }
+
+    private func openTeamFromNudge(_ notification: Notification) async {
+        guard let rawTeamId = notification.userInfo?["teamId"] as? String,
+              let teamId = UUID(uuidString: rawTeamId) else { return }
+        _ = PushManager.shared.consumePendingOpenedTeamId()
+        await openTeam(teamId)
+    }
+
+    private func openPendingNudgeIfNeeded() {
+        guard let teamId = PushManager.shared.consumePendingOpenedTeamId() else { return }
+        Task { await openTeam(teamId) }
+    }
+
+    private func openTeam(_ teamId: UUID) async {
+        if teamService.teams.first(where: { $0.id == teamId }) == nil {
+            await reload()
+        }
+        selectedTeam = teamService.teams.first(where: { $0.id == teamId })
     }
 }
 
@@ -628,13 +653,17 @@ struct TeamDetailView: View {
     /// Team 计划三级页导航：绑定式，避免闭包式 NavigationLink 在嵌套 TabView 的 stack 里失灵。
     @State private var showingPlans = false
     @State private var showOwnerTakeoverNotice = false
-    @State private var autoShareWorkouts = false
+    @State private var autoShareWorkouts = true
     @State private var autoSharePreferenceBusy = false
     @State private var confirmingAutoShareEnable = false
     @State private var pendingWithdrawCheckin: TeamCheckinDTO?
     @State private var confirmingWithdraw = false
     @State private var showingHistory = false
     @State private var openedCheckin: TeamCheckinDTO?
+    @State private var showingTodayMembers = false
+    @State private var nudgeState: TeamNudgeTodayDTO?
+    @State private var nudgeBusyRecipientIds: Set<UUID> = []
+    @State private var nudgePreferenceBusy = false
 
     private enum ConfirmKind: Identifiable { case leave, dissolve; var id: Int { hashValue } }
 
@@ -652,6 +681,7 @@ struct TeamDetailView: View {
                         }
                         headerCard
                         autoSharePreferenceCard
+                        receiveNudgePreferenceCard
                         planEntry
 
                         todayFeedSection
@@ -704,11 +734,29 @@ struct TeamDetailView: View {
         .sheet(item: $openedCheckin) { checkin in
             TeamCheckinDetailSheet(checkin: checkin, memberName: displayName(for: checkin.userId))
         }
+        .sheet(isPresented: $showingTodayMembers) {
+            TeamTodayMembersSheet(
+                members: members,
+                checkinUserIds: Set(checkins.map(\.userId)),
+                currentUserId: session.currentUserId,
+                nudgedRecipientIds: Set(nudgeState?.nudgedRecipientUserIds ?? []),
+                receivableRecipientIds: Set(nudgeState?.receivableRecipientUserIds ?? []),
+                busyRecipientIds: nudgeBusyRecipientIds,
+                onNudge: { await sendNudge(to: $0) }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .overlay(alignment: .top) { failureToast }
         .onAppear { prepareOwnerTakeoverNotice() }
         .task { await reload() }
         // 同步周期完成后重拉今日动态：删训练经同步使后端撤销 checkin，此处反映移除（无需手动下拉）。
         .onReceive(NotificationCenter.default.publisher(for: .dontliftSyncCompleted)) { _ in
+            Task { await reload() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dontliftTeamNudgeReceived)) { notification in
+            guard let rawTeamId = notification.userInfo?["teamId"] as? String,
+                  UUID(uuidString: rawTeamId) == team.id else { return }
             Task { await reload() }
         }
         // 回前台兜底刷新：删除/同步若在后台完成，切回前台时反映最新动态。
@@ -758,13 +806,19 @@ struct TeamDetailView: View {
             HStack(alignment: .top) {
                 Text(isOwner ? "Team · 你是队长" : "Team").eyebrowStyle()
                 Spacer(minLength: 8)
-                Text("\(trainedToday) / \(totalMembers) 今日已练")
-                    .font(Theme.Font.mono(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.Color.accent)
-                    .padding(.horizontal, 9).padding(.vertical, 4)
-                    .background(Theme.Color.accentSoft, in: Capsule())
-                    .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1))
-                    .fixedSize()
+                Button { showingTodayMembers = true } label: {
+                    Text("\(trainedToday) / \(totalMembers) 今日已练")
+                        .font(Theme.Font.mono(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.Color.accent)
+                        .padding(.horizontal, 9).padding(.vertical, 4)
+                        .background(Theme.Color.accentSoft, in: Capsule())
+                        .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1))
+                        .fixedSize()
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("拍一拍队友，\(trainedToday) / \(totalMembers) 今日已练")
             }
             Text(team.name)
                 .font(Theme.Font.l2)
@@ -785,7 +839,13 @@ struct TeamDetailView: View {
                 }
                 .buttonStyle(.plain)
                 Spacer(minLength: 8)
-                avatarStack
+                Button { showingTodayMembers = true } label: {
+                    avatarStack
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("拍一拍队友")
             }
         }
         .padding(15)
@@ -818,6 +878,29 @@ struct TeamDetailView: View {
                         } else {
                             Task { await setAutoShareWorkouts(false) }
                         }
+                    }
+                ))
+                .labelsHidden()
+                .tint(Theme.Color.accent)
+            }
+        }
+        .cardStyle()
+    }
+
+    private var receiveNudgePreferenceCard: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text("接收这个 Team 的拍一拍")
+                .font(Theme.Font.body(size: 15, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+            Spacer(minLength: 8)
+            if nudgePreferenceBusy || nudgeState == nil {
+                ProgressView()
+                    .frame(width: 44, height: 31)
+            } else {
+                Toggle("", isOn: Binding(
+                    get: { nudgeState?.receiveWorkoutNudges ?? true },
+                    set: { enabled in
+                        Task { await setReceiveWorkoutNudges(enabled) }
                     }
                 ))
                 .labelsHidden()
@@ -1201,12 +1284,14 @@ struct TeamDetailView: View {
         do {
             async let m = teamService.members(of: team.id)
             async let feed = teamService.checkinFeed(teamId: team.id)
+            async let nudges = teamService.todayNudgeState(teamId: team.id)
             let loadedMembers = try await m
             members = loadedMembers
             syncAutoSharePreference(from: loadedMembers)
             let loadedFeed = try await feed
             checkins = loadedFeed.checkins
             reactions = Dictionary(grouping: loadedFeed.reactions, by: \.checkinId)
+            nudgeState = try await nudges
         } catch {
             guard !error.isCancellationError else { return }
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -1284,6 +1369,45 @@ struct TeamDetailView: View {
         }
     }
 
+    private func sendNudge(to recipientUserId: UUID) async -> String? {
+        guard var optimistic = nudgeState,
+              !nudgeBusyRecipientIds.contains(recipientUserId) else {
+            return "拍一拍状态尚未加载，请稍后重试"
+        }
+        let previous = optimistic
+        nudgeBusyRecipientIds.insert(recipientUserId)
+        if !optimistic.nudgedRecipientUserIds.contains(recipientUserId) {
+            optimistic.nudgedRecipientUserIds.append(recipientUserId)
+        }
+        nudgeState = optimistic
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        defer { nudgeBusyRecipientIds.remove(recipientUserId) }
+        do {
+            _ = try await teamService.nudge(teamId: team.id, recipientUserId: recipientUserId)
+            return nil
+        } catch {
+            nudgeState = previous
+            guard !error.isCancellationError else { return nil }
+            return "拍一拍失败，请稍后重试"
+        }
+    }
+
+    private func setReceiveWorkoutNudges(_ enabled: Bool) async {
+        guard var optimistic = nudgeState, !nudgePreferenceBusy else { return }
+        let previous = optimistic
+        optimistic.receiveWorkoutNudges = enabled
+        nudgeState = optimistic
+        nudgePreferenceBusy = true
+        defer { nudgePreferenceBusy = false }
+        do {
+            nudgeState = try await teamService.updateNudgePreference(teamId: team.id, enabled: enabled)
+        } catch {
+            nudgeState = previous
+            guard !error.isCancellationError else { return }
+            self.error = "提醒设置保存失败，请稍后重试"
+        }
+    }
+
     /// 退出/解散：成功写跨页 toast 并返回列表；失败保留弹窗 + 顶部红 toast。
     private func performConfirmedAction(_ kind: ConfirmKind) async {
         guard dangerEnabled(kind), !actionBusy else { return }
@@ -1306,6 +1430,153 @@ struct TeamDetailView: View {
         withAnimation(.easeOut(duration: 0.2)) { actionFailed = true }
         try? await Task.sleep(for: .seconds(2.5))
         withAnimation(.easeOut(duration: 0.2)) { actionFailed = false }
+    }
+}
+
+// MARK: - 拍一拍队友
+
+private struct TeamTodayMembersSheet: View {
+    let members: [TeamMemberDTO]
+    let checkinUserIds: Set<UUID>
+    let currentUserId: UUID?
+    let nudgedRecipientIds: Set<UUID>
+    let receivableRecipientIds: Set<UUID>
+    let busyRecipientIds: Set<UUID>
+    let onNudge: (UUID) async -> String?
+
+    @State private var errorMessage: String?
+
+    private var waitingTeammates: [TeamMemberDTO] {
+        sorted(members.filter {
+            $0.userId != currentUserId
+                && receivableRecipientIds.contains($0.userId)
+                && !checkinUserIds.contains($0.userId)
+        })
+    }
+
+    private var sharedMembers: [TeamMemberDTO] {
+        sorted(members.filter {
+            $0.userId != currentUserId
+                && receivableRecipientIds.contains($0.userId)
+                && checkinUserIds.contains($0.userId)
+        })
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                if !waitingTeammates.isEmpty {
+                    memberSection(title: "今天还没有 Team 动态", members: waitingTeammates)
+                }
+                if !sharedMembers.isEmpty {
+                    memberSection(title: "今日已分享", members: sharedMembers)
+                }
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.top, Theme.Spacing.md)
+            .padding(.bottom, 28)
+        }
+        .background(Theme.Color.bg.ignoresSafeArea())
+        .alert("操作未完成", isPresented: .constant(errorMessage != nil)) {
+            Button("好") { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private func memberSection(title: String, members: [TeamMemberDTO]) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text(title).eyebrowStyle()
+            VStack(spacing: 0) {
+                ForEach(Array(members.enumerated()), id: \.element.id) { index, member in
+                    memberRow(member)
+                    if index < members.count - 1 {
+                        Divider().overlay(Theme.Color.border)
+                            .padding(.leading, 52)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .stroke(Theme.Color.border, lineWidth: 1))
+        }
+    }
+
+    private func memberRow(_ member: TeamMemberDTO) -> some View {
+        let shared = checkinUserIds.contains(member.userId)
+        return HStack(spacing: 12) {
+            Text(String(memberName(member).prefix(1)))
+                .font(Theme.Font.body(size: 14, weight: .bold))
+                .foregroundStyle(Theme.Color.fg2)
+                .frame(width: 40, height: 40)
+                .background(Theme.Color.surface2, in: Circle())
+                .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(memberName(member))
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg)
+                Text(shared ? "今日已分享" : "今天还没有 Team 动态")
+                    .font(Theme.Font.body(size: 11))
+                    .foregroundStyle(Theme.Color.fg2)
+            }
+            Spacer(minLength: 8)
+            memberAction(member, shared: shared)
+        }
+        .frame(minHeight: 64)
+    }
+
+    @ViewBuilder
+    private func memberAction(_ member: TeamMemberDTO, shared: Bool) -> some View {
+        if shared {
+            statusLabel(systemName: "checkmark.circle.fill", text: "已分享")
+        } else if nudgedRecipientIds.contains(member.userId) {
+            statusLabel(systemName: "hand.tap.fill", text: "已拍")
+        } else {
+            Button {
+                Task {
+                    if let message = await onNudge(member.userId) {
+                        errorMessage = message
+                    }
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    if busyRecipientIds.contains(member.userId) {
+                        ProgressView().tint(.white)
+                    } else {
+                        Image(systemName: "hand.tap")
+                    }
+                    Text("拍一拍")
+                }
+                .font(Theme.Font.body(size: 13, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(minWidth: 88, minHeight: 44)
+                .background(Theme.Color.accent, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(busyRecipientIds.contains(member.userId))
+        }
+    }
+
+    private func statusLabel(systemName: String, text: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: systemName)
+            Text(text)
+        }
+        .font(Theme.Font.body(size: 12, weight: .semibold))
+        .foregroundStyle(Theme.Color.accent)
+        .frame(minWidth: 76, minHeight: 44)
+    }
+
+    private func memberName(_ member: TeamMemberDTO) -> String {
+        let trimmed = member.displayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trimmed.isEmpty { return trimmed }
+        return "队友"
+    }
+
+    private func sorted(_ values: [TeamMemberDTO]) -> [TeamMemberDTO] {
+        values.sorted { memberName($0).localizedStandardCompare(memberName($1)) == .orderedAscending }
     }
 }
 

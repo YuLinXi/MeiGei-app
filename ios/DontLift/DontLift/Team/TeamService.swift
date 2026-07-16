@@ -57,6 +57,29 @@ final class TeamService {
         try await api.send("GET", "/teams/\(teamId)/members")
     }
 
+    func todayNudgeState(teamId: UUID) async throws -> TeamNudgeTodayDTO {
+        try await api.send("GET", "/teams/\(teamId)/nudges/today")
+    }
+
+    @discardableResult
+    func nudge(teamId: UUID, recipientUserId: UUID) async throws -> TeamNudgeSendResultDTO {
+        try await api.send(
+            "POST",
+            "/teams/\(teamId)/members/\(recipientUserId)/nudges",
+            idempotencyKey: "team-nudge-\(teamId.uuidString):\(recipientUserId.uuidString):\(UUID().uuidString)"
+        )
+    }
+
+    @discardableResult
+    func updateNudgePreference(teamId: UUID, enabled: Bool) async throws -> TeamNudgeTodayDTO {
+        try await api.send(
+            "PATCH",
+            "/teams/\(teamId)/members/me/nudge-preferences",
+            body: UpdateTeamNudgePreferenceRequest(receiveWorkoutNudges: enabled),
+            idempotencyKey: "team-nudge-preference-\(teamId.uuidString):\(enabled):\(UUID().uuidString)"
+        )
+    }
+
     func mySharePreferences(cacheFor userId: UUID? = nil) async throws -> [TeamMemberDTO] {
         let preferences: [TeamMemberDTO] = try await api.send("GET", "/teams/members/me/share-preferences")
         if let userId {

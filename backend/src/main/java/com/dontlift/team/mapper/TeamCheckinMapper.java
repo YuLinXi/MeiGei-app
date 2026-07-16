@@ -37,6 +37,16 @@ public interface TeamCheckinMapper extends BaseMapper<TeamCheckin> {
     List<TeamCheckin> findByTeamAndDate(@Param("teamId") UUID teamId, @Param("date") LocalDate date);
 
     @Select("""
+            SELECT EXISTS (
+                SELECT 1 FROM team_checkin
+                WHERE team_id = #{teamId} AND user_id = #{userId} AND checkin_date = #{date}
+            )
+            """)
+    boolean existsByTeamUserDate(@Param("teamId") UUID teamId,
+                                 @Param("userId") UUID userId,
+                                 @Param("date") LocalDate date);
+
+    @Select("""
             SELECT * FROM team_checkin
             WHERE team_id = #{teamId}
               AND checkin_date >= #{startDate}

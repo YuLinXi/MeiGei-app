@@ -4,11 +4,14 @@ import com.dontlift.common.web.AppException;
 import com.dontlift.security.SecurityUtils;
 import com.dontlift.team.dto.TeamMemberView;
 import com.dontlift.team.dto.TeamPlanShareCard;
+import com.dontlift.team.dto.TeamNudgeResponses.SendResult;
+import com.dontlift.team.dto.TeamNudgeResponses.TodayState;
 import com.dontlift.team.dto.TeamRequests.CreateTeam;
 import com.dontlift.team.dto.TeamRequests.JoinTeam;
 import com.dontlift.team.dto.TeamRequests.SharePlan;
 import com.dontlift.team.dto.TeamRequests.SharePlanEvent;
 import com.dontlift.team.dto.TeamRequests.UpdateSharePreference;
+import com.dontlift.team.dto.TeamRequests.UpdateNudgePreference;
 import com.dontlift.team.entity.Team;
 import com.dontlift.team.entity.TeamPlanShareEvent;
 import com.dontlift.team.entity.TeamPlanShareVersion;
@@ -37,6 +40,7 @@ public class TeamController {
 
     private final TeamService teamService;
     private final TeamPlanService teamPlanService;
+    private final TeamNudgeService teamNudgeService;
 
     @PostMapping
     public Team create(@Valid @RequestBody CreateTeam req) {
@@ -67,6 +71,28 @@ public class TeamController {
     public TeamMemberView updateSharePreference(@PathVariable UUID teamId,
                                                 @Valid @RequestBody UpdateSharePreference req) {
         return teamService.updateSharePreference(SecurityUtils.currentUserId(), teamId, req.autoShareWorkouts());
+    }
+
+    @GetMapping("/{teamId}/nudges/today")
+    public TodayState todayNudgeState(@PathVariable UUID teamId) {
+        return teamNudgeService.todayState(SecurityUtils.currentUserId(), teamId);
+    }
+
+    @PostMapping("/{teamId}/members/{recipientUserId}/nudges")
+    public SendResult nudge(@PathVariable UUID teamId,
+                            @PathVariable UUID recipientUserId,
+                            @RequestHeader("Idempotency-Key") String idempotencyKey) {
+        requireIdempotencyKey(idempotencyKey);
+        return teamNudgeService.send(SecurityUtils.currentUserId(), teamId, recipientUserId);
+    }
+
+    @PatchMapping("/{teamId}/members/me/nudge-preferences")
+    public TodayState updateNudgePreference(@PathVariable UUID teamId,
+                                            @RequestHeader("Idempotency-Key") String idempotencyKey,
+                                            @Valid @RequestBody UpdateNudgePreference req) {
+        requireIdempotencyKey(idempotencyKey);
+        return teamNudgeService.updatePreference(
+                SecurityUtils.currentUserId(), teamId, req.receiveWorkoutNudges());
     }
 
     @DeleteMapping("/{teamId}/members/me")
