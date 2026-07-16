@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-policy:
+    name: release-policy
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Git diff check
+        run: git diff --check origin/main...HEAD
+
+      - name: Reject credential files
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only origin/main...HEAD)"
+          if printf '%s\n' "$changed" | grep -Eqi '(^|/)(AuthKey_.*\.p8|.*\.p12|.*\.mobileprovision|\.env($|\.)|id_(rsa|ed25519))$'; then
+            printf 'PR 包含疑似凭据文件\n' >&2
+            exit 1
+          fi
+
+      - name: Install OpenSpec
+        run: npm install --global @fission-ai/openspec@1.6.0
+
+      - name: Validate OpenSpec
+        run: openspec validate --all --strict --no-interactive
+
+      - name: Validate release metadata
+        if: startsWith(github.head_ref, 'release/v') || startsWith(github.head_ref, 'feature/v')
+        env:
+          RELEASE_BRANCH: ${{ github.head_ref }}
+        run: bash .codex/skills/dontlift-automated-release/scripts/preflight.sh
+
+  backend-test:
+    name: backend-test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Java 21
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Gradle build and tests
+        working-directory: backend
+        run: ./gradlew build
+
+      - name: Docker image build
+        run: docker build --tag dontlift-api:ci backend
+
+  ios-test:
+    name: ios-test
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Verify stable Xcode 26
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          major="$(xcodebuild -version | awk 'NR == 1 { split($2, v, "."); print v[1] }')"
+          [ "$major" = "26" ] || { printf '需要 Xcode 26，实际 major=%s\n' "$major" >&2; exit 1; }
+
+      - name: Build and test iOS
+        working-directory: ios/DontLift
+        run: |
+          xcodebuild test \
+            -project DontLift.xcodeproj \
+            -scheme DontLift \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+            -configuration Debug \
+            -resultBundlePath "$RUNNER_TEMP/DontLiftTests.xcresult" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload xcresult
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: DontLiftTests-xcresult
+          path: ${{ runner.temp }}/DontLiftTests.xcresult
+          if-no-files-found: ignore
+          retention-days: 14

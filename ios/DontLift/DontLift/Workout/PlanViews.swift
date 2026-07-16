@@ -620,7 +620,9 @@ struct PlanDetailView: View {
     @State private var confirmingDelete = false
     @State private var decodeError: String?
     @State private var pendingEditAfterPick: PlanItem?
-    /// 待删除动作行；由原生 swipe action 触发，再走统一纸感二次确认。
+    /// 当前展开的动作详情；nil 表示全部折叠。
+    @State private var expandedItemId: UUID?
+    /// 待删除动作行；由卡片更多菜单触发，再走统一纸感二次确认。
     @State private var pendingDeleteItem: PlanItem?
     /// 显式动作排序面板。
     @State private var showingOrderEditor = false
@@ -674,22 +676,17 @@ struct PlanDetailView: View {
                 if decodeError == nil, !orderedItems.isEmpty {
                     ForEach(orderedItems, id: \.itemId) { item in
                         planItemRow(item)
-                            .contentShape(Rectangle())
-                            .onTapGesture { editPlanItem(item) }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    pendingDeleteItem = item
-                                } label: {
-                                    Label("删除", systemImage: "trash")
-                                }
-                                .tint(Theme.Color.danger)
-                            }
-                            .accessibilityAction(named: "删除") {
-                                pendingDeleteItem = item
-                            }
                             .listRowInsets(EdgeInsets(top: 5.5, leading: 17, bottom: 5.5, trailing: 17))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
+
+                        if expandedItemId == item.itemId {
+                            planItemDetail(item)
+                                .id("plan-item-detail-\(item.itemId.uuidString)")
+                                .listRowInsets(EdgeInsets(top: 2.5, leading: 17, bottom: 5.5, trailing: 17))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        }
                     }
                 }
 
@@ -904,46 +901,54 @@ struct PlanDetailView: View {
         .padding(.horizontal, 2)
     }
 
-    // 动作行保持独立纸感卡片；外层原生 List 统一处理滚动与左滑删除。
+    // 动作卡只展示静态计划信息；展开和更多菜单使用独立命中区域。
     private func planItemRow(_ item: PlanItem) -> some View {
-        // 序号按当前顺序推出（动作数极少，firstIndex 开销可忽略）。
         let index = (orderedItems.firstIndex { $0.itemId == item.itemId } ?? 0) + 1
-        let summary = planItemSummary(item)
-        return HStack(spacing: 11) {
-            Text(String(format: "%02d", index))
-                .font(Theme.Font.mono(size: 12, weight: .bold))
-                .foregroundStyle(Theme.Color.muted)
-                .frame(width: 18)
-            planItemKindIcon(item)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(planItemTitle(item))
-                    .font(Theme.Font.body(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Text(summary.main)
-                    .font(Theme.Font.body(size: 12))
-                    .foregroundStyle(Theme.Color.fg2)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                if let warmup = summary.warmup {
-                    Text(warmup)
-                        .font(Theme.Font.body(size: 11.5))
-                        .foregroundStyle(Theme.Color.muted)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+        let isExpanded = expandedItemId == item.itemId
+        return HStack(spacing: 8) {
+            Button {
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    expandedItemId = isExpanded ? nil : item.itemId
                 }
-                if !item.usableAlternatives.isEmpty {
-                    Text("备选：\(item.usableAlternatives.map(\.displayExerciseName).joined(separator: "、"))")
-                        .font(Theme.Font.body(size: 11.5))
+            } label: {
+                HStack(spacing: 11) {
+                    Text(String(format: "%02d", index))
+                        .font(Theme.Font.mono(size: 12, weight: .bold))
                         .foregroundStyle(Theme.Color.muted)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                        .frame(width: 18)
+                    planItemKindIcon(item)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(planItemTitle(item))
+                            .font(Theme.Font.body(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.Color.fg)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Text(PlanItemDisplay.compactSummary(for: item))
+                            .font(Theme.Font.body(size: 12))
+                            .foregroundStyle(Theme.Color.fg2)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            }
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Spacer(minLength: 0)
-            editItemButton(item)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(planItemTitle(item))，\(PlanItemDisplay.compactSummary(for: item))")
+            .accessibilityValue(isExpanded ? "已展开" : "已收起")
+            .accessibilityHint(isExpanded ? "双击收起组次详情" : "双击展开组次详情")
+
+            PaperActionMenuButton(items: planItemMenuItems(item),
+                                  accessibilityLabel: "\(item.unitDisplayName)更多操作") { isPresented in
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(isPresented ? Theme.Color.accent : Theme.Color.fg2)
+                    .frame(width: 34, height: 34)
+                    .contentShape(Rectangle())
+            }
         }
         .cardStyle(padding: 12)
     }
@@ -966,33 +971,6 @@ struct PlanDetailView: View {
         }
     }
 
-    private func supersetPrescriptionSummary(_ item: PlanItem) -> String {
-        let memberText = item.orderedSupersetMembers.map { member in
-            switch (member.suggestedWeightKg, member.suggestedReps) {
-            case let (.some(weight), .some(reps)):
-                return "\(formatKg(weight)) kg × \(reps)"
-            case let (.some(weight), .none):
-                return "\(formatKg(weight)) kg"
-            case let (.none, .some(reps)):
-                return "\(reps) 次"
-            case (.none, .none):
-                return "未设"
-            }
-        }.joined(separator: " / ")
-        return "\(memberText) × \(item.supersetRounds)组"
-    }
-
-    private func planItemSummary(_ item: PlanItem) -> (main: String, warmup: String?) {
-        if item.isSuperset {
-            return (supersetPrescriptionSummary(item), nil)
-        }
-        let preview = PlanPrescriptionPreview.make(for: item,
-                                                   mode: plan.mode,
-                                                   lookup: historyStore.planLookup,
-                                                   planId: plan.localId)
-        return (preview.summaryText, preview.warmupSummaryText)
-    }
-
     private func editPlanItem(_ item: PlanItem) {
         if item.isSuperset {
             editingSupersetItem = item
@@ -1001,18 +979,200 @@ struct PlanDetailView: View {
         }
     }
 
-    private func editItemButton(_ item: PlanItem) -> some View {
-        Button {
-            editPlanItem(item)
-        } label: {
-            Image(systemName: "square.and.pencil")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Theme.Color.muted)
-                .frame(width: 34, height: 34)
-                .contentShape(Rectangle())
+    private func planItemMenuItems(_ item: PlanItem) -> [PaperMenuItem] {
+        [
+            PaperMenuItem(id: "edit-\(item.itemId)",
+                          title: "编辑",
+                          systemImage: "pencil") {
+                editPlanItem(item)
+            },
+            PaperMenuItem(id: "delete-\(item.itemId)",
+                          title: "删除",
+                          systemImage: "trash",
+                          role: .destructive) {
+                pendingDeleteItem = item
+            }
+        ]
+    }
+
+    @ViewBuilder
+    private func planItemDetail(_ item: PlanItem) -> some View {
+        if item.isSuperset {
+            supersetPlanItemDetail(item)
+        } else {
+            singlePlanItemDetail(item)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("编辑\(item.unitDisplayName)")
+    }
+
+    private func singlePlanItemDetail(_ item: PlanItem) -> some View {
+        let groups = PlanItemDisplay.planGroups(for: item)
+        let preview = PlanPrescriptionPreview.make(for: item,
+                                                   mode: plan.mode,
+                                                   lookup: historyStore.planLookup,
+                                                   planId: plan.localId)
+        let nextGroups = PlanItemDisplay.groups(from: preview.sets)
+        return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            detailSectionTitle(item.isDropSet ? "递减组详情" : "组次详情")
+
+            if groups.isEmpty {
+                Text("尚未设置组次")
+                    .font(Theme.Font.body(size: 13))
+                    .foregroundStyle(Theme.Color.muted)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(groups) { group in
+                        plannedGroupRow(group, includesWeight: plan.mode == .strict)
+                        if group.id != groups.last?.id { detailDivider }
+                    }
+                }
+            }
+
+            if !item.usableAlternatives.isEmpty {
+                detailDivider
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("备选动作")
+                        .font(Theme.Font.body(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg2)
+                    Text(item.usableAlternatives.map(\.displayExerciseName).joined(separator: "、"))
+                        .font(Theme.Font.body(size: 13))
+                        .foregroundStyle(Theme.Color.fg)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            detailDivider
+            if plan.mode == .adaptive {
+                VStack(alignment: .leading, spacing: 8) {
+                    detailSectionTitle("下次训练重量")
+                    Text(preview.detailText)
+                        .font(Theme.Font.body(size: 11.5))
+                        .foregroundStyle(Theme.Color.muted)
+                    ForEach(nextGroups) { group in
+                        nextWeightGroupRow(group)
+                    }
+                }
+            } else {
+                Label("严格模式 · 完成后不更新", systemImage: "lock")
+                    .font(Theme.Font.body(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.muted)
+            }
+        }
+        .cardStyle(padding: 14)
+    }
+
+    private func supersetPlanItemDetail(_ item: PlanItem) -> some View {
+        let members = PlanItemDisplay.supersetMembers(for: item)
+        return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            detailSectionTitle("超级组详情")
+            detailKeyValue(label: "轮数", value: "\(item.supersetRounds) 轮")
+            detailDivider
+
+            ForEach(Array(members.enumerated()), id: \.element.id) { index, member in
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("动作 \(index + 1) · \(member.name)")
+                        .font(Theme.Font.body(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.fg)
+                    detailKeyValue(label: "计划次数", value: repsText(member.reps))
+                    detailKeyValue(label: plan.mode == .adaptive ? "下次训练重量" : "计划重量",
+                                   value: weightText(member.weightKg))
+                }
+                if member.id != members.last?.id { detailDivider }
+            }
+
+            detailDivider
+            detailKeyValue(label: "轮后休息",
+                           value: item.supersetRestAfterRoundSeconds.map { "\($0) 秒" } ?? "未设置")
+            if plan.mode == .strict {
+                Label("严格模式 · 完成后不更新", systemImage: "lock")
+                    .font(Theme.Font.body(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.muted)
+            }
+        }
+        .cardStyle(padding: 14)
+    }
+
+    private func detailSectionTitle(_ title: String) -> some View {
+        Text(title)
+            .font(Theme.Font.body(size: 13, weight: .bold))
+            .foregroundStyle(Theme.Color.fg)
+    }
+
+    private func plannedGroupRow(_ group: PlanItemGroupDisplay, includesWeight: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if group.kind == .drop {
+                Text(group.title)
+                    .font(Theme.Font.body(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+                ForEach(group.values) { value in
+                    detailKeyValue(label: "第 \(value.position + 1) 段",
+                                   value: plannedValueText(value, includesWeight: includesWeight))
+                }
+            } else {
+                detailKeyValue(label: group.title,
+                               value: plannedValueText(group.values.first, includesWeight: includesWeight))
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    private func nextWeightGroupRow(_ group: PlanItemGroupDisplay) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if group.kind == .drop {
+                Text(group.title)
+                    .font(Theme.Font.body(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+                ForEach(group.values) { value in
+                    detailKeyValue(label: "第 \(value.position + 1) 段",
+                                   value: weightText(value.weightKg))
+                }
+            } else {
+                detailKeyValue(label: group.title,
+                               value: weightText(group.values.first?.weightKg))
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func detailKeyValue(label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label)
+                .font(Theme.Font.body(size: 12))
+                .foregroundStyle(Theme.Color.muted)
+            Spacer(minLength: 8)
+            Text(value)
+                .font(Theme.Font.mono(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg)
+                .multilineTextAlignment(.trailing)
+        }
+    }
+
+    private var detailDivider: some View {
+        Rectangle()
+            .fill(Theme.Color.border)
+            .frame(height: 1)
+    }
+
+    private func plannedValueText(_ value: PlanItemGroupValue?, includesWeight: Bool) -> String {
+        guard let value else { return "未设置" }
+        if !includesWeight { return repsText(value.reps) }
+        switch (value.weightKg, value.reps) {
+        case let (.some(weight), .some(reps)):
+            return "\(formatKg(weight)) kg × \(reps) 次"
+        case let (.some(weight), .none):
+            return "\(formatKg(weight)) kg"
+        case let (.none, .some(reps)):
+            return "\(reps) 次"
+        case (.none, .none):
+            return "未设置"
+        }
+    }
+
+    private func repsText(_ reps: Int?) -> String {
+        reps.map { "\($0) 次" } ?? "未设置"
+    }
+
+    private func weightText(_ weight: Double?) -> String {
+        weight.map { "\(formatKg($0)) kg" } ?? "未设置"
     }
 
     private var modeInfoCard: some View {
@@ -1027,8 +1187,8 @@ struct PlanDetailView: View {
                         .font(Theme.Font.body(size: 15, weight: .bold))
                         .foregroundStyle(Theme.Color.fg)
                     Text(plan.mode == .adaptive
-                         ? "自适应模式会按下方处方预填；完成后继续跟随实绩更新，跳过动作会保留。"
-                         : "严格模式会复制当前处方；完成后不回写，每个动作需有组数与次数。")
+                         ? "自适应模式会按训练安排预填；展开动作可查看下次训练重量，完成后继续跟随实绩更新。"
+                         : "严格模式会复制当前训练安排；完成后不回写，每个动作需有组数与次数。")
                         .font(Theme.Font.body(size: 12))
                         .foregroundStyle(Theme.Color.fg2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1175,7 +1335,7 @@ struct PlanDetailView: View {
     }
 
     private func subtitle(_ item: PlanItem) -> String {
-        if item.isSuperset { return supersetPrescriptionSummary(item) }
+        if item.isSuperset { return supersetOrderSummary(item) }
         // 对齐原型 .pm：「3 组 × 10 · 60 kg」/「3 组 × 12」；重量可空时仅显示组×次。
         var parts: [String] = []
         if let r = item.suggestedReps { parts.append("\(item.formalSetCount) 组 × \(r)") }
@@ -1183,6 +1343,22 @@ struct PlanDetailView: View {
         if let w = item.suggestedWeightKg { parts.append("\(formatKg(w)) kg") }
         if let warmup = item.warmupSummaryText { parts.append(warmup) }
         return parts.isEmpty ? "未设建议" : parts.joined(separator: " · ")
+    }
+
+    private func supersetOrderSummary(_ item: PlanItem) -> String {
+        let memberText = item.orderedSupersetMembers.map { member in
+            switch (member.suggestedWeightKg, member.suggestedReps) {
+            case let (.some(weight), .some(reps)):
+                return "\(formatKg(weight)) kg × \(reps)"
+            case let (.some(weight), .none):
+                return "\(formatKg(weight)) kg"
+            case let (.none, .some(reps)):
+                return "\(reps) 次"
+            case (.none, .none):
+                return "未设"
+            }
+        }.joined(separator: " / ")
+        return "\(memberText) × \(item.supersetRounds)组"
     }
 
     private func planItem(from pick: ExercisePick, kind: PlanUnitKind, orderIndex: Int) -> PlanItem {
@@ -1425,6 +1601,7 @@ struct PlanDetailView: View {
 
     /// 删除单个动作项：从 items 移除后按顺序重排 orderIndex，markDirty 并落盘。
     private func deleteItem(_ item: PlanItem) {
+        if expandedItemId == item.itemId { expandedItemId = nil }
         var items = plan.items.sorted { $0.orderIndex < $1.orderIndex }
         items.removeAll { $0.itemId == item.itemId }
         for i in items.indices { items[i].orderIndex = i }
@@ -2234,9 +2411,6 @@ struct PlanItemEditorView: View {
                     .font(Theme.Font.l2)
                     .foregroundStyle(Theme.Color.fg)
                 Spacer()
-                Text("每次只练其中一个")
-                    .font(Theme.Font.l4)
-                    .foregroundStyle(Theme.Color.muted)
             }
 
             if !alternatives.isEmpty {

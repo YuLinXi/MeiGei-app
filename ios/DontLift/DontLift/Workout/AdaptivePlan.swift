@@ -207,6 +207,16 @@ enum PlanPrefill {
         return legacySets(for: item, count: count)
     }
 
+    /// 展开计划详情时使用的静态训练安排，不读取历史，也不执行严格模式必填拦截。
+    /// 开始训练仍由上方按模式的 `sets` 决定，避免展示辅助逻辑改变业务规则。
+    static func plannedSets(for item: PlanItem) -> [WorkoutSet] {
+        guard !item.isSuperset else { return [] }
+        let prescriptions = startPrescriptions(for: item)
+        if !prescriptions.isEmpty { return sets(from: prescriptions) }
+        guard let count = item.suggestedSets, count > 0 else { return [] }
+        return legacySets(for: item, count: count)
+    }
+
     /// 训练中切换候选的落值：严格模式不读历史；自适应仅读同动作位下该实际动作的历史。
     static func replacementSets(planItemId: UUID,
                                 option: PlanExerciseOption,

@@ -1,0 +1,403 @@
+name: Release DontLift
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: 已在 main 上的发布提交 SHA
+        required: true
+      release_branch:
+        description: release/vX.Y-bN；仅兼容历史 feature/vX.Y-bN
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dontlift-production-release
+  cancel-in-progress: false
+
+jobs:
+  release-context:
+    name: release-context
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       (startsWith(github.event.pull_request.head.ref, 'release/v') ||
+        startsWith(github.event.pull_request.head.ref, 'feature/v')))
+    runs-on: ubuntu-24.04
+    outputs:
+      release_sha: ${{ steps.context.outputs.release_sha }}
+      release_branch: ${{ steps.context.outputs.release_branch }}
+      version: ${{ steps.preflight.outputs.version }}
+      build: ${{ steps.preflight.outputs.build }}
+      tag: ${{ steps.preflight.outputs.tag }}
+      previous_tag: ${{ steps.preflight.outputs.previous_tag }}
+      backend_changed: ${{ steps.preflight.outputs.backend_changed }}
+      migration_changed: ${{ steps.preflight.outputs.migration_changed }}
+      checklist: ${{ steps.preflight.outputs.checklist }}
+      feature_intro: ${{ steps.preflight.outputs.feature_intro }}
+    steps:
+      - name: Resolve release context
+        id: context
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          INPUT_SHA: ${{ inputs.release_ref }}
+          INPUT_BRANCH: ${{ inputs.release_branch }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            release_sha="$PR_SHA"
+            release_branch="$PR_BRANCH"
+          else
+            release_sha="$INPUT_SHA"
+            release_branch="$INPUT_BRANCH"
+          fi
+          printf 'release_sha=%s\n' "$release_sha" >> "$GITHUB_OUTPUT"
+          printf 'release_branch=%s\n' "$release_branch" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout release SHA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ steps.context.outputs.release_sha }}
+          fetch-depth: 0
+
+      - name: Prove release SHA is on main
+        run: |
+          git fetch origin main --tags
+          git merge-base --is-ancestor HEAD origin/main
+
+      - name: Validate release metadata
+        id: preflight
+        env:
+          RELEASE_BRANCH: ${{ steps.context.outputs.release_branch }}
+        run: |
+          OUTPUT_FILE="$GITHUB_OUTPUT" \
+          bash .codex/skills/dontlift-automated-release/scripts/preflight.sh
+
+      - name: Install and validate OpenSpec
+        run: |
+          npm install --global @fission-ai/openspec@1.6.0
+          openspec validate --all --strict --no-interactive
+
+  backend-verify:
+    name: release-backend-verify
+    needs: release-context
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout release SHA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.release-context.outputs.release_sha }}
+
+      - name: Set up Java 21
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Gradle build and Docker build
+        run: |
+          cd backend
+          ./gradlew build
+          cd ..
+          docker build --tag dontlift-api:${{ needs.release-context.outputs.release_sha }} backend
+
+  ios-verify:
+    name: release-ios-verify
+    needs: release-context
+    runs-on: macos-26
+    steps:
+      - name: Checkout release SHA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.release-context.outputs.release_sha }}
+
+      - name: Verify Xcode and run tests
+        working-directory: ios/DontLift
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          major="$(xcodebuild -version | awk 'NR == 1 { split($2, v, "."); print v[1] }')"
+          [ "$major" = "26" ]
+          xcodebuild test \
+            -project DontLift.xcodeproj \
+            -scheme DontLift \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+            -configuration Debug \
+            -resultBundlePath "$RUNNER_TEMP/DontLiftReleaseTests.xcresult" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload release xcresult
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: DontLiftReleaseTests-xcresult
+          path: ${{ runner.temp }}/DontLiftReleaseTests.xcresult
+          if-no-files-found: ignore
+          retention-days: 30
+
+  backend-deploy:
+    name: production-backend
+    needs: [release-context, backend-verify, ios-verify]
+    runs-on: ubuntu-24.04
+    environment: production-backend
+    env:
+      PROD_SSH_TARGET: ${{ vars.PROD_SSH_TARGET }}
+      PROD_HEALTH_URL: ${{ vars.PROD_HEALTH_URL }}
+    steps:
+      - name: Checkout release SHA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.release-context.outputs.release_sha }}
+          fetch-depth: 0
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "$SSH_PRIVATE_KEY"
+          printf 'SSH_AUTH_SOCK=%s\n' "$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          printf 'SSH_AGENT_PID=%s\n' "$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
+      - name: Deploy backend when changed
+        if: needs.release-context.outputs.backend_changed == 'true'
+        env:
+          RELEASE_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          MIGRATION_CHANGED: ${{ needs.release-context.outputs.migration_changed }}
+        run: bash .codex/skills/dontlift-automated-release/scripts/deploy-backend.sh
+
+      - name: Production smoke
+        env:
+          EVIDENCE_FILE: ${{ runner.temp }}/production-smoke.md
+        run: bash .codex/skills/dontlift-automated-release/scripts/production-smoke.sh
+
+      - name: Verify production Flyway
+        run: |
+          set -euo pipefail
+          expected="$(
+            find backend/src/main/resources/db/migration -maxdepth 1 -type f -name 'V*__*.sql' -print \
+              | sed -E 's#.*/V([0-9]+)__.*#\1#' \
+              | sort -n \
+              | tail -1
+          )"
+          applied="$(ssh "$PROD_SSH_TARGET" "docker exec shared-postgres psql -U dontlift -d dontlift -tAc \
+            \"SELECT success FROM flyway_schema_history WHERE version = '$expected' ORDER BY installed_rank DESC LIMIT 1;\"" | tr -d '[:space:]')"
+          [ "$applied" = "t" ] || { printf '生产 Flyway V%s 未确认 success=true\n' "$expected" >&2; exit 1; }
+          printf -- '- Flyway：`V%s success=true`\n' "$expected" >> "$RUNNER_TEMP/production-smoke.md"
+
+      - name: Upload production evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: production-smoke
+          path: ${{ runner.temp }}/production-smoke.md
+          retention-days: 90
+
+  testflight:
+    name: testflight
+    needs: [release-context, backend-deploy]
+    runs-on: macos-26
+    environment: testflight
+    env:
+      RELEASE_VERSION: ${{ needs.release-context.outputs.version }}
+      RELEASE_BUILD: ${{ needs.release-context.outputs.build }}
+      APPSTORE_ISSUER_ID: ${{ vars.APPSTORE_ISSUER_ID }}
+      APPSTORE_API_KEY_ID: ${{ vars.APPSTORE_API_KEY_ID }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      IOS_BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID }}
+    steps:
+      - name: Checkout release SHA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.release-context.outputs.release_sha }}
+
+      - name: Create temporary signing keychain and API key
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERT_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERT_PASSWORD }}
+          API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/dontlift-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          cert="$RUNNER_TEMP/distribution.p12"
+          api_key="$RUNNER_TEMP/AuthKey_${APPSTORE_API_KEY_ID}.p8"
+          printf '%s' "$CERTIFICATE_BASE64" | /usr/bin/base64 -D > "$cert"
+          printf '%s' "$API_PRIVATE_KEY" > "$api_key"
+          chmod 600 "$cert" "$api_key"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$cert" -k "$keychain" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain"
+          security list-keychain -d user -s "$keychain"
+          printf 'SIGNING_KEYCHAIN=%s\n' "$keychain" >> "$GITHUB_ENV"
+          printf 'APPSTORE_API_PRIVATE_KEY_PATH=%s\n' "$api_key" >> "$GITHUB_ENV"
+
+      - name: Inspect target build
+        id: target
+        run: node .codex/skills/dontlift-automated-release/scripts/appstore-connect-builds.mjs target-status
+
+      - name: Assert build number is unused
+        if: steps.target.outputs.exists != 'true'
+        run: node .codex/skills/dontlift-automated-release/scripts/appstore-connect-builds.mjs assert-available
+
+      - name: Archive app
+        if: steps.target.outputs.exists != 'true'
+        working-directory: ios/DontLift
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project DontLift.xcodeproj \
+            -scheme DontLift \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/DontLift.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$APPSTORE_API_PRIVATE_KEY_PATH" \
+            -authenticationKeyID "$APPSTORE_API_KEY_ID" \
+            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
+
+      - name: Export IPA
+        if: steps.target.outputs.exists != 'true'
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>destination</key><string>export</string>
+            <key>method</key><string>app-store-connect</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>stripSwiftSymbols</key><true/>
+            <key>uploadSymbols</key><true/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/DontLift.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$APPSTORE_API_PRIVATE_KEY_PATH" \
+            -authenticationKeyID "$APPSTORE_API_KEY_ID" \
+            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
+
+      - name: Verify IPA metadata
+        if: steps.target.outputs.exists != 'true'
+        run: |
+          set -euo pipefail
+          ipa="$(find "$RUNNER_TEMP/export" -maxdepth 1 -name '*.ipa' -print -quit)"
+          [ -n "$ipa" ]
+          mkdir "$RUNNER_TEMP/ipa"
+          ditto -x -k "$ipa" "$RUNNER_TEMP/ipa"
+          app="$(find "$RUNNER_TEMP/ipa/Payload" -maxdepth 1 -name '*.app' -print -quit)"
+          plist="$app/Info.plist"
+          actual_bundle="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")"
+          actual_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")"
+          actual_build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
+          [ "$actual_bundle" = "$IOS_BUNDLE_ID" ]
+          [ "$actual_version" = "$RELEASE_VERSION" ]
+          [ "$actual_build" = "$RELEASE_BUILD" ]
+          printf 'IPA_PATH=%s\n' "$ipa" >> "$GITHUB_ENV"
+
+      - name: Prepare TestFlight notes
+        id: notes
+        if: steps.target.outputs.exists != 'true'
+        env:
+          FEATURE_INTRO: ${{ needs.release-context.outputs.feature_intro }}
+        run: |
+          notes="$(awk '/^## 面向测试用户的更新说明/{capture=1;next}/^## /{if(capture)exit}capture' "$FEATURE_INTRO")"
+          {
+            printf 'value<<NOTES_EOF\n'
+            printf '%s\n' "$notes"
+            printf 'NOTES_EOF\n'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload and wait for TestFlight processing
+        if: steps.target.outputs.exists != 'true'
+        uses: Apple-Actions/upload-testflight-build@1ad58030672057aa084b4e96beb6f7a8c627f9e6
+        with:
+          app-path: ${{ env.IPA_PATH }}
+          issuer-id: ${{ vars.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ vars.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          release-notes: ${{ steps.notes.outputs.value }}
+          uses-non-exempt-encryption: "false"
+          wait-for-processing: "true"
+          backend: appstore-api
+
+      - name: Verify App Store Connect build is valid
+        run: node .codex/skills/dontlift-automated-release/scripts/appstore-connect-builds.mjs verify-valid
+
+      - name: Remove temporary keychain
+        if: always()
+        run: |
+          if [ -n "${SIGNING_KEYCHAIN:-}" ]; then security delete-keychain "$SIGNING_KEYCHAIN" || true; fi
+          rm -f "${APPSTORE_API_PRIVATE_KEY_PATH:-}" "$RUNNER_TEMP/distribution.p12"
+
+  finalize:
+    name: release-finalize
+    needs: [release-context, testflight]
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: ${{ needs.release-context.outputs.release_sha }}
+      TAG: ${{ needs.release-context.outputs.tag }}
+      FEATURE_INTRO: ${{ needs.release-context.outputs.feature_intro }}
+      CHECKLIST: ${{ needs.release-context.outputs.checklist }}
+    steps:
+      - name: Checkout release SHA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+
+      - name: Final production smoke
+        run: bash .codex/skills/dontlift-automated-release/scripts/production-smoke.sh
+
+      - name: Create immutable Tag
+        run: |
+          set -euo pipefail
+          git fetch origin --tags
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            existing="$(git rev-list -n 1 "$TAG")"
+            [ "$existing" = "$RELEASE_SHA" ] || { printf 'Tag %s 指向 %s，不是 %s\n' "$TAG" "$existing" "$RELEASE_SHA" >&2; exit 1; }
+          else
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git tag -a "$TAG" "$RELEASE_SHA" -m "TestFlight 发布：$TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Create GitHub Release
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            printf 'GitHub Release %s 已存在，保持幂等\n' "$TAG"
+            exit 0
+          fi
+          notes="$RUNNER_TEMP/release-notes.md"
+          cp "$FEATURE_INTRO" "$notes"
+          {
+            printf '\n## 发布证据\n\n'
+            printf -- '- Checklist：[%s](https://github.com/%s/blob/%s/%s)\n' "$CHECKLIST" "$GITHUB_REPOSITORY" "$RELEASE_SHA" "$CHECKLIST"
+            printf -- '- Workflow：[run %s](https://github.com/%s/actions/runs/%s)\n' "$GITHUB_RUN_ID" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            printf -- '- TestFlight：processing=`VALID`，version=`%s`，build=`%s`\n' \
+              '${{ needs.release-context.outputs.version }}' '${{ needs.release-context.outputs.build }}'
+          } >> "$notes"
+          gh release create "$TAG" --target "$RELEASE_SHA" --title "$TAG" --notes-file "$notes"

@@ -2,6 +2,104 @@ import SwiftUI
 import UIKit
 import Photos
 
+enum WorkoutPosterLayoutKind: String, Equatable {
+    case topCompact
+    case upperCenter
+    case centerReceipt
+}
+
+struct WorkoutPosterContext: Equatable {
+    let workoutId: UUID
+    let hasPersonalRecord: Bool
+    let isFromTeamShare: Bool
+    let durationMinutes: Int
+    let totalVolumeKg: Double
+    let setCount: Int
+    let exerciseCount: Int
+    let structuredUnitCount: Int
+
+    var isHighEffort: Bool {
+        durationMinutes >= 60 || setCount >= 20 || totalVolumeKg >= 10_000
+    }
+
+    var hasRichOrComplexStructure: Bool {
+        exerciseCount >= 5 || structuredUnitCount > 0
+    }
+}
+
+enum WorkoutPosterBackground: String, Identifiable, Hashable {
+    case celebration
+    case energyTrail
+    case miniGym
+    case highFive
+    case equipmentWreath
+
+    static let catalog: [Self] = [
+        .celebration,
+        .energyTrail,
+        .miniGym,
+        .highFive,
+        .equipmentWreath
+    ]
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .celebration: return "完成庆典台"
+        case .energyTrail: return "能量环游轨迹"
+        case .miniGym: return "迷你综合训练场"
+        case .highFive: return "伙伴击掌"
+        case .equipmentWreath: return "训练装备花环"
+        }
+    }
+
+    var assetName: String {
+        switch self {
+        case .celebration: return "posterBackgroundCelebration"
+        case .energyTrail: return "posterBackgroundEnergyTrail"
+        case .miniGym: return "posterBackgroundMiniGym"
+        case .highFive: return "posterBackgroundHighFive"
+        case .equipmentWreath: return "posterBackgroundEquipmentWreath"
+        }
+    }
+
+    var layoutKind: WorkoutPosterLayoutKind {
+        switch self {
+        case .celebration, .miniGym, .highFive: return .topCompact
+        case .energyTrail: return .upperCenter
+        case .equipmentWreath: return .centerReceipt
+        }
+    }
+
+    static func resolve(rawValue: String?) -> Self {
+        rawValue.flatMap(Self.init(rawValue:)) ?? .equipmentWreath
+    }
+
+    static func recommended(for context: WorkoutPosterContext) -> Self {
+        if context.hasPersonalRecord { return .celebration }
+        if context.isFromTeamShare { return .highFive }
+        if context.exerciseCount >= 5, context.isHighEffort {
+            return stableChoice(for: context.workoutId, from: [.energyTrail, .miniGym])
+        }
+        if context.hasRichOrComplexStructure { return .miniGym }
+        if context.isHighEffort { return .energyTrail }
+        return .equipmentWreath
+    }
+
+    static func stableChoice(for workoutId: UUID, from choices: [Self]) -> Self {
+        guard !choices.isEmpty else { return .equipmentWreath }
+
+        // 使用固定 FNV-1a 折叠 UUID 字节，避免 Swift hashValue 的跨进程随机种子。
+        let hash = withUnsafeBytes(of: workoutId.uuid) { bytes in
+            bytes.reduce(UInt64(14_695_981_039_346_656_037)) { partialResult, byte in
+                (partialResult ^ UInt64(byte)) &* 1_099_511_628_211
+            }
+        }
+        return choices[Int(hash % UInt64(choices.count))]
+    }
+}
+
 struct WorkoutPosterData: Equatable {
     struct ExerciseLine: Identifiable, Equatable {
         let id: String
@@ -25,6 +123,7 @@ struct WorkoutPosterData: Equatable {
     let calorieValueText: String?
     let exerciseLines: [ExerciseLine]
     let prLines: [PRLine]
+    let context: WorkoutPosterContext
 
     init(
         workout: Workout,
@@ -40,10 +139,11 @@ struct WorkoutPosterData: Equatable {
         }
         let statSetCount = statSets.count
 
+        let durationMinutes = Self.durationMinutes(start: workout.timerStartedAt ?? workout.startedAt,
+                                                   end: workout.endedAt ?? workout.startedAt)
         self.title = Self.title(for: workout, exercises: exercises)
         self.dateText = Self.dateFormatter.string(from: workout.startedAt)
-        self.durationText = Self.durationText(start: workout.timerStartedAt ?? workout.startedAt,
-                                              end: workout.endedAt ?? workout.startedAt)
+        self.durationText = "\(durationMinutes)"
         self.volumeText = Self.volumeText(totalVolume)
         self.setCountText = "\(statSetCount)"
         self.exerciseCountText = "\(exercises.count)"
@@ -58,6 +158,16 @@ struct WorkoutPosterData: Equatable {
                    name: $0.exerciseName,
                    weightText: "\(formatKg($0.weightKg))kg")
         }
+        self.context = WorkoutPosterContext(
+            workoutId: workout.localId,
+            hasPersonalRecord: !personalRecords.isEmpty,
+            isFromTeamShare: workout.sourceShareId != nil,
+            durationMinutes: durationMinutes,
+            totalVolumeKg: totalVolume,
+            setCount: statSetCount,
+            exerciseCount: exercises.count,
+            structuredUnitCount: workout.trainingUnits.filter { $0.kind != .singleExercise }.count
+        )
     }
 
     private static func exerciseLines(workout: Workout) -> [ExerciseLine] {
@@ -112,9 +222,8 @@ struct WorkoutPosterData: Equatable {
         return text.isEmpty ? nil : text
     }
 
-    private static func durationText(start: Date, end: Date) -> String {
-        let minutes = max(0, Int(end.timeIntervalSince(start) / 60))
-        return "\(minutes)"
+    private static func durationMinutes(start: Date, end: Date) -> Int {
+        max(0, Int(end.timeIntervalSince(start) / 60))
     }
 
     private static func volumeText(_ value: Double) -> String {
@@ -170,6 +279,20 @@ struct WorkoutPosterPreviewSheet: View {
     @State private var shareItem: WorkoutPosterShareItem?
     @State private var isSaving = false
     @State private var hasSavedPoster = false
+    @State private var selectedBackground: WorkoutPosterBackground
+
+    init(workout: Workout, personalRecords: [PersonalRecord]) {
+        self.workout = workout
+        self.personalRecords = personalRecords
+        let posterData = WorkoutPosterData(
+            workout: workout,
+            personalRecords: personalRecords,
+            caloriePreferences: .current()
+        )
+        _selectedBackground = State(
+            initialValue: WorkoutPosterBackground.recommended(for: posterData.context)
+        )
+    }
 
     private var data: WorkoutPosterData {
         WorkoutPosterData(workout: workout,
@@ -182,6 +305,7 @@ struct WorkoutPosterPreviewSheet: View {
             ScrollView {
                 VStack(spacing: 18) {
                     posterPreview
+                    backgroundPicker
                 }
                 .padding(.horizontal, Theme.Spacing.lg)
                 .padding(.top, posterPreviewTopPadding)
@@ -201,13 +325,81 @@ struct WorkoutPosterPreviewSheet: View {
     }
 
     private var posterPreview: some View {
-        WorkoutPosterCanvas(data: data)
-            .frame(maxWidth: 360)
-            .aspectRatio(WorkoutPosterLayout.aspectRatio(for: data), contentMode: .fit)
+        WorkoutPosterCanvas(data: data, background: selectedBackground)
+            .frame(maxWidth: 320)
+            .aspectRatio(WorkoutPosterLayout.aspectRatio, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
             .paperShadow(.md, cornerRadius: Theme.Radius.lg)
             .frame(maxWidth: .infinity)
             .accessibilityLabel("训练海报预览")
+    }
+
+    private var backgroundPicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("海报背景")
+                    .font(Theme.Font.body(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.fg)
+                Spacer()
+                Text(selectedBackground.title)
+                    .font(Theme.Font.mono(size: 11, weight: .bold))
+                    .foregroundStyle(Theme.Color.muted)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(WorkoutPosterBackground.catalog) { background in
+                        backgroundOption(background)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: 320)
+    }
+
+    private func backgroundOption(_ background: WorkoutPosterBackground) -> some View {
+        let isSelected = selectedBackground == background
+        let isRecommended = recommendedBackground == background
+        return Button {
+            guard !isSelected else { return }
+            Theme.Haptics.selection()
+            selectedBackground = background
+            hasSavedPoster = false
+        } label: {
+            VStack(spacing: 6) {
+                Image(background.assetName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 58, height: 88)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                            .stroke(isSelected ? Theme.Color.accent : Theme.Color.border, lineWidth: isSelected ? 2 : 1)
+                    )
+                Text(background.title)
+                    .font(Theme.Font.body(size: 10.5, weight: .semibold))
+                    .foregroundStyle(isSelected ? Theme.Color.accent : Theme.Color.fg2)
+                    .lineLimit(1)
+                Text(isRecommended ? "推荐" : " ")
+                    .font(Theme.Font.mono(size: 8.5, weight: .bold))
+                    .foregroundStyle(isRecommended ? Theme.Color.accent : .clear)
+            }
+            .padding(6)
+            .background(
+                isSelected ? Theme.Color.accentSoft : Theme.Color.surface,
+                in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(background.title)背景")
+        .accessibilityValue([isSelected ? "已选择" : "未选择", isRecommended ? "系统推荐" : nil]
+            .compactMap { $0 }
+            .joined(separator: "，"))
+    }
+
+    private var recommendedBackground: WorkoutPosterBackground {
+        WorkoutPosterBackground.recommended(for: data.context)
     }
 
     private var posterPreviewTopPadding: CGFloat {
@@ -280,7 +472,7 @@ struct WorkoutPosterPreviewSheet: View {
     }
 
     private func sharePoster() {
-        guard let image = WorkoutPosterImageRenderer.render(data: data) else {
+        guard let image = WorkoutPosterImageRenderer.render(data: data, background: selectedBackground) else {
             globalMessage.show("海报生成失败，请稍后重试。", style: .error)
             return
         }
@@ -292,7 +484,7 @@ struct WorkoutPosterPreviewSheet: View {
         isSaving = true
         defer { isSaving = false }
 
-        guard let image = WorkoutPosterImageRenderer.render(data: data) else {
+        guard let image = WorkoutPosterImageRenderer.render(data: data, background: selectedBackground) else {
             globalMessage.show("海报生成失败，请稍后重试。", style: .error)
             return
         }
@@ -314,301 +506,277 @@ struct WorkoutPosterShareItem: Identifiable {
 
 struct WorkoutPosterCanvas: View {
     let data: WorkoutPosterData
+    let background: WorkoutPosterBackground
 
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height
-            WorkoutPosterVisualCardView(data: data, width: width, height: height)
+            WorkoutPosterVisualCardView(data: data,
+                                        background: background,
+                                        width: width,
+                                        height: height)
         }
+    }
+}
+
+private struct WorkoutPosterBackgroundLayer: View {
+    let background: WorkoutPosterBackground
+
+    private let fallback = Color(red: 0.98, green: 0.93, blue: 0.86)
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                fallback
+                if let image = UIImage(named: background.assetName) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                }
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
 private struct WorkoutPosterVisualCardView: View {
     let data: WorkoutPosterData
+    let background: WorkoutPosterBackground
     let width: CGFloat
     let height: CGFloat
 
-    private let ink = Color(red: 0.08, green: 0.075, blue: 0.065)
-    private let paper = Color(red: 0.96, green: 0.94, blue: 0.89)
+    private let receiptPaper = Color(red: 1.0, green: 0.965, blue: 0.91)
+    private let warmInk = Color(red: 0.25, green: 0.17, blue: 0.13)
+    private let coral = Color(red: 0.91, green: 0.29, blue: 0.18)
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            ink
-            accentBlock
-            rightRail
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("别练了")
-                            .font(Theme.Font.body(size: 12, weight: .heavy))
-                            .foregroundStyle(paper)
-                        Text(data.dateText)
-                            .font(Theme.Font.mono(size: 10, weight: .bold))
-                            .foregroundStyle(paper.opacity(0.64))
-                    }
-                    Spacer()
-                }
+        ZStack(alignment: .top) {
+            WorkoutPosterBackgroundLayer(background: background)
+
+            VStack(spacing: 0) {
+                receipt
+                    .frame(width: receiptWidth)
+                    .padding(.top, receiptTopPadding)
 
                 Spacer(minLength: 0)
 
-                Text("弱者在舒适区冬眠，强者在风雪中冬训。")
-                    .font(Theme.Font.mono(size: 11, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.82)
-                    .frame(width: blackContentWidth, alignment: .leading)
-
-                Text(data.title)
-                    .font(Theme.Font.display(size: 34, weight: .heavy))
-                    .foregroundStyle(paper)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.74)
-                    .padding(.top, 7)
-
-                metricRow
-                    .padding(.top, 24)
-
-                exerciseList
-                    .padding(.top, 22)
-                    .frame(width: blackContentWidth, alignment: .leading)
-
-                Spacer(minLength: 0)
-
-                footer
-                    .frame(width: blackContentWidth, alignment: .leading)
+                brandSignature
+                    .padding(.bottom, 16)
             }
-            .padding(24)
+            .frame(width: width, height: height)
         }
         .frame(width: width, height: height)
+        .clipped()
     }
 
-    private var accentBlock: some View {
-        VStack(spacing: 0) {
-            Rectangle()
-                .fill(Theme.Color.accent)
-                .frame(width: railWidth, height: height)
+    private var receipt: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(data.dateText)
+                    .font(Theme.Font.mono(size: 9.5, weight: .bold))
+                    .foregroundStyle(warmInk.opacity(0.66))
+                    .lineLimit(1)
+
+                Spacer(minLength: 4)
+
+                statusTag
+            }
+
+            Text(data.title)
+                .font(Theme.Font.display(size: 25, weight: .heavy))
+                .foregroundStyle(warmInk)
+                .lineLimit(2)
+                .minimumScaleFactor(0.76)
+
+            metricRow
+
+            Divider()
+                .overlay(warmInk.opacity(0.13))
+
+            exerciseSummary
+
+            if let firstPR = data.prLines.first {
+                HStack(spacing: 6) {
+                    Text("PR")
+                        .font(Theme.Font.mono(size: 9.5, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(coral, in: Capsule())
+                    Text("\(firstPR.name) \(firstPR.weightText)")
+                        .font(Theme.Font.body(size: 11.5, weight: .bold))
+                        .foregroundStyle(warmInk)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+            }
         }
-        .opacity(0.92)
-        .offset(x: width - railWidth)
+        .padding(14)
+        .background(
+            receiptPaper.opacity(receiptOpacity),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(.white.opacity(0.72), lineWidth: 1)
+        )
+        .shadow(color: warmInk.opacity(0.12), radius: 7, x: 0, y: 4)
     }
 
-    private var rightRail: some View {
-        VStack(spacing: 0) {
-            rightRailQRCode
-                .padding(.top, 30)
-
-            Spacer(minLength: 28)
-
-            Text("DON'T LIFT")
-                .font(Theme.Font.mono(size: 14, weight: .heavy))
-                .foregroundStyle(paper.opacity(0.72))
-                .tracking(2.2)
-                .rotationEffect(.degrees(90))
-                .fixedSize()
-                .frame(width: railWidth, height: 132)
-
-            Spacer(minLength: 28)
-
-            Text("WORKOUT LOG")
-                .font(Theme.Font.mono(size: 8.5, weight: .bold))
-                .foregroundStyle(paper.opacity(0.38))
-                .tracking(1.3)
-                .rotationEffect(.degrees(90))
-                .fixedSize()
-                .frame(width: railWidth, height: 86)
-                .padding(.bottom, 30)
+    private var statusTag: some View {
+        HStack(spacing: 4) {
+            Image(systemName: statusIcon)
+                .font(.system(size: 8, weight: .bold))
+            Text(statusTitle)
+                .font(Theme.Font.mono(size: 8.5, weight: .heavy))
         }
-        .frame(width: railWidth, height: height)
-        .offset(x: width - railWidth)
-        .accessibilityHidden(true)
+        .foregroundStyle(coral)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(coral.opacity(0.10), in: Capsule())
+    }
+
+    private var statusTitle: String {
+        if data.context.hasPersonalRecord { return "PR 新纪录" }
+        if data.context.isFromTeamShare { return "TEAM 训练" }
+        if data.context.isHighEffort { return "高投入" }
+        if data.context.hasRichOrComplexStructure { return "复合训练" }
+        return "训练完成"
+    }
+
+    private var statusIcon: String {
+        if data.context.hasPersonalRecord { return "trophy.fill" }
+        if data.context.isFromTeamShare { return "person.2.fill" }
+        if data.context.isHighEffort { return "flame.fill" }
+        if data.context.hasRichOrComplexStructure { return "square.stack.3d.up.fill" }
+        return "checkmark.circle.fill"
     }
 
     private var metricRow: some View {
-        HStack(alignment: .top, spacing: metricSpacing) {
+        HStack(alignment: .top, spacing: 5) {
+            metric(data.durationText, "分钟")
+            metric(data.volumeText, "KG·REP")
+            metric(data.setCountText, "组")
             if let calorieValueText = data.calorieValueText {
-                calorieMetric(calorieValueText)
-                    .frame(width: calorieMetricWidth, alignment: .leading)
+                metric("≈\(calorieValueText)", "KCAL")
             }
-            visualMetric(data.durationText, "时长", unit: "min")
-                .frame(width: durationMetricWidth, alignment: .leading)
-            visualMetric(data.volumeText, "训练量", unit: "kg·rep")
-                .frame(width: volumeMetricWidth, alignment: .leading)
         }
-        .frame(width: blackContentWidth, alignment: .leading)
     }
 
-    private func visualMetric(_ value: String, _ label: String, unit: String? = nil, highlighted: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+    private func metric(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
             Text(value)
-                .font(Theme.Font.number(size: 22, weight: .bold))
-                .foregroundStyle(highlighted ? Theme.Color.accent : paper)
+                .font(Theme.Font.number(size: 16, weight: .bold))
+                .foregroundStyle(coral)
                 .lineLimit(1)
-                .minimumScaleFactor(0.72)
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(label)
-                    .font(Theme.Font.mono(size: 9.5, weight: .bold))
-                    .foregroundStyle(highlighted ? Theme.Color.accent.opacity(0.74) : paper.opacity(0.52))
-                if let unit {
-                    Text("(\(unit))")
-                        .font(Theme.Font.mono(size: 7.2, weight: .bold))
-                        .foregroundStyle(highlighted ? Theme.Color.accent.opacity(0.54) : paper.opacity(0.42))
-                }
-            }
-            .lineLimit(1)
-            .minimumScaleFactor(0.76)
+                .minimumScaleFactor(0.68)
+            Text(label)
+                .font(Theme.Font.mono(size: 7.2, weight: .bold))
+                .foregroundStyle(warmInk.opacity(0.48))
+                .lineLimit(1)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func calorieMetric(_ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 1) {
-                Text("≈")
-                    .font(Theme.Font.number(size: 14, weight: .bold))
-                Text(value)
-                    .font(Theme.Font.number(size: 22, weight: .bold))
-            }
-            .foregroundStyle(Theme.Color.accent)
-            .lineLimit(1)
-            .minimumScaleFactor(0.72)
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text("消耗")
-                    .font(Theme.Font.mono(size: 9.5, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent.opacity(0.74))
-                Text("(kcal)")
-                    .font(Theme.Font.mono(size: 7.2, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent.opacity(0.54))
-            }
-            .lineLimit(1)
-            .minimumScaleFactor(0.76)
-        }
-    }
-
-    private var exerciseList: some View {
-        VStack(spacing: exerciseRowSpacing) {
-            ForEach(data.exerciseLines) { line in
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
+    private var exerciseSummary: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            if visibleExerciseLines.isEmpty {
+                Text("本次训练已完成")
+                    .font(Theme.Font.body(size: 11.5, weight: .semibold))
+                    .foregroundStyle(warmInk.opacity(0.72))
+            } else {
+                ForEach(visibleExerciseLines) { line in
                     HStack(spacing: 6) {
                         if let kind = line.structureKind {
-                            WorkoutStructureIcon(kind: kind, size: 18, symbolSize: 9)
+                            Image(systemName: kind.systemImage)
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(coral)
+                                .frame(width: 12)
                         }
                         Text(line.name)
-                            .font(Theme.Font.body(size: exerciseNameFontSize, weight: .semibold))
-                            .foregroundStyle(paper)
+                            .font(Theme.Font.body(size: 11.5, weight: .semibold))
+                            .foregroundStyle(warmInk)
                             .lineLimit(1)
                             .minimumScaleFactor(0.76)
+                        Spacer(minLength: 6)
+                        Text(line.topSetText)
+                            .font(Theme.Font.mono(size: 10, weight: .bold))
+                            .foregroundStyle(warmInk.opacity(0.72))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.68)
                     }
-                    .frame(width: exerciseNameColumnWidth, alignment: .leading)
-                    Text(line.topSetText)
-                        .font(Theme.Font.mono(size: exerciseValueFontSize, weight: .bold))
-                        .foregroundStyle(paper.opacity(0.82))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.68)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .layoutPriority(1)
                 }
+            }
+
+            if hiddenExerciseCount > 0 {
+                Text("另有 \(hiddenExerciseCount) 个动作")
+                    .font(Theme.Font.mono(size: 9, weight: .bold))
+                    .foregroundStyle(coral)
             }
         }
     }
 
-    private var exerciseRowSpacing: CGFloat {
-        data.exerciseLines.count > 8 ? 6 : 8
+    private var visibleExerciseLines: ArraySlice<WorkoutPosterData.ExerciseLine> {
+        data.exerciseLines.prefix(maxExerciseLines)
     }
 
-    private var exerciseNameFontSize: CGFloat {
-        data.exerciseLines.count > 8 ? 13.5 : 14.5
+    private var hiddenExerciseCount: Int {
+        max(0, data.exerciseLines.count - visibleExerciseLines.count)
     }
 
-    private var exerciseValueFontSize: CGFloat {
-        data.exerciseLines.count > 8 ? 12.5 : 13.5
+    private var maxExerciseLines: Int {
+        background.layoutKind == .centerReceipt ? 4 : 3
     }
 
-    private var exerciseNameColumnWidth: CGFloat {
-        min(86, blackContentWidth * 0.38)
-    }
-
-    private var metricSpacing: CGFloat {
-        min(24, max(12, blackContentWidth * 0.055))
-    }
-
-    private var calorieMetricWidth: CGFloat {
-        min(78, blackContentWidth * 0.34)
-    }
-
-    private var durationMetricWidth: CGFloat {
-        min(62, blackContentWidth * 0.24)
-    }
-
-    private var volumeMetricWidth: CGFloat {
-        let calorieWidth = data.calorieValueText == nil ? 0 : calorieMetricWidth
-        let spacingCount: CGFloat = data.calorieValueText == nil ? 1 : 2
-        let remaining = blackContentWidth - calorieWidth - durationMetricWidth - metricSpacing * spacingCount
-        return max(48, min(106, remaining))
-    }
-
-    private var blackContentWidth: CGFloat {
-        max(180, width - railWidth - 58)
-    }
-
-    private var railWidth: CGFloat {
-        width * 0.24
-    }
-
-    private var footer: some View {
-        HStack(spacing: 10) {
-            if let firstPR = data.prLines.first {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("PR")
-                        .font(Theme.Font.mono(size: 9, weight: .bold))
-                        .foregroundStyle(Theme.Color.accent)
-                    Text("\(firstPR.name) \(firstPR.weightText)")
-                        .font(Theme.Font.body(size: 12, weight: .bold))
-                        .foregroundStyle(paper)
-                        .lineLimit(1)
-                }
-            } else {
-                Text("\(data.exerciseCountText) 个动作")
-                    .font(Theme.Font.mono(size: 11, weight: .bold))
-                    .foregroundStyle(paper.opacity(0.64))
-            }
-            Spacer()
+    private var receiptWidth: CGFloat {
+        switch background.layoutKind {
+        case .topCompact: return width * 0.87
+        case .upperCenter: return width * 0.79
+        case .centerReceipt: return width * 0.78
         }
     }
 
-    private var rightRailQRCode: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(paper.opacity(0.24), lineWidth: 1)
-            Image(systemName: "qrcode")
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(paper.opacity(0.28))
+    private var receiptTopPadding: CGFloat {
+        switch background.layoutKind {
+        case .topCompact: return height * 0.035
+        case .upperCenter: return height * 0.055
+        case .centerReceipt: return height * 0.20
         }
-        .frame(width: 42, height: 42)
-        .accessibilityHidden(true)
+    }
+
+    private var receiptOpacity: Double {
+        switch background.layoutKind {
+        case .topCompact: return 0.88
+        case .upperCenter: return 0.90
+        case .centerReceipt: return 0.92
+        }
+    }
+
+    private var brandSignature: some View {
+        Text("别练了 · DON'T LIFT")
+            .font(Theme.Font.mono(size: 9, weight: .heavy))
+            .tracking(0.8)
+            .foregroundStyle(warmInk.opacity(0.72))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(receiptPaper.opacity(0.76), in: Capsule())
     }
 }
 
 private enum WorkoutPosterLayout {
-    private static let baseWidth: CGFloat = 360
-    private static let baseHeight: CGFloat = 450
-
-    static func size(for data: WorkoutPosterData) -> CGSize {
-        let extraExercises = max(0, data.exerciseLines.count - 4)
-        return CGSize(width: baseWidth, height: baseHeight + CGFloat(extraExercises * 28))
-    }
-
-    static func aspectRatio(for data: WorkoutPosterData) -> CGFloat {
-        let size = size(for: data)
-        return size.width / size.height
-    }
+    static let size = CGSize(width: 360, height: 640)
+    static let aspectRatio = size.width / size.height
 }
 
 @MainActor
 enum WorkoutPosterImageRenderer {
-    static func render(data: WorkoutPosterData) -> UIImage? {
-        let size = WorkoutPosterLayout.size(for: data)
+    static func render(data: WorkoutPosterData, background: WorkoutPosterBackground) -> UIImage? {
+        let size = WorkoutPosterLayout.size
         let renderer = ImageRenderer(
-            content: WorkoutPosterCanvas(data: data)
+            content: WorkoutPosterCanvas(data: data, background: background)
                 .frame(width: size.width, height: size.height)
         )
         renderer.scale = 3
