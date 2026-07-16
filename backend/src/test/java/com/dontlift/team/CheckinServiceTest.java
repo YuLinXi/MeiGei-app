@@ -1,14 +1,17 @@
 package com.dontlift.team;
 
+import com.dontlift.team.dto.TeamRequests.CheckIn;
 import com.dontlift.common.web.AppException;
 import com.dontlift.push.PushService;
 import com.dontlift.team.entity.CheckinReaction;
 import com.dontlift.team.entity.TeamCheckin;
+import com.dontlift.team.entity.TeamMember;
 import com.dontlift.team.mapper.CheckinReactionMapper;
 import com.dontlift.team.mapper.TeamCheckinMapper;
 import com.dontlift.team.mapper.TeamMemberMapper;
 import com.dontlift.workout.entity.Workout;
 import com.dontlift.workout.mapper.WorkoutMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -48,7 +51,7 @@ class CheckinServiceTest {
 
     @Test
     void checkIn_rejectsMissingTeamIds() {
-        assertThatThrownBy(() -> service.checkIn(userId, workoutId, today, "{}", List.of()))
+        assertThatThrownBy(() -> service.checkIn(userId, workoutId, today, "{}", List.of(), false))
                 .isInstanceOf(AppException.class)
                 .hasMessageContaining("请选择");
 
@@ -56,10 +59,14 @@ class CheckinServiceTest {
     }
 
     @Test
-    void checkIn_createsOnlySelectedTeam() {
+    void checkIn_createsOnlySelectedTeamAndNotifiesOnlyOtherMembers() {
         givenShareableWorkout();
+        UUID teammateId = UUID.randomUUID();
+        when(memberMapper.findByTeam(teamId)).thenReturn(List.of(
+                teamMember(userId), teamMember(teammateId)));
 
-        List<TeamCheckin> result = service.checkIn(userId, workoutId, today, "{\"exerciseCount\":1}", List.of(teamId));
+        List<TeamCheckin> result = service.checkIn(
+                userId, workoutId, today, "{\"exerciseCount\":1}", List.of(teamId), false);
 
         assertThat(result).hasSize(1);
         TeamCheckin created = result.get(0);
@@ -68,6 +75,40 @@ class CheckinServiceTest {
         assertThat(created.getWorkoutId()).isEqualTo(workoutId);
         verify(teamService).requireMember(teamId, userId);
         verify(checkinMapper).insert(created);
+        verify(pushService).sendToUser(
+                eq(teammateId), eq("队友打卡了"), eq("你的训练搭子完成了今天的训练"), any());
+        verify(pushService, never()).sendToUser(eq(userId), any(), any(), any());
+    }
+
+    @Test
+    void checkIn_notifiesOnlyMembersWithTeamMessagesEnabled() {
+        givenShareableWorkout();
+        UUID enabledMemberId = UUID.randomUUID();
+        UUID disabledMemberId = UUID.randomUUID();
+        when(memberMapper.findByTeam(teamId)).thenReturn(List.of(
+                teamMember(userId),
+                teamMember(enabledMemberId),
+                teamMember(disabledMemberId, false)));
+
+        service.checkIn(userId, workoutId, today, "{}", List.of(teamId), false);
+
+        verify(pushService).sendToUser(eq(enabledMemberId), any(), any(), any());
+        verify(pushService, never()).sendToUser(eq(disabledMemberId), any(), any(), any());
+    }
+
+    @Test
+    void checkIn_suppressedHistoricalCheckinIsCreatedWithoutMemberQueryOrPush() {
+        givenShareableWorkout();
+        LocalDate yesterday = today.minusDays(1);
+
+        List<TeamCheckin> result = service.checkIn(
+                userId, workoutId, yesterday, "{\"exerciseCount\":1}", List.of(teamId), true);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getCheckinDate()).isEqualTo(yesterday);
+        verify(checkinMapper).insert(result.get(0));
+        verify(memberMapper, never()).findByTeam(any());
+        verify(pushService, never()).sendToUser(any(), any(), any(), any());
     }
 
     @Test
@@ -81,12 +122,36 @@ class CheckinServiceTest {
         existing.setSummary("{}");
         when(checkinMapper.findByTeamUserWorkout(teamId, userId, workoutId)).thenReturn(existing);
 
-        List<TeamCheckin> result = service.checkIn(userId, workoutId, today, "{\"totalSets\":2}", List.of(teamId));
+        List<TeamCheckin> result = service.checkIn(
+                userId, workoutId, today, "{\"totalSets\":2}", List.of(teamId), false);
 
         assertThat(result).containsExactly(existing);
         assertThat(existing.getSummary()).isEqualTo("{\"totalSets\":2}");
         verify(checkinMapper).updateById(existing);
         verify(checkinMapper, never()).insert(any(TeamCheckin.class));
+        verify(memberMapper, never()).findByTeam(any());
+        verify(pushService, never()).sendToUser(any(), any(), any(), any());
+    }
+
+    @Test
+    void checkIn_legacyRequestDefaultsToNotification() throws Exception {
+        CheckIn request = new ObjectMapper().findAndRegisterModules().readValue("""
+                {
+                  "workoutId": "%s",
+                  "checkinDate": "%s",
+                  "summary": {},
+                  "teamIds": ["%s"]
+                }
+                """.formatted(workoutId, today, teamId), CheckIn.class);
+        givenShareableWorkout();
+        UUID teammateId = UUID.randomUUID();
+        when(memberMapper.findByTeam(teamId)).thenReturn(List.of(teamMember(teammateId)));
+
+        service.checkIn(userId, request.workoutId(), request.checkinDate(), request.summary().toString(),
+                request.teamIds(), request.suppressNotification());
+
+        assertThat(request.suppressNotification()).isFalse();
+        verify(pushService).sendToUser(eq(teammateId), any(), any(), any());
     }
 
     @Test
@@ -94,7 +159,7 @@ class CheckinServiceTest {
         givenShareableWorkout();
         when(teamService.requireMember(teamId, userId)).thenThrow(AppException.forbidden("非该 Team 成员"));
 
-        assertThatThrownBy(() -> service.checkIn(userId, workoutId, today, "{}", List.of(teamId)))
+        assertThatThrownBy(() -> service.checkIn(userId, workoutId, today, "{}", List.of(teamId), false))
                 .isInstanceOf(AppException.class)
                 .hasMessageContaining("非该 Team 成员");
 
@@ -105,7 +170,7 @@ class CheckinServiceTest {
     void checkIn_rejectsUnsyncedWorkout() {
         when(workoutMapper.findByIdIncludingDeleted(workoutId)).thenReturn(null);
 
-        assertThatThrownBy(() -> service.checkIn(userId, workoutId, today, "{}", List.of(teamId)))
+        assertThatThrownBy(() -> service.checkIn(userId, workoutId, today, "{}", List.of(teamId), false))
                 .isInstanceOf(AppException.class)
                 .hasMessageContaining("训练尚未同步");
 
@@ -133,6 +198,7 @@ class CheckinServiceTest {
         when(reactionMapper.insertPushReceiptIfAbsent(
                 any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
                 .thenReturn(1);
+        when(memberMapper.findByTeamAndUser(teamId, ownerId)).thenReturn(teamMember(ownerId));
 
         CheckinReaction result = service.react(reactorId, checkinId, "fire");
 
@@ -156,6 +222,7 @@ class CheckinServiceTest {
         when(reactionMapper.insertPushReceiptIfAbsent(
                 any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
                 .thenReturn(0);
+        when(memberMapper.findByTeamAndUser(teamId, ownerId)).thenReturn(teamMember(ownerId));
 
         CheckinReaction result = service.react(reactorId, checkinId, "muscle");
 
@@ -196,6 +263,7 @@ class CheckinServiceTest {
         when(reactionMapper.insertPushReceiptIfAbsent(
                 any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
                 .thenReturn(0);
+        when(memberMapper.findByTeamAndUser(teamId, ownerId)).thenReturn(teamMember(ownerId));
 
         CheckinReaction result = service.react(reactorId, checkinId, "heart");
 
@@ -235,12 +303,32 @@ class CheckinServiceTest {
         when(reactionMapper.insertPushReceiptIfAbsent(
                 any(UUID.class), eq(checkinId), eq(reactorId), any(OffsetDateTime.class)))
                 .thenReturn(0);
+        when(memberMapper.findByTeamAndUser(teamId, ownerId)).thenReturn(teamMember(ownerId));
 
         CheckinReaction result = service.react(reactorId, checkinId, "fire");
 
         assertThat(result).isSameAs(concurrent);
         verify(reactionMapper, never()).deleteById(any(UUID.class));
         verify(reactionMapper, never()).updateById(any(CheckinReaction.class));
+        verify(pushService, never()).sendToUser(any(), any(), any(), any());
+    }
+
+    @Test
+    void react_doesNotPushWhenCheckinOwnerDisabledTeamMessages() {
+        UUID ownerId = UUID.randomUUID();
+        UUID reactorId = UUID.randomUUID();
+        UUID checkinId = UUID.randomUUID();
+        TeamCheckin checkin = checkinForReaction(checkinId, ownerId);
+        when(checkinMapper.selectById(checkinId)).thenReturn(checkin);
+        when(reactionMapper.findByCheckinAndUser(checkinId, reactorId)).thenReturn(null);
+        when(reactionMapper.insertReactionIfAbsent(any(CheckinReaction.class))).thenReturn(1);
+        when(memberMapper.findByTeamAndUser(teamId, ownerId)).thenReturn(teamMember(ownerId, false));
+
+        CheckinReaction result = service.react(reactorId, checkinId, "heart");
+
+        assertThat(result.getEmoji()).isEqualTo("heart");
+        verify(reactionMapper, never()).insertPushReceiptIfAbsent(
+                any(UUID.class), any(UUID.class), any(UUID.class), any(OffsetDateTime.class));
         verify(pushService, never()).sendToUser(any(), any(), any(), any());
     }
 
@@ -292,6 +380,18 @@ class CheckinServiceTest {
         workout.setId(workoutId);
         workout.setUserId(userId);
         when(workoutMapper.findByIdIncludingDeleted(workoutId)).thenReturn(workout);
+    }
+
+    private TeamMember teamMember(UUID memberUserId) {
+        return teamMember(memberUserId, true);
+    }
+
+    private TeamMember teamMember(UUID memberUserId, boolean receiveTeamNotifications) {
+        TeamMember member = new TeamMember();
+        member.setTeamId(teamId);
+        member.setUserId(memberUserId);
+        member.setReceiveTeamNotifications(receiveTeamNotifications);
+        return member;
     }
 
     private TeamCheckin checkin(UUID id, LocalDate date, String createdAt) {

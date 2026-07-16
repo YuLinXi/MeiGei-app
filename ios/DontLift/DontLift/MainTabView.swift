@@ -118,7 +118,12 @@ struct MainTabView: View {
             .toolbarColorScheme(.light, for: .navigationBar)
         }
         .tint(Theme.Color.accent)
-        .onAppear { refreshActiveSession() }
+        .onAppear {
+            refreshActiveSession()
+            if PushManager.shared.pendingOpenedTeamId != nil {
+                selectedTab = .team
+            }
+        }
         .onChange(of: selectedTab) { _, tab in
             if tab == .workout {
                 WorkoutPerformanceMonitor.event("home.tab.selected")
@@ -136,6 +141,9 @@ struct MainTabView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .dontliftWorkoutSyncSucceeded)) { _ in
             Task { await retryReadyPendingShares() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dontliftTeamNudgeOpened)) { _ in
+            selectedTab = .team
         }
         // 全局训练中悬浮窗/训练浮层：挂在 NavigationStack 之外，push 子页面上也可见；
         // 展开和收起都不改变当前 Tab 或导航层级。

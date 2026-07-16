@@ -171,6 +171,14 @@ final class RestTimerController {
         return completionEvent
     }
 
+    /// 结束整场训练时按本次目标总时长完成最后一段休息，避免归档为空或仅记录已流逝秒数。
+    @discardableResult
+    func completeForWorkoutFinish() -> CompletionEvent? {
+        guard let endDate else { return completionEvent }
+        completeCurrentRest(now: endDate, playFeedback: false)
+        return completionEvent
+    }
+
     /// App 回到前台时兜底收束后台到点的休息。后台通知已负责提示音，这里不再补播。
     func handleAppBecameActive(now: Date = .now) {
         tick = now

@@ -15,7 +15,7 @@ struct PRBadge: Equatable, Hashable {
     var weightKg: Double
 }
 
-struct SetSnapshot: Equatable, Hashable {
+struct SetSnapshot: Codable, Equatable, Hashable {
     var weightKg: Double?
     var reps: Int?
     var setTypeRaw: String = WorkoutSetType.working.rawValue
@@ -150,8 +150,17 @@ struct LatestExercisePerformance: Equatable {
     var sets: [SetSnapshot]
 
     func matches(_ item: PlanItem) -> Bool {
-        sets.contains { $0.setTypeRaw == WorkoutSetType.drop.rawValue } == item.isDropSet
+        matches(isDropSet: item.isDropSet)
     }
+
+    func matches(isDropSet: Bool) -> Bool {
+        sets.contains { $0.setTypeRaw == WorkoutSetType.drop.rawValue } == isDropSet
+    }
+}
+
+struct PlanExerciseHistoryKey: Equatable, Hashable {
+    var planItemId: UUID
+    var historyKey: String
 }
 
 struct PlanWorkoutCompletionSnapshot: Equatable {
@@ -161,24 +170,33 @@ struct PlanWorkoutCompletionSnapshot: Equatable {
 }
 
 struct PlanHistoryLookup: Equatable {
-    var latestByPlanItemId: [UUID: LatestExercisePerformance]
+    var latestByPlanExercise: [PlanExerciseHistoryKey: LatestExercisePerformance]
     var latestByHistoryKey: [String: LatestExercisePerformance]
     var lastWorkoutByPlanId: [UUID: PlanWorkoutCompletionSnapshot]
 
     static let empty = PlanHistoryLookup(
-        latestByPlanItemId: [:],
+        latestByPlanExercise: [:],
         latestByHistoryKey: [:],
         lastWorkoutByPlanId: [:]
     )
 
     func latestSets(for item: PlanItem) -> [SetSnapshot] {
-        if let exact = latestByPlanItemId[item.itemId], exact.matches(item) { return exact.sets }
+        let key = PlanExerciseHistoryKey(planItemId: item.itemId, historyKey: item.historyKey)
+        if let exact = latestByPlanExercise[key], exact.matches(item) { return exact.sets }
         if let fallback = latestByHistoryKey[item.historyKey], fallback.matches(item) { return fallback.sets }
         return []
     }
 
+    /// 备选动作只读取同一动作位下该实际动作的历史，不借用其他动作位的全局同动作数据。
+    func latestSets(planItemId: UUID, historyKey: String, isDropSet: Bool = false) -> [SetSnapshot] {
+        let key = PlanExerciseHistoryKey(planItemId: planItemId, historyKey: historyKey)
+        guard let exact = latestByPlanExercise[key], exact.matches(isDropSet: isDropSet) else { return [] }
+        return exact.sets
+    }
+
     func latestDate(for item: PlanItem) -> Date? {
-        if let exact = latestByPlanItemId[item.itemId], exact.matches(item) { return exact.date }
+        let key = PlanExerciseHistoryKey(planItemId: item.itemId, historyKey: item.historyKey)
+        if let exact = latestByPlanExercise[key], exact.matches(item) { return exact.date }
         if let fallback = latestByHistoryKey[item.historyKey], fallback.matches(item) { return fallback.date }
         return nil
     }
@@ -727,7 +745,7 @@ final class WorkoutHistoryStore {
 
 extension PlanHistoryLookup {
     static func build(from workouts: [Workout]) -> PlanHistoryLookup {
-        var latestByPlanItemId: [UUID: LatestExercisePerformance] = [:]
+        var latestByPlanExercise: [PlanExerciseHistoryKey: LatestExercisePerformance] = [:]
         var latestByHistoryKey: [String: LatestExercisePerformance] = [:]
         var lastWorkoutByPlanId: [UUID: PlanWorkoutCompletionSnapshot] = [:]
 
@@ -741,8 +759,10 @@ extension PlanHistoryLookup {
 
                 if let planItemId = ex.planItemId {
                     completedPlanItemIds.insert(planItemId)
-                    if latestByPlanItemId[planItemId] == nil {
-                        latestByPlanItemId[planItemId] = LatestExercisePerformance(
+                    let planExerciseKey = PlanExerciseHistoryKey(planItemId: planItemId,
+                                                                 historyKey: ex.historyKey)
+                    if latestByPlanExercise[planExerciseKey] == nil {
+                        latestByPlanExercise[planExerciseKey] = LatestExercisePerformance(
                             date: workout.startedAt,
                             sets: snapshots
                         )
@@ -769,7 +789,7 @@ extension PlanHistoryLookup {
         }
 
         return PlanHistoryLookup(
-            latestByPlanItemId: latestByPlanItemId,
+            latestByPlanExercise: latestByPlanExercise,
             latestByHistoryKey: latestByHistoryKey,
             lastWorkoutByPlanId: lastWorkoutByPlanId
         )

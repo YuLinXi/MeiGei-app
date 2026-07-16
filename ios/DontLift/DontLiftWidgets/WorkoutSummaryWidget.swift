@@ -24,13 +24,22 @@ struct WorkoutSummaryProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (WorkoutSummaryEntry) -> Void) {
-        completion(WorkoutSummaryEntry(date: .now, snapshot: WorkoutWidgetSnapshotStore.read()))
+        let now = Date.now
+        completion(WorkoutSummaryEntry(date: now, snapshot: WorkoutWidgetSnapshotStore.read().normalized(for: now)))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<WorkoutSummaryEntry>) -> Void) {
-        let entry = WorkoutSummaryEntry(date: .now, snapshot: WorkoutWidgetSnapshotStore.read())
-        let next = Calendar.current.date(byAdding: .minute, value: 30, to: .now) ?? .now.addingTimeInterval(1800)
-        completion(Timeline(entries: [entry], policy: .after(next)))
+        let now = Date.now
+        let calendar = Calendar.current
+        let storedSnapshot = WorkoutWidgetSnapshotStore.read()
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now))
+            ?? now.addingTimeInterval(86_400)
+        let entries = [now, tomorrow].map { date in
+            WorkoutSummaryEntry(date: date, snapshot: storedSnapshot.normalized(for: date, calendar: calendar))
+        }
+        let nextReload = calendar.date(byAdding: .minute, value: 30, to: tomorrow)
+            ?? tomorrow.addingTimeInterval(1800)
+        completion(Timeline(entries: entries, policy: .after(nextReload)))
     }
 }
 
@@ -121,16 +130,11 @@ private struct WorkoutSummaryWidgetView: View {
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(WidgetStyle.fg2)
                 }
-                HStack(spacing: 8) {
-                    metric("\(entry.snapshot.weekStats.sessionCount)", "次")
-                    metric("\(entry.snapshot.weekStats.setCount)", "组")
-                    metric("\(entry.snapshot.weekStats.repCount)", "次")
-                }
                 weekStrip
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(primaryTitle)，本周 \(entry.snapshot.weekStats.sessionCount) 次训练，\(entry.snapshot.weekStats.setCount) 组")
+        .accessibilityLabel("\(primaryTitle)，\(primaryMessage)，本周训练量 \(formatTons(entry.snapshot.weekStats.volumeKg)) 吨")
     }
 
     private var header: some View {
@@ -174,18 +178,6 @@ private struct WorkoutSummaryWidgetView: View {
                 sessionCount: 0,
                 isToday: index == 0
             )
-        }
-    }
-
-    private func metric(_ value: String, _ label: String) -> some View {
-        VStack(alignment: .trailing, spacing: 1) {
-            Text(value)
-                .font(.system(size: 15, weight: .black, design: .monospaced))
-                .foregroundStyle(WidgetStyle.fg)
-                .monospacedDigit()
-            Text(label)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(WidgetStyle.muted)
         }
     }
 

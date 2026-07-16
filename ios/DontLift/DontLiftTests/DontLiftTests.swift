@@ -143,7 +143,7 @@ struct WorkoutWeeklyStatsTests {
 
 struct TeamMemberDTOTests {
 
-    @Test func missingAutoShareWorkoutsDefaultsToFalse() throws {
+    @Test func missingAutoShareWorkoutsDefaultsToEnabled() throws {
         let json = """
         {
           "id": "00000000-0000-0000-0000-000000000001",
@@ -156,7 +156,7 @@ struct TeamMemberDTOTests {
 
         let member = try JSONCoding.decoder.decode(TeamMemberDTO.self, from: json)
 
-        #expect(member.autoShareWorkouts == false)
+        #expect(member.autoShareWorkouts)
     }
 
     @Test func decodesAutoShareWorkouts() throws {
@@ -173,6 +173,54 @@ struct TeamMemberDTOTests {
         let member = try JSONCoding.decoder.decode(TeamMemberDTO.self, from: json)
 
         #expect(member.autoShareWorkouts == true)
+    }
+}
+
+@MainActor
+struct TeamNudgeTodayDTOTests {
+
+    @Test func decodesCurrentTeamNotificationPreference() throws {
+        let json = """
+        {
+          "date": "2026-07-16",
+          "nudgedRecipientUserIds": [],
+          "receivableRecipientUserIds": [],
+          "receiveTeamNotifications": false
+        }
+        """.data(using: .utf8)!
+
+        let state = try JSONCoding.decoder.decode(TeamNudgeTodayDTO.self, from: json)
+
+        #expect(state.receiveTeamNotifications == false)
+    }
+
+    @Test func decodesLegacyNudgePreference() throws {
+        let json = """
+        {
+          "date": "2026-07-16",
+          "nudgedRecipientUserIds": [],
+          "receivableRecipientUserIds": [],
+          "receiveWorkoutNudges": false
+        }
+        """.data(using: .utf8)!
+
+        let state = try JSONCoding.decoder.decode(TeamNudgeTodayDTO.self, from: json)
+
+        #expect(state.receiveTeamNotifications == false)
+    }
+
+    @Test func missingTeamNotificationPreferenceDefaultsToEnabled() throws {
+        let json = """
+        {
+          "date": "2026-07-16",
+          "nudgedRecipientUserIds": [],
+          "receivableRecipientUserIds": []
+        }
+        """.data(using: .utf8)!
+
+        let state = try JSONCoding.decoder.decode(TeamNudgeTodayDTO.self, from: json)
+
+        #expect(state.receiveTeamNotifications)
     }
 }
 

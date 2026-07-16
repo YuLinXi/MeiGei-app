@@ -133,6 +133,8 @@ public class TeamService {
         m.setUserId(userId);
         m.setRole(role);
         m.setJoinedAt(OffsetDateTime.now());
+        m.setAutoShareWorkouts(true);
+        m.setReceiveTeamNotifications(true);
         memberMapper.insert(m);
     }
 

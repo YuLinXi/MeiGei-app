@@ -24,14 +24,47 @@ public interface TeamMemberMapper extends BaseMapper<TeamMember> {
             """)
     int countActiveByUser(@Param("userId") UUID userId);
 
-    @Select("SELECT * FROM team_member WHERE team_id = #{teamId} AND user_id = #{userId}")
+    @Select("""
+            SELECT id, team_id, user_id, role, joined_at, auto_share_workouts,
+                   receive_workout_nudges AS receive_team_notifications
+            FROM team_member
+            WHERE team_id = #{teamId} AND user_id = #{userId}
+            """)
     TeamMember findByTeamAndUser(@Param("teamId") UUID teamId, @Param("userId") UUID userId);
 
-    @Select("SELECT * FROM team_member WHERE team_id = #{teamId} ORDER BY joined_at")
+    @Select("""
+            SELECT id, team_id, user_id, role, joined_at, auto_share_workouts,
+                   receive_workout_nudges AS receive_team_notifications
+            FROM team_member
+            WHERE team_id = #{teamId} AND user_id = #{userId}
+            FOR UPDATE
+            """)
+    TeamMember findByTeamAndUserForUpdate(@Param("teamId") UUID teamId,
+                                          @Param("userId") UUID userId);
+
+    @Select("""
+            SELECT id, team_id, user_id, role, joined_at, auto_share_workouts,
+                   receive_workout_nudges AS receive_team_notifications
+            FROM team_member
+            WHERE team_id = #{teamId}
+            ORDER BY joined_at
+            """)
     List<TeamMember> findByTeam(@Param("teamId") UUID teamId);
 
     @Select("""
-            SELECT * FROM team_member
+            SELECT user_id FROM team_member
+            WHERE team_id = #{teamId}
+              AND user_id <> #{currentUserId}
+              AND receive_workout_nudges = true
+            ORDER BY joined_at
+            """)
+    List<UUID> findReceivableNudgeUserIds(@Param("teamId") UUID teamId,
+                                          @Param("currentUserId") UUID currentUserId);
+
+    @Select("""
+            SELECT id, team_id, user_id, role, joined_at, auto_share_workouts,
+                   receive_workout_nudges AS receive_team_notifications
+            FROM team_member
             WHERE team_id = #{teamId} AND user_id <> #{userId}
             ORDER BY joined_at
             LIMIT 1
@@ -83,6 +116,15 @@ public interface TeamMemberMapper extends BaseMapper<TeamMember> {
     int updateAutoShareWorkouts(@Param("teamId") UUID teamId,
                                 @Param("userId") UUID userId,
                                 @Param("autoShareWorkouts") boolean autoShareWorkouts);
+
+    @Update("""
+            UPDATE team_member
+            SET receive_workout_nudges = #{enabled}
+            WHERE team_id = #{teamId} AND user_id = #{userId}
+            """)
+    int updateReceiveTeamNotifications(@Param("teamId") UUID teamId,
+                                       @Param("userId") UUID userId,
+                                       @Param("enabled") boolean enabled);
 
     @Delete("DELETE FROM team_member WHERE team_id = #{teamId}")
     int deleteByTeam(@Param("teamId") UUID teamId);

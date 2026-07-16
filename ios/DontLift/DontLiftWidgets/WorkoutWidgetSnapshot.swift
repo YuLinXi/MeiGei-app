@@ -65,6 +65,37 @@ struct WorkoutWidgetSnapshot: Codable, Equatable {
     var hasAnyWorkoutSignal: Bool {
         weekStats.sessionCount > 0 || todayCompletedWorkoutCount > 0 || activeWorkout != nil
     }
+
+    func normalized(for date: Date, calendar: Calendar = .current) -> WorkoutWidgetSnapshot {
+        var snapshot = self
+
+        if let todayIndex = weekDays.firstIndex(where: { calendar.isDate($0.date, inSameDayAs: date) }) {
+            snapshot.weekDays = weekDays.enumerated().map { index, day in
+                var day = day
+                day.isToday = index == todayIndex
+                return day
+            }
+            snapshot.todayCompletedWorkoutCount = weekDays[todayIndex].sessionCount
+            if !calendar.isDate(generatedAt, inSameDayAs: date), snapshot.todayCompletedWorkoutCount == 0 {
+                snapshot.currentTrainingStreakDays = 0
+            }
+            return snapshot
+        }
+
+        let labels = ["一", "二", "三", "四", "五", "六", "日"]
+        let today = calendar.startOfDay(for: date)
+        let daysSinceMonday = (calendar.component(.weekday, from: today) + 5) % 7
+        let monday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: today) ?? today
+        snapshot.todayCompletedWorkoutCount = 0
+        snapshot.currentTrainingStreakDays = 0
+        snapshot.weekStats = WeekStats(volumeKg: 0, sessionCount: 0, setCount: 0, repCount: 0)
+        snapshot.weekDays = labels.enumerated().compactMap { index, label in
+            guard let day = calendar.date(byAdding: .day, value: index, to: monday) else { return nil }
+            return Day(date: day, label: label, sessionCount: 0, isToday: calendar.isDate(day, inSameDayAs: today))
+        }
+        snapshot.recentWorkout = nil
+        return snapshot
+    }
 }
 
 enum WorkoutWidgetSnapshotStore {

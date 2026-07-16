@@ -80,6 +80,31 @@ enum PlanUnitKind: String, Codable {
     case superset
 }
 
+/// 计划动作位中的轻量动作候选。数组顺序即展示顺序，动作身份由 canonical `historyKey` 表示。
+struct PlanExerciseOption: Codable, Hashable, Identifiable {
+    var builtinExerciseCode: String?
+    var customExerciseId: UUID?
+    var exerciseName: String
+    var primaryMuscle: String?
+    var equipmentType: String?
+
+    var id: String { historyKey }
+
+    init(
+        builtinExerciseCode: String? = nil,
+        customExerciseId: UUID? = nil,
+        exerciseName: String,
+        primaryMuscle: String? = nil,
+        equipmentType: String? = nil
+    ) {
+        self.builtinExerciseCode = builtinExerciseCode
+        self.customExerciseId = customExerciseId
+        self.exerciseName = exerciseName
+        self.primaryMuscle = primaryMuscle
+        self.equipmentType = equipmentType
+    }
+}
+
 /// 超级组计划成员。超级组统一组数，成员只保存各自动作引用和每组重量/次数。
 struct PlanSupersetMember: Codable, Identifiable, Hashable {
     var memberId: UUID
@@ -135,6 +160,8 @@ struct PlanItem: Codable, Identifiable, Hashable {
     var suggestedWeightKg: Double?
     /// 可选逐组处方；缺失时继续使用 `suggested*` 兼容旧计划。
     var setPrescriptions: [PlanSetPrescription]?
+    /// 普通单动作的备选动作快照；nil/空数组保持旧计划行为。
+    var alternatives: [PlanExerciseOption]?
     /// 超级组固定 2 个成员；非超级组为空。
     var supersetMembers: [PlanSupersetMember]?
     /// 超级组统一组数；非超级组为空。
@@ -157,6 +184,7 @@ struct PlanItem: Codable, Identifiable, Hashable {
         suggestedReps: Int? = nil,
         suggestedWeightKg: Double? = nil,
         setPrescriptions: [PlanSetPrescription]? = nil,
+        alternatives: [PlanExerciseOption]? = nil,
         supersetMembers: [PlanSupersetMember]? = nil,
         supersetRoundCount: Int? = nil,
         supersetRestAfterRoundSeconds: Int? = nil
@@ -173,6 +201,7 @@ struct PlanItem: Codable, Identifiable, Hashable {
         self.suggestedReps = suggestedReps
         self.suggestedWeightKg = suggestedWeightKg
         self.setPrescriptions = setPrescriptions
+        self.alternatives = alternatives
         self.supersetMembers = supersetMembers
         self.supersetRoundCount = supersetRoundCount
         self.supersetRestAfterRoundSeconds = supersetRestAfterRoundSeconds
@@ -190,6 +219,32 @@ extension PlanItem {
 
     var isDropSet: Bool {
         unitKind == .dropSet
+    }
+
+    var defaultExerciseOption: PlanExerciseOption {
+        PlanExerciseOption(builtinExerciseCode: builtinExerciseCode,
+                           customExerciseId: customExerciseId,
+                           exerciseName: exerciseName,
+                           primaryMuscle: primaryMuscle,
+                           equipmentType: equipmentType)
+    }
+
+    /// 只向训练暴露可解析、且不与默认/其他备选重复的候选；损坏备选不阻断默认动作开始。
+    var usableAlternatives: [PlanExerciseOption] {
+        guard unitKind == .singleExercise else { return [] }
+        var seen = Set([historyKey])
+        return (alternatives ?? []).filter { option in
+            option.resolvedExerciseName != nil && seen.insert(option.historyKey).inserted
+        }
+    }
+
+    var exerciseOptions: [PlanExerciseOption] {
+        let alternatives = usableAlternatives
+        return alternatives.isEmpty ? [] : [defaultExerciseOption] + alternatives
+    }
+
+    func containsAlternative(historyKey: String) -> Bool {
+        usableAlternatives.contains { $0.historyKey == historyKey }
     }
 
     var orderedSupersetMembers: [PlanSupersetMember] {
@@ -568,6 +623,41 @@ extension PlanItem {
 }
 
 extension PlanSupersetMember {
+    private var trimmedSnapshotName: String? {
+        let value = exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private var resolvedBuiltin: BuiltinExercise? {
+        ExerciseLibrary.resolve(code: builtinExerciseCode, name: trimmedSnapshotName)
+    }
+
+    var resolvedExerciseName: String? {
+        resolvedBuiltin?.name ?? trimmedSnapshotName
+    }
+
+    var displayExerciseName: String {
+        resolvedExerciseName ?? "未知动作"
+    }
+
+    var resolvedPrimaryMuscle: String? {
+        primaryMuscle ?? resolvedBuiltin?.category
+    }
+
+    var resolvedEquipmentType: String? {
+        equipmentType ?? resolvedBuiltin?.equipmentType
+    }
+
+    var historyKey: String {
+        ExerciseLibrary.canonicalHistoryKey(
+            code: builtinExerciseCode,
+            name: exerciseName,
+            customId: customExerciseId
+        )
+    }
+}
+
+extension PlanExerciseOption {
     private var trimmedSnapshotName: String? {
         let value = exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value

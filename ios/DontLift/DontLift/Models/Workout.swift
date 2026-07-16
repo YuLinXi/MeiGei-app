@@ -80,6 +80,12 @@ struct WorkoutUnit: Codable, Identifiable, Hashable {
     var orderIndex: Int
     var singleExerciseId: UUID?
     var superset: WorkoutSupersetUnit?
+    /// 含备选的普通动作保存“默认 + 备选”完整候选，供离线/重启后临场切换。
+    var exerciseOptions: [PlanExerciseOption]?
+    /// 备选落值需要复用来源计划模式；仅含备选的普通动作写入。
+    var planModeRaw: String?
+    /// 本次训练创建时默认动作的逐组落值，严格模式切回默认时可完整恢复。
+    var defaultSetSnapshots: [SetSnapshot]?
 
     var id: UUID { unitId }
 
@@ -88,17 +94,27 @@ struct WorkoutUnit: Codable, Identifiable, Hashable {
         kind: WorkoutUnitKind,
         orderIndex: Int,
         singleExerciseId: UUID? = nil,
-        superset: WorkoutSupersetUnit? = nil
+        superset: WorkoutSupersetUnit? = nil,
+        exerciseOptions: [PlanExerciseOption]? = nil,
+        planModeRaw: String? = nil,
+        defaultSetSnapshots: [SetSnapshot]? = nil
     ) {
         self.unitId = unitId
         self.kindRaw = kind.rawValue
         self.orderIndex = orderIndex
         self.singleExerciseId = singleExerciseId
         self.superset = superset
+        self.exerciseOptions = exerciseOptions
+        self.planModeRaw = planModeRaw
+        self.defaultSetSnapshots = defaultSetSnapshots
     }
 
     var kind: WorkoutUnitKind {
         WorkoutUnitKind(rawValue: kindRaw) ?? .singleExercise
+    }
+
+    var planMode: WorkoutPlanMode {
+        WorkoutPlanMode(rawValue: planModeRaw ?? "") ?? .adaptive
     }
 }
 
@@ -238,15 +254,24 @@ extension Workout {
         storedUnits = normalizedUnits(units)
     }
 
-    func appendSingleExerciseUnit(for exercise: WorkoutExercise) {
+    func appendSingleExerciseUnit(for exercise: WorkoutExercise,
+                                  exerciseOptions: [PlanExerciseOption]? = nil,
+                                  planMode: WorkoutPlanMode? = nil,
+                                  defaultSetSnapshots: [SetSnapshot]? = nil) {
         var units = trainingUnits
-        if units.contains(where: { $0.singleExerciseId == exercise.localId }) {
+        if let index = units.firstIndex(where: { $0.singleExerciseId == exercise.localId }) {
+            units[index].exerciseOptions = exerciseOptions
+            units[index].planModeRaw = planMode?.rawValue
+            units[index].defaultSetSnapshots = defaultSetSnapshots
             updateTrainingUnits(units)
             return
         }
         units.append(WorkoutUnit(kind: .singleExercise,
                                  orderIndex: (units.map(\.orderIndex).max() ?? -1) + 1,
-                                 singleExerciseId: exercise.localId))
+                                 singleExerciseId: exercise.localId,
+                                 exerciseOptions: exerciseOptions,
+                                 planModeRaw: planMode?.rawValue,
+                                 defaultSetSnapshots: defaultSetSnapshots))
         updateTrainingUnits(units)
     }
 
@@ -610,7 +635,7 @@ extension WorkoutSet {
 }
 
 extension WorkoutExercise {
-    /// 展示用排序：热身组吸顶（warmup 段在前），段内按 setIndex 稳定升序（design.md D4）。
+    /// 展示用排序：热身组吸顶（warmup 段在前），段内按稳定原序 setIndex 升序。
     var displaySortedSets: [WorkoutSet] {
         sets.sorted {
             let lw = $0.isWarmupEffective, rw = $1.isWarmupEffective
@@ -632,13 +657,13 @@ extension WorkoutExercise {
         return last.summaryWeightReps
     }
 
-    /// 切换某组正式 ⇄ 热身，并重排到对应段尾（赋最大 setIndex+1）。仅改模型，保存由调用方负责。
+    /// 切换某组正式 ⇄ 热身，仅改变热身语义并保留稳定 setIndex。旧 warmup raw 值在编辑时归一；保存由调用方负责。
     func toggleWarmup(_ set: WorkoutSet) {
-        set.isWarmup.toggle()
+        let nextIsWarmup = !set.isWarmupEffective
         if set.setTypeRaw == WorkoutSetType.warmup.rawValue {
             set.setTypeRaw = WorkoutSetType.working.rawValue
         }
-        set.setIndex = (sets.map(\.setIndex).max() ?? -1) + 1
+        set.isWarmup = nextIsWarmup
     }
 
     /// 旧调用兼容入口。

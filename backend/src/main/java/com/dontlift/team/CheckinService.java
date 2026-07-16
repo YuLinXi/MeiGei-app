@@ -50,10 +50,11 @@ public class CheckinService {
 
     /**
      * 保存训练分享打卡：仅写入用户显式选择的 Team，按 (team,user,workout) 幂等。
-     * summary 为成交时刻快照。新打卡推送给同团其他成员。
+     * summary 为成交时刻快照。未要求静默的新打卡推送给同团其他成员。
      */
     @Transactional
-    public List<TeamCheckin> checkIn(UUID userId, UUID workoutId, LocalDate date, String summary, List<UUID> teamIds) {
+    public List<TeamCheckin> checkIn(UUID userId, UUID workoutId, LocalDate date, String summary,
+                                    List<UUID> teamIds, boolean suppressNotification) {
         if (teamIds == null || teamIds.isEmpty()) {
             throw AppException.badRequest("请选择要分享的 Team");
         }
@@ -80,7 +81,9 @@ public class CheckinService {
             c.setCreatedAt(OffsetDateTime.now());
             checkinMapper.insert(c);
             affected.add(c);
-            notifyOtherMembers(teamId, userId, "队友打卡了", "你的训练搭子完成了今天的训练");
+            if (!suppressNotification) {
+                notifyOtherMembers(teamId, userId, "队友打卡了", "你的训练搭子完成了今天的训练");
+            }
         }
         return affected;
     }
@@ -196,6 +199,10 @@ public class CheckinService {
         if (checkin.getUserId().equals(reactorUserId)) {
             return false;
         }
+        TeamMember recipient = memberMapper.findByTeamAndUser(checkin.getTeamId(), checkin.getUserId());
+        if (recipient == null || !recipient.isReceiveTeamNotifications()) {
+            return false;
+        }
         return reactionMapper.insertPushReceiptIfAbsent(Uuid7.generate(), checkinId, reactorUserId, now) == 1;
     }
 
@@ -210,7 +217,7 @@ public class CheckinService {
 
     private void notifyOtherMembers(UUID teamId, UUID actorUserId, String title, String body) {
         for (TeamMember m : memberMapper.findByTeam(teamId)) {
-            if (!m.getUserId().equals(actorUserId)) {
+            if (!m.getUserId().equals(actorUserId) && m.isReceiveTeamNotifications()) {
                 pushService.sendToUser(m.getUserId(), title, body, Map.of("teamId", teamId.toString()));
             }
         }

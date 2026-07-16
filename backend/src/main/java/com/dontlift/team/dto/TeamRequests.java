@@ -24,11 +24,19 @@ public final class TeamRequests {
     public record UpdateSharePreference(@NotNull Boolean autoShareWorkouts) {
     }
 
+    public record UpdateTeamNotificationPreference(@NotNull Boolean receiveTeamNotifications) {
+    }
+
+    /** 兼容尚未升级的客户端；与 Team 消息偏好共用同一份状态。 */
+    public record UpdateLegacyNudgePreference(@NotNull Boolean receiveWorkoutNudges) {
+    }
+
     public record CheckIn(
             @NotNull UUID workoutId,
             @NotNull LocalDate checkinDate,
             @NotNull JsonNode summary,
-            @NotEmpty List<UUID> teamIds
+            @NotEmpty List<UUID> teamIds,
+            boolean suppressNotification
     ) {
     }
 

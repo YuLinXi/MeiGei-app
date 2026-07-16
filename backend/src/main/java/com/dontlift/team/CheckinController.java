@@ -36,7 +36,7 @@ public class CheckinController {
     @PostMapping("/checkins")
     public List<TeamCheckin> checkIn(@Valid @RequestBody CheckIn req) {
         return checkinService.checkIn(SecurityUtils.currentUserId(),
-                req.workoutId(), req.checkinDate(), req.summary().toString(), req.teamIds());
+                req.workoutId(), req.checkinDate(), req.summary().toString(), req.teamIds(), req.suppressNotification());
     }
 
     /** 撤回某次训练在单个 Team 的可见性；个人训练记录不受影响。 */

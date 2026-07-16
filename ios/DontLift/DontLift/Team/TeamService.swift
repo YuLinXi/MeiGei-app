@@ -57,6 +57,29 @@ final class TeamService {
         try await api.send("GET", "/teams/\(teamId)/members")
     }
 
+    func todayNudgeState(teamId: UUID) async throws -> TeamNudgeTodayDTO {
+        try await api.send("GET", "/teams/\(teamId)/nudges/today")
+    }
+
+    @discardableResult
+    func nudge(teamId: UUID, recipientUserId: UUID) async throws -> TeamNudgeSendResultDTO {
+        try await api.send(
+            "POST",
+            "/teams/\(teamId)/members/\(recipientUserId)/nudges",
+            idempotencyKey: "team-nudge-\(teamId.uuidString):\(recipientUserId.uuidString):\(UUID().uuidString)"
+        )
+    }
+
+    @discardableResult
+    func updateTeamNotificationPreference(teamId: UUID, enabled: Bool) async throws -> TeamNudgeTodayDTO {
+        try await api.send(
+            "PATCH",
+            "/teams/\(teamId)/members/me/notification-preferences",
+            body: UpdateTeamNotificationPreferenceRequest(receiveTeamNotifications: enabled),
+            idempotencyKey: "team-notification-preference-\(teamId.uuidString):\(enabled):\(UUID().uuidString)"
+        )
+    }
+
     func mySharePreferences(cacheFor userId: UUID? = nil) async throws -> [TeamMemberDTO] {
         let preferences: [TeamMemberDTO] = try await api.send("GET", "/teams/members/me/share-preferences")
         if let userId {
@@ -225,7 +248,9 @@ final class TeamService {
         let body = CheckInRequest(workoutId: draft.workoutId,
                                   checkinDate: draft.checkinDate,
                                   summary: draft.summary,
-                                  teamIds: teamIds)
+                                  teamIds: teamIds,
+                                  suppressNotification: Self.shouldSuppressCheckinNotification(
+                                    checkinDate: draft.checkinDate))
         // 幂等键含 updatedAt：首次打卡去重；编辑训练后 updatedAt 变化 → 新键穿透幂等过滤，
         // 后端按 (team,user,workout) 更新摘要快照。
         return try await api.send("POST", "/checkins", body: body,
@@ -346,6 +371,10 @@ final class TeamService {
 
     static func dateOnly(_ date: Date) -> String { dateOnlyFormatter.string(from: date) }
 
+    static func shouldSuppressCheckinNotification(checkinDate: String, now: Date = .now) -> Bool {
+        checkinDate != dateOnly(now)
+    }
+
     private static let monthOnlyFormatter: DateFormatter = {
         let f = DateFormatter()
         f.calendar = Calendar(identifier: .gregorian)
@@ -415,7 +444,8 @@ final class TeamService {
                             suggestedSets: item.suggestedSets,
                             suggestedReps: item.suggestedReps,
                             suggestedWeightKg: nil,
-                            setPrescriptions: weightlessPrescriptions(item.orderedSetPrescriptions))
+                            setPrescriptions: weightlessPrescriptions(item.orderedSetPrescriptions),
+                            alternatives: item.alternatives)
         }
         return (try? String(data: JSONCoding.encoder.encode(items), encoding: .utf8)) ?? "[]"
     }
@@ -450,7 +480,9 @@ final class TeamService {
         let body = CheckInRequest(workoutId: intent.workoutId,
                                   checkinDate: intent.checkinDate,
                                   summary: intent.summary,
-                                  teamIds: intent.teamIds)
+                                  teamIds: intent.teamIds,
+                                  suppressNotification: Self.shouldSuppressCheckinNotification(
+                                    checkinDate: intent.checkinDate))
         return try await api.send("POST", "/checkins", body: body,
                                   idempotencyKey: intent.idempotencyKey)
     }
