@@ -7,7 +7,7 @@
 ## 0. 本次发版摘要
 
 - 版本号：`MARKETING_VERSION = 1.0`，`CURRENT_PROJECT_VERSION = 21`。
-- 后端状态：本地 build/test 已通过；生产 health 为 `UP`，但 Flyway 当前仍为 `V18`，候选后端及 `V19/V20` 尚未部署。
+- 后端状态：已于 2026-07-16 22:21 CST 部署生产，Flyway `V19/V20` 和独立 production smoke 均已通过。
 - iOS 状态：Simulator build/test 已通过；TestFlight `1.0 (21)` 尚未上传。
 - 发布顺序：提交并推送候选分支 → 部署后端并验证 `V19/V20` → Archive/上传 TestFlight → 等待 App Store Connect 状态 `VALID` → 真机回归 → 合并 `main` 并打 tag。
 - Tag 策略：只有生产后端部署成功、TestFlight build 21 为 `VALID` 且真机主流程回归通过后，才创建 `v1.0-b21`。
@@ -26,7 +26,7 @@
 - [x] Team 拍一拍本地 Simulator 端到端请求返回 `HTTP 200`，UI 与数据库状态一致。
 - [x] `git diff --check` 通过。
 - [x] 生产只读检查通过：health=`UP`、dev token=`404`、privacy=`200`、terms=`200`。
-- [x] 生产 Flyway 已确认当前最新为 `V18`，明确 `V19/V20` 仍待部署。
+- [x] 发布前生产 Flyway 已确认为 `V18`；随后已完成本次部署并升级到 `V20`。
 - [x] 当前候选改动已完成最终 review，工作区范围无遗漏或意外文件。
 - [x] 候选改动、版本号和两份发版文档已提交并推送到 `origin/feature/v1.0-b21`，功能候选 commit 为 `834aebd`。
 
@@ -34,29 +34,29 @@
 
 > 本次 iOS 依赖新的 Team nudge 和消息偏好 API，必须先部署后端。真实部署入口为 `backend/deploy/release-update.sh`。
 
-- [ ] 确认远程服务器备份目录和 PostgreSQL 备份可写。
-- [ ] 在候选分支已提交、推送且最终 review 通过后执行：
+- [x] 确认远程服务器备份目录和 PostgreSQL 备份可写。
+- [x] 在候选分支已提交、推送且最终 review 通过后执行：
 
 ```bash
 cd backend
 ./deploy/release-update.sh
 ```
 
-- [ ] 部署脚本完成数据库备份、代码同步和远程 `docker compose up -d --build`。
-- [ ] 连续检查生产 health，确认多次返回 `UP`：
+- [x] 部署脚本完成数据库备份、代码同步和远程 `docker compose up -d --build`。
+- [x] 连续检查生产 health，确认 3 次返回 `UP`：
 
 ```bash
 curl -fsS https://dontlift.peipadada.com/actuator/health
 ```
 
-- [ ] 查询 Flyway，确认 `V19` 与 `V20` 均为 `success=true`，最新版本为 `20`：
+- [x] 查询 Flyway，确认 `V19` 与 `V20` 均为 `success=true`，最新版本为 `20`：
 
 ```bash
 ssh root@124.222.79.121 "docker exec shared-postgres psql -U dontlift -d dontlift -tAc \
   \"SELECT version || '  ' || description || '  success=' || success FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 8;\""
 ```
 
-- [ ] 确认生产 dev token 仍关闭：
+- [x] 确认生产 dev token 仍关闭：
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \
@@ -65,10 +65,10 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 
 期望返回 `404`。
 
-- [ ] 确认 `/privacy` 与 `/terms` 均返回 `200`。
-- [ ] 检查后端启动日志，无 Flyway、MyBatis、APNs 或持续 5xx 异常。
+- [x] 确认 `/privacy` 与 `/terms` 均返回 `200`。
+- [x] 检查后端启动日志：Flyway 成功应用 2 个迁移，启动后扫描 `recent_errors=0`，无持续 5xx 异常。
 - [ ] 使用旧 TestFlight build 20 做最小兼容回归：Apple 登录、训练拉取/同步、Team 列表和动态正常。
-- [ ] 记录后端部署时间、备份位置、部署 commit 和迁移结果。
+- [x] 记录后端部署时间、备份位置、部署 commit 和迁移结果。
 
 ## 3. iOS TestFlight 上传
 
@@ -130,9 +130,9 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 
 ## 5. 合并、Tag 与推送
 
-> 当前后端尚未部署，TestFlight `1.0 (21)` 尚未上传；不要现在创建 `v1.0-b21` tag。
+> 当前后端已部署，TestFlight `1.0 (21)` 尚未确认 `VALID` 和真机回归；不要现在创建 `v1.0-b21` tag。
 
-- [ ] 生产后端 health 与 Flyway `V20` 验证通过。
+- [x] 生产后端 health 与 Flyway `V20` 验证通过。
 - [ ] TestFlight `1.0 (21)` 状态为 `VALID`，可安装。
 - [ ] TestFlight 主流程回归全部通过，阻塞问题已清零。
 - [ ] 将 `feature/v1.0-b21` 合并到最新 `main`，解决冲突后重新运行必要门禁。
@@ -155,9 +155,9 @@ git push origin v1.0-b21
 
 ## 7. 发布记录待回填
 
-- 后端部署 commit：
-- 数据库备份位置：
-- Flyway `V19/V20` 完成时间：
+- 后端部署 commit：`834aebd`
+- 数据库备份位置：`/opt/DontLift-app/backend/backups/dontlift_2026-07-16_222004.sql.gz`（`449K`）
+- Flyway `V19/V20` 完成时间：2026-07-16 22:21 CST
 - TestFlight 上传时间：
 - App Store Connect `VALID` 时间：
 - 真机回归设备与 iOS 版本：

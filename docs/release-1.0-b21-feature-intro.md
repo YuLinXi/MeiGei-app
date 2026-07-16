@@ -3,7 +3,7 @@
 > 适用版本：`1.0 (build 21)`
 > 对比基线：已发布版本 `v1.0-b20` 与当前 `feature/v1.0-b21` 候选版本的最终状态。
 > 生成时间：2026-07-16 22:12 CST。
-> 后端状态：本地构建和测试已通过；生产当前健康，但 Flyway 仍为 `V18`，本次后端代码及 `V19/V20` 尚未部署。
+> 后端状态：已于 2026-07-16 22:21 CST 部署生产，Flyway `V19/V20` 已应用，production smoke 通过。
 > iOS 状态：Simulator build/test 已通过；TestFlight `1.0 (21)` 尚未上传。
 
 ## 一句话摘要
@@ -35,7 +35,7 @@
 
 ## 兼容性说明
 
-- 本次必须先部署后端并确认 Flyway 从 `V18` 升级到 `V20`，再上传或放量 TestFlight build 21。若先安装新版 iOS，拍一拍和 Team 消息接口将不可用。
+- 本次后端已先于 TestFlight build 21 部署，Flyway 已从 `V18` 升级到 `V20`；新版 iOS 所需的拍一拍和 Team 消息接口已经就绪。
 - `V19/V20` 为新增表、索引和默认值调整；旧 build 20 不会调用新 nudge API，登录、训练、同步和既有 Team 功能可继续使用。
 - 已有 Team 成员的分享和消息偏好保持原值；默认开启只作用于新建或新加入的成员关系。
 - 计划备选字段为 optional，旧计划和旧训练记录可以继续解码；海报和计划详情改动主要在新版 iOS 客户端生效。
@@ -50,13 +50,14 @@
 - 8 个本次相关 OpenSpec change 均通过 strict validate：动态海报背景、计划备选动作、Team 拍一拍、结束训练休息回填、计划详情、计划手势、热身顺序和跨日 Team 通知。
 - Team 拍一拍本地端到端验证通过：Simulator 请求返回 `HTTP 200`，页面保持“已拍”，重新进入后可恢复服务端状态并确认落库。
 - `git diff --check` 通过；分支为 `feature/v1.0-b21`，发布基线为 `v1.0-b20`。
-- 生产只读检查通过：health=`UP`，`POST /auth/dev/token`=`404`，`/privacy`=`200`，`/terms`=`200`。
-- 生产 Flyway 当前最新仍为 `V18 workout set is warmup success=true`，证明 `V19/V20` 尚待本次后端部署。
+- 生产发布前备份已生成：`/opt/DontLift-app/backend/backups/dontlift_2026-07-16_222004.sql.gz`，大小 `449K`。
+- 生产后端容器重建成功；Flyway 已成功应用 `V19 team workout nudges` 与 `V20 team member preferences default enabled`，当前 schema 为 `V20`。
+- 独立 production smoke 通过：health 连续 3 次返回 `UP`，`POST /auth/dev/token`=`404`，`/privacy`=`200`，`/terms`=`200`，启动后日志扫描 `recent_errors=0`。
 - iOS 测试编译存在 Swift 6 actor-isolation 兼容性 warning，但当前 Swift 模式下不阻塞 build/test；本次没有测试失败。
 
 ## TestFlight 回归重点
 
-- 完成后端部署后，先确认 health、Flyway `V19/V20`、生产 dev token 关闭和旧 build 20 基础功能正常，再开始 build 21 回归。
+- 后端 health 与 Flyway `V19/V20` 已通过；开始 build 21 回归前，再用旧 build 20 快速确认 Apple 登录、训练同步和既有 Team 功能兼容。
 - 使用两个真实账号验证拍一拍：队友分组、发送成功、重复发送、已有 Team 动态不可拍、系统通知展示及点击后进入对应 Team。
 - 分别关闭“分享动态”和“Team消息”，确认前者只影响训练分享，后者统一停止当前 Team 的拍一拍、队友打卡和表情回应提醒，其他 Team 不受影响。
 - 为普通计划动作添加多个备选，验证个人计划、Team 分享、Fork 和离线重启后仍保留；训练未完成组时可切换，完成任意热身或正式组后不可切换。
