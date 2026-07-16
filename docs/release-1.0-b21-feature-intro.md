@@ -5,6 +5,7 @@
 > 生成时间：2026-07-16 22:12 CST。
 > 后端状态：已于 2026-07-16 22:21 CST 部署生产，Flyway `V19/V20` 已应用，production smoke 通过。
 > iOS 状态：Simulator build/test 已通过；TestFlight `1.0 (21)` 已为 `VALID` 并完成真机回归，2026-07-16 22:28 CST 由用户确认。
+> 发布状态：`feature/v1.0-b21` 已合并到 `main`，发布记录已完成，tag 为 `v1.0-b21`。
 
 ## 一句话摘要
 
@@ -49,11 +50,12 @@
 - iOS Simulator test 通过，xcresult 为 `Passed`，`192` 个测试、`0` failed、`0` skipped；参数化展开后的设备执行记录为 `195` 个 passed case。
 - 8 个本次相关 OpenSpec change 均通过 strict validate：动态海报背景、计划备选动作、Team 拍一拍、结束训练休息回填、计划详情、计划手势、热身顺序和跨日 Team 通知。
 - Team 拍一拍本地端到端验证通过：Simulator 请求返回 `HTTP 200`，页面保持“已拍”，重新进入后可恢复服务端状态并确认落库。
-- `git diff --check` 通过；分支为 `feature/v1.0-b21`，发布基线为 `v1.0-b20`。
+- `git diff --check` 通过；发布来源为 `feature/v1.0-b21`，基线为 `v1.0-b20`，已无冲突合并到 `main`。
 - 生产发布前备份已生成：`/opt/DontLift-app/backend/backups/dontlift_2026-07-16_222004.sql.gz`，大小 `449K`。
 - 生产后端容器重建成功；Flyway 已成功应用 `V19 team workout nudges` 与 `V20 team member preferences default enabled`，当前 schema 为 `V20`。
 - 独立 production smoke 通过：health 连续 3 次返回 `UP`，`POST /auth/dev/token`=`404`，`/privacy`=`200`，`/terms`=`200`，启动后日志扫描 `recent_errors=0`。
 - TestFlight `1.0 (21)` 已处理为 `VALID` 并完成真机回归，2026-07-16 22:28 CST 由用户确认，未报告阻塞问题。
+- `main` 合并后门禁再次通过：后端 `80` tests、iOS build、iOS `192` tests、8 个 OpenSpec strict validate、生产 health 和 Flyway `V20` 均正常。
 - iOS 测试编译存在 Swift 6 actor-isolation 兼容性 warning，但当前 Swift 模式下不阻塞 build/test；本次没有测试失败。
 
 ## TestFlight 回归重点

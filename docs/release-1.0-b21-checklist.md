@@ -11,6 +11,7 @@
 - iOS 状态：Simulator build/test 已通过；TestFlight `1.0 (21)` 已为 `VALID` 并完成真机回归，2026-07-16 22:28 CST 由用户确认。
 - 发布顺序：提交并推送候选分支 → 部署后端并验证 `V19/V20` → Archive/上传 TestFlight → 等待 App Store Connect 状态 `VALID` → 真机回归 → 合并 `main` 并打 tag。
 - Tag 策略：只有生产后端部署成功、TestFlight build 21 为 `VALID` 且真机主流程回归通过后，才创建 `v1.0-b21`。
+- 发布结果：全部门禁已通过，`feature/v1.0-b21` 已合并到 `main`，发布 tag 为 `v1.0-b21`。
 
 ## 1. 已完成准备
 
@@ -135,16 +136,17 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 - [x] 生产后端 health 与 Flyway `V20` 验证通过。
 - [x] TestFlight `1.0 (21)` 状态为 `VALID`，可安装，用户已确认。
 - [x] TestFlight 主流程回归全部通过，阻塞问题已清零，用户已确认。
-- [ ] 将 `feature/v1.0-b21` 合并到最新 `main`，解决冲突后重新运行必要门禁。
-- [ ] 推送 `main`。
-- [ ] 创建并推送 tag：
+- [x] 将 `feature/v1.0-b21` 无冲突合并到最新 `main`，合并 commit 为 `e8b079b`。
+- [x] 合并后重新运行门禁：后端 `80` tests、iOS build、iOS `192` tests、8 个 OpenSpec strict validate、生产 health 与 Flyway `V20` 均通过。
+- [x] 推送 `main`。
+- [x] 创建并推送 tag：
 
 ```bash
 git tag -a v1.0-b21 -m "TestFlight 发版：1.0 (build 21)"
 git push origin v1.0-b21
 ```
 
-- [ ] 在本 checklist 和功能介绍中回填生产部署、TestFlight `VALID`、真机回归和 tag 状态。
+- [x] 在本 checklist 和功能介绍中回填生产部署、TestFlight `VALID`、真机回归、`main` 合并和 tag 状态。
 
 ## 6. 回滚与异常处理
 
@@ -162,5 +164,6 @@ git push origin v1.0-b21
 - App Store Connect `VALID` 时间：2026-07-16 22:28 CST 用户确认
 - 真机回归设备与 iOS 版本：未提供
 - 回归结论与已知问题：通过，用户确认无阻塞问题
-- `main` 合并 commit：
-- `v1.0-b21` tag：
+- `main` 合并 commit：`e8b079b`
+- `v1.0-b21` tag：已创建并推送
+- 发布完成时间：2026-07-16 22:34 CST
