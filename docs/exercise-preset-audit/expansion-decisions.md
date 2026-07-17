@@ -201,3 +201,23 @@
 - M12 `FOAM_ROLL_LATS`：泡沫轴背阔肌放松，器械「其他」，分类「热身拉伸」，子分类「泡沫轴放松」。
 
 后续回填时新增 M1-M12。
+
+## 肩部第 2 批（2026-07-16）
+
+结论：接受两项，并用更不易歧义的标准名展示；用户提出的名称进入别名兼容层。
+
+- `CABLE_UPRIGHT_ROW`：标准名「绳索直立划船」，兼容「绳索站姿提拉」「站姿绳索提拉」「绳索直立提拉」。器械「绳索」，分类「肩 / 中束」，主动肌 `deltSide`，协同肌 `deltFront` + `traps` + `biceps`。
+  - 命名：英文通用名为 `Cable Upright Row`；「绳索直立划船」能明确贴身垂直上拉轨迹，避免「站姿绳索提拉」被理解为低位到高位的对角线核心动作。
+  - 肌群：绳索直立划船以三角肌中束为主要目标，三角肌前束、斜方肌和肘屈肌群协同。直立划船 EMG 研究也显示三角肌与斜方肌均有显著参与，宽握会进一步提高二者参与度。
+  - 分类：本 App 只有一个 L1 主分类；按主要训练目的归「肩」，L3 归「中束」，斜方肌作为协同肌保留高亮。
+- `SUPINATED_DB_LATERAL_RAISE`：标准名「掌心向上哑铃侧平举」，兼容「反握哑铃侧平举」「哑铃反握侧平举」。器械「哑铃」，分类「肩 / 前束」，主动肌 `deltFront`，协同肌 `deltSide` + `deltRear`。
+  - 命名：哑铃没有固定杆件方向，「掌心向上」比「反握」更准确地描述肩外旋位；别名继续覆盖用户常用说法。
+  - 肌群：侧平举在肩外旋位时，实验中三角肌前束激活最高，中束仍有明显参与，后束参与较低，因此按前束主导记录。
+  - 分类：归「肩 / 前束」，与普通「哑铃侧平举」的「肩 / 中束」保持区分。
+
+调研依据：
+
+- McAllister 等人的直立划船 EMG 研究：<https://pubmed.ncbi.nlm.nih.gov/22362088/>
+- `Cable Upright Row` 动作与肌群说明：<https://www.bodytrainer.tv/en/exercise/cable_upright_row>
+- Coratella 等人的侧平举旋转位 EMG 研究：<https://pmc.ncbi.nlm.nih.gov/articles/PMC7503819/>
+- ACE `Lateral Raise` 动作说明：<https://www.acefitness.org/resources/everyone/exercise-library/26/lateral-raise/>

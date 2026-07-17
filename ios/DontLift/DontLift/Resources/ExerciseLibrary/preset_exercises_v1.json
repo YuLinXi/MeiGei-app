@@ -3759,6 +3759,43 @@
       "formCues": [],
       "source": "preset-v1",
       "order": 223
+    },
+    {
+      "code": "CABLE_UPRIGHT_ROW",
+      "name": "绳索直立划船",
+      "category": "肩",
+      "subcategory": "中束",
+      "equipmentType": "绳索",
+      "primaryRegions": [
+        "deltSide"
+      ],
+      "secondaryRegions": [
+        "deltFront",
+        "traps",
+        "biceps"
+      ],
+      "note": "调研新增，兼容“绳索站姿提拉”",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 224
+    },
+    {
+      "code": "SUPINATED_DB_LATERAL_RAISE",
+      "name": "掌心向上哑铃侧平举",
+      "category": "肩",
+      "subcategory": "前束",
+      "equipmentType": "哑铃",
+      "primaryRegions": [
+        "deltFront"
+      ],
+      "secondaryRegions": [
+        "deltSide",
+        "deltRear"
+      ],
+      "note": "调研新增，兼容“反握哑铃侧平举”",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 225
     }
   ]
 }

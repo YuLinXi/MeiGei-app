@@ -71,6 +71,8 @@ const manualCodes = new Map(Object.entries({
   "单臂悍马机划船": "SINGLE_ARM_HAMMER_ROW",
   "史密斯肩推": "SMITH_SHOULDER_PRESS",
   "单臂绳索侧平举": "SINGLE_ARM_CABLE_LATERAL_RAISE",
+  "绳索直立划船": "CABLE_UPRIGHT_ROW",
+  "掌心向上哑铃侧平举": "SUPINATED_DB_LATERAL_RAISE",
   "交叉锤式弯举": "DB_CROSS_HAMMER_CURL",
   "双杠臂屈伸(胸)": "CHEST_DIP",
   "双杠臂屈伸(三头)": "TRICEP_DIP",
@@ -116,6 +118,8 @@ const manualAliases = [
   { targetName: "杠铃深蹲", legacyCodes: ["BB_SQUAT"], legacyNames: ["深蹲", "杠铃深蹲"] },
   { targetName: "罗马尼亚硬拉", legacyCodes: ["ROMANIAN_DL"], legacyNames: ["杠铃罗马尼亚硬拉", "罗马尼亚硬拉"] },
   { targetName: "单臂绳索下拉", legacyNames: ["龙门架单边下拉练胸", "单臂绳索下拉下压", "单臂绳索下拉"] },
+  { targetName: "绳索直立划船", legacyNames: ["绳索站姿提拉", "站姿绳索提拉", "绳索直立提拉"] },
+  { targetName: "掌心向上哑铃侧平举", legacyNames: ["反握哑铃侧平举", "哑铃反握侧平举"] },
   { targetName: "哑铃直立划船", legacyNames: ["站姿哑铃划船", "哑铃直立划船"] },
   { targetName: "窄距卧推", legacyNames: ["窄距卧推(靠近式)", "窄距卧推"] },
   { targetName: "单臂牧师凳弯举", legacyNames: ["坐姿单手牧师凳弯举", "单臂牧师凳弯举"] },
@@ -310,6 +314,8 @@ function secondaryRegionsFor(row) {
   if (category === "胸") add("deltFront", "triceps");
   if (category === "背" && !name.includes("硬拉") && !name.includes("山羊") && !name.includes("早安")) add("biceps", "deltRear");
   if (category === "肩" && name.includes("推")) add("triceps");
+  if (name === "绳索直立划船") add("deltFront", "traps", "biceps");
+  if (name === "掌心向上哑铃侧平举") add("deltSide", "deltRear");
   if (category === "腿" && name.includes("罗马尼亚")) add("glutes");
   if (category === "臀" && name.includes("单腿哑铃硬拉")) add("hams");
   return Array.from(regions);
