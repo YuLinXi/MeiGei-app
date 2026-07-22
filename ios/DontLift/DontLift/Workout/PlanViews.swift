@@ -604,6 +604,7 @@ struct PlanDetailView: View {
     @Environment(GlobalMessageCenter.self) private var globalMessage
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(WorkoutPresentationCenter.self) private var workoutPresentation
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Query(filter: #Predicate<WorkoutPlanGroup> { $0.deletedAt == nil },
            sort: \WorkoutPlanGroup.sortOrder)
     private var planGroups: [WorkoutPlanGroup]
@@ -633,6 +634,10 @@ struct PlanDetailView: View {
     @State private var showConflict = false
     /// 严格模式缺失必填预设时，阻止开始训练并展示原因。
     @State private var strictStartError: String?
+
+    @ScaledMetric(relativeTo: .subheadline) private var detailTitleFontSize = 13
+    @ScaledMetric(relativeTo: .caption) private var detailBodyFontSize = 12
+    @ScaledMetric(relativeTo: .caption2) private var detailMetadataFontSize = 11.5
 
     private static let log = Logger(subsystem: "com.yulinxi.app.DontLift", category: "PlanDetail")
 
@@ -939,7 +944,7 @@ struct PlanDetailView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("\(planItemTitle(item))，\(PlanItemDisplay.compactSummary(for: item))")
             .accessibilityValue(isExpanded ? "已展开" : "已收起")
-            .accessibilityHint(isExpanded ? "双击收起组次详情" : "双击展开组次详情")
+            .accessibilityHint(isExpanded ? "双击收起训练安排" : "双击展开训练安排")
 
             PaperActionMenuButton(items: planItemMenuItems(item),
                                   accessibilityLabel: "\(item.unitDisplayName)更多操作") { isPresented in
@@ -1005,56 +1010,46 @@ struct PlanDetailView: View {
     }
 
     private func singlePlanItemDetail(_ item: PlanItem) -> some View {
-        let groups = PlanItemDisplay.planGroups(for: item)
         let preview = PlanPrescriptionPreview.make(for: item,
                                                    mode: plan.mode,
                                                    lookup: historyStore.planLookup,
                                                    planId: plan.localId)
-        let nextGroups = PlanItemDisplay.groups(from: preview.sets)
+        let groups = PlanItemDisplay.groups(from: preview.sets)
+        let baselineSummary = plan.mode == .adaptive
+            ? PlanItemDisplay.templateBaselineSummary(for: item, comparedTo: preview.sets)
+            : nil
         return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            detailSectionTitle(item.isDropSet ? "递减组详情" : "组次详情")
+            trainingArrangementHeader(preview)
 
             if groups.isEmpty {
                 Text("尚未设置组次")
-                    .font(Theme.Font.body(size: 13))
+                    .font(Theme.Font.body(size: detailTitleFontSize))
                     .foregroundStyle(Theme.Color.muted)
             } else {
                 VStack(spacing: 0) {
                     ForEach(groups) { group in
-                        plannedGroupRow(group, includesWeight: plan.mode == .strict)
+                        trainingGroupRow(group, equipmentType: item.resolvedEquipmentType)
                         if group.id != groups.last?.id { detailDivider }
                     }
                 }
+            }
+
+            if let baselineSummary {
+                detailDivider
+                detailKeyValue(label: "模板基准", value: baselineSummary)
             }
 
             if !item.usableAlternatives.isEmpty {
                 detailDivider
                 VStack(alignment: .leading, spacing: 5) {
                     Text("备选动作")
-                        .font(Theme.Font.body(size: 12, weight: .bold))
+                        .font(Theme.Font.body(size: detailBodyFontSize, weight: .bold))
                         .foregroundStyle(Theme.Color.fg2)
                     Text(item.usableAlternatives.map(\.displayExerciseName).joined(separator: "、"))
-                        .font(Theme.Font.body(size: 13))
+                        .font(Theme.Font.body(size: detailTitleFontSize))
                         .foregroundStyle(Theme.Color.fg)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-            }
-
-            detailDivider
-            if plan.mode == .adaptive {
-                VStack(alignment: .leading, spacing: 8) {
-                    detailSectionTitle("下次训练重量")
-                    Text(preview.detailText)
-                        .font(Theme.Font.body(size: 11.5))
-                        .foregroundStyle(Theme.Color.muted)
-                    ForEach(nextGroups) { group in
-                        nextWeightGroupRow(group)
-                    }
-                }
-            } else {
-                Label("严格模式 · 完成后不更新", systemImage: "lock")
-                    .font(Theme.Font.body(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
             }
         }
         .cardStyle(padding: 14)
@@ -1063,19 +1058,17 @@ struct PlanDetailView: View {
     private func supersetPlanItemDetail(_ item: PlanItem) -> some View {
         let members = PlanItemDisplay.supersetMembers(for: item)
         return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            detailSectionTitle("超级组详情")
+            detailSectionTitle("训练安排")
             detailKeyValue(label: "轮数", value: "\(item.supersetRounds) 轮")
             detailDivider
 
             ForEach(Array(members.enumerated()), id: \.element.id) { index, member in
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("动作 \(index + 1) · \(member.name)")
-                        .font(Theme.Font.body(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.fg)
-                    detailKeyValue(label: "计划次数", value: repsText(member.reps))
-                    detailKeyValue(label: plan.mode == .adaptive ? "下次训练重量" : "计划重量",
-                                   value: weightText(member.weightKg))
-                }
+                detailKeyValue(
+                    label: "动作 \(index + 1) · \(member.name)",
+                    value: PlanItemDisplay.valueText(weightKg: member.weightKg,
+                                                     reps: member.reps,
+                                                     equipmentType: member.equipmentType)
+                )
                 if member.id != members.last?.id { detailDivider }
             }
 
@@ -1084,95 +1077,112 @@ struct PlanDetailView: View {
                            value: item.supersetRestAfterRoundSeconds.map { "\($0) 秒" } ?? "未设置")
             if plan.mode == .strict {
                 Label("严格模式 · 完成后不更新", systemImage: "lock")
-                    .font(Theme.Font.body(size: 12, weight: .semibold))
+                    .font(Theme.Font.body(size: detailBodyFontSize, weight: .semibold))
                     .foregroundStyle(Theme.Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .cardStyle(padding: 14)
     }
 
-    private func detailSectionTitle(_ title: String) -> some View {
-        Text(title)
-            .font(Theme.Font.body(size: 13, weight: .bold))
-            .foregroundStyle(Theme.Color.fg)
+    private func trainingArrangementHeader(_ preview: PlanPrescriptionPreview) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            if plan.mode == .adaptive {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 5) {
+                        detailSectionTitle("下次训练安排")
+                        previewBadge(preview.badgeText)
+                    }
+                } else {
+                    HStack(spacing: 7) {
+                        detailSectionTitle("下次训练安排")
+                        previewBadge(preview.badgeText)
+                    }
+                }
+                Text(preview.detailText)
+                    .font(Theme.Font.body(size: detailMetadataFontSize))
+                    .foregroundStyle(Theme.Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                detailSectionTitle("训练安排")
+                Label("严格模式 · 完成后不更新", systemImage: "lock")
+                    .font(Theme.Font.body(size: detailBodyFontSize, weight: .semibold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
-    private func plannedGroupRow(_ group: PlanItemGroupDisplay, includesWeight: Bool) -> some View {
+    private func previewBadge(_ text: String) -> some View {
+        Text(text)
+            .font(Theme.Font.body(size: detailMetadataFontSize, weight: .bold))
+            .foregroundStyle(Theme.Color.accent)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Theme.Color.accentSoft, in: Capsule())
+    }
+
+    private func detailSectionTitle(_ title: String) -> some View {
+        Text(title)
+            .font(Theme.Font.body(size: detailTitleFontSize, weight: .bold))
+            .foregroundStyle(Theme.Color.fg)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func trainingGroupRow(_ group: PlanItemGroupDisplay, equipmentType: String?) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             if group.kind == .drop {
                 Text(group.title)
-                    .font(Theme.Font.body(size: 12, weight: .semibold))
+                    .font(Theme.Font.body(size: detailBodyFontSize, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg2)
                 ForEach(group.values) { value in
                     detailKeyValue(label: "第 \(value.position + 1) 段",
-                                   value: plannedValueText(value, includesWeight: includesWeight))
+                                   value: PlanItemDisplay.groupValueText(value, equipmentType: equipmentType))
                 }
             } else {
                 detailKeyValue(label: group.title,
-                               value: plannedValueText(group.values.first, includesWeight: includesWeight))
+                               value: PlanItemDisplay.groupValueText(group.values.first, equipmentType: equipmentType))
             }
         }
         .padding(.vertical, 8)
     }
 
-    private func nextWeightGroupRow(_ group: PlanItemGroupDisplay) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if group.kind == .drop {
-                Text(group.title)
-                    .font(Theme.Font.body(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg2)
-                ForEach(group.values) { value in
-                    detailKeyValue(label: "第 \(value.position + 1) 段",
-                                   value: weightText(value.weightKg))
-                }
-            } else {
-                detailKeyValue(label: group.title,
-                               value: weightText(group.values.first?.weightKg))
+    @ViewBuilder
+    private func detailKeyValue(label: String, value: String) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 4) {
+                detailLabel(label)
+                detailValue(value, alignment: .leading)
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                detailLabel(label)
+                Spacer(minLength: 8)
+                detailValue(value, alignment: .trailing)
+                    .layoutPriority(1)
             }
         }
-        .padding(.vertical, 4)
     }
 
-    private func detailKeyValue(label: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(label)
-                .font(Theme.Font.body(size: 12))
-                .foregroundStyle(Theme.Color.muted)
-            Spacer(minLength: 8)
-            Text(value)
-                .font(Theme.Font.mono(size: 12, weight: .semibold))
-                .foregroundStyle(Theme.Color.fg)
-                .multilineTextAlignment(.trailing)
-        }
+    private func detailLabel(_ text: String) -> some View {
+        Text(text)
+            .font(Theme.Font.body(size: detailBodyFontSize))
+            .foregroundStyle(Theme.Color.muted)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func detailValue(_ text: String, alignment: TextAlignment) -> some View {
+        Text(text)
+            .font(Theme.Font.mono(size: detailBodyFontSize, weight: .semibold))
+            .foregroundStyle(Theme.Color.fg)
+            .multilineTextAlignment(alignment)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var detailDivider: some View {
         Rectangle()
             .fill(Theme.Color.border)
             .frame(height: 1)
-    }
-
-    private func plannedValueText(_ value: PlanItemGroupValue?, includesWeight: Bool) -> String {
-        guard let value else { return "未设置" }
-        if !includesWeight { return repsText(value.reps) }
-        switch (value.weightKg, value.reps) {
-        case let (.some(weight), .some(reps)):
-            return "\(formatKg(weight)) kg × \(reps) 次"
-        case let (.some(weight), .none):
-            return "\(formatKg(weight)) kg"
-        case let (.none, .some(reps)):
-            return "\(reps) 次"
-        case (.none, .none):
-            return "未设置"
-        }
-    }
-
-    private func repsText(_ reps: Int?) -> String {
-        reps.map { "\($0) 次" } ?? "未设置"
-    }
-
-    private func weightText(_ weight: Double?) -> String {
-        weight.map { "\(formatKg($0)) kg" } ?? "未设置"
     }
 
     private var modeInfoCard: some View {
@@ -1187,7 +1197,7 @@ struct PlanDetailView: View {
                         .font(Theme.Font.body(size: 15, weight: .bold))
                         .foregroundStyle(Theme.Color.fg)
                     Text(plan.mode == .adaptive
-                         ? "自适应模式会按训练安排预填；展开动作可查看下次训练重量，完成后继续跟随实绩更新。"
+                         ? "自适应模式会按训练安排预填；展开动作可查看完整下次训练安排，完成后继续跟随实绩更新。"
                          : "严格模式会复制当前训练安排；完成后不回写，每个动作需有组数与次数。")
                         .font(Theme.Font.body(size: 12))
                         .foregroundStyle(Theme.Color.fg2)
