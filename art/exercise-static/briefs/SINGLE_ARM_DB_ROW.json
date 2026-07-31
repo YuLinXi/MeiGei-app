@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "SINGLE_ARM_DB_ROW",
+  "exerciseName": "单臂哑铃划船",
+  "variant": "单膝单手支撑的单臂哑铃划船",
+  "representativePose": "人物一膝和同侧手支撑在平凳，另一脚着地；自由手中立握哑铃，肘向后将其拉到髋部，躯干保持稳定。",
+  "camera": { "view": "45° 前侧视角，突出三点支撑、单只哑铃和工作侧背阔肌", "subjectFill": "显示平凳、支撑手膝、自由脚、工作臂和完整哑铃", "safeMarginPercent": 8 },
+  "equipment": { "family": "平凳辅助单只哑铃", "recognitionFeatures": ["一只平凳", "一膝一手支撑", "单只自由哑铃", "无绳索或杠铃"] },
+  "grip": "工作手闭合中立握，掌心朝向身体",
+  "bodyContacts": ["一手支撑平凳", "一膝支撑平凳", "另一脚着地", "另一手握哑铃"],
+  "jointDirections": ["髋部稳定", "工作肘向后", "肩胛骨后缩下压", "脊柱保持平直"],
+  "primaryMuscles": ["背阔肌", "菱形肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["双臂同步", "无平凳支撑", "两只哑铃", "身体扭转或弓背", "工作臂/哑铃裁切"]
+}

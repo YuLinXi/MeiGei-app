@@ -1,0 +1,45 @@
+{
+  "assetId": "GLUTE_KICKBACK_MACHINE-v1",
+  "exerciseCode": "GLUTE_KICKBACK_MACHINE",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T02:00:03.602Z",
+  "promptPath": "art/exercise-static/briefs/GLUTE_KICKBACK_MACHINE.json",
+  "briefPath": "art/exercise-static/briefs/GLUTE_KICKBACK_MACHINE.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/GLUTE_KICKBACK_MACHINE.json",
+      "sha256": "bd93de0a968878e2923788202442bc72150e6ba5e7d2b4a9f1fd8c7171fcf994",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/GLUTE_KICKBACK_MACHINE/GLUTE_KICKBACK_MACHINE-candidate-01.png",
+      "sha256": "426cbdf25f7013246bc9b3c0e69dd5959696a1c0e4217de48c46b4c5e0ca71eb",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/GLUTE_KICKBACK_MACHINE-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1846319,
+  "sha256": "426cbdf25f7013246bc9b3c0e69dd5959696a1c0e4217de48c46b4c5e0ca71eb",
+  "reviewRecord": "art/exercise-static/reviews/GLUTE_KICKBACK_MACHINE-review.json",
+  "approvedAt": "2026-07-25T02:00:03.602Z",
+  "reviewerId": "production-autopilot"
+}

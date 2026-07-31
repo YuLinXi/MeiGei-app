@@ -1,0 +1,45 @@
+{
+  "assetId": "FROG_PUMP-v1",
+  "exerciseCode": "FROG_PUMP",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T21:59:57.521Z",
+  "promptPath": "art/exercise-static/briefs/FROG_PUMP.json",
+  "briefPath": "art/exercise-static/briefs/FROG_PUMP.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/FROG_PUMP.json",
+      "sha256": "4d65ea1e16730be3c1532e29590106f944caac704e57fca2aecbf69f8c4e83eb",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/FROG_PUMP/FROG_PUMP-candidate-01.png",
+      "sha256": "f56d5e5ca836fe77ca2578500ad48e8b444e589cdda60dbebb099ce9eaa1c9b8",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/FROG_PUMP-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 2028088,
+  "sha256": "f56d5e5ca836fe77ca2578500ad48e8b444e589cdda60dbebb099ce9eaa1c9b8",
+  "reviewRecord": "art/exercise-static/reviews/FROG_PUMP-review.json",
+  "approvedAt": "2026-07-25T21:59:57.521Z",
+  "reviewerId": "production-autopilot"
+}

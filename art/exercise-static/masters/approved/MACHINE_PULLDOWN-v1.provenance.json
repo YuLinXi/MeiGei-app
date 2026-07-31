@@ -1,0 +1,45 @@
+{
+  "assetId": "MACHINE_PULLDOWN-v1",
+  "exerciseCode": "MACHINE_PULLDOWN",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-29T05:05:00.000Z",
+  "promptPath": "art/exercise-static/briefs/MACHINE_PULLDOWN.json",
+  "briefPath": "art/exercise-static/briefs/MACHINE_PULLDOWN.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/MACHINE_PULLDOWN.json",
+      "sha256": "6126281dfa484b60631cc73a7a9e2b2e47718a2ebf42b06a269c3ec537c750db",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/MACHINE_PULLDOWN/MACHINE_PULLDOWN-candidate-selectorized-v2.png",
+      "sha256": "6aa0ea41c860ad33bc07c804c47abcd9912964cadd9a2ac40b5ff0240d95aa5b",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/MACHINE_PULLDOWN/MACHINE_PULLDOWN-candidate-selectorized-v2.png",
+      "sha256": "6aa0ea41c860ad33bc07c804c47abcd9912964cadd9a2ac40b5ff0240d95aa5b",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/MACHINE_PULLDOWN/MACHINE_PULLDOWN-candidate-selectorized-v2.png",
+      "sha256": "6aa0ea41c860ad33bc07c804c47abcd9912964cadd9a2ac40b5ff0240d95aa5b",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑；将候选图统一填充至 1536×1536 白底母版尺寸。",
+  "file": "art/exercise-static/masters/approved/MACHINE_PULLDOWN-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1503045,
+  "sha256": "89a9c44ba4363f2613ce5b2128ea1b4566152fd82351d2917ebaf18c6cb7ccc5",
+  "reviewRecord": "art/exercise-static/reviews/MACHINE_PULLDOWN-review.json",
+  "approvedAt": "2026-07-29T05:05:00.000Z",
+  "reviewerId": "project-owner"
+}

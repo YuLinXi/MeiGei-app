@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "CLOSE_LAT_PULLDOWN",
+  "exerciseName": "窄握正手高位下拉",
+  "variant": "坐姿窄握正手高位下拉，短直杆拉至上胸",
+  "representativePose": "人物坐在高位下拉座椅，双腿由压腿垫固定，躯干直立；双手窄于肩正握短直杆，杆至上胸，双肘向下靠近肋骨。",
+  "camera": { "view": "45° 前侧视角，显示正面握法、杆路、背阔肌和配重架", "subjectFill": "显示完整人物、座椅、短直杆、导线、滑轮、配重块和双脚", "safeMarginPercent": 8 },
+  "equipment": { "family": "标准高位下拉机与短直杆", "recognitionFeatures": ["顶部滑轮和竖直导线", "窄握短直杆", "座椅与大腿压垫", "侧置配重块"] },
+  "grip": "双手闭合正握，握距明显窄于肩，腕部中立",
+  "bodyContacts": ["臀部坐在座椅", "双腿接触压腿垫", "双手握住短直杆", "杆接近上胸"],
+  "jointDirections": ["肩关节内收", "肘关节向下屈曲", "肩胛骨下压并后缩", "脊柱保持中立"],
+  "primaryMuscles": ["背阔肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["宽握或反握", "杆拉到颈后", "站姿下压", "电缆穿过头脸", "窄握特征不清或设备被裁切"]
+}

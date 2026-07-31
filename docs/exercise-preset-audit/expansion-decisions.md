@@ -34,10 +34,9 @@
 - B4 `CHEST_SUPPORTED_MACHINE_ROW`：胸托器械划船，器械「器械」，分类「背」，主动肌 `lats` + `rhomboids`，协同肌 `biceps` + `deltRear`。
 - B5 `MEADOWS_ROW`：梅多斯划船，器械「杠铃」，分类「背」，主动肌 `lats` + `rhomboids`，协同肌 `biceps` + `deltRear`。
 - B6 `SEAL_ROW`：海豹划船，器械「杠铃」，分类「背」，主动肌 `lats` + `rhomboids`，协同肌 `biceps` + `deltRear`。
-- B7 `MACHINE_PULLOVER`：器械上拉，器械「器械」，分类「背」，主动肌 `lats`，协同肌 `chest` + `triceps`。
 - B8 `LANDMINE_ROW`：地雷杆划船，器械「杠铃」，分类「背」，主动肌 `lats` + `rhomboids`，协同肌 `biceps` + `deltRear`。
 
-后续回填时新增 B1-B8。
+后续回填时新增 B1-B6、B8。
 
 ## 肩部第 1 批
 

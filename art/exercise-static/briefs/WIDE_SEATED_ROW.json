@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "WIDE_SEATED_ROW",
+  "exerciseName": "宽握坐姿划船",
+  "variant": "坐姿低位绳索长直杆宽握正手划船",
+  "representativePose": "人物坐在低位绳索站，双脚抵脚踏；双手远宽于肩正握长直杆，将杆拉至上腹，肘部略向外但不高于肩。",
+  "camera": { "view": "45° 前侧视角，展示宽握距离、长直杆和脚踏", "subjectFill": "完整显示人物、长杆两端、电缆、脚踏和配重", "safeMarginPercent": 8 },
+  "equipment": { "family": "低位绳索机与长直杆", "recognitionFeatures": ["低位滑轮", "肩宽以外的长直杆握点", "脚踏板", "配重块"] },
+  "grip": "双手闭合正握，握距明显宽于肩",
+  "bodyContacts": ["臀部座椅", "双脚抵脚踏", "双手握长直杆", "直杆至上腹"],
+  "jointDirections": ["肩胛骨后缩", "肘向后并略外展", "躯干中立", "膝部微屈"],
+  "primaryMuscles": ["菱形肌", "背阔肌"],
+  "secondaryMuscles": ["三角肌后束", "肱二头肌"],
+  "rejectionCases": ["窄握或 V-bar", "高位下拉", "肘部高过肩变后束飞鸟", "杆或脚踏裁切", "宽握特征不清"]
+}

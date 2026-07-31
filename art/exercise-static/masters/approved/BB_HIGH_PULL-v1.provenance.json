@@ -1,0 +1,45 @@
+{
+  "assetId": "BB_HIGH_PULL-v1",
+  "exerciseCode": "BB_HIGH_PULL",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T04:36:45.132Z",
+  "promptPath": "art/exercise-static/briefs/BB_HIGH_PULL.json",
+  "briefPath": "art/exercise-static/briefs/BB_HIGH_PULL.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/BB_HIGH_PULL.json",
+      "sha256": "607380b52eaaa265a3fcf04793ac6940bed16a2a6b6a4255ea15dd52c0dee2c1",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/BB_HIGH_PULL/BB_HIGH_PULL-candidate-01.png",
+      "sha256": "b9646b684dac3db8e3b85b420cb5b0590796bc2cceff7f23951c128b67a883dd",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/BB_HIGH_PULL-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1662643,
+  "sha256": "b9646b684dac3db8e3b85b420cb5b0590796bc2cceff7f23951c128b67a883dd",
+  "reviewRecord": "art/exercise-static/reviews/BB_HIGH_PULL-review.json",
+  "approvedAt": "2026-07-25T04:36:45.132Z",
+  "reviewerId": "production-autopilot"
+}

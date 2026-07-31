@@ -1,0 +1,45 @@
+{
+  "assetId": "ROPE_PUSHDOWN-v1",
+  "exerciseCode": "ROPE_PUSHDOWN",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-29T04:34:44.000Z",
+  "promptPath": "art/exercise-static/briefs/ROPE_PUSHDOWN.json",
+  "briefPath": "art/exercise-static/briefs/ROPE_PUSHDOWN.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/ROPE_PUSHDOWN.json",
+      "sha256": "490a8a639e78bbf7ba4677df25617d09303fc610ccce9671c2f0fb9afcfecb4a",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/ROPE_PUSHDOWN/ROPE_PUSHDOWN-candidate-v2.png",
+      "sha256": "f6c5c3f634a5cef3228924c38d899488af1004a2a924f5d3f5c9ff10440ad5a8",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/ROPE_PUSHDOWN-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1536,
+  "sizeBytes": 1505180,
+  "sha256": "514e994e44bfccf9d889fcdc681be3df4435f0e1ca29d348bd9c760543b57c47",
+  "reviewRecord": "art/exercise-static/reviews/ROPE_PUSHDOWN-review.json",
+  "approvedAt": "2026-07-29T04:34:44.000Z",
+  "reviewerId": "project-owner"
+}

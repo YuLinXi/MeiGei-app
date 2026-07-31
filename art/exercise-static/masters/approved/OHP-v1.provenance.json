@@ -1,0 +1,24 @@
+{
+  "assetId": "OHP-v1",
+  "exerciseCode": "OHP",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-24T09:34:17Z",
+  "promptPath": "art/exercise-static/briefs/OHP.json",
+  "briefPath": "art/exercise-static/briefs/OHP.json",
+  "inputs": [
+    { "kind": "original-text", "source": "art/exercise-static/briefs/OHP.json", "sha256": "b2f059958b4f86c943fc843dfd59ec53a9d820b473419fe4364e7b195047637f", "rightsBasis": "本项目原创动作与器械 brief" },
+    { "kind": "owned-reference", "source": "art/exercise-static/references/approved/character-v1.png", "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590", "rightsBasis": "本项目已批准的原创统一角色母版" },
+    { "kind": "owned-reference", "source": "art/exercise-static/references/approved/style-v1.png", "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0", "rightsBasis": "本项目已批准的原创风格母版" }
+  ],
+  "humanEdits": "无手工像素编辑；候选 02 通过 imagegen edit 移除前序自有候选的乳头特征，并保持严格站姿推举、杠铃结构、肌肉高亮和构图。前序候选按 staging 清理规则未保留可校验文件。",
+  "file": "art/exercise-static/masters/approved/OHP-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1575856,
+  "sha256": "959a5d101c02c00537a781ea7eeb30ae693d52ed12c1d3e40052b10b29045d5c",
+  "reviewRecord": "art/exercise-static/reviews/OHP-candidate-02-review.md",
+  "approvedAt": "2026-07-24T11:10:21Z",
+  "reviewerId": "project-owner"
+}

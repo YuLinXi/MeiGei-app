@@ -1,0 +1,45 @@
+{
+  "assetId": "ARNOLD_PRESS-v1",
+  "exerciseCode": "ARNOLD_PRESS",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T04:30:40.485Z",
+  "promptPath": "art/exercise-static/briefs/ARNOLD_PRESS.json",
+  "briefPath": "art/exercise-static/briefs/ARNOLD_PRESS.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/ARNOLD_PRESS.json",
+      "sha256": "5b733139f9acb050b0975672ca85f5bb786847e95760310da6f151dd07cdd3fa",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/ARNOLD_PRESS/ARNOLD_PRESS-candidate-04.png",
+      "sha256": "cbecd2d7cde48681d3512da558c3f508cb650f283681c6112cec7e248706dd8d",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/ARNOLD_PRESS-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1580486,
+  "sha256": "cbecd2d7cde48681d3512da558c3f508cb650f283681c6112cec7e248706dd8d",
+  "reviewRecord": "art/exercise-static/reviews/ARNOLD_PRESS-review.json",
+  "approvedAt": "2026-07-25T04:30:40.485Z",
+  "reviewerId": "production-autopilot"
+}

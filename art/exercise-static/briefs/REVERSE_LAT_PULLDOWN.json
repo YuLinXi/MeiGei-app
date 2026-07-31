@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "REVERSE_LAT_PULLDOWN",
+  "exerciseName": "窄握反手高位下拉",
+  "variant": "坐姿窄握反手高位下拉，短直杆拉至上胸",
+  "representativePose": "人物坐在高位下拉座椅，双手窄于肩反握短直杆，掌心朝向人物；杆拉至上胸，肘向下略向前，躯干直立。",
+  "camera": { "view": "45° 前侧视角，优先表现直杆和反握手腕方向", "subjectFill": "显示完整人物、直杆、两手、滑轮、配重和下肢固定关系", "safeMarginPercent": 8 },
+  "equipment": { "family": "标准高位下拉机与短直杆", "recognitionFeatures": ["顶部滑轮和导线", "窄握短直杆", "座椅与压腿垫", "侧置配重块"] },
+  "grip": "双手闭合反握，掌心朝向人物，握距明显窄于肩",
+  "bodyContacts": ["臀部接触座椅", "大腿接触压腿垫", "双手握住直杆", "直杆至上胸"],
+  "jointDirections": ["肩关节内收", "肘部向下并略向前", "肩胛骨下压后缩", "脊柱中立"],
+  "primaryMuscles": ["背阔肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["正握或宽握", "颈后下拉", "直臂下压", "手掌方向无法判断", "直杆或脚部裁切"]
+}

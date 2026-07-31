@@ -1,0 +1,45 @@
+{
+  "assetId": "T_BAR_ROW-v1",
+  "exerciseCode": "T_BAR_ROW",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-30T07:10:47.571Z",
+  "promptPath": "art/exercise-static/briefs/T_BAR_ROW.json",
+  "briefPath": "art/exercise-static/briefs/T_BAR_ROW.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/T_BAR_ROW.json",
+      "sha256": "139863adcb3e93e83f56a5257f4280830823c7f7ce366df489ddbadfade00827",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/T_BAR_ROW/T_BAR_ROW-candidate-landmine-researched-v10.png",
+      "sha256": "fbb5ecd0ff7ef8499c7988fec2d32e068127541299010c2af027f4eb5b0622e4",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑；将人工确认候选图白底补齐为 1536×1536 母版尺寸。",
+  "file": "art/exercise-static/masters/approved/T_BAR_ROW-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1536,
+  "sizeBytes": 1448196,
+  "sha256": "2f864eedc733d2e0c6f5f54714815c23b3c399a3048d8f1d569a31bed661d53c",
+  "reviewRecord": "art/exercise-static/reviews/T_BAR_ROW-review.json",
+  "approvedAt": "2026-07-30T07:10:47.571Z",
+  "reviewerId": "human-review"
+}

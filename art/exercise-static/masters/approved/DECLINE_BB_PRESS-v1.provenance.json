@@ -1,0 +1,45 @@
+{
+  "assetId": "DECLINE_BB_PRESS-v1",
+  "exerciseCode": "DECLINE_BB_PRESS",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-28T02:13:09.000Z",
+  "promptPath": "art/exercise-static/briefs/DECLINE_BB_PRESS.json",
+  "briefPath": "art/exercise-static/briefs/DECLINE_BB_PRESS.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/DECLINE_BB_PRESS.json",
+      "sha256": "dff8d5b4a651b8db1775a4ddd12f55c482287e0c7de6f6b1e3c2c5e8f9c03039",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/staging/candidates/DECLINE_BB_PRESS/DECLINE_BB_PRESS-candidate-02.png",
+      "sha256": "ec183919d9d7ce597058250ee07be929ca7658d7d799976c2e7385c9da66b64e",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/DECLINE_BB_PRESS-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1536,
+  "sizeBytes": 1918192,
+  "sha256": "ec183919d9d7ce597058250ee07be929ca7658d7d799976c2e7385c9da66b64e",
+  "reviewRecord": "art/exercise-static/reviews/DECLINE_BB_PRESS-review.json",
+  "approvedAt": "2026-07-28T02:13:09.000Z",
+  "reviewerId": "project-owner"
+}

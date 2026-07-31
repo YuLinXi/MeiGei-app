@@ -1,0 +1,3 @@
+# 只将已批准的高分辨率静态母版交给 Git LFS；运行时 JPG、候选图和仓库其他图片保持原存储方式。
+art/exercise-static/references/approved/*.png filter=lfs diff=lfs merge=lfs -text
+art/exercise-static/masters/approved/*.png filter=lfs diff=lfs merge=lfs -text

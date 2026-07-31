@@ -1,0 +1,45 @@
+{
+  "assetId": "STRAIGHT_ARM_PULLDOWN-v1",
+  "exerciseCode": "STRAIGHT_ARM_PULLDOWN",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-30T02:10:00.000Z",
+  "promptPath": "art/exercise-static/briefs/STRAIGHT_ARM_PULLDOWN.json",
+  "briefPath": "art/exercise-static/briefs/STRAIGHT_ARM_PULLDOWN.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/STRAIGHT_ARM_PULLDOWN.json",
+      "sha256": "36b896923a553d1cb0a470bd62372ade27a86e167aa1986733c53e28db01b6ca",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/STRAIGHT_ARM_PULLDOWN/STRAIGHT_ARM_PULLDOWN-candidate-side-rear-v2.png",
+      "sha256": "7a8bbc044a1dee4d479dbcf51d927eff8c4f576417c58392832d514746c4651a",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/STRAIGHT_ARM_PULLDOWN/STRAIGHT_ARM_PULLDOWN-candidate-side-rear-v2.png",
+      "sha256": "7a8bbc044a1dee4d479dbcf51d927eff8c4f576417c58392832d514746c4651a",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/STRAIGHT_ARM_PULLDOWN/STRAIGHT_ARM_PULLDOWN-candidate-side-rear-v2.png",
+      "sha256": "7a8bbc044a1dee4d479dbcf51d927eff8c4f576417c58392832d514746c4651a",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑；将确认候选图统一填充至 1536×1536 白底母版尺寸。",
+  "file": "art/exercise-static/masters/approved/STRAIGHT_ARM_PULLDOWN-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1515146,
+  "sha256": "05d47c9790d3166db75cfcece42fe7511acb791a0cac821f403a31d72041f14b",
+  "reviewRecord": "art/exercise-static/reviews/STRAIGHT_ARM_PULLDOWN-review.json",
+  "approvedAt": "2026-07-30T02:10:00.000Z",
+  "reviewerId": "project-owner"
+}

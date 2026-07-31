@@ -1,0 +1,45 @@
+{
+  "assetId": "PEC_DECK_FLY-v1",
+  "exerciseCode": "PEC_DECK_FLY",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-24T05:57:30Z",
+  "promptPath": "art/exercise-static/briefs/PEC_DECK_FLY.md",
+  "briefPath": "art/exercise-static/briefs/PEC_DECK_FLY.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/PEC_DECK_FLY.md",
+      "sha256": "11fd5e414bf2022268d7d7d2c2cc88685a306a004751757c64c75dd80f097090",
+      "rightsBasis": "本项目原创文字 prompt"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "本地未入库的 PEC_DECK_FLY-candidate-01.png",
+      "sha256": "2235c2165af4694ecc84f3c2577a5ec3612ae3d46464122506c74111d2ee1669",
+      "rightsBasis": "本项目通过 imagegen 生成的前序候选，仅作为候选 02 的 edit target；按候选不入库规则只保留摘要"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑；候选 02 通过 imagegen edit 弱化明显乳头圆点、乳晕环和凸起，保持候选 01 的构图、动作与器械。",
+  "file": "art/exercise-static/masters/approved/PEC_DECK_FLY-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1813582,
+  "sha256": "a4c0f07e6046f73717505222ea3deee1e029381cb7734553e230e1295ce9f82f",
+  "reviewRecord": "art/exercise-static/reviews/PEC_DECK_FLY-candidate-02-review.md",
+  "approvedAt": "2026-07-24T06:05:27Z",
+  "reviewerId": "project-owner"
+}

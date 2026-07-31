@@ -1,0 +1,45 @@
+{
+  "assetId": "PISTOL_SQUAT-v1",
+  "exerciseCode": "PISTOL_SQUAT",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T21:58:08.751Z",
+  "promptPath": "art/exercise-static/briefs/PISTOL_SQUAT.json",
+  "briefPath": "art/exercise-static/briefs/PISTOL_SQUAT.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/PISTOL_SQUAT.json",
+      "sha256": "713b1059580586da2519b45c21b4447687be9dea55f949721c984d1e6d789829",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/PISTOL_SQUAT/PISTOL_SQUAT-candidate-01.png",
+      "sha256": "9ff728b85861d774ae9fc2e22d6eed1de22307204f6f15e195beec06cf152f75",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/PISTOL_SQUAT-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1748957,
+  "sha256": "9ff728b85861d774ae9fc2e22d6eed1de22307204f6f15e195beec06cf152f75",
+  "reviewRecord": "art/exercise-static/reviews/PISTOL_SQUAT-review.json",
+  "approvedAt": "2026-07-25T21:58:08.751Z",
+  "reviewerId": "production-autopilot"
+}

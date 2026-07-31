@@ -1,0 +1,45 @@
+{
+  "assetId": "REVERSE_HYPEREXTENSION-v1",
+  "exerciseCode": "REVERSE_HYPEREXTENSION",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-26T01:55:05.575Z",
+  "promptPath": "art/exercise-static/briefs/REVERSE_HYPEREXTENSION.json",
+  "briefPath": "art/exercise-static/briefs/REVERSE_HYPEREXTENSION.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/REVERSE_HYPEREXTENSION.json",
+      "sha256": "ac8a8d15e23963c1bcfec1447a14ecd663f6d9dd95350e5c21c2b6663349af7d",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/REVERSE_HYPEREXTENSION/REVERSE_HYPEREXTENSION-candidate-01.png",
+      "sha256": "8ce313bdb7f6d7411d5b5286237498f65b6e48c69e895b4a954c05f46c9b4a4f",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1779293,
+  "sha256": "8ce313bdb7f6d7411d5b5286237498f65b6e48c69e895b4a954c05f46c9b4a4f",
+  "reviewRecord": "art/exercise-static/reviews/REVERSE_HYPEREXTENSION-review.json",
+  "approvedAt": "2026-07-26T01:55:05.575Z",
+  "reviewerId": "production-autopilot"
+}

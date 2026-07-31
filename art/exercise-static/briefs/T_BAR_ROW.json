@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "T_BAR_ROW",
+  "exerciseName": "T杠划船",
+  "variant": "站姿俯身固定端 T 杠中立握划船",
+  "representativePose": "人物站在固定端 T 杠上方，髋铰链俯身、背部中立；双手握紧贴近的中立把手，将 T 杠拉向下腹，固定端、套筒和片清晰。",
+  "camera": { "view": "45° 前侧视角，显示固定端、近握把和俯身姿势", "subjectFill": "显示完整人物、T 杠固定底座、把手、杠片和双脚", "safeMarginPercent": 8 },
+  "equipment": { "family": "地面固定端 T 杠划船", "recognitionFeatures": ["一端铰接固定底座", "近握中立把手", "杠片位于自由端", "无电缆或胸托"] },
+  "grip": "双手掌心相对的窄中立握",
+  "bodyContacts": ["双脚着地", "双手握近握把", "杠片悬在固定端远侧"],
+  "jointDirections": ["髋关节屈曲", "膝部微屈", "脊柱中立", "肘向后贴近躯干"],
+  "primaryMuscles": ["背阔肌", "菱形肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["普通直杠铃划船", "潘德利触地起始", "胸托器械", "固定端或 T 杠结构缺失", "人物或杠片裁切"]
+}

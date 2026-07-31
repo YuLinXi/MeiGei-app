@@ -1,0 +1,45 @@
+{
+  "assetId": "CLOSE_GRIP_BENCH-v1",
+  "exerciseCode": "CLOSE_GRIP_BENCH",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-26T03:21:06.645Z",
+  "promptPath": "art/exercise-static/briefs/CLOSE_GRIP_BENCH.json",
+  "briefPath": "art/exercise-static/briefs/CLOSE_GRIP_BENCH.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/CLOSE_GRIP_BENCH.json",
+      "sha256": "df0e15b974d21e33ace5759ccee3735db48802b880c551da647c1f34de66aa1e",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/CLOSE_GRIP_BENCH/candidate-01.png",
+      "sha256": "147e33870999e9f5ebbe740854d364cfd93796f51595812cce7369bbf6da65be",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/CLOSE_GRIP_BENCH-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1920501,
+  "sha256": "147e33870999e9f5ebbe740854d364cfd93796f51595812cce7369bbf6da65be",
+  "reviewRecord": "art/exercise-static/reviews/CLOSE_GRIP_BENCH-review.json",
+  "approvedAt": "2026-07-26T03:21:06.645Z",
+  "reviewerId": "production-autopilot"
+}

@@ -1,0 +1,45 @@
+{
+  "assetId": "MACHINE_LATERAL_RAISE-v1",
+  "exerciseCode": "MACHINE_LATERAL_RAISE",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T04:32:49.154Z",
+  "promptPath": "art/exercise-static/briefs/MACHINE_LATERAL_RAISE.json",
+  "briefPath": "art/exercise-static/briefs/MACHINE_LATERAL_RAISE.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/MACHINE_LATERAL_RAISE.json",
+      "sha256": "19826a284443643aeac89bca9a3f511392cce61a9a9c0a3ad0f74937387c4c5b",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/MACHINE_LATERAL_RAISE/MACHINE_LATERAL_RAISE-candidate-01.png",
+      "sha256": "45770b3b76e5b6aab4ff9f8fea2128d04cce3f252a7a061b2b0d05e4aac27bb5",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/MACHINE_LATERAL_RAISE-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1847990,
+  "sha256": "45770b3b76e5b6aab4ff9f8fea2128d04cce3f252a7a061b2b0d05e4aac27bb5",
+  "reviewRecord": "art/exercise-static/reviews/MACHINE_LATERAL_RAISE-review.json",
+  "approvedAt": "2026-07-25T04:32:49.154Z",
+  "reviewerId": "production-autopilot"
+}

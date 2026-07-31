@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "BB_CURL",
+  "exerciseName": "杠铃弯举",
+  "variant": "站姿双臂同步杠铃弯举，掌心向上中段收缩姿势",
+  "representativePose": "双脚髋宽站立，躯干直立；双上臂贴近躯干，肘部固定，前臂旋后屈曲约 90 度，杠铃位于腹部与胸部之间。",
+  "camera": { "view": "45° 前侧视角，弱透视，清楚显示双肘固定、掌心向上握杆和整根杠铃", "subjectFill": "完整显示人物、杠铃和双脚，四肢与器械不裁切", "safeMarginPercent": 8 },
+  "equipment": { "family": "标准直杆杠铃", "recognitionFeatures": ["整根直杆", "左右对称圆形杠铃片", "双手闭合握住同一根杠铃"] },
+  "grip": "双手旋后握，掌心向上，握距略宽于肩",
+  "bodyContacts": ["双手握住杠铃", "双上臂靠近躯干", "双脚全掌接触地面"],
+  "jointDirections": ["双肘屈曲并固定在躯干两侧", "前臂旋后", "躯干保持直立"],
+  "primaryMuscles": ["肱二头肌"],
+  "secondaryMuscles": ["前臂屈肌"],
+  "rejectionCases": ["锤式或反握弯举", "身体后仰借力", "肘部明显前移", "杠铃、双手、头部或双脚裁切"]
+}

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dontlift.local/schemas/exercise-static-production-manifest-v1.json",
+  "title": "静态动作图生产 Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "assets"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "assets": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[A-Z0-9_]+$" },
+      "additionalProperties": { "$ref": "#/$defs/asset" }
+    }
+  },
+  "$defs": {
+    "humanReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["pending", "approved", "rejected"] },
+        "reviewerId": { "type": "string", "minLength": 1 },
+        "reviewedAt": { "type": "string", "format": "date-time" },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exerciseCode",
+        "characterVersion",
+        "styleVersion",
+        "briefPath",
+        "masterPath",
+        "runtimePath",
+        "masterSha256",
+        "runtimeSha256",
+        "pixelWidth",
+        "pixelHeight",
+        "jpegQuality",
+        "sizeBytes",
+        "reviews",
+        "technicalStatus",
+        "releaseStatus"
+      ],
+      "properties": {
+        "exerciseCode": { "type": "string", "pattern": "^[A-Z0-9_]+$" },
+        "characterVersion": { "type": "string", "pattern": "^character-v[0-9]+$" },
+        "styleVersion": { "type": "string", "pattern": "^style-v[0-9]+$" },
+        "briefPath": { "type": "string", "minLength": 1 },
+        "masterPath": { "type": "string", "minLength": 1 },
+        "runtimePath": { "type": "string", "pattern": "^ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_[A-Z0-9_]+\\.jpg$" },
+        "masterSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "runtimeSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "pixelWidth": { "const": 288 },
+        "pixelHeight": { "const": 288 },
+        "jpegQuality": { "const": 82 },
+        "sizeBytes": { "type": "integer", "minimum": 1, "maximum": 24576 },
+        "reviews": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["identity", "art", "movement", "equipment", "rights"],
+          "properties": {
+            "identity": { "$ref": "#/$defs/humanReview" },
+            "art": { "$ref": "#/$defs/humanReview" },
+            "movement": { "$ref": "#/$defs/humanReview" },
+            "equipment": { "$ref": "#/$defs/humanReview" },
+            "rights": { "$ref": "#/$defs/humanReview" }
+          }
+        },
+        "technicalStatus": { "enum": ["pending", "passed", "failed"] },
+        "releaseStatus": { "enum": ["draft", "released"] }
+      }
+    }
+  }
+}

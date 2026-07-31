@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "DB_ALTERNATING_CURL",
+  "exerciseName": "哑铃交替弯举",
+  "variant": "站姿左右交替哑铃弯举，单侧中段收缩",
+  "representativePose": "人物站立，右臂屈曲至约 90 度并掌心向上，左臂自然下垂持哑铃，躯干稳定不摆动。",
+  "camera": { "view": "45° 前侧视角，弱透视，清楚显示一侧掌心向上和另一侧下垂哑铃", "subjectFill": "完整显示人物、两只哑铃和双脚", "safeMarginPercent": 8 },
+  "equipment": { "family": "一对标准短柄哑铃", "recognitionFeatures": ["左右各一只哑铃", "一侧屈曲、一侧下垂", "两只哑铃大小一致"] },
+  "grip": "屈曲侧旋后握，下垂侧自然中立握",
+  "bodyContacts": ["双手分别握住哑铃", "双脚全掌接地"],
+  "jointDirections": ["一侧肘屈曲且固定", "另一侧肘伸展", "躯干保持直立"],
+  "primaryMuscles": ["肱二头肌"],
+  "secondaryMuscles": [],
+  "rejectionCases": ["双臂同步弯举", "锤式或反握", "身体摆动", "哑铃、双手、头部或双脚裁切"]
+}

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "HAMMER_PULLDOWN",
+  "candidateId": "HAMMER_PULLDOWN-candidate-relocated-right-plates-v9",
+  "masterPath": "art/exercise-static/masters/approved/HAMMER_PULLDOWN-v1.png",
+  "masterSha256": "e0610e4f40f03b71a59e1808120bdd0d64d0ffa78bd0aa052a76e05f47c2fa19",
+  "reviews": {
+    "identity": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T05:45:00.000Z",
+      "evidence": [
+        "art/exercise-static/references/approved/character-v1.png",
+        "art/exercise-static/masters/approved/HAMMER_PULLDOWN-v1.png"
+      ],
+      "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+    },
+    "art": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T05:45:00.000Z",
+      "evidence": [
+        "art/exercise-static/references/approved/style-v1.png",
+        "art/exercise-static/masters/approved/HAMMER_PULLDOWN-v1.png"
+      ],
+      "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+    },
+    "movement": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T05:45:00.000Z",
+      "evidence": [
+        "art/exercise-static/briefs/HAMMER_PULLDOWN.json",
+        "art/exercise-static/masters/approved/HAMMER_PULLDOWN-v1.png"
+      ],
+      "notes": "按调研结论核对悍马机盘片加载式独立双臂前置下拉：人物胸部朝向器械、侧后方视角、水平把手正握、把手位于上胸至肩线的中段下拉状态。"
+    },
+    "equipment": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T05:45:00.000Z",
+      "evidence": [
+        "art/exercise-static/briefs/HAMMER_PULLDOWN.json",
+        "art/exercise-static/masters/approved/HAMMER_PULLDOWN-v1.png"
+      ],
+      "notes": "按 Hammer Strength Iso-Lateral Front Lat Pulldown 结构核对中央座椅、腿部固定垫、左右独立运动臂、水平握把和中部加载轴；左右杠铃片数量、规格及挂载位置对称，排除钢索与选择片式配重塔。"
+    },
+    "rights": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T05:45:00.000Z",
+      "evidence": [
+        "art/exercise-static/reviews/input-policy-v1.md",
+        "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+        "art/exercise-static/masters/approved/HAMMER_PULLDOWN-v1.provenance.json"
+      ],
+      "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+    }
+  }
+}

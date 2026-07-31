@@ -1,0 +1,45 @@
+{
+  "assetId": "MACHINE_LEG_PRESS-v1",
+  "exerciseCode": "MACHINE_LEG_PRESS",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-29T02:49:55Z",
+  "promptPath": "art/exercise-static/briefs/MACHINE_LEG_PRESS.json",
+  "briefPath": "art/exercise-static/briefs/MACHINE_LEG_PRESS.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/MACHINE_LEG_PRESS.json",
+      "sha256": "89bd2658f5d2c2764b639643f177b0ea89d48693f69c73932fbf33bdb321e799",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/MACHINE_LEG_PRESS/MACHINE_LEG_PRESS-candidate-side-rear-selected.png",
+      "sha256": "4224feb0a9660f6a1e5b38b2a9e36156a30bc6d498900420a5d9b13f9c344cef",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "为统一方形母图标准，以白色扩边至 1536×1536；无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/MACHINE_LEG_PRESS-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1536,
+  "sizeBytes": 2358824,
+  "sha256": "397826d10c4fe0183e66969ed22ebadc717f75914f50aa2e455b419504e80d7e",
+  "reviewRecord": "art/exercise-static/reviews/MACHINE_LEG_PRESS-review.json",
+  "approvedAt": "2026-07-29T02:49:55Z",
+  "reviewerId": "production-autopilot"
+}

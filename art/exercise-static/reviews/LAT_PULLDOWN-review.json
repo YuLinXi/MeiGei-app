@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "LAT_PULLDOWN",
+  "candidateId": "LAT_PULLDOWN-candidate-06",
+  "masterPath": "art/exercise-static/masters/approved/LAT_PULLDOWN-v1.png",
+  "masterSha256": "9777b036e24168397bbc6f5a3647386f4df48236151eecd148263bb0f6e27ad4",
+  "reviews": {
+    "identity": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-28T07:25:59Z",
+      "evidence": [
+        "art/exercise-static/references/approved/character-v1.png",
+        "art/exercise-static/masters/approved/LAT_PULLDOWN-v1.png"
+      ],
+      "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+    },
+    "art": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-28T07:25:59Z",
+      "evidence": [
+        "art/exercise-static/references/approved/style-v1.png",
+        "art/exercise-static/masters/approved/LAT_PULLDOWN-v1.png"
+      ],
+      "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+    },
+    "movement": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-28T07:25:59Z",
+      "evidence": [
+        "art/exercise-static/briefs/LAT_PULLDOWN.json",
+        "art/exercise-static/masters/approved/LAT_PULLDOWN-v1.png"
+      ],
+      "notes": "用户确认人物胸腹正面朝向器械，采用宽正握下拉至上胸前的终点，背阔肌为主要发力区域。"
+    },
+    "equipment": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-28T07:25:59Z",
+      "evidence": [
+        "art/exercise-static/briefs/LAT_PULLDOWN.json",
+        "art/exercise-static/masters/approved/LAT_PULLDOWN-v1.png"
+      ],
+      "notes": "用户确认传统单选择片滑轮塔、无背靠座位、膝上压腿垫及人物面向器械的相对位置。"
+    },
+    "rights": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-28T07:25:59Z",
+      "evidence": [
+        "art/exercise-static/reviews/input-policy-v1.md",
+        "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+        "art/exercise-static/masters/approved/LAT_PULLDOWN-v1.provenance.json"
+      ],
+      "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+    }
+  }
+}

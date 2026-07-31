@@ -1,0 +1,45 @@
+{
+  "assetId": "CABLE_TRICEP_EXT-v1",
+  "exerciseCode": "CABLE_TRICEP_EXT",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T12:45:43.521Z",
+  "promptPath": "art/exercise-static/briefs/CABLE_TRICEP_EXT.json",
+  "briefPath": "art/exercise-static/briefs/CABLE_TRICEP_EXT.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/CABLE_TRICEP_EXT.json",
+      "sha256": "7a2ecda17f9b143f444e8c4be239689e2843a9acd98433b283f26be593286295",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/CABLE_TRICEP_EXT/CABLE_TRICEP_EXT-candidate-01.png",
+      "sha256": "7aa878440dce1778a4a0cba245c2b8cd0f0be18fcf6ac32f35f958d36140653c",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/CABLE_TRICEP_EXT-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1636473,
+  "sha256": "7aa878440dce1778a4a0cba245c2b8cd0f0be18fcf6ac32f35f958d36140653c",
+  "reviewRecord": "art/exercise-static/reviews/CABLE_TRICEP_EXT-review.json",
+  "approvedAt": "2026-07-25T12:45:43.521Z",
+  "reviewerId": "production-autopilot"
+}

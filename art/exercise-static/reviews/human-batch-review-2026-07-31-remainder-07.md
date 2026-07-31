@@ -1,0 +1,17 @@
+# 剩余正式资源第 7 批人工复核
+
+- 复核方式：本地正式发布 JPG，20 张一组总览
+- 复核时间：2026-07-31
+- 复核结论：17 项通过；3 项待回修。原有单动作审核记录和发布溯源保持不变。
+
+## 待回修项
+
+| 序号 | code | 中文名 |
+| ---: | --- | --- |
+| 10 | `HAMMER_LATERAL_RAISE` | 悍马机侧平举 |
+| 17 | `DB_SINGLE_LEG_DEADLIFT` | 单腿哑铃硬拉 |
+| 20 | `CABLE_CRUNCH` | 绳索卷腹 |
+
+## 本轮通过项
+
+`MACHINE_CHEST_PRESS`、`PUSH_UP`、`INCLINE_PUSH_UP`、`DECLINE_PUSH_UP`、`DIAMOND_PUSH_UP`、`SMITH_REVERSE_ROW`、`DB_PULLOVER`、`SHRUG_BB`、`SHRUG_DB`、`FACE_PULL`、`PREACHER_BENCH_REAR_DELT_FLY`、`SEATED_LEG_CURL`、`SUMO_DEADLIFT`、`STANDING_CALF_RAISE`、`GLUTE_KICKBACK_MACHINE`、`HIP_ABDUCTION`、`BAND_LATERAL_WALK`。

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "SMITH_REVERSE_ROW",
+  "exerciseName": "史密斯反手划船",
+  "variant": "史密斯机站姿反握俯身划船",
+  "representativePose": "站在史密斯杠前，双脚着地、膝盖微屈，髋部后移使躯干前倾并保持背部中立；双手肩宽反握杠铃，在杠位于下腹的顶端位置，肘部贴近身体向后，肩胛骨后缩，躯干保持稳定。",
+  "camera": { "view": "45° 侧后视角，显示反握手掌方向、史密斯导轨和身体相对杠位", "subjectFill": "完整显示史密斯架、固定杠、人物身体和双脚", "safeMarginPercent": 8 },
+  "equipment": { "family": "史密斯机固定杠反握划船", "recognitionFeatures": ["垂直导轨", "可调高度固定直杠", "左右对称杠铃片", "反握双手", "无自由杠铃脱离导轨"] },
+  "grip": "双手闭合反握，掌心朝上，握距约肩宽",
+  "bodyContacts": ["双脚着地", "双手反握史密斯杠", "髋部后移、躯干保持稳定"],
+  "jointDirections": ["肘部向后屈曲", "肩胛骨后缩", "躯干保持中立", "髋部稳定"],
+  "primaryMuscles": ["菱形肌", "背阔肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["正握史密斯俯身划船", "自由杠铃", "动作定义混为两种标准", "导轨/固定杠缺失", "反握方向不可判断"]
+}

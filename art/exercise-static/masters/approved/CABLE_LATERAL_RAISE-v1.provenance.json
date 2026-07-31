@@ -1,0 +1,45 @@
+{
+  "assetId": "CABLE_LATERAL_RAISE-v1",
+  "exerciseCode": "CABLE_LATERAL_RAISE",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T04:32:04.772Z",
+  "promptPath": "art/exercise-static/briefs/CABLE_LATERAL_RAISE.json",
+  "briefPath": "art/exercise-static/briefs/CABLE_LATERAL_RAISE.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/CABLE_LATERAL_RAISE.json",
+      "sha256": "d8ff07da123ad557035605c4c7c27fd924579c367b75b9ee51f6700cb2d26858",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/CABLE_LATERAL_RAISE/CABLE_LATERAL_RAISE-candidate-01.png",
+      "sha256": "9475e0089655dd115d7d991dcc00f74ed3115cf0c16ae230eb6d021f59c708dc",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1676191,
+  "sha256": "9475e0089655dd115d7d991dcc00f74ed3115cf0c16ae230eb6d021f59c708dc",
+  "reviewRecord": "art/exercise-static/reviews/CABLE_LATERAL_RAISE-review.json",
+  "approvedAt": "2026-07-25T04:32:04.772Z",
+  "reviewerId": "production-autopilot"
+}

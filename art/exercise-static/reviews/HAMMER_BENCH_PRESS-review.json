@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "HAMMER_BENCH_PRESS",
+  "candidateId": "candidate-02",
+  "masterPath": "art/exercise-static/masters/approved/HAMMER_BENCH_PRESS-v1.png",
+  "masterSha256": "5d8f3b295b79c4307a5555139d17d57e4cd1f9c5d0b6fc00357eb7365177c11d",
+  "reviews": {
+    "identity": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-28T06:25:24Z",
+      "evidence": [
+        "art/exercise-static/references/approved/character-v1.png",
+        "art/exercise-static/masters/approved/HAMMER_BENCH_PRESS-v1.png"
+      ],
+      "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+    },
+    "art": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-28T06:25:24Z",
+      "evidence": [
+        "art/exercise-static/references/approved/style-v1.png",
+        "art/exercise-static/masters/approved/HAMMER_BENCH_PRESS-v1.png"
+      ],
+      "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+    },
+    "movement": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-28T06:25:24Z",
+      "evidence": [
+        "art/exercise-static/briefs/HAMMER_BENCH_PRESS.json",
+        "art/exercise-static/masters/approved/HAMMER_BENCH_PRESS-v1.png"
+      ],
+      "notes": "用户确认近水平卧姿、肘部弯曲的中胸起始位置及近水平前推路径，区别于直立式推胸。"
+    },
+    "equipment": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-28T06:25:24Z",
+      "evidence": [
+        "art/exercise-static/briefs/HAMMER_BENCH_PRESS.json",
+        "art/exercise-static/masters/approved/HAMMER_BENCH_PRESS-v1.png"
+      ],
+      "notes": "用户确认板片加载、左右独立杠杆臂、双侧挂片杆及脚部支撑的悍马机卧推器械结构。"
+    },
+    "rights": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-28T06:25:24Z",
+      "evidence": [
+        "art/exercise-static/reviews/input-policy-v1.md",
+        "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+        "art/exercise-static/masters/approved/HAMMER_BENCH_PRESS-v1.provenance.json"
+      ],
+      "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+    }
+  }
+}

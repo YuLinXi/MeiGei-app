@@ -1,0 +1,25 @@
+{
+  "assetId": "LATERAL_RAISE-v1",
+  "exerciseCode": "LATERAL_RAISE",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-24T09:53:19Z",
+  "promptPath": "art/exercise-static/briefs/LATERAL_RAISE.json",
+  "briefPath": "art/exercise-static/briefs/LATERAL_RAISE.json",
+  "inputs": [
+    { "kind": "original-text", "source": "art/exercise-static/briefs/LATERAL_RAISE.json", "sha256": "6055add361d4663588db6f6860c726fb8275df5c4f1ea452722afb0bc61abc07", "rightsBasis": "本项目原创动作与器械 brief" },
+    { "kind": "owned-reference", "source": "本地未入库的 LATERAL_RAISE-candidate-02.png", "sha256": "8cccc26a38b1c8ae29a71bbc261f9b15b2b6616c997fddbd2fdae3abdfcc3339", "rightsBasis": "本项目通过 imagegen 生成的前序候选，仅作为候选 03 的 edit target；按候选不入库规则只保留摘要" },
+    { "kind": "owned-reference", "source": "art/exercise-static/references/approved/character-v1.png", "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590", "rightsBasis": "本项目已批准的原创统一角色母版" },
+    { "kind": "owned-reference", "source": "art/exercise-static/references/approved/style-v1.png", "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0", "rightsBasis": "本项目已批准的原创风格母版" }
+  ],
+  "humanEdits": "无手工像素编辑；候选 03 通过 imagegen edit 移除候选 02 的双侧乳头、乳晕与凸起，保持人物、哑铃、侧平举姿势、肩部高亮和构图。",
+  "file": "art/exercise-static/masters/approved/LATERAL_RAISE-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1663186,
+  "sha256": "2d46e20ff1d5aa3b314d411b824f32c4604d2931e1b3a4321c2b919d91f1bbc9",
+  "reviewRecord": "art/exercise-static/reviews/LATERAL_RAISE-candidate-03-review.md",
+  "approvedAt": "2026-07-24T11:10:21Z",
+  "reviewerId": "project-owner"
+}

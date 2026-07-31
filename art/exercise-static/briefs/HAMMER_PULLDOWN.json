@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "HAMMER_PULLDOWN",
+  "exerciseName": "悍马机下拉",
+  "variant": "坐姿板载悍马机双臂中立握下拉",
+  "representativePose": "人物坐在悍马机靠背前，双手掌心相对握住左右独立高位把手，肘向下拉至肋侧，左右杠杆和板片清晰可见。",
+  "camera": { "view": "45° 前侧视角，展示左右独立杠杆和中立把手", "subjectFill": "显示完整人物、靠背、双侧杠杆、把手、板片和双脚", "safeMarginPercent": 8 },
+  "equipment": { "family": "悍马机独立杠杆高位下拉", "recognitionFeatures": ["左右分动高位杠杆", "平行中立握把", "靠背座椅和压腿垫", "外侧板载圆片"] },
+  "grip": "双手闭合中立握，掌心相对，左右对称",
+  "bodyContacts": ["臀部坐垫", "背部靠垫", "大腿接触压垫", "双手握左右把手"],
+  "jointDirections": ["双肩内收", "双肘向下", "肩胛骨下压", "躯干保持直立"],
+  "primaryMuscles": ["背阔肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["绳索或导线塔", "胸推机手柄", "正面推举轨迹", "单臂动作", "杠杆和板片不对称或裁切"]
+}

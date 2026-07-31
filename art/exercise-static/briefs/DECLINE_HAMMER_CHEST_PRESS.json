@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "DECLINE_HAMMER_CHEST_PRESS",
+  "exerciseName": "下斜悍马机推胸",
+  "variant": "约 15 度下斜 plate-loaded 悍马机推胸，手柄位于下胸代表姿势",
+  "representativePose": "人物坐在头侧低于臀部的悍马机靠背，肩背贴靠，双脚踩踏板；双手握左右独立推臂手柄，肘部约 45 至 60 度外展，手柄位于胸骨下段回程位。",
+  "camera": { "view": "45° 前侧略俯视角，弱透视，靠背下斜角度、独立推臂、加载片和脚踏清晰", "subjectFill": "完整显示人物、下斜靠背、双机械臂、手柄、等重圆盘片和底座；不出现长杠铃", "safeMarginPercent": 8 },
+  "equipment": { "family": "标准 plate-loaded 下斜悍马机胸推", "recognitionFeatures": ["靠背头侧低于臀部约 15 度", "左右独立推胸臂与圆盘加载轴", "手柄与中下胸同高", "固定低位脚踏和厚重底座"] },
+  "grip": "双手各自闭合中立握住独立手柄，腕部与前臂对齐",
+  "bodyContacts": ["头部、上背和臀部接触下斜靠背", "双脚踩踏板", "双手各握一只独立手柄"],
+  "jointDirections": ["躯干向后下倾约 15 度", "手柄与胸骨下段同高", "双肘屈曲约 45 至 60 度", "左右推臂轨迹对称"],
+  "primaryMuscles": ["胸大肌下部"],
+  "secondaryMuscles": ["三角肌前束", "肱三头肌"],
+  "rejectionCases": ["水平或上斜悍马机、普通器械或杠铃", "靠背角度无法辨认、没有独立推臂或加载轴", "手柄位于上胸或腹部", "圆盘片不对称、人物离开靠背或脚悬空", "人物、器械、配重片或双脚被裁切"]
+}

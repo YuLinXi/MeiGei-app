@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "V_BAR_ROW",
+  "exerciseName": "V-bar 划船",
+  "variant": "坐姿低位绳索 V-bar 中立握划船",
+  "representativePose": "人物坐在低位绳索站，双脚抵脚踏；双手掌心相对握紧紧凑 V-bar，拉到肚脐，肘部沿身体两侧向后。",
+  "camera": { "view": "45° 前侧视角，突出紧凑 V-bar、低位电缆和脚踏", "subjectFill": "显示完整人物、V-bar、滑轮、电缆、脚踏和配重塔", "safeMarginPercent": 8 },
+  "equipment": { "family": "低位绳索机与紧凑 V-bar", "recognitionFeatures": ["低位滑轮", "三角紧凑 V-bar", "脚踏板", "配重导杆"] },
+  "grip": "双手掌心相对中立握，拇指环握 V-bar",
+  "bodyContacts": ["臀部座椅", "双脚抵脚踏", "双手握 V-bar", "V-bar至肚脐"],
+  "jointDirections": ["肩胛骨后缩下压", "双肘向后贴身", "躯干保持直立", "膝部微屈"],
+  "primaryMuscles": ["背阔肌", "菱形肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["直杆或宽握", "高位下拉", "V-bar形状不清", "无脚踏/电缆", "器械和人物裁切"]
+}

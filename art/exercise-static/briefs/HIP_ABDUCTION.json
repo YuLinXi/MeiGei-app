@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "HIP_ABDUCTION",
+  "exerciseName": "髋外展",
+  "variant": "坐姿器械髋外展，双腿向外打开的代表姿势",
+  "representativePose": "人物坐姿背部贴靠靠背，膝盖约 90°，双腿在外侧软垫推动下向两侧打开，双脚踩脚踏板，双手握把手。",
+  "camera": { "view": "正面略偏 45°，弱透视，必须看清双侧外展软垫和腿间间隙", "subjectFill": "完整显示人物、座椅靠背、双侧软垫/摆臂、脚踏板和配重箱；无背景", "safeMarginPercent": 8 },
+  "equipment": { "family": "标准选择器械坐姿髋外展", "recognitionFeatures": ["两块位于大腿外侧的独立软垫", "双侧向外旋转的摆臂与中央轴", "座椅靠背和脚踏板", "选择器械配重箱"] },
+  "grip": "双手闭合握住座椅两侧把手",
+  "bodyContacts": ["背部和髋部接触靠背", "大腿外侧接触双侧软垫", "双脚接触脚踏板"],
+  "jointDirections": ["髋关节外展、双膝向两侧分开", "膝盖保持约 90°", "骨盆保持正中不旋转", "左右腿外展幅度对称"],
+  "primaryMuscles": ["臀中肌"],
+  "secondaryMuscles": ["臀大肌", "阔筋膜张肌"],
+  "rejectionCases": ["髋内收（膝盖向内夹）、腿屈伸或无器械侧抬腿", "软垫位于大腿内侧而非外侧", "只有单腿外展或双腿姿势无法确认", "机器、软垫、人物或脚踏板被裁切"]
+}

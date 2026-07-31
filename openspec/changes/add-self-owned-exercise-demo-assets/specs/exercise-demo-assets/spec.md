@@ -1,144 +1,120 @@
 ## ADDED Requirements
 
-### Requirement: imagegen 静态母版与正式动画职责分离
+### Requirement: 动作素材只交付静态图片
 
-系统 SHALL 使用经过人工批准的 imagegen 静态母版定义动作演示的解剖表现、肌肉强调、器械类别、构图、相机方向和视觉风格。静态母版 MUST NOT 直接作为 App 动画帧、Blender 贴图或独立生成正式多帧；正式 GIF/JPG MUST 由 Blender 中可编辑的人体、器械、骨骼、约束、相机、材质和灯光确定性渲染。
+系统 SHALL 为已覆盖的内置动作维护一张已批准的高分辨率静态母版，并从该母版确定性导出 288×288、JPEG 质量 82、单张不超过 24 KiB（24,576 bytes）的 sRGB JPG。系统 MUST NOT 为本能力生产、保存或运行 GIF、视频、APNG、SVG 动画、帧序列、Blender 模型或骨骼动画。
 
-被采用的静态母版 SHALL 记录动作 code、完整 prompt、工具/模型版本、全部输入及 License、生成日期、人工修改、文件摘要和审核状态。未采用候选与失败多帧 MUST NOT 进入版本控制。
+#### Scenario: 静态母版被批准
+- **WHEN** 某动作的高分辨率静态母版通过五项自治或人工审核
+- **THEN** 导出流程从同一母版生成符合尺寸、质量和大小上限的 288×288 JPG 与运行时 manifest 条目
+- **AND** 不生成任何动态媒体或三维源文件
 
-#### Scenario: 静态母版通过后进入 Blender
-- **GIVEN** `PEC_DECK_FLY` 有一张通过美术、器械和权利初审的静态母版
-- **WHEN** 开始制作动画
-- **THEN** Blender 根据母版重新建立可编辑人体、器械、骨骼、约束和固定相机
-- **AND** 正式帧不直接使用该母版的像素
+#### Scenario: 候选尚未批准
+- **WHEN** 某动作只有 AI 候选图而没有已批准母版
+- **THEN** 该候选不得进入运行时资源或 manifest
+- **AND** 候选与失败图不得提交为正式资产
 
-#### Scenario: AI 多帧存在漂移
-- **WHEN** imagegen 候选多帧出现人物、器械、相机或运动轴漂移
-- **THEN** 这些帧不得编码或 promote 为正式 GIF
-- **AND** 系统不得通过插帧、光流或淡化掩盖几何错误
+### Requirement: 全部动作使用同一个原创角色
 
-### Requirement: 生成输入与参考来源必须商业可追溯
+系统 SHALL 建立并版本化唯一 `character-v1` 角色母版，锁定原创虚构成年男性的面部、发型、体型比例、四肢比例、服装、肤色/灰阶和线稿表现。每张动作候选 MUST 使用已批准角色母版和风格母版作为 imagegen reference/edit 输入；仅复用文本 prompt、角色名称或 seed MUST NOT 被视为满足角色一致性。
 
-正式母版的输入 MUST 仅包含文字 brief、自有素材或明确允许该生成用途的素材。受限第三方媒体 MUST NOT 作为 imagegen reference/edit 输入、转描源、训练输入、Blender 贴图、背景或正式派生素材。系统 SHALL 记录实施时的 imagegen 服务条款、模型版本、输入来源、License、人工修改和 SHA-256；AI 输出 MUST NOT 被自动视为独占、动作正确或权利审核通过。
+每张候选 MUST 对照角色母版和已批准动作联系表审核面部、发型、体型、四肢、服装与渲染风格。出现换脸、比例漂移、服装变化、多余/缺失肢体、手指融合或左右错误时 MUST 被拒绝。
 
-`hasaneyldrm/exercises-dataset` 的媒体只能用于理解产品形态及常规器械事实，MUST NOT 下载入库或用于图生图。
+#### Scenario: 新动作保持角色身份
+- **WHEN** 新动作候选使用 `character-v1` 与 `style-v1` 生成且身份清单全部通过
+- **THEN** 身份审核人可将该候选标记为 `identity=approved`
+- **AND** 审核记录关联角色版本、证据联系表和候选摘要
 
-#### Scenario: 输入包含受限媒体
-- **WHEN** 候选母版使用了受限第三方 JPG/GIF 作为生成输入
-- **THEN** 权利审核必须拒绝该候选
-- **AND** 该候选及其派生 Blender/媒体不得进入正式生产链
+#### Scenario: 角色发生漂移
+- **WHEN** 候选的脸型、发型、体型、服装或肢体结构与角色母版不一致
+- **THEN** 身份审核必须拒绝该候选
+- **AND** 该动作继续使用既有列表降级图，不得以较低标准发布
 
-#### Scenario: 采用自有文字 brief
-- **WHEN** 母版只使用原创文字 brief 和许可清晰的自有输入
-- **THEN** 来源台账记录 prompt、输入、工具条款、模型版本和摘要
-- **AND** 仍需人工权利审核后才可采用
+### Requirement: 静态图必须准确表达动作与器械
 
-### Requirement: 每个器械动作必须声明并验证常规器械结构
+每个动作 SHALL 使用以 `BuiltinExercise.code` 标识的原创 brief 和验收卡，声明动作变体、代表姿势、相机方向、器械识别特征、握法、身体接触点、关节方向、主动肌、协同肌和排除项。正式图片 MUST 在 288×288 与真实双列卡片下可辨认实际动作及必要器械，主动肌使用统一朱砂红强调，协同肌使用统一浅红，其他人体与器械保持灰阶。
 
-生产 manifest SHALL 为器械动作关联器械验收卡，至少声明器械类别、180×180 识别特征、静止组件、活动组件、转轴与轨迹、身体接触点和拒绝案例。Blender 器械 MUST 是本项目原创可编辑网格或来源许可清晰的可编辑资产，并 MUST 具备物理可解释的运动与配重联动。
+`PEC_DECK_FLY` MUST 使用顶部横梁式常规蝴蝶机，包含中央座椅、垂直靠背、左右顶部转轴、向外向下弯曲摆臂和垂直握把；MUST NOT 退化为胸推机、绳索夹胸或左右独立短直臂变体。
 
-`PEC_DECK_FLY` MUST 表现中央座椅、垂直靠背、刚性支架、左右对称转轴、两侧力臂与握把，以及可解释的配重/滑轮联动。人物 MUST 保持坐姿、背贴靠垫、双脚着地、双臂在肩高附近对称开合；MUST NOT 表现为胸推、绳索夹胸或泛化器械。
+#### Scenario: 蝴蝶机夹胸通过首个闸门
+- **WHEN** `PEC_DECK_FLY` 候选呈现批准器械结构、正确坐姿与握法、胸大肌高亮和统一角色
+- **THEN** 动作、器械和美术审核可分别记录批准
+- **AND** 该图片可进入 288×288 导出与真实双列卡片验收
 
-#### Scenario: 常规蝴蝶机验收通过
-- **WHEN** 审核 `PEC_DECK_FLY` 的 180×180 起点、终点和循环 GIF
-- **THEN** 用户能辨认常规蝴蝶机的座椅、靠背、支架、力臂、握把和配重结构
-- **AND** 左右力臂绕固定转轴对称运动并与人物双手保持接触
+#### Scenario: 图片漂亮但器械错误
+- **WHEN** 候选的人物与构图符合风格但器械类别、结构、握法或身体接触点错误
+- **THEN** 动作或器械审核必须拒绝该候选
+- **AND** 美术审核通过不得覆盖该拒绝结论
 
-#### Scenario: 器械只是外形近似
-- **WHEN** 器械缺少真实转轴/配重联动或表现为其他胸部器械
-- **THEN** 器械审核必须拒绝该动作
-- **AND** 该动作不得进入运行时 manifest
+### Requirement: 生成输入和权利必须可追溯
 
-### Requirement: Blender 源必须确定性生成十二帧动画
+正式母版的输入 MUST 仅包含原创文字 brief、本项目自有角色/风格母版，或明确许可该生成用途的素材。受限第三方媒体 MUST NOT 作为 imagegen reference/edit 输入、转描源、训练输入、贴图或正式派生素材。
 
-动态动作 SHALL 由同一 Blender 人体、器械、骨骼、约束、相机、材质和灯光生成 12 个有序帧。animation contract MUST 明确允许变化的人体骨骼、器械活动组件和配重联动；人物身份、头部、躯干接触、座椅、静止机架、相机、背景、画布和目标肌区域 MUST 逐帧保持一致。
+系统 SHALL 为每个已批准母版记录动作 code、完整 prompt/brief、工具与模型版本、全部输入及权利状态、生成日期、人工修改、审核主体、审核时间和 SHA-256，并保存实施时适用的 imagegen 商业使用条款证据。AI 输出 MUST NOT 自动被视为独占、无侵权、角色一致或动作正确。
 
-系统 MUST NOT 使用 AI 独立生成正式中间帧。Blender 源引用 MUST Pack Resources 或使用仓库相对路径，并能在 fresh clone 中无需个人 Add-on 或外部 AI 服务重渲染。
+#### Scenario: 使用自有输入生成
+- **WHEN** 候选只使用原创 brief 和本项目已批准母版作为输入
+- **THEN** 来源台账记录全部输入、工具版本、条款证据和文件摘要
+- **AND** 权利审核须由项目所有者人工批准或由其明确授权的 `production-autopilot` 按输入政策签署
 
-#### Scenario: 重渲染同一动作
-- **GIVEN** fresh clone 已取得指定 commit 和全部 LFS 对象
-- **WHEN** 使用规定 Blender 版本渲染 `PEC_DECK_FLY`
-- **THEN** 输出同一 12 个 scene、相机、尺寸、运动轨迹和器械联动
-- **AND** 导出报告记录 Blender 版本、commit、manifest 版本和时间
+#### Scenario: 使用受限第三方图片
+- **WHEN** 候选使用 `hasaneyldrm/exercises-dataset` 或其他未获许可图片作为 reference/edit 输入
+- **THEN** 权利审核必须拒绝该候选及其派生图
+- **AND** 文件不得进入正式母版、运行时资源或版本控制
 
-#### Scenario: 静止组件发生漂移
-- **WHEN** 任一帧的机架、座椅、靠背、相机或人物固定接触点偏离 animation contract
-- **THEN** 技术或器械审核必须失败
-- **AND** 编码器不得 promote 该动画
+### Requirement: 审核与 promote 必须分离
 
-### Requirement: GIF 与 JPG 遵守统一交付标准
+生产 manifest SHALL 对每个动作分别记录 `identity`、`art`、`movement`、`equipment`、`rights` 五类审核状态和自动技术状态。只有五类审核状态均为 `approved`、审核记录完整且技术校验通过时，promote 流程才可写入运行时 manifest。未获得项目所有者自治授权时，Codex、imagegen、脚本和 CI MUST NOT 以人工审核人身份把状态改为 `approved`；获得明确授权时，记录必须使用 `production-autopilot`，不得冒充人工审核人。
 
-动态动作 SHALL 提供 180×180、sRGB、无限循环 GIF 和 180×180 JPG；静态保持动作 SHALL 只提供 JPG。Blender MUST 先渲染至少 720×720 的高分辨率帧，再以高质量缩小并合成到统一 `#F6F3EC` 暖白背景。成品 MUST NOT 包含文字、动作阶段、品牌 Logo 或水印。
+#### Scenario: 全部审核通过
+- **WHEN** 某动作五类审核均已由稳定人工主体或获授权的 `production-autopilot` 记录且技术校验通过
+- **THEN** promote 流程生成或更新该 code 的 288×288 JPG 与运行时条目
 
-动态试点默认 12 帧，起点与最大收缩位各停留 1000 ms，其余帧各 100 ms，总周期 3000 ms。JPG MUST 取 production manifest 指定代表帧。
+#### Scenario: 任一审核未通过
+- **WHEN** 某动作任一审核状态为 `pending` 或 `rejected`
+- **THEN** promote 流程必须失败且不得写入运行时 manifest
+- **AND** 已发布的其他动作不受影响
 
-#### Scenario: 动态媒体技术校验通过
-- **WHEN** 一个动态动作准备发布
-- **THEN** GIF 的画布、颜色空间、帧数、顺序、时长和循环与 manifest 一致
-- **AND** JPG 的画布、颜色空间和代表帧声明一致
+### Requirement: 正式静态资源具有稳定身份与技术约束
 
-#### Scenario: 时序或尺寸错误
-- **WHEN** GIF/JPG 尺寸错误、GIF 帧数不符、循环缺失或时长错误
-- **THEN** 技术校验失败
-- **AND** 对应动作不得 promote
+正式资源 SHALL 以稳定 `BuiltinExercise.code` 映射，运行时文件命名为 `exercise_<CODE>.jpg`。导出流程 MUST 将母版中与四角背景相近的烘焙暖色像素确定性归一为纯白。导出结果 MUST 为 288×288、JPEG 质量 82、sRGB、不透明纯白背景、无文字、无 Logo、主体未裁切且具有安全边距，文件大小 MUST 不超过 24,576 bytes；manifest 中的尺寸、质量、大小、文件名和 SHA-256 MUST 与实际文件一致。
 
-### Requirement: 动作演示资产以稳定 code 建立独立清单
+技术校验 SHALL 拒绝未知 code、重复 code、缺文件、尺寸错误、摘要不符、孤立正式图片和无法解码的 JPG。编码质量 MUST 在首个真机试点后全局锁定，MUST NOT 按动作任意变化。
 
-系统 SHALL 以 `BuiltinExercise.code` 作为唯一关联键，并维护独立于动作分类数据的 production manifest。动态动作 MUST 声明 GIF/JPG、母版、器械验收卡、Blender scene、肌肉强调、帧时长、审核和发布状态；静态保持动作 MUST 声明 JPG、代表 scene、审核和发布状态。
+#### Scenario: 正式文件通过技术校验
+- **WHEN** 288×288 JPG 可解码、背景已归一为纯白、JPEG 质量为 82、文件不超过 24,576 bytes、code 存在、摘要一致且没有孤立映射
+- **THEN** 技术状态可标记为通过
 
-运行时 manifest SHALL 是 production manifest 的可重建精简产物，只包含已发布 code、演示类型和必要文件名。资源 MUST NOT 以本地化动作名建立身份关系，也 MUST NOT 把制作状态写入权威动作分类清单。
+#### Scenario: manifest 与文件不一致
+- **WHEN** manifest 声明的文件缺失、尺寸不是 288×288、质量不是 82、文件超过 24,576 bytes 或 SHA-256 不匹配
+- **THEN** 严格校验必须失败
+- **AND** 该条目不得随 App 发布
 
-#### Scenario: 动作名称改变
-- **WHEN** `PEC_DECK_FLY` 的中文显示名发生变化
-- **THEN** 其母版、Blender scene、GIF/JPG 和运行时映射保持不变
+### Requirement: 必要生产资源必须可跨电脑恢复
 
-#### Scenario: 未发布动作不伪造映射
-- **WHEN** 动作尚未通过全部审核
-- **THEN** 运行时 manifest 不声明该动作
-- **AND** App 不生成占位图或同名猜测映射
+版本控制 SHALL 保存已批准角色/风格母版、已批准动作母版、prompt/brief、来源台账、审核记录、manifest、导出/校验脚本和正式 288×288 JPG。候选图、失败图、缓存、API key 和账户凭证 MUST NOT 入库。大尺寸母版使用 Git LFS 时 MUST 采用路径限定规则，MUST NOT 迁移无关图片。
 
-### Requirement: 正式素材须通过五类审核门槛
+fresh clone SHALL 能取得全部已批准输入，重新导出符合尺寸与摘要规则的运行时 JPG，并在不安装 AI 工具时完成 iOS 构建。
 
-动作只有在 `art`、`movement`、`equipment`、`rights` 和 `technical` 全部通过时才可发布。审核 SHALL 覆盖解剖与构图、动作变体和关节轨迹、器械识别和机械联动、输入/工具/License/人工修改、帧/媒体/LFS/恢复完整性。每批 SHALL 生成 Contact Sheet；单个动作失败只阻止自身。
+#### Scenario: 更换电脑继续工作
+- **WHEN** 开发者在 fresh clone 拉取普通 Git 与所需 LFS 对象
+- **THEN** 已批准母版、brief、审核、脚本和正式资源均可用
+- **AND** 不依赖旧电脑的候选目录、缓存或密钥
 
-#### Scenario: 器械审核仍为待定
-- **WHEN** 动作的 GIF/JPG 已生成但 `equipment` 仍为 `pending`
-- **THEN** 该动作不得进入运行时 manifest
+#### Scenario: 未安装 AI 工具构建 App
+- **WHEN** 开发者只需要构建现有 iOS App
+- **THEN** 构建只消费已提交运行时 JPG 和 manifest
+- **AND** 不要求调用 imagegen 或安装 Blender
 
-#### Scenario: 单个动作被驳回
-- **WHEN** 12 个试点中一个动作因轨迹或器械错误被拒绝
-- **THEN** 其余已通过动作仍可发布
-- **AND** 被拒绝动作不生成占位资源
+### Requirement: 扩量必须经过分阶段质量闸门
 
-### Requirement: 首次变更使用两道扩量闸门并限定十二个试点
+系统 SHALL 先以 `PEC_DECK_FLY` 验证统一角色、常规器械、动作姿势、肌肉高亮和 288×288 双列卡片真机效果。首个动作和代表动作验证通过后，项目所有者可明确授权 `production-autopilot` 连续覆盖全部内置动作；无唯一标准、无法稳定保持角色或无法满足动作/器械规则的动作 MUST 被跳过并写入版本控制的台账，不得阻塞其他动作。
 
-本 change SHALL 先只制作并审核 `PEC_DECK_FLY`，用于锁定静态母版、常规器械、Blender 重建、45° 相机、解剖风格、目标肌、机械联动、循环和 180×180 可读性。其五类审核全部通过后，才可制作 `BB_BENCH_PRESS`、`BB_SQUAT`、`LATERAL_RAISE`；三类代表动作通过后，才可扩展至最多 12 个试点。
+#### Scenario: 首个动作未通过
+- **WHEN** `PEC_DECK_FLY` 任一人工或技术审核未通过
+- **THEN** 不得开始批量生成其他正式动作
 
-十二项范围 SHALL 限定为：`PEC_DECK_FLY`、`BB_BENCH_PRESS`、`BB_SQUAT`、`DEADLIFT`、`OHP`、`BB_ROW`、`LAT_PULLDOWN`、`LATERAL_RAISE`、`DB_CURL`、`TRICEP_PUSHDOWN`、`LUNGE`、`PLANK`。
-
-#### Scenario: 首个质量闸门未通过
-- **WHEN** `PEC_DECK_FLY` 任一审核未通过
-- **THEN** 不制作其他正式试点
-- **AND** 先修正母版、器械或 Blender 生产链
-
-#### Scenario: 试点范围完成
-- **WHEN** change 准备完成验收
-- **THEN** 运行时 manifest 最多声明上述 12 个动作
-- **AND** 每个声明动作均已通过五类审核
-
-### Requirement: 制作源与正式媒体必须可恢复和测量
-
-所有无法确定性重建的被采用母版、正式 Blender 源、实际使用贴图和正式 GIF/JPG SHALL 进入当前仓库，并由路径限定的 Git LFS 跟踪；manifest、prompt、器械验收卡、脚本、来源台账、审核和压缩预览 SHALL 使用普通 Git。规则 MUST NOT 接管无关图片。
-
-流程 SHALL 自动校验 code、来源、审核、帧完整性、媒体属性、孤立资源、LFS pointer 和运行时 manifest，并输出媒体总大小。iOS 验收 SHALL 测量 App 增量、首次 GIF 解码、连续切换详情的峰值内存和小屏清晰度。
-
-#### Scenario: 新电脑恢复完整生产链
-- **GIVEN** 新电脑安装 Git、Git LFS 和规定 Blender 版本
-- **WHEN** clone、`git lfs pull` 并运行预检
-- **THEN** 被采用母版、prompt、人体、器械、骨骼、动作、贴图、manifest 和审核资料均可取得
-- **AND** Blender 不报告仓库外资源缺失
-
-#### Scenario: App 构建不依赖 Blender
-- **WHEN** fresh clone 不运行 Blender而直接构建 iOS App
-- **THEN** 构建只消费已提交的正式 GIF/JPG 和运行时 manifest
-- **AND** 不访问 AI 服务或生产源文件
+#### Scenario: 自治全量覆盖
+- **WHEN** 项目所有者已授权 `production-autopilot`，且某动作通过五项审核、确定性导出和技术校验
+- **THEN** 该动作可直接进入正式运行时资源
+- **AND** 无法得出唯一动作或器械标准的动作写入跳过台账，仍不得标记为已覆盖

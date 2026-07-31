@@ -1,0 +1,24 @@
+{
+  "assetId": "INCLINE_DB_FLY-v1",
+  "exerciseCode": "INCLINE_DB_FLY",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-24T16:52:32Z",
+  "promptPath": "art/exercise-static/briefs/INCLINE_DB_FLY.json",
+  "briefPath": "art/exercise-static/briefs/INCLINE_DB_FLY.json",
+  "inputs": [
+    { "kind": "original-text", "source": "art/exercise-static/briefs/INCLINE_DB_FLY.json", "sha256": "7276c00c782c007231e99bed7716e7e71882ab3b403fb40c1dd3f4db104823d3", "rightsBasis": "本项目原创动作与器械 brief" },
+    { "kind": "owned-reference", "source": "art/exercise-static/references/approved/character-v1.png", "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590", "rightsBasis": "本项目已批准的原创统一角色母版" },
+    { "kind": "owned-reference", "source": "art/exercise-static/references/approved/style-v1.png", "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0", "rightsBasis": "本项目已批准的原创风格母版" }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/INCLINE_DB_FLY-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1024,
+  "sizeBytes": 1896604,
+  "sha256": "15803534e02e5889883e6134e37ab821c317d197ba6d34f4ac91a589bb5b9bbb",
+  "reviewRecord": "art/exercise-static/reviews/INCLINE_DB_FLY-review.json",
+  "approvedAt": "2026-07-24T16:52:32Z",
+  "reviewerId": "production-autopilot"
+}

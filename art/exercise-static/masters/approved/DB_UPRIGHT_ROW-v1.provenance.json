@@ -1,0 +1,45 @@
+{
+  "assetId": "DB_UPRIGHT_ROW-v1",
+  "exerciseCode": "DB_UPRIGHT_ROW",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T04:36:20.188Z",
+  "promptPath": "art/exercise-static/briefs/DB_UPRIGHT_ROW.json",
+  "briefPath": "art/exercise-static/briefs/DB_UPRIGHT_ROW.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/DB_UPRIGHT_ROW.json",
+      "sha256": "736d8c8baaad0ff2986a1bb7a48d292c5b19091b81dd29b1d87111f11b90d0f9",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/DB_UPRIGHT_ROW/DB_UPRIGHT_ROW-candidate-01.png",
+      "sha256": "24d38f311b03441241008b43e92adc342bf7df75e2550d3187d6d5e0467753b4",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/DB_UPRIGHT_ROW-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1609533,
+  "sha256": "24d38f311b03441241008b43e92adc342bf7df75e2550d3187d6d5e0467753b4",
+  "reviewRecord": "art/exercise-static/reviews/DB_UPRIGHT_ROW-review.json",
+  "approvedAt": "2026-07-25T04:36:20.188Z",
+  "reviewerId": "production-autopilot"
+}

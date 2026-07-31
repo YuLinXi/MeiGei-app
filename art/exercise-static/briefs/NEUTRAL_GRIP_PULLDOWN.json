@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "NEUTRAL_GRIP_PULLDOWN",
+  "exerciseName": "对握高位下拉",
+  "variant": "坐姿平行握把高位下拉，双手掌心相对",
+  "representativePose": "人物坐在高位下拉座椅，双腿固定；双手握平行中立把手并拉至上胸，肘部向下贴近躯干，背部保持直立。",
+  "camera": { "view": "45° 前侧视角，清晰显示掌心相对握法和滑轮", "subjectFill": "显示完整人物、平行握把、导线、座椅、压腿垫和配重块", "safeMarginPercent": 8 },
+  "equipment": { "family": "标准高位下拉机与平行中立把手", "recognitionFeatures": ["顶部单滑轮与竖直导线", "紧凑 V 形/平行握把", "座椅和压腿垫", "配重块"] },
+  "grip": "双手闭合中立握，掌心相对，左右对称",
+  "bodyContacts": ["臀部坐在座椅", "大腿接触压腿垫", "双手握住平行把手", "把手至上胸"],
+  "jointDirections": ["肩关节内收", "肘部向下并略向后", "肩胛骨下压", "躯干保持中立"],
+  "primaryMuscles": ["背阔肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["直杆正握或反握", "宽握", "把手拉到颈后", "器械或把手被裁切"]
+}

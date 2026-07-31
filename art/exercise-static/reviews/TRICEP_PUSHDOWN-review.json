@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "TRICEP_PUSHDOWN",
+  "candidateId": "TRICEP_PUSHDOWN-candidate-02",
+  "masterPath": "art/exercise-static/masters/approved/TRICEP_PUSHDOWN-v1.png",
+  "masterSha256": "28cc22647ffa2a451899dc67eb26b2d5d5b949f0ae8ad21dbfd21ed6963a6bc1",
+  "reviews": {
+    "identity": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/references/approved/character-v1.png",
+        "art/exercise-static/masters/approved/TRICEP_PUSHDOWN-v1.png"
+      ],
+      "notes": "人物身份、体型、服装、双脚和灰阶线稿与 character-v1 一致。"
+    },
+    "art": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/references/approved/style-v1.png",
+        "art/exercise-static/masters/approved/TRICEP_PUSHDOWN-v1.png"
+      ],
+      "notes": "肱三头肌朱砂红高亮、器械灰阶、白底安全边距和无文字/Logo 通过；候选 02 已去除明显乳头/乳晕特征。"
+    },
+    "movement": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/briefs/TRICEP_PUSHDOWN.json",
+        "art/exercise-static/masters/approved/TRICEP_PUSHDOWN-v1.png"
+      ],
+      "notes": "站姿双手绳索下压，双上臂贴近躯干、肘部接近伸直、绳端在大腿两侧分开。"
+    },
+    "equipment": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/briefs/TRICEP_PUSHDOWN.json",
+        "art/exercise-static/masters/approved/TRICEP_PUSHDOWN-v1.png"
+      ],
+      "notes": "高位滑轮、连续钢索、中央连接的双头绳、两端止挡球、导杆和配重塔均可识别；双手分别握住绳端。"
+    },
+    "rights": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/reviews/input-policy-v1.md",
+        "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+        "art/exercise-static/masters/approved/TRICEP_PUSHDOWN-v1.provenance.json"
+      ],
+      "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 候选链。"
+    }
+  }
+}

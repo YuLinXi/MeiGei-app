@@ -21,3 +21,15 @@
 .claude/worktrees/
 
 .vscode/*
+
+# 静态动作图本地候选与可重建生成物；已批准母版和正式 JPG 不忽略
+art/exercise-static/staging/
+art/exercise-static/candidates/
+art/exercise-static/cache/
+art/exercise-static/logs/
+art/exercise-static/reviews/generated/
+art/exercise-static/**/*.tmp
+art/exercise-static/**/.env
+art/exercise-static/**/.env.*
+art/exercise-static/**/*api-key*
+art/exercise-static/**/*secret*

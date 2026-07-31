@@ -1,0 +1,45 @@
+{
+  "assetId": "BENCH_DIP-v1",
+  "exerciseCode": "BENCH_DIP",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-26T03:21:49.944Z",
+  "promptPath": "art/exercise-static/briefs/BENCH_DIP.json",
+  "briefPath": "art/exercise-static/briefs/BENCH_DIP.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/BENCH_DIP.json",
+      "sha256": "da530a6f9c6cf402ed180d81a0214e02403bcd3127979befb4ab8c63681483a1",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/BENCH_DIP/candidate-01.png",
+      "sha256": "13b235d0d99a26b4267d3c341e3edb2cb3cae8ce9f26f233348897abf1af1734",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/BENCH_DIP-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1600186,
+  "sha256": "13b235d0d99a26b4267d3c341e3edb2cb3cae8ce9f26f233348897abf1af1734",
+  "reviewRecord": "art/exercise-static/reviews/BENCH_DIP-review.json",
+  "approvedAt": "2026-07-26T03:21:49.944Z",
+  "reviewerId": "production-autopilot"
+}

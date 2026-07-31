@@ -1,0 +1,22 @@
+{
+  "assetId": "style-v1",
+  "status": "approved",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-24",
+  "promptPath": "art/exercise-static/briefs/style-v1.md",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "原 PEC_DECK_FLY 静态母版原创文字 prompt；关键约束已整理到 style-v1.md",
+      "rightsBasis": "本项目原创文字 brief，无第三方媒体输入"
+    }
+  ],
+  "humanEdits": "无像素修改；恢复项目所有者此前批准的效果图 1 作为纯风格 reference。",
+  "file": "art/exercise-static/references/approved/style-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1630497,
+  "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+  "reviewRecord": "art/exercise-static/reviews/style-v1-review.md"
+}

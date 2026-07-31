@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "STRAIGHT_ARM_PULLDOWN",
+  "candidateId": "STRAIGHT_ARM_PULLDOWN-candidate-side-rear-v2",
+  "masterPath": "art/exercise-static/masters/approved/STRAIGHT_ARM_PULLDOWN-v1.png",
+  "masterSha256": "05d47c9790d3166db75cfcece42fe7511acb791a0cac821f403a31d72041f14b",
+  "reviews": {
+    "identity": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-30T02:10:00.000Z",
+      "evidence": [
+        "art/exercise-static/references/approved/character-v1.png",
+        "art/exercise-static/masters/approved/STRAIGHT_ARM_PULLDOWN-v1.png"
+      ],
+      "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+    },
+    "art": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-30T02:10:00.000Z",
+      "evidence": [
+        "art/exercise-static/references/approved/style-v1.png",
+        "art/exercise-static/masters/approved/STRAIGHT_ARM_PULLDOWN-v1.png"
+      ],
+      "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+    },
+    "movement": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-30T02:10:00.000Z",
+      "evidence": [
+        "art/exercise-static/briefs/STRAIGHT_ARM_PULLDOWN.json",
+        "art/exercise-static/masters/approved/STRAIGHT_ARM_PULLDOWN-v1.png"
+      ],
+      "notes": "按动作 brief 核对站姿直臂下压、面向高位滑轮、身体略前倾、双臂基本伸直、直杆向下压至大腿前方和背阔肌目标区域。"
+    },
+    "equipment": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-30T02:10:00.000Z",
+      "evidence": [
+        "art/exercise-static/briefs/STRAIGHT_ARM_PULLDOWN.json",
+        "art/exercise-static/masters/approved/STRAIGHT_ARM_PULLDOWN-v1.png"
+      ],
+      "notes": "按动作 brief 核对单一选择片式高位拉力器、单一配重塔、高位滑轮、直杆连接连续性及安全边距，排除重复配重结构。"
+    },
+    "rights": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-30T02:10:00.000Z",
+      "evidence": [
+        "art/exercise-static/reviews/input-policy-v1.md",
+        "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+        "art/exercise-static/masters/approved/STRAIGHT_ARM_PULLDOWN-v1.provenance.json"
+      ],
+      "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+    }
+  }
+}

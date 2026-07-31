@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "ROPE_PUSHDOWN",
+  "exerciseName": "绳柄下压",
+  "variant": "站姿双臂绳索下压，肘部固定在躯干两侧的底部姿势",
+  "representativePose": "面向高位绳索机站立，双脚稳定；双肘屈曲后贴近躯干，双手握绳并向下压至髋部两侧，绳端略向外分开。",
+  "camera": { "view": "45° 前侧视角，弱透视，清楚显示高位滑轮、绳索、双手和肘部路径", "subjectFill": "完整显示人物、绳索机立柱、配重箱和双脚，器械不裁切", "safeMarginPercent": 8 },
+  "equipment": { "family": "高位绳索机与双端绳柄", "recognitionFeatures": ["顶部滑轮", "一根向下垂落的绳索", "双手握住绳端并在底部向外分开", "配重箱和立柱"] },
+  "grip": "双手中立握绳端，拇指包住绳结",
+  "bodyContacts": ["双手握住绳端", "双肘贴近躯干", "双脚全掌接触地面"],
+  "jointDirections": ["肘关节由屈曲向伸展", "上臂保持垂直", "肩部不耸起", "躯干微前倾但保持稳定"],
+  "primaryMuscles": ["肱三头肌"],
+  "secondaryMuscles": [],
+  "rejectionCases": ["绳索从低位向上拉", "肘部明显前移或外张", "直杆下压或过顶臂屈伸", "滑轮、绳端、双手、头部或双脚裁切"]
+}

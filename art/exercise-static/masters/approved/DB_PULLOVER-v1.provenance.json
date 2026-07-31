@@ -1,0 +1,45 @@
+{
+  "assetId": "DB_PULLOVER-v1",
+  "exerciseCode": "DB_PULLOVER",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-26T03:17:33.402Z",
+  "promptPath": "art/exercise-static/briefs/DB_PULLOVER.json",
+  "briefPath": "art/exercise-static/briefs/DB_PULLOVER.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/DB_PULLOVER.json",
+      "sha256": "7d6fe9f3ceb7df0cb6d4d8d54621e22d375d6c4380a87949c755771e3d77b2e2",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/DB_PULLOVER/DB_PULLOVER-candidate-01.png",
+      "sha256": "4deca094b1fd7b8cfb754005bef04d7e00cd563908d4bce44010f64e102574ef",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/DB_PULLOVER-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1685282,
+  "sha256": "4deca094b1fd7b8cfb754005bef04d7e00cd563908d4bce44010f64e102574ef",
+  "reviewRecord": "art/exercise-static/reviews/DB_PULLOVER-review.json",
+  "approvedAt": "2026-07-26T03:17:33.402Z",
+  "reviewerId": "production-autopilot"
+}

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "MACHINE_PULLDOWN",
+  "candidateId": "MACHINE_PULLDOWN-candidate-selectorized-v2",
+  "masterPath": "art/exercise-static/masters/approved/MACHINE_PULLDOWN-v1.png",
+  "masterSha256": "89a9c44ba4363f2613ce5b2128ea1b4566152fd82351d2917ebaf18c6cb7ccc5",
+  "reviews": {
+    "identity": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T05:05:00.000Z",
+      "evidence": [
+        "art/exercise-static/references/approved/character-v1.png",
+        "art/exercise-static/masters/approved/MACHINE_PULLDOWN-v1.png"
+      ],
+      "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+    },
+    "art": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T05:05:00.000Z",
+      "evidence": [
+        "art/exercise-static/references/approved/style-v1.png",
+        "art/exercise-static/masters/approved/MACHINE_PULLDOWN-v1.png"
+      ],
+      "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+    },
+    "movement": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T05:05:00.000Z",
+      "evidence": [
+        "art/exercise-static/briefs/MACHINE_PULLDOWN.json",
+        "art/exercise-static/masters/approved/MACHINE_PULLDOWN-v1.png"
+      ],
+      "notes": "按动作 brief 核对坐姿下拉、胸部朝向器械、侧后方视角、双手握同一根连续把手、肘部向下收至肋部和背阔肌目标区域。"
+    },
+    "equipment": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T05:05:00.000Z",
+      "evidence": [
+        "art/exercise-static/briefs/MACHINE_PULLDOWN.json",
+        "art/exercise-static/masters/approved/MACHINE_PULLDOWN-v1.png"
+      ],
+      "notes": "按动作 brief 核对普通选择片式器械、单一封闭式配重塔、选择插销、座椅/腿部固定垫、上方滑轮和连续平行把手；排除悍马机与重复配重结构。"
+    },
+    "rights": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T05:05:00.000Z",
+      "evidence": [
+        "art/exercise-static/reviews/input-policy-v1.md",
+        "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+        "art/exercise-static/masters/approved/MACHINE_PULLDOWN-v1.provenance.json"
+      ],
+      "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+    }
+  }
+}

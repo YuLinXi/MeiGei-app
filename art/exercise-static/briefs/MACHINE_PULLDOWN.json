@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "MACHINE_PULLDOWN",
+  "exerciseName": "器械下拉",
+  "variant": "坐姿独立杠杆器械下拉，固定中立握把",
+  "representativePose": "人物坐在独立杠杆下拉机，背部靠垫，双手握固定平行把手并向下拉到胸侧，双肘贴近肋骨；无绳索配重塔。",
+  "camera": { "view": "45° 前侧视角，完整显示独立杠杆、座椅和手柄", "subjectFill": "显示完整人物、双侧杠杆臂、握把、靠背、压腿垫和配重片", "safeMarginPercent": 8 },
+  "equipment": { "family": "板载独立杠杆高位下拉机", "recognitionFeatures": ["左右独立上方杠杆臂", "固定平行握把", "靠背与大腿压垫", "杠杆端板载配重片，无电缆塔"] },
+  "grip": "双手闭合中立握，掌心相对",
+  "bodyContacts": ["臀部坐垫", "背部靠背", "大腿接触压垫", "双手握固定把手"],
+  "jointDirections": ["肩关节内收", "肘部向下贴近身体", "肩胛骨下压", "脊柱保持中立"],
+  "primaryMuscles": ["背阔肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["出现电缆配重塔", "直杆下拉", "胸部推举杠杆", "杠杆或板片缺失", "人物被裁切"]
+}

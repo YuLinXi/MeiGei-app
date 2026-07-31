@@ -3,7 +3,7 @@
 23,curated,CHIN_UP,反握引体,自重,背,背阔,背,背阔肌,,背 > 背阔肌,lats,biceps|forearms,,,,,,,
 24,curated,WIDE_PULL_UP,宽距引体,自重,背,背阔,背,背阔肌,,背 > 背阔肌,lats,deltRear|biceps|forearms,,,,,,,
 25,curated,LAT_PULLDOWN,高位下拉,绳索,背,背阔,背,背阔肌,,背 > 背阔肌,lats,biceps|deltRear,,,,,,,
-26,curated,CLOSE_LAT_PULLDOWN,窄握高位下拉,绳索,背,背阔,背,背阔肌,,背 > 背阔肌,lats,biceps|forearms,,,,,,,
+26,curated,CLOSE_LAT_PULLDOWN,窄握正手高位下拉,绳索,背,背阔,背,背阔肌,,背 > 背阔肌,lats,biceps|forearms,,,,,,,
 27,curated,STRAIGHT_ARM_PULLDOWN,直臂下压,绳索,背,背阔,背,背阔肌,,背 > 背阔肌,lats,triceps,,,,,,,
 28,curated,BB_ROW,杠铃划船,杠铃,背,中背,背,背阔肌,,背 > 背阔肌,lats,traps|biceps|lowerBack|deltRear,,,,,,,
 29,curated,PENDLAY_ROW,潘德利划船,杠铃,背,中背,背,背阔肌,,背 > 背阔肌,lats,traps|biceps|lowerBack,,,,,,,

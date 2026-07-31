@@ -1,0 +1,45 @@
+{
+  "assetId": "BB_STRAIGHT_BAR_PUSHDOWN-v1",
+  "exerciseCode": "BB_STRAIGHT_BAR_PUSHDOWN",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T12:44:43.578Z",
+  "promptPath": "art/exercise-static/briefs/BB_STRAIGHT_BAR_PUSHDOWN.json",
+  "briefPath": "art/exercise-static/briefs/BB_STRAIGHT_BAR_PUSHDOWN.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/BB_STRAIGHT_BAR_PUSHDOWN.json",
+      "sha256": "497452487039bbb431596fa946558504510b948f615cd9a7a821015923e63b36",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/BB_STRAIGHT_BAR_PUSHDOWN/BB_STRAIGHT_BAR_PUSHDOWN-candidate-01.png",
+      "sha256": "54984892adadce3d292fef46ceec5a7a0bf26369a37e51c5f17fcb5fc0e2def2",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/BB_STRAIGHT_BAR_PUSHDOWN-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1705108,
+  "sha256": "54984892adadce3d292fef46ceec5a7a0bf26369a37e51c5f17fcb5fc0e2def2",
+  "reviewRecord": "art/exercise-static/reviews/BB_STRAIGHT_BAR_PUSHDOWN-review.json",
+  "approvedAt": "2026-07-25T12:44:43.578Z",
+  "reviewerId": "production-autopilot"
+}

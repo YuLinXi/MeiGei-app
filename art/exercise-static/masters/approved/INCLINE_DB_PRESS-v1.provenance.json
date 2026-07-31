@@ -1,0 +1,24 @@
+{
+  "assetId": "INCLINE_DB_PRESS-v1",
+  "exerciseCode": "INCLINE_DB_PRESS",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-24T16:52:32Z",
+  "promptPath": "art/exercise-static/briefs/INCLINE_DB_PRESS.json",
+  "briefPath": "art/exercise-static/briefs/INCLINE_DB_PRESS.json",
+  "inputs": [
+    { "kind": "original-text", "source": "art/exercise-static/briefs/INCLINE_DB_PRESS.json", "sha256": "d8a777f29d75999ce248b2ce33bcd5cda739c9560e72b256a2fb1562d5025ba2", "rightsBasis": "本项目原创动作与器械 brief" },
+    { "kind": "owned-reference", "source": "art/exercise-static/references/approved/character-v1.png", "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590", "rightsBasis": "本项目已批准的原创统一角色母版" },
+    { "kind": "owned-reference", "source": "art/exercise-static/references/approved/style-v1.png", "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0", "rightsBasis": "本项目已批准的原创风格母版" }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/INCLINE_DB_PRESS-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1024,
+  "sizeBytes": 1896604,
+  "sha256": "6b39c046d14db4fc2ee703d989cafc9fa448f4ee6e65cc87a3c0cd3d72d75074",
+  "reviewRecord": "art/exercise-static/reviews/INCLINE_DB_PRESS-review.json",
+  "approvedAt": "2026-07-24T16:52:32Z",
+  "reviewerId": "production-autopilot"
+}

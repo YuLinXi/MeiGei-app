@@ -1,0 +1,24 @@
+{
+  "assetId": "DEADLIFT-v1",
+  "exerciseCode": "DEADLIFT",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-24T09:59:49Z",
+  "promptPath": "art/exercise-static/briefs/DEADLIFT.json",
+  "briefPath": "art/exercise-static/briefs/DEADLIFT.json",
+  "inputs": [
+    { "kind": "original-text", "source": "art/exercise-static/briefs/DEADLIFT.json", "sha256": "2f3caba29e4379f202769a340290fe33d89a0e6ae059e62c2e4d97e9cbafa92c", "rightsBasis": "本项目原创动作与器械 brief" },
+    { "kind": "owned-reference", "source": "art/exercise-static/references/approved/character-v1.png", "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590", "rightsBasis": "本项目已批准的原创统一角色母版" },
+    { "kind": "owned-reference", "source": "art/exercise-static/references/approved/style-v1.png", "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0", "rightsBasis": "本项目已批准的原创风格母版" }
+  ],
+  "humanEdits": "无手工像素编辑；候选 08 通过 imagegen edit 移除前序自有候选的乳头特征，并保留传统硬拉起始位、握距、器械和构图。前序候选按 staging 清理规则未保留可校验文件。",
+  "file": "art/exercise-static/masters/approved/DEADLIFT-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1489968,
+  "sha256": "cffe2f559e68e2759db40db88ea6257d9c6a2de4e7373fc96a241a1ab8df3a87",
+  "reviewRecord": "art/exercise-static/reviews/DEADLIFT-candidate-08-review.md",
+  "approvedAt": "2026-07-24T11:10:21Z",
+  "reviewerId": "project-owner"
+}

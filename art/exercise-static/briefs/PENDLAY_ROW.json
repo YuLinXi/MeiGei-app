@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "PENDLAY_ROW",
+  "exerciseName": "潘德利划船",
+  "variant": "每次从地面起始的俯身杠铃潘德利划船",
+  "representativePose": "人物髋铰链至躯干近水平，背部平直、膝部屈曲；双手略宽于肩正握杠铃，杠铃从地面拉向下胸，杠片接触地面或接近地面。",
+  "camera": { "view": "45° 前侧视角，兼顾近水平躯干、地面杠铃和背部高亮", "subjectFill": "显示全身、整根杠铃、两侧圆片、双脚和地面起始关系", "safeMarginPercent": 8 },
+  "equipment": { "family": "标准奥林匹克杠铃潘德利划船", "recognitionFeatures": ["直奥杆与对称杠铃片", "杠铃位于地面", "无胸托、T 杠或绳索", "双腿站立髋铰链"] },
+  "grip": "双手闭合正握，握距略宽于肩",
+  "bodyContacts": ["双脚着地", "双手握杠铃", "杠铃片接触或接近地面"],
+  "jointDirections": ["髋关节深度屈曲", "膝部屈曲", "脊柱中立近水平", "双肘向后拉向下胸"],
+  "primaryMuscles": ["背阔肌", "菱形肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["站姿普通杠铃划船", "杠铃悬空不接近地面", "T 杠或胸托", "脊柱弓背或躯干直立", "杠铃片或双脚裁切"]
+}

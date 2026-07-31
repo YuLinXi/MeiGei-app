@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "SINGLE_ARM_HAMMER_PULLDOWN",
+  "candidateId": "SINGLE_ARM_HAMMER_PULLDOWN-candidate-one-side-v2",
+  "masterPath": "art/exercise-static/masters/approved/SINGLE_ARM_HAMMER_PULLDOWN-v1.png",
+  "masterSha256": "2e881b99b5960298d1cff4cff38d68dcb706701238ead70ae69eded04e2366d1",
+  "reviews": {
+    "identity": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T06:05:00.000Z",
+      "evidence": [
+        "art/exercise-static/references/approved/character-v1.png",
+        "art/exercise-static/masters/approved/SINGLE_ARM_HAMMER_PULLDOWN-v1.png"
+      ],
+      "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+    },
+    "art": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T06:05:00.000Z",
+      "evidence": [
+        "art/exercise-static/references/approved/style-v1.png",
+        "art/exercise-static/masters/approved/SINGLE_ARM_HAMMER_PULLDOWN-v1.png"
+      ],
+      "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+    },
+    "movement": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T06:05:00.000Z",
+      "evidence": [
+        "art/exercise-static/briefs/SINGLE_ARM_HAMMER_PULLDOWN.json",
+        "art/exercise-static/masters/approved/SINGLE_ARM_HAMMER_PULLDOWN-v1.png"
+      ],
+      "notes": "按单臂悍马机下拉标准核对：与 HAMMER_PULLDOWN 使用同一盘片加载式独立双臂器械；仅一侧手臂握水平把手下拉至上胸中段，另一侧手臂放松且不参与发力。"
+    },
+    "equipment": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T06:05:00.000Z",
+      "evidence": [
+        "art/exercise-static/briefs/SINGLE_ARM_HAMMER_PULLDOWN.json",
+        "art/exercise-static/masters/approved/SINGLE_ARM_HAMMER_PULLDOWN-v1.png"
+      ],
+      "notes": "按 HAMMER_PULLDOWN 已确认器械核对中央座椅、靠背、腿部固定垫、左右独立运动臂、水平握把和对称盘片加载轴；非工作侧运动臂保持停放。"
+    },
+    "rights": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T06:05:00.000Z",
+      "evidence": [
+        "art/exercise-static/reviews/input-policy-v1.md",
+        "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+        "art/exercise-static/masters/approved/SINGLE_ARM_HAMMER_PULLDOWN-v1.provenance.json"
+      ],
+      "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+    }
+  }
+}

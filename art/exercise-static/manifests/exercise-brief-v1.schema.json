@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dontlift.local/schemas/exercise-static-brief-v1.json",
+  "title": "静态动作图 Brief v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "exerciseCode",
+    "exerciseName",
+    "variant",
+    "representativePose",
+    "camera",
+    "equipment",
+    "grip",
+    "bodyContacts",
+    "jointDirections",
+    "primaryMuscles",
+    "secondaryMuscles",
+    "rejectionCases"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "exerciseCode": { "type": "string", "pattern": "^[A-Z0-9_]+$" },
+    "exerciseName": { "type": "string", "minLength": 1 },
+    "variant": { "type": "string", "minLength": 1 },
+    "representativePose": { "type": "string", "minLength": 1 },
+    "camera": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["view", "subjectFill", "safeMarginPercent"],
+      "properties": {
+        "view": { "type": "string", "minLength": 1 },
+        "subjectFill": { "type": "string", "minLength": 1 },
+        "safeMarginPercent": { "type": "number", "minimum": 0, "maximum": 30 }
+      }
+    },
+    "equipment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "recognitionFeatures"],
+      "properties": {
+        "family": { "type": "string", "minLength": 1 },
+        "recognitionFeatures": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "grip": { "type": "string", "minLength": 1 },
+    "bodyContacts": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "jointDirections": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "primaryMuscles": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "secondaryMuscles": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "rejectionCases": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+  }
+}

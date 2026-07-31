@@ -538,7 +538,7 @@
     },
     {
       "code": "CLOSE_LAT_PULLDOWN",
-      "name": "窄握高位下拉",
+      "name": "窄握正手高位下拉",
       "category": "背",
       "subcategory": null,
       "equipmentType": "绳索",
@@ -574,7 +574,7 @@
     },
     {
       "code": "REVERSE_LAT_PULLDOWN",
-      "name": "反握高位下拉",
+      "name": "窄握反手高位下拉",
       "category": "背",
       "subcategory": null,
       "equipmentType": "绳索",
@@ -3252,24 +3252,6 @@
       "formCues": [],
       "source": "preset-v1",
       "order": 191
-    },
-    {
-      "code": "MACHINE_PULLOVER",
-      "name": "器械上拉",
-      "category": "背",
-      "subcategory": null,
-      "equipmentType": "器械",
-      "primaryRegions": [
-        "lats"
-      ],
-      "secondaryRegions": [
-        "chest",
-        "triceps"
-      ],
-      "note": "扩展新增",
-      "formCues": [],
-      "source": "preset-v1",
-      "order": 192
     },
     {
       "code": "LANDMINE_ROW",

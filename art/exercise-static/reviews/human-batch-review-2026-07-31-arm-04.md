@@ -1,0 +1,15 @@
+# 手臂动作第 4 批人工复核
+
+- 复核方式：本地正式发布 JPG，20 张一组总览
+- 复核时间：2026-07-31
+- 复核结论：19 项通过；1 项待回修。原有单动作审核记录和发布溯源保持不变。
+
+## 待回修项
+
+| 序号 | code | 中文名 |
+| ---: | --- | --- |
+| 15 | `CABLE_SEATED_BAR_CURL` | 坐姿绳索拉杆二头弯举 |
+
+## 本轮通过项
+
+`BB_CURL`、`EZ_BAR_CURL`、`DB_CURL`、`DB_ALTERNATING_CURL`、`HAMMER_CURL`、`DB_CROSS_HAMMER_CURL`、`INCLINE_DB_CURL`、`CONCENTRATION_CURL`、`SPIDER_CURL`、`EZ_BAR_PREACHER_CURL`、`BB_PREACHER_CURL`、`DB_PREACHER_CURL`、`CABLE_CURL`、`BB_STRAIGHT_BAR_CURL`、`MACHINE_CURL`、`REVERSE_CURL`、`TRICEP_PUSHDOWN`、`ROPE_PUSHDOWN`、`CABLE_V_BAR_PUSHDOWN`。

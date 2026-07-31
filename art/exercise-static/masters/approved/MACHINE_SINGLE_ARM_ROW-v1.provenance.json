@@ -1,0 +1,45 @@
+{
+  "assetId": "MACHINE_SINGLE_ARM_ROW-v1",
+  "exerciseCode": "MACHINE_SINGLE_ARM_ROW",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-24T21:06:01.676Z",
+  "promptPath": "art/exercise-static/briefs/MACHINE_SINGLE_ARM_ROW.json",
+  "briefPath": "art/exercise-static/briefs/MACHINE_SINGLE_ARM_ROW.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/MACHINE_SINGLE_ARM_ROW.json",
+      "sha256": "eed78a41d20cf840727acda7615b82872f522048decf3eb026941cd2705d0c45",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/MACHINE_SINGLE_ARM_ROW/MACHINE_SINGLE_ARM_ROW-candidate-01.png",
+      "sha256": "6d8101490709e122dc543352d4be9d56fed00166baeb6d444ac6c2ff497df896",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/MACHINE_SINGLE_ARM_ROW-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1895479,
+  "sha256": "6d8101490709e122dc543352d4be9d56fed00166baeb6d444ac6c2ff497df896",
+  "reviewRecord": "art/exercise-static/reviews/MACHINE_SINGLE_ARM_ROW-review.json",
+  "approvedAt": "2026-07-24T21:06:01.676Z",
+  "reviewerId": "production-autopilot"
+}

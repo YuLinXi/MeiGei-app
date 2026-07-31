@@ -1,0 +1,45 @@
+{
+  "assetId": "SINGLE_ARM_HAMMER_PULLDOWN-v1",
+  "exerciseCode": "SINGLE_ARM_HAMMER_PULLDOWN",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-29T06:05:00.000Z",
+  "promptPath": "art/exercise-static/briefs/SINGLE_ARM_HAMMER_PULLDOWN.json",
+  "briefPath": "art/exercise-static/briefs/SINGLE_ARM_HAMMER_PULLDOWN.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/SINGLE_ARM_HAMMER_PULLDOWN.json",
+      "sha256": "4fd36b48626cf66666ab22be28cffb3bfab57a071dee4193b746138f10b89506",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/SINGLE_ARM_HAMMER_PULLDOWN/SINGLE_ARM_HAMMER_PULLDOWN-candidate-one-side-v2.png",
+      "sha256": "bea75cd8c3cbcee34d4ff1d0e8dbd740cffb4ca38f226b7aa9acca90597620d7",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/SINGLE_ARM_HAMMER_PULLDOWN/SINGLE_ARM_HAMMER_PULLDOWN-candidate-one-side-v2.png",
+      "sha256": "bea75cd8c3cbcee34d4ff1d0e8dbd740cffb4ca38f226b7aa9acca90597620d7",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/SINGLE_ARM_HAMMER_PULLDOWN/SINGLE_ARM_HAMMER_PULLDOWN-candidate-one-side-v2.png",
+      "sha256": "bea75cd8c3cbcee34d4ff1d0e8dbd740cffb4ca38f226b7aa9acca90597620d7",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑；将确认候选图统一填充至 1536×1536 白底母版尺寸。",
+  "file": "art/exercise-static/masters/approved/SINGLE_ARM_HAMMER_PULLDOWN-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1484338,
+  "sha256": "2e881b99b5960298d1cff4cff38d68dcb706701238ead70ae69eded04e2366d1",
+  "reviewRecord": "art/exercise-static/reviews/SINGLE_ARM_HAMMER_PULLDOWN-review.json",
+  "approvedAt": "2026-07-29T06:05:00.000Z",
+  "reviewerId": "project-owner"
+}

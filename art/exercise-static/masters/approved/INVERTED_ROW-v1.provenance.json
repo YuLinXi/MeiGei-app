@@ -1,0 +1,45 @@
+{
+  "assetId": "INVERTED_ROW-v1",
+  "exerciseCode": "INVERTED_ROW",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-26T01:53:44.461Z",
+  "promptPath": "art/exercise-static/briefs/INVERTED_ROW.json",
+  "briefPath": "art/exercise-static/briefs/INVERTED_ROW.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/INVERTED_ROW.json",
+      "sha256": "2d087b5bb0135b0eb7b6b275032bf2e1546ff0b9575534dc03a7cb012521efda",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/INVERTED_ROW/INVERTED_ROW-candidate-01.png",
+      "sha256": "fd02b11673f11aaf093ccc540f0bd6c11ce56bb381538144b9f8405a8812c63e",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/INVERTED_ROW-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1817952,
+  "sha256": "fd02b11673f11aaf093ccc540f0bd6c11ce56bb381538144b9f8405a8812c63e",
+  "reviewRecord": "art/exercise-static/reviews/INVERTED_ROW-review.json",
+  "approvedAt": "2026-07-26T01:53:44.461Z",
+  "reviewerId": "production-autopilot"
+}

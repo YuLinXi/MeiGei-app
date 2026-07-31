@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "LEG_CURL",
+  "exerciseName": "俯卧腿弯举",
+  "variant": "选择器械俯卧双腿腿弯举，膝关节约 90° 屈曲的收缩位",
+  "representativePose": "人物俯卧在长垫上，髋部和躯干贴靠，双膝弯曲，小腿向后上方卷起，脚踝抵住后方圆柱软垫，双手握住前端把手。",
+  "camera": { "view": "45° 后侧视角，弱透视，兼顾俯卧姿势、胫托、摆臂和配重", "subjectFill": "完整显示人物头、躯干、双腿、双脚与俯卧腿弯举机；无背景", "safeMarginPercent": 8 },
+  "equipment": { "family": "标准选择器械俯卧腿弯举", "recognitionFeatures": ["水平俯卧长垫", "后端圆柱形踝部软垫", "以膝关节为轴的摆臂", "机架和选择器械配重箱"] },
+  "grip": "双手闭合握住前端把手，肩部放松",
+  "bodyContacts": ["胸腹和髋部接触长垫", "双踝后侧接触圆柱软垫", "双手接触前端把手"],
+  "jointDirections": ["双膝屈曲、脚跟向臀部靠近", "髋部保持贴垫不抬起", "骨盆保持中立", "左右腿同步且对称"],
+  "primaryMuscles": ["腘绳肌"],
+  "secondaryMuscles": ["腓肠肌", "臀大肌"],
+  "rejectionCases": ["坐姿腿弯举、腿屈伸或臀桥", "人物仰卧、站立或胸腹未接触俯卧垫", "软垫压在胫骨前侧或脚掌", "机器、人物或双脚被裁切"]
+}

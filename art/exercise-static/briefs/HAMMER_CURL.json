@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "HAMMER_CURL",
+  "exerciseName": "锤式弯举",
+  "variant": "站姿双臂同步中立握哑铃弯举，中段收缩姿势",
+  "representativePose": "双脚髋宽站立，躯干直立；双上臂贴近躯干，肘部固定，前臂保持中立握屈曲约 90 度，哑铃位于身体前侧。",
+  "camera": { "view": "45° 前侧视角，弱透视，清楚显示双手掌心相对的中立握法和两只哑铃", "subjectFill": "完整显示人物、两只哑铃和双脚，四肢与器械不裁切", "safeMarginPercent": 8 },
+  "equipment": { "family": "一对标准短柄哑铃", "recognitionFeatures": ["左右各一只短柄哑铃", "哑铃两端对称配重头", "双手掌心相对"] },
+  "grip": "双手中立握，掌心相对，拇指包住握柄",
+  "bodyContacts": ["双手分别握住哑铃", "双上臂靠近躯干", "双脚全掌接触地面"],
+  "jointDirections": ["双肘屈曲并固定", "前臂保持中立旋转", "躯干保持直立"],
+  "primaryMuscles": ["肱二头肌"],
+  "secondaryMuscles": ["肱肌", "肱桡肌"],
+  "rejectionCases": ["掌心向上或向下的握法", "身体摆动", "肘部前移", "哑铃、双手、头部或双脚裁切"]
+}

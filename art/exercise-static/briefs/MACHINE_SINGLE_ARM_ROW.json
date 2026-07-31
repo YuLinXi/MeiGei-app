@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "MACHINE_SINGLE_ARM_ROW",
+  "exerciseName": "单臂器械划船",
+  "variant": "胸托器械单臂中立握划船",
+  "representativePose": "人物胸部贴靠器械胸垫；一侧手臂向后拉独立中立握把到肋部，另一手停在支撑处，工作侧杠杆与板片清楚。",
+  "camera": { "view": "45° 前侧视角，突出胸托、单侧把手和工作侧背部", "subjectFill": "显示胸垫、座椅、左右机器框架、工作侧杠杆、板片和完整人物", "safeMarginPercent": 8 },
+  "equipment": { "family": "板载独立杠杆单臂器械划船", "recognitionFeatures": ["胸部支撑垫", "一侧独立中立握把", "工作侧板载片", "无绳索"] },
+  "grip": "工作侧单手闭合中立握",
+  "bodyContacts": ["胸部贴胸垫", "臀部坐垫", "一手握工作把手", "另一手支撑"],
+  "jointDirections": ["工作肘向后", "工作肩胛骨后缩", "躯干抗旋转", "腕部中立"],
+  "primaryMuscles": ["菱形肌", "背阔肌"],
+  "secondaryMuscles": ["三角肌后束", "肱二头肌"],
+  "rejectionCases": ["双臂同时划船", "无胸托", "绳索或哑铃", "两侧同时工作", "工作侧把手/板片裁切"]
+}

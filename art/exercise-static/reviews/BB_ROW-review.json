@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "BB_ROW",
+  "candidateId": "BB_ROW-candidate-01",
+  "masterPath": "art/exercise-static/masters/approved/BB_ROW-v1.png",
+  "masterSha256": "037f5995bdd9e87d800bf2ad261785a93d26e5b25dce9f47fb56cc36ecc3203a",
+  "reviews": {
+    "identity": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/references/approved/character-v1.png",
+        "art/exercise-static/masters/approved/BB_ROW-v1.png"
+      ],
+      "notes": "后侧视角下发型、体型、黑色短裤、四肢和线稿仍与 character-v1 一致。"
+    },
+    "art": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/references/approved/style-v1.png",
+        "art/exercise-static/masters/approved/BB_ROW-v1.png"
+      ],
+      "notes": "后侧背部高亮、灰阶线稿、器械对比、白底安全边距和无文字/Logo 通过。"
+    },
+    "movement": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/briefs/BB_ROW.json",
+        "art/exercise-static/masters/approved/BB_ROW-v1.png"
+      ],
+      "notes": "站姿髋铰链俯身约 30–45 度，中立脊柱，杠铃拉向脐部/下肋，双肘向后靠近躯干。"
+    },
+    "equipment": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/briefs/BB_ROW.json",
+        "art/exercise-static/masters/approved/BB_ROW-v1.png"
+      ],
+      "notes": "一根直奥杆、两端对称圆片、套筒和卡扣清晰；无胸托、T 杠、绳索或史密斯导轨。"
+    },
+    "rights": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/reviews/input-policy-v1.md",
+        "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+        "art/exercise-static/masters/approved/BB_ROW-v1.provenance.json"
+      ],
+      "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链。"
+    }
+  }
+}

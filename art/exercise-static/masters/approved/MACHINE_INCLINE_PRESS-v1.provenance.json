@@ -1,0 +1,45 @@
+{
+  "assetId": "MACHINE_INCLINE_PRESS-v1",
+  "exerciseCode": "MACHINE_INCLINE_PRESS",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-28T06:32:17Z",
+  "promptPath": "art/exercise-static/briefs/MACHINE_INCLINE_PRESS.json",
+  "briefPath": "art/exercise-static/briefs/MACHINE_INCLINE_PRESS.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/MACHINE_INCLINE_PRESS.json",
+      "sha256": "20b1f39acb04e55b85b5087ddcce9f52300adaca28f2f24af01c398b34215e52",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/MACHINE_INCLINE_PRESS/candidate-02.png",
+      "sha256": "c08041e69b434ac53c74a098a46beda987372305e10ecf3b045ef02bb615f091",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/masters/approved/MACHINE_CHEST_PRESS-v1.png",
+      "sha256": "74acf5ff9ae32e66edbde8a0b8092161218acab05d69ba19cfcbbdb3659b0907",
+      "rightsBasis": "本项目已批准的普通器械推胸母图，仅用作选择片器械家族与线稿风格参考"
+    }
+  ],
+  "humanEdits": "为统一方形母图标准，以白色扩边至 1536×1536；无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/MACHINE_INCLINE_PRESS-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1536,
+  "sizeBytes": 2157929,
+  "sha256": "c08041e69b434ac53c74a098a46beda987372305e10ecf3b045ef02bb615f091",
+  "reviewRecord": "art/exercise-static/reviews/MACHINE_INCLINE_PRESS-review.json",
+  "approvedAt": "2026-07-28T06:32:17Z",
+  "reviewerId": "project-owner"
+}

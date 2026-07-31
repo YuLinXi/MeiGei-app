@@ -1,0 +1,45 @@
+{
+  "assetId": "NEUTRAL_GRIP_PULLDOWN-v1",
+  "exerciseCode": "NEUTRAL_GRIP_PULLDOWN",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-29T04:45:39.000Z",
+  "promptPath": "art/exercise-static/briefs/NEUTRAL_GRIP_PULLDOWN.json",
+  "briefPath": "art/exercise-static/briefs/NEUTRAL_GRIP_PULLDOWN.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/NEUTRAL_GRIP_PULLDOWN.json",
+      "sha256": "9339a59a0c0e9fdca86c927dba010d3e229c57db518007439ab3e67cfc29cf42",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/NEUTRAL_GRIP_PULLDOWN/NEUTRAL_GRIP_PULLDOWN-candidate-bg-white.png",
+      "sha256": "3bbeb4632772e9b644e06a2795922410b7478a3a4df11c9b99705a85bd000598",
+      "rightsBasis": "本项目已批准母版的本地背景标准化版本；未引入第三方素材"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "仅将原图米色渐变背景统一为白色；人物、动作、器械和构图保持不变。",
+  "file": "art/exercise-static/masters/approved/NEUTRAL_GRIP_PULLDOWN-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1536,
+  "sizeBytes": 1048939,
+  "sha256": "3bbeb4632772e9b644e06a2795922410b7478a3a4df11c9b99705a85bd000598",
+  "reviewRecord": "art/exercise-static/reviews/NEUTRAL_GRIP_PULLDOWN-review.json",
+  "approvedAt": "2026-07-29T04:45:39.000Z",
+  "reviewerId": "project-owner"
+}

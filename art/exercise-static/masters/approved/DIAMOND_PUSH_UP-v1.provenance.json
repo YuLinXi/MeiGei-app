@@ -1,0 +1,45 @@
+{
+  "assetId": "DIAMOND_PUSH_UP-v1",
+  "exerciseCode": "DIAMOND_PUSH_UP",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-27T08:26:58.218Z",
+  "promptPath": "art/exercise-static/briefs/DIAMOND_PUSH_UP.json",
+  "briefPath": "art/exercise-static/briefs/DIAMOND_PUSH_UP.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/DIAMOND_PUSH_UP.json",
+      "sha256": "fa1cd55894ffa41c1c3ca8b408e5555764f9ddd0bdef2398e0d1d5cf73a66346",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/staging/candidates/DIAMOND_PUSH_UP/DIAMOND_PUSH_UP-candidate-02.png",
+      "sha256": "155eb8b2073ecb0df09530241d3de2a98a3f7c2d5a1d7933418a0a7cb223bdc4",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/DIAMOND_PUSH_UP-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1536,
+  "sizeBytes": 1877066,
+  "sha256": "155eb8b2073ecb0df09530241d3de2a98a3f7c2d5a1d7933418a0a7cb223bdc4",
+  "reviewRecord": "art/exercise-static/reviews/DIAMOND_PUSH_UP-review.json",
+  "approvedAt": "2026-07-27T08:26:58.218Z",
+  "reviewerId": "project-owner"
+}

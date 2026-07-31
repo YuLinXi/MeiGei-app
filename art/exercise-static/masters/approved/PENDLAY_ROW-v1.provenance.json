@@ -1,0 +1,45 @@
+{
+  "assetId": "PENDLAY_ROW-v1",
+  "exerciseCode": "PENDLAY_ROW",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-30T02:40:00.000Z",
+  "promptPath": "art/exercise-static/briefs/PENDLAY_ROW.json",
+  "briefPath": "art/exercise-static/briefs/PENDLAY_ROW.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/PENDLAY_ROW.json",
+      "sha256": "9bad4435f172e02f48abc8c7d445525cf2e7bb67f783d58cc084e801710c2a78",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/PENDLAY_ROW/PENDLAY_ROW-candidate-horizontal-v2.png",
+      "sha256": "03254d3286e0c3565c2c27ca7e4626cd2bb139dde2bb661ea88b65d92d6f3e94",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/PENDLAY_ROW/PENDLAY_ROW-candidate-horizontal-v2.png",
+      "sha256": "03254d3286e0c3565c2c27ca7e4626cd2bb139dde2bb661ea88b65d92d6f3e94",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/PENDLAY_ROW/PENDLAY_ROW-candidate-horizontal-v2.png",
+      "sha256": "03254d3286e0c3565c2c27ca7e4626cd2bb139dde2bb661ea88b65d92d6f3e94",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑；将确认候选图统一填充至 1536×1536 白底母版尺寸。",
+  "file": "art/exercise-static/masters/approved/PENDLAY_ROW-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1704123,
+  "sha256": "5b68e2c00ff4d22eae68891cb62cbf093a0f493098134a2d298150341f974616",
+  "reviewRecord": "art/exercise-static/reviews/PENDLAY_ROW-review.json",
+  "approvedAt": "2026-07-30T02:40:00.000Z",
+  "reviewerId": "project-owner"
+}

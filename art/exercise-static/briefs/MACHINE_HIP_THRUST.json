@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "MACHINE_HIP_THRUST",
+  "exerciseName": "器械臀推",
+  "variant": "专用臀推机坐姿髋伸展，臀部完全收缩位",
+  "representativePose": "人物上背贴靠臀推机靠垫，双脚踩在脚踏板，膝盖约 90°；厚实髋垫/杠杆压在髋褶，髋部推至完全伸展，双手握侧把手。",
+  "camera": { "view": "45° 前侧视角，弱透视，兼顾靠背、髋垫、脚踏板和摆臂", "subjectFill": "完整显示人物、臀推机靠背、髋垫杠杆、脚踏板和底座；无背景", "safeMarginPercent": 8 },
+  "equipment": { "family": "专用选择器械臀推机", "recognitionFeatures": ["固定靠背与坐垫", "覆盖髋褶的宽厚软垫和杠杆", "脚踏板及两侧摆臂/轴承", "选择器械配重箱或配重调节结构；无自由杠铃"] },
+  "grip": "双手闭合握住机身两侧把手",
+  "bodyContacts": ["上背接触靠背", "髋褶接触宽厚软垫", "双脚全掌接触脚踏板"],
+  "jointDirections": ["髋关节由屈曲向完全伸展", "膝盖约 90°且与脚尖同向", "躯干稳定、腰椎不过度过伸", "左右腿和杠杆对称"],
+  "primaryMuscles": ["臀大肌"],
+  "secondaryMuscles": ["腘绳肌", "股四头肌"],
+  "rejectionCases": ["杠铃臀冲、地面臀桥或倒蹬机", "缺少靠背、髋垫、脚踏板或专用摆臂", "软垫压在腹部、双脚悬空或膝盖明显内扣", "机器、人物或脚踏板被裁切"]
+}

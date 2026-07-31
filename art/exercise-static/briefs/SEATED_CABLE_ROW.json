@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "SEATED_CABLE_ROW",
+  "exerciseName": "坐姿绳索划船",
+  "variant": "坐姿直杆正握绳索划船",
+  "representativePose": "人物坐在低位绳索划船站，双脚抵住脚踏；双手肩宽正握直杆，从前方伸展位拉到下腹，躯干直立略前倾。",
+  "camera": { "view": "45° 前侧视角，显示脚踏、直杆、电缆和配重塔", "subjectFill": "完整显示人物、座椅/滑轨、脚踏、直杆、导线与配重", "safeMarginPercent": 8 },
+  "equipment": { "family": "低位绳索机与直杆", "recognitionFeatures": ["低位滑轮和电缆", "长直杆正握", "脚踏板", "后侧配重块"] },
+  "grip": "双手闭合正握，握距约肩宽",
+  "bodyContacts": ["臀部坐垫", "双脚抵脚踏", "双手握直杆", "直杆至下腹"],
+  "jointDirections": ["肩胛骨后缩", "肘向后贴近躯干", "躯干由前倾回到中立", "膝部保持微屈"],
+  "primaryMuscles": ["背阔肌", "菱形肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["高位下拉", "V-bar或宽握专用变体", "无脚踏或绳索", "直杆拉到胸口过高", "电缆/杆/脚踏裁切"]
+}

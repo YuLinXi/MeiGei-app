@@ -1,0 +1,45 @@
+{
+  "assetId": "CONCENTRATION_CURL-v1",
+  "exerciseCode": "CONCENTRATION_CURL",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T07:34:20.085Z",
+  "promptPath": "art/exercise-static/briefs/CONCENTRATION_CURL.json",
+  "briefPath": "art/exercise-static/briefs/CONCENTRATION_CURL.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/CONCENTRATION_CURL.json",
+      "sha256": "8c4dfbed7aabf6dcc8905186d38ac542fbc07c0bc8c13e481f70e13aae79b008",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/CONCENTRATION_CURL/CONCENTRATION_CURL-candidate-01.png",
+      "sha256": "c310e65e5a3815513b02d839e57bd0faf3ac143eba86fa25992f6ec3b402ba52",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/CONCENTRATION_CURL-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1791420,
+  "sha256": "c310e65e5a3815513b02d839e57bd0faf3ac143eba86fa25992f6ec3b402ba52",
+  "reviewRecord": "art/exercise-static/reviews/CONCENTRATION_CURL-review.json",
+  "approvedAt": "2026-07-25T07:34:20.085Z",
+  "reviewerId": "production-autopilot"
+}

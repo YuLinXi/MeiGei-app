@@ -40,30 +40,17 @@ private enum LibrarySelection: Hashable {
     case head(String, String, String)          // L1 + L2 + L3 肌头
 }
 
-/// 行卡片切片：复刻纸感分组卡——surface 底 + 左右描边、首行顶边/末行底边、行间分隔线、首末圆角。
-/// 每行独立成视图以支持外层 LazyVStack 逐行懒加载。
-private struct RowCardSlice: ViewModifier {
-    let first: Bool
-    let last: Bool
-    private var shape: UnevenRoundedRectangle {
-        UnevenRoundedRectangle(
-            topLeadingRadius: first ? Theme.Radius.md : 0,
-            bottomLeadingRadius: last ? Theme.Radius.md : 0,
-            bottomTrailingRadius: last ? Theme.Radius.md : 0,
-            topTrailingRadius: first ? Theme.Radius.md : 0,
-            style: .continuous)
-    }
+/// 动作库双列卡片的唯一表面和裁切边界。
+private struct ExerciseLibraryCardSurface: ViewModifier {
+    private let shape = RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+
     func body(content: Content) -> some View {
         content
-            .background(Theme.Color.surface)
-            .overlay(alignment: .top)      { if first { hline } }
-            .overlay(alignment: .bottom)   { hline }
-            .overlay(alignment: .leading)  { vline }
-            .overlay(alignment: .trailing) { vline }
+            .background(Color.white)
             .clipShape(shape)
+            .overlay(shape.stroke(Theme.Color.border, lineWidth: 1))
+            .contentShape(shape)
     }
-    private var hline: some View { Rectangle().fill(Theme.Color.border).frame(height: 1) }
-    private var vline: some View { Rectangle().fill(Theme.Color.border).frame(width: 1) }
 }
 
 /// 动作库内容的使用场景：Tab 浏览打开详情；添加动作抽屉回传选择结果。
@@ -344,6 +331,15 @@ private struct ExerciseLibraryContentView: View {
     private static let quickIndexTopID = "__top"
     private static let initialLibraryRowLimit = 60
     private static let libraryRowPageSize = 50
+    private static let cardSpacing: CGFloat = 8
+    /// 卡片不再撑满右侧列宽，在 iPhone 上以约 104pt 保持更紧凑的浏览密度。
+    private static let cardMaximumWidth: CGFloat = 104
+    /// 提高媒体区占比，让动作主体更易辨认，同时保持双列卡片的整体浏览密度。
+    private static let cardMediaAspectRatio: CGFloat = 1.25
+    private static let cardColumns = [
+        GridItem(.flexible(minimum: 88, maximum: 104), spacing: 8, alignment: .top),
+        GridItem(.flexible(minimum: 88, maximum: 104), spacing: 8, alignment: .top)
+    ]
 
     /// 器械 chip（全部 + EquipmentType）。
     private let equipChips: [LibraryChip] =
@@ -616,20 +612,35 @@ private struct ExerciseLibraryContentView: View {
     // MARK: 右侧动作区（右侧器械快速筛选 + 按树层级分段，逐行懒加载 + 返回顶部）
 
     private var rightArea: some View {
-        let rowPage = libraryRowPage
+        let gridPage = libraryGridPage
+        let lastVisibleID = gridPage.sections.last?.items.last?.id
         return ScrollViewReader { proxy in
             ZStack(alignment: .trailing) {
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         Color.clear.frame(height: 0).id("LIB_TOP")
-                        if rowPage.rows.isEmpty {
+                        if gridPage.sections.isEmpty {
                             emptyState
                         } else {
-                            ForEach(Array(rowPage.rows.enumerated()), id: \.element.id) { idx, row in
-                                libRowView(row, isFirst: idx == 0)
-                            }
-                            if rowPage.hasMore {
-                                loadMoreLibraryRowsTrigger(totalExerciseCount: rowPage.totalExerciseCount)
+                            LazyVGrid(columns: Self.cardColumns,
+                                      alignment: .center,
+                                      spacing: Self.cardSpacing) {
+                                ForEach(Array(gridPage.sections.enumerated()), id: \.element.id) { index, section in
+                                    Section {
+                                        ForEach(section.items) { item in
+                                            libraryCardView(item)
+                                                .onAppear {
+                                                    guard item.id == lastVisibleID else { return }
+                                                    loadMoreLibraryRowsIfNeeded(
+                                                        totalExerciseCount: gridPage.totalExerciseCount
+                                                    )
+                                                }
+                                        }
+                                    } header: {
+                                        sectionHeader(section.title,
+                                                      topGap: index == 0 ? 2 : 14)
+                                    }
+                                }
                             }
                         }
                         Color.clear.frame(height: 40)
@@ -724,78 +735,79 @@ private struct ExerciseLibraryContentView: View {
         visibleLibRowLimit = Self.initialLibraryRowLimit
     }
 
-    @ViewBuilder
-    private func loadMoreLibraryRowsTrigger(totalExerciseCount: Int) -> some View {
-        Color.clear
-            .frame(height: 1)
-            .onAppear {
-                loadMoreLibraryRowsIfNeeded(totalExerciseCount: totalExerciseCount)
-            }
-    }
-
     private func loadMoreLibraryRowsIfNeeded(totalExerciseCount: Int) {
         guard shouldPageLibraryRows, visibleLibRowLimit < totalExerciseCount else { return }
         visibleLibRowLimit = min(totalExerciseCount, visibleLibRowLimit + Self.libraryRowPageSize)
     }
 
-    /// 扁平行模型：段头 / 内置行 / 自定义行（first/last 控制卡片切片圆角与分隔）。
-    private enum LibRow: Identifiable {
-        case header(String)
-        case builtin(BuiltinExercise, Bool, Bool)
-        case custom(CustomExercise, Bool, Bool)
+    /// 网格卡片保持稳定 code/UUID identity，避免筛选和分页时重建错误卡片。
+    private enum LibraryCardItem: Identifiable {
+        case builtin(BuiltinExercise)
+        case custom(CustomExercise)
+
         var id: String {
             switch self {
-            case .header(let t):        return "h:" + t
-            case .builtin(let e, _, _): return "b:" + e.code
-            case .custom(let e, _, _):  return "c:" + e.localId.uuidString
+            case .builtin(let exercise): return "b:" + exercise.code
+            case .custom(let exercise):  return "c:" + exercise.localId.uuidString
             }
         }
     }
 
-    private struct LibraryRowPage {
-        let rows: [LibRow]
+    private struct LibraryGridSection: Identifiable {
+        let id: String
+        let title: String
+        let items: [LibraryCardItem]
+    }
+
+    private struct LibraryGridPage {
+        let sections: [LibraryGridSection]
         let visibleExerciseCount: Int
         let totalExerciseCount: Int
-
-        var hasMore: Bool { visibleExerciseCount < totalExerciseCount }
     }
 
     private var shouldPageLibraryRows: Bool {
         isAll && !searching
     }
 
-    private var libraryRowPage: LibraryRowPage {
-        makeLibraryRows(limit: shouldPageLibraryRows ? visibleLibRowLimit : nil)
+    private var libraryGridPage: LibraryGridPage {
+        makeLibraryGridSections(limit: shouldPageLibraryRows ? visibleLibRowLimit : nil)
     }
 
-    /// 把分段 + 自定义摊平成逐行，并在「全部」页只构建当前可见批次。
-    private func makeLibraryRows(limit: Int?) -> LibraryRowPage {
-        var rows: [LibRow] = []
+    /// 保留既有分段与分页合同，只把每段的展示容器改为双列卡片。
+    private func makeLibraryGridSections(limit: Int?) -> LibraryGridPage {
+        var sections: [LibraryGridSection] = []
         var visibleExerciseCount = 0
         var totalExerciseCount = 0
         let customs = filteredCustom
         totalExerciseCount += customs.count
-        if !customs.isEmpty, let visibleCustoms = visibleItems(customs, limit: limit, currentCount: visibleExerciseCount) {
-            rows.append(.header("自定义"))
-            for (i, ex) in visibleCustoms.enumerated() {
-                rows.append(.custom(ex, i == 0, i == visibleCustoms.count - 1))
-            }
+        if !customs.isEmpty,
+           let visibleCustoms = visibleItems(customs,
+                                             limit: limit,
+                                             currentCount: visibleExerciseCount) {
+            sections.append(LibraryGridSection(
+                id: "custom",
+                title: "自定义",
+                items: visibleCustoms.map(LibraryCardItem.custom)
+            ))
             visibleExerciseCount += visibleCustoms.count
         }
-        for seg in builtinSegments {
+        for (index, seg) in builtinSegments.enumerated() {
             totalExerciseCount += seg.items.count
-            guard let visibleItems = visibleItems(seg.items, limit: limit, currentCount: visibleExerciseCount) else {
+            guard let visibleItems = visibleItems(seg.items,
+                                                  limit: limit,
+                                                  currentCount: visibleExerciseCount) else {
                 continue
             }
-            if !seg.title.isEmpty { rows.append(.header(seg.title)) }
-            for (i, ex) in visibleItems.enumerated() {
-                rows.append(.builtin(ex, i == 0, i == visibleItems.count - 1))
-            }
+            sections.append(LibraryGridSection(
+                id: "builtin:\(index):\(seg.title)",
+                title: seg.title,
+                items: visibleItems.map(LibraryCardItem.builtin)
+            ))
             visibleExerciseCount += visibleItems.count
         }
-        return LibraryRowPage(rows: rows,
-                              visibleExerciseCount: visibleExerciseCount,
-                              totalExerciseCount: totalExerciseCount)
+        return LibraryGridPage(sections: sections,
+                               visibleExerciseCount: visibleExerciseCount,
+                               totalExerciseCount: totalExerciseCount)
     }
 
     private func visibleItems<T>(_ items: [T], limit: Int?, currentCount: Int) -> [T]? {
@@ -807,21 +819,17 @@ private struct ExerciseLibraryContentView: View {
     }
 
     @ViewBuilder
-    private func libRowView(_ row: LibRow, isFirst: Bool) -> some View {
-        switch row {
-        case .header(let title):
-            sectionHeader(title, topGap: isFirst ? 2 : 14)
-        case .builtin(let ex, let first, let last):
-            Button { selectBuiltin(ex) } label: { builtinRow(ex) }
+    private func libraryCardView(_ item: LibraryCardItem) -> some View {
+        switch item {
+        case .builtin(let exercise):
+            Button { selectBuiltin(exercise) } label: { builtinCard(exercise) }
                 .buttonStyle(.plain)
-                .modifier(RowCardSlice(first: first, last: last))
-        case .custom(let ex, let first, let last):
+        case .custom(let exercise):
             if isPicking {
-                Button { selectCustom(ex) } label: { customRow(ex) }
+                Button { selectCustom(exercise) } label: { customCard(exercise) }
                     .buttonStyle(.plain)
-                    .modifier(RowCardSlice(first: first, last: last))
             } else {
-                customBrowseRow(ex, first: first, last: last)
+                customBrowseCard(exercise)
             }
         }
     }
@@ -870,10 +878,8 @@ private struct ExerciseLibraryContentView: View {
         syncEngine.scheduleSyncAll()
     }
 
-    private func customBrowseRow(_ ex: CustomExercise, first: Bool, last: Bool) -> some View {
-        customRow(ex)
-            .modifier(RowCardSlice(first: first, last: last))
-            .contentShape(Rectangle())
+    private func customBrowseCard(_ ex: CustomExercise) -> some View {
+        customCard(ex)
             .onLongPressGesture(minimumDuration: 0.5) {
                 requestDeleteCustom(ex)
             }
@@ -978,51 +984,43 @@ private struct ExerciseLibraryContentView: View {
         .cardStyle()
     }
 
-    // MARK: 列表样式件
+    // MARK: 双列动作卡片
 
     private func sectionHeader(_ title: String, topGap: CGFloat = 14) -> some View {
         Text(title)
-            .font(Theme.Font.mono(size: 10, weight: .regular))
-            .tracking(0.1 * 10)
-            .textCase(.uppercase)
-            .foregroundStyle(Theme.Color.muted)
+            .font(Theme.Font.display(size: 17, weight: .semibold))
+            .foregroundStyle(Theme.Color.fg)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, topGap)
-            .padding(.bottom, 6)
+            .padding(.bottom, 8)
             .padding(.leading, 2)
     }
 
-    private func builtinRow(_ ex: BuiltinExercise) -> some View {
+    private func builtinCard(_ ex: BuiltinExercise) -> some View {
         let muscle = displayMuscleName(for: ex)
         let sub = [muscle, ex.subcategory].compactMap { $0 }.joined(separator: " · ")
         let meta = sub.isEmpty ? "\(ex.category) · \(ex.equipmentType)" : "\(ex.category) · \(sub) · \(ex.equipmentType)"
-        return HStack(spacing: 12) {
-            builtinThumbnail(ex)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(ex.name)
-                    .font(Theme.Font.body(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-                Text(meta)
-                    .font(Theme.Font.body(size: 12))
-                    .foregroundStyle(Theme.Color.muted)
-                    .lineLimit(1)
+        return VStack(spacing: 0) {
+            compactCardMedia { size in
+                builtinThumbnail(ex, size: size)
             }
-            .layoutPriority(1)
-            Spacer(minLength: 0)
+            cardTitle(ex.name)
         }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 11)
-        .contentShape(Rectangle())
+        .modifier(ExerciseLibraryCardSurface())
+        .frame(maxWidth: Self.cardMaximumWidth)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(ex.name)，\(meta)")
     }
 
     @ViewBuilder
-    private func builtinThumbnail(_ ex: BuiltinExercise) -> some View {
-        if let assetName = thumbnailAssetName(for: ex) {
+    private func builtinThumbnail(_ ex: BuiltinExercise, size: CGFloat) -> some View {
+        if let image = ExerciseArtworkLibrary.image(forBuiltinCode: ex.code) {
+            ExerciseArtworkThumbnail(image: image, size: max(0, size - 8))
+        } else if let assetName = thumbnailAssetName(for: ex) {
             MuscleMapThumbnail(assetName: assetName,
-                               size: 48)
+                               size: max(0, size - 24))
         } else {
-            avatar(String(ex.name.prefix(1)), size: 48)
+            avatar(String(ex.name.prefix(1)), size: max(0, size - 24))
         }
     }
 
@@ -1133,35 +1131,51 @@ private struct ExerciseLibraryContentView: View {
         return nil
     }
 
-    private func customRow(_ ex: CustomExercise) -> some View {
-        return HStack(spacing: 12) {
-            avatar(String(ex.name.prefix(1)))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(ex.name)
-                    .font(Theme.Font.body(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Color.fg)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-                Text("\(ex.primaryMuscle ?? "—") · \(ex.equipmentType ?? "—")")
-                    .font(Theme.Font.body(size: 12))
-                    .foregroundStyle(Theme.Color.muted)
-                    .lineLimit(1)
+    private func customCard(_ ex: CustomExercise) -> some View {
+        let meta = "\(ex.primaryMuscle ?? "—") · \(ex.equipmentType ?? "—")"
+        return VStack(spacing: 0) {
+            compactCardMedia { size in
+                avatar(String(ex.name.prefix(1)), size: max(0, size - 24))
             }
-            .layoutPriority(1)
-            Spacer(minLength: 0)
+            cardTitle(ex.name)
         }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 11)
+        .modifier(ExerciseLibraryCardSurface())
+        .frame(maxWidth: Self.cardMaximumWidth)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(ex.name)，\(meta)")
+    }
+
+    private func compactCardMedia<Content: View>(
+        @ViewBuilder content: @escaping (CGFloat) -> Content
+    ) -> some View {
+        GeometryReader { proxy in
+            let contentSize = min(proxy.size.width, proxy.size.height)
+            content(contentSize)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, Theme.Spacing.xs)
+        }
+        .aspectRatio(Self.cardMediaAspectRatio, contentMode: .fit)
+        .background(Color.white)
+        .clipped()
+    }
+
+    private func cardTitle(_ name: String) -> some View {
+        Text(name)
+            .font(Theme.Font.body(size: 12, weight: .semibold))
+            .foregroundStyle(Theme.Color.fg)
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .minimumScaleFactor(0.82)
+            .frame(maxWidth: .infinity, minHeight: 26, alignment: .top)
+            .padding(.horizontal, 6)
     }
 
     private func avatar(_ ch: String, size: CGFloat = 40) -> some View {
-        let radius: CGFloat = size > 40 ? 12 : 11
         return Text(ch)
-            .font(Theme.Font.body(size: size > 40 ? 15 : 14, weight: .bold))
+            .font(Theme.Font.display(size: 26, weight: .bold))
             .foregroundStyle(Theme.Color.fg2)
             .frame(width: size, height: size)
-            .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
+            .accessibilityHidden(true)
     }
 
 }

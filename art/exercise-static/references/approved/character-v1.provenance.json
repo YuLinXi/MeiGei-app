@@ -1,0 +1,22 @@
+{
+  "assetId": "character-v1",
+  "status": "approved",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-24",
+  "promptPath": "art/exercise-static/briefs/character-v1.md",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/character-v1.md",
+      "rightsBasis": "本项目原创文字 brief"
+    }
+  ],
+  "humanEdits": "无像素修改；人工选择并批准候选 01。",
+  "file": "art/exercise-static/references/approved/character-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1024,
+  "sizeBytes": 2004340,
+  "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+  "reviewRecord": "art/exercise-static/reviews/character-v1-review.md"
+}

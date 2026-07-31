@@ -1,0 +1,45 @@
+{
+  "assetId": "CABLE_CROSS_REAR_FLY-v1",
+  "exerciseCode": "CABLE_CROSS_REAR_FLY",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T04:35:55.691Z",
+  "promptPath": "art/exercise-static/briefs/CABLE_CROSS_REAR_FLY.json",
+  "briefPath": "art/exercise-static/briefs/CABLE_CROSS_REAR_FLY.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/CABLE_CROSS_REAR_FLY.json",
+      "sha256": "b1ef93a27c8c25313fcc0e7809992392e8608062ced3ab39af22c3f2fa7b8a29",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/CABLE_CROSS_REAR_FLY/CABLE_CROSS_REAR_FLY-candidate-01.png",
+      "sha256": "2221b8b606f07bfb24741bf5ba965f083c16f6e966e4723c533d9c43fd91bd4a",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/CABLE_CROSS_REAR_FLY-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1763986,
+  "sha256": "2221b8b606f07bfb24741bf5ba965f083c16f6e966e4723c533d9c43fd91bd4a",
+  "reviewRecord": "art/exercise-static/reviews/CABLE_CROSS_REAR_FLY-review.json",
+  "approvedAt": "2026-07-25T04:35:55.691Z",
+  "reviewerId": "production-autopilot"
+}

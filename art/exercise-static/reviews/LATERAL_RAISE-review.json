@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "LATERAL_RAISE",
+  "candidateId": "LATERAL_RAISE-candidate-03",
+  "masterPath": "art/exercise-static/masters/approved/LATERAL_RAISE-v1.png",
+  "masterSha256": "2d46e20ff1d5aa3b314d411b824f32c4604d2931e1b3a4321c2b919d91f1bbc9",
+  "reviews": {
+    "identity": { "status": "approved", "reviewerId": "project-owner", "reviewedAt": "2026-07-24T11:10:21Z", "sourceCommit": "7ef36ad60aac753dc95ff4e6b3f0feb33c3202b0", "evidence": ["art/exercise-static/references/approved/character-v1.png", "art/exercise-static/masters/approved/LATERAL_RAISE-v1.png"], "notes": "批准候选 03 的人物身份一致性。" },
+    "art": { "status": "approved", "reviewerId": "project-owner", "reviewedAt": "2026-07-24T11:10:21Z", "sourceCommit": "7ef36ad60aac753dc95ff4e6b3f0feb33c3202b0", "evidence": ["art/exercise-static/references/approved/style-v1.png", "art/exercise-static/masters/approved/LATERAL_RAISE-v1.png"], "notes": "批准候选 03 的灰阶线稿、三角肌高亮、构图与移除乳头特征后的美术表现。" },
+    "movement": { "status": "approved", "reviewerId": "project-owner", "reviewedAt": "2026-07-24T11:10:21Z", "sourceCommit": "7ef36ad60aac753dc95ff4e6b3f0feb33c3202b0", "evidence": ["art/exercise-static/briefs/LATERAL_RAISE.json", "art/exercise-static/masters/approved/LATERAL_RAISE-v1.png"], "notes": "批准候选 03 的站姿哑铃侧平举、轻微屈肘与肘高于腕的代表姿势。" },
+    "equipment": { "status": "approved", "reviewerId": "project-owner", "reviewedAt": "2026-07-24T11:10:21Z", "sourceCommit": "7ef36ad60aac753dc95ff4e6b3f0feb33c3202b0", "evidence": ["art/exercise-static/briefs/LATERAL_RAISE.json", "art/exercise-static/masters/approved/LATERAL_RAISE-v1.png"], "notes": "批准候选 03 的一对短柄六角哑铃与握持关系。" },
+    "rights": { "status": "approved", "reviewerId": "project-owner", "reviewedAt": "2026-07-24T11:10:21Z", "sourceCommit": "7ef36ad60aac753dc95ff4e6b3f0feb33c3202b0", "evidence": ["art/exercise-static/reviews/input-policy-v1.md", "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md", "art/exercise-static/masters/approved/LATERAL_RAISE-v1.provenance.json"], "notes": "批准候选 03 的自有输入来源与当前记录的商业使用边界。" }
+  }
+}

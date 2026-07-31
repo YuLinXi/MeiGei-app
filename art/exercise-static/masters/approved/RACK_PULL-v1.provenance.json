@@ -1,0 +1,45 @@
+{
+  "assetId": "RACK_PULL-v1",
+  "exerciseCode": "RACK_PULL",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T10:36:55.058Z",
+  "promptPath": "art/exercise-static/briefs/RACK_PULL.json",
+  "briefPath": "art/exercise-static/briefs/RACK_PULL.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/RACK_PULL.json",
+      "sha256": "83be0cc995e9fa7d4422a6a36825425c5cbe551010b7db487db8b4095a66554b",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/RACK_PULL/RACK_PULL-candidate-01.png",
+      "sha256": "1669b9993f441384d90cbe612ff5c50d5b799af15d9bbbeeb85e955754c1013c",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/RACK_PULL-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1897692,
+  "sha256": "1669b9993f441384d90cbe612ff5c50d5b799af15d9bbbeeb85e955754c1013c",
+  "reviewRecord": "art/exercise-static/reviews/RACK_PULL-review.json",
+  "approvedAt": "2026-07-25T10:36:55.058Z",
+  "reviewerId": "production-autopilot"
+}

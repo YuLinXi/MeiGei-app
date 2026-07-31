@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "SKULL_CRUSHER",
+  "exerciseName": "仰卧臂屈伸",
+  "variant": "平凳仰卧 EZ 杠臂屈伸，肘部固定的中段姿势",
+  "representativePose": "仰卧在平凳，双脚全掌着地；双臂垂直，双肘屈曲使 EZ 杠位于额头上方，肘部朝向天花板并保持稳定。",
+  "camera": { "view": "45° 前侧视角，弱透视，清楚显示平凳、EZ 杠、双肘和前臂方向", "subjectFill": "完整显示人物、平凳、EZ 杠和双脚，器械不裁切", "safeMarginPercent": 8 },
+  "equipment": { "family": "EZ 杠与平凳", "recognitionFeatures": ["波浪形短杠", "左右对称小圆片", "人物仰卧平凳", "杠铃位于额头上方"] },
+  "grip": "双手闭合窄距握住 EZ 杠，掌心向前",
+  "bodyContacts": ["背部与头部接触平凳", "双手握住 EZ 杠", "双脚全掌接触地面"],
+  "jointDirections": ["肘关节屈伸而上臂保持垂直", "肩关节不过度移动", "躯干贴凳稳定"],
+  "primaryMuscles": ["肱三头肌"],
+  "secondaryMuscles": [],
+  "rejectionCases": ["杠铃下落至胸部的卧推", "上臂明显张开", "直杆或哑铃替代 EZ 杠", "杠铃、双手、头部或双脚裁切"]
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "HAMMER_ROW",
+  "exerciseName": "悍马机划船",
+  "variant": "胸托悍马机双臂中立握划船",
+  "representativePose": "人物胸部贴在悍马机胸垫，双手握左右独立中立把手向后拉到肋部，双侧杠杆和板片对称可见。",
+  "camera": { "view": "45° 前侧视角，兼顾胸托、双侧独立杠杆和板载片", "subjectFill": "显示完整人物、胸垫、座椅、双侧把手、杠杆和圆片", "safeMarginPercent": 8 },
+  "equipment": { "family": "悍马机独立杠杆划船", "recognitionFeatures": ["胸部支撑垫", "左右独立中立把手", "独立转轴杠杆", "外侧板载配重片"] },
+  "grip": "双手闭合中立握，掌心相对",
+  "bodyContacts": ["胸部贴胸垫", "臀部座椅", "双手握左右把手", "双脚着地"],
+  "jointDirections": ["双肩胛骨后缩", "双肘向后贴身", "躯干由胸托固定", "腕部中立"],
+  "primaryMuscles": ["菱形肌", "背阔肌"],
+  "secondaryMuscles": ["三角肌后束", "肱二头肌"],
+  "rejectionCases": ["绳索划船", "胸推机", "单臂悍马机划船", "无胸托或板片", "杠杆/人物裁切"]
+}

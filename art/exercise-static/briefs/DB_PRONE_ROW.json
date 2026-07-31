@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "DB_PRONE_ROW",
+  "exerciseName": "俯卧哑铃划船",
+  "variant": "胸部支撑斜凳双哑铃划船",
+  "representativePose": "人物胸腹贴在上斜凳，双腿向后伸展；双手各握哑铃从凳侧拉向肋骨，双肘向后，胸部持续接触靠垫。",
+  "camera": { "view": "45° 前侧视角，清晰展示胸托、双哑铃和拉向肋部的轨迹", "subjectFill": "显示完整斜凳、胸部接触、双哑铃、双脚和人物", "safeMarginPercent": 8 },
+  "equipment": { "family": "上斜胸托凳与双哑铃", "recognitionFeatures": ["上斜凳胸腹支撑", "左右各一只哑铃", "手臂从凳侧拉向肋骨", "无杠铃或绳索"] },
+  "grip": "双手闭合中立握，掌心相对",
+  "bodyContacts": ["胸腹贴靠上斜凳", "双手握哑铃", "双脚/小腿向后支撑"],
+  "jointDirections": ["肩胛骨后缩", "双肘向后", "躯干由胸托固定", "手腕保持中立"],
+  "primaryMuscles": ["背阔肌", "菱形肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["站姿或单膝支撑", "平板卧推姿势", "杠铃/绳索", "胸部不接触凳面", "哑铃、凳脚或人物裁切"]
+}

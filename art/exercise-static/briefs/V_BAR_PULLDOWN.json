@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "V_BAR_PULLDOWN",
+  "exerciseName": "V-bar 下拉",
+  "variant": "坐姿 V-bar 中立握高位下拉，握把拉至胸骨",
+  "representativePose": "人物坐在高位下拉机，双手握紧紧凑 V 形中立把手并拉到胸骨上段，肘贴近身体向下，双腿由压腿垫固定。",
+  "camera": { "view": "45° 前侧视角，突出紧凑 V-bar 与电缆连接", "subjectFill": "完整显示人物、V-bar、滑轮、电缆、座椅、压腿垫和配重", "safeMarginPercent": 8 },
+  "equipment": { "family": "高位下拉机与紧凑 V-bar", "recognitionFeatures": ["单条顶部电缆", "三角形紧凑 V-bar", "座椅与压腿垫", "配重块与导杆"] },
+  "grip": "双手掌心相对的中立握，拇指环握 V-bar",
+  "bodyContacts": ["臀部坐在座椅", "大腿接触压腿垫", "双手握 V-bar", "把手至胸骨"],
+  "jointDirections": ["肩关节内收", "双肘向下贴近肋骨", "肩胛骨下压", "躯干直立"],
+  "primaryMuscles": ["背阔肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["直杆宽握", "V-bar 被画成直杆", "把手拉到颈后", "电缆断裂或裁切"]
+}

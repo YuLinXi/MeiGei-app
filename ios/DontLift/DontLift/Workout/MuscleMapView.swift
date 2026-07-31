@@ -103,25 +103,17 @@ struct MuscleMapView: View {
     }
 }
 
-/// 动作列表专用肌群缩略图：单面、无图例、固定尺寸，用于快速识别主要训练部位。
+/// 动作库肌群降级图；完整显示并由卡片媒体区提供白底和安全边距。
 struct MuscleMapThumbnail: View {
     let assetName: String
     var size: CGFloat = 48
 
     var body: some View {
-        ZStack {
-            Theme.Color.surface2
-            Image(assetName)
-                .resizable()
-                .scaledToFill()
-        }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Theme.Color.border, lineWidth: 1)
-        )
-        .accessibilityHidden(true)
+        Image(assetName)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
     }
 }
 

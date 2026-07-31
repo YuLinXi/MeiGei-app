@@ -1,0 +1,45 @@
+{
+  "assetId": "CABLE_SINGLE_ARM_PULLDOWN-v1",
+  "exerciseCode": "CABLE_SINGLE_ARM_PULLDOWN",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T19:41:17.319Z",
+  "promptPath": "art/exercise-static/briefs/CABLE_SINGLE_ARM_PULLDOWN.json",
+  "briefPath": "art/exercise-static/briefs/CABLE_SINGLE_ARM_PULLDOWN.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/CABLE_SINGLE_ARM_PULLDOWN.json",
+      "sha256": "f57bba51c319fe634d616a3f77282c11a035337b649beca91eb11ef677d1897d",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/CABLE_SINGLE_ARM_PULLDOWN/CABLE_SINGLE_ARM_PULLDOWN-candidate-01.png",
+      "sha256": "a8fb33a3c4a948ca4da717f5e10c5fb8927b2805ce166de1c195c15917963897",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/CABLE_SINGLE_ARM_PULLDOWN-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1697878,
+  "sha256": "a8fb33a3c4a948ca4da717f5e10c5fb8927b2805ce166de1c195c15917963897",
+  "reviewRecord": "art/exercise-static/reviews/CABLE_SINGLE_ARM_PULLDOWN-review.json",
+  "approvedAt": "2026-07-25T19:41:17.319Z",
+  "reviewerId": "production-autopilot"
+}

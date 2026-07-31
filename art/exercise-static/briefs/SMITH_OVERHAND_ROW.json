@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "SMITH_OVERHAND_ROW",
+  "exerciseName": "史密斯正手划船",
+  "variant": "站姿俯身史密斯机正握划船",
+  "representativePose": "人物在史密斯架内髋铰链俯身，双手略宽于肩正握导轨杠，杠拉向下肋，双膝微屈、脊柱中立；垂直导轨和安全钩可见。",
+  "camera": { "view": "45° 前侧视角，清晰显示正握手腕、导轨和俯身髋铰链", "subjectFill": "完整显示史密斯架、导轨、杠铃、人物双脚和杠片", "safeMarginPercent": 8 },
+  "equipment": { "family": "史密斯机直杠俯身划船", "recognitionFeatures": ["左右垂直导轨", "导轨上的固定直杠", "安全挂钩/滑块", "杠端板片"] },
+  "grip": "双手闭合正握，握距略宽于肩",
+  "bodyContacts": ["双脚着地", "双手握导轨杠", "杠接近下肋", "身体不接触胸托"],
+  "jointDirections": ["髋关节屈曲", "膝部微屈", "脊柱中立", "双肘向后贴身"],
+  "primaryMuscles": ["菱形肌", "背阔肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["反握史密斯划船", "自由杠铃或 T 杠", "仰卧反向划船", "导轨和安全钩缺失", "正握不清或裁切"]
+}

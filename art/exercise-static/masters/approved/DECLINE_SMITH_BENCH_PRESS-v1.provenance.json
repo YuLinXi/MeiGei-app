@@ -1,0 +1,45 @@
+{
+  "assetId": "DECLINE_SMITH_BENCH_PRESS-v1",
+  "exerciseCode": "DECLINE_SMITH_BENCH_PRESS",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-28T03:02:27.000Z",
+  "promptPath": "art/exercise-static/briefs/DECLINE_SMITH_BENCH_PRESS.json",
+  "briefPath": "art/exercise-static/briefs/DECLINE_SMITH_BENCH_PRESS.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/DECLINE_SMITH_BENCH_PRESS.json",
+      "sha256": "343aad4d8f1ae2763e23ab36ac9f902327499a9676fe672e94034af2f7e4fbf7",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/staging/candidates/DECLINE_SMITH_BENCH_PRESS/DECLINE_SMITH_BENCH_PRESS-candidate-02.png",
+      "sha256": "94baae1791ce65637ae186706628e9a9315b8270122961358865e702caf2111d",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑；候选 02 通过 imagegen 以已确认的下斜杠铃卧推姿势为底稿替换为 Smith 机架和导轨，保留头低脚高、脚踝滚筒和胸部发力姿势。",
+  "file": "art/exercise-static/masters/approved/DECLINE_SMITH_BENCH_PRESS-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1536,
+  "sizeBytes": 1415126,
+  "sha256": "94baae1791ce65637ae186706628e9a9315b8270122961358865e702caf2111d",
+  "reviewRecord": "art/exercise-static/reviews/DECLINE_SMITH_BENCH_PRESS-review.json",
+  "approvedAt": "2026-07-28T03:02:27.000Z",
+  "reviewerId": "project-owner"
+}

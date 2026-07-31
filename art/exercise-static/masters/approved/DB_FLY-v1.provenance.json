@@ -1,0 +1,25 @@
+{
+  "assetId": "DB_FLY-v1",
+  "exerciseCode": "DB_FLY",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-24T16:52:32Z",
+  "promptPath": "art/exercise-static/briefs/DB_FLY.json",
+  "briefPath": "art/exercise-static/briefs/DB_FLY.json",
+  "inputs": [
+    { "kind": "original-text", "source": "art/exercise-static/briefs/DB_FLY.json", "sha256": "2c0a0558f64fa2417004b5446fc7e45286b13a00481d436c84170cdb8b19d63b", "rightsBasis": "本项目原创动作与器械 brief" },
+    { "kind": "owned-reference", "source": "本地未入库的 DB_FLY-candidate-01-rejected.png", "sha256": "b7e9edcd11f36f7bc412025c3acc0811fecf23a198ed96e677033472a614a7c8", "rightsBasis": "本项目 imagegen 前序候选，仅作为候选 02 edit target；候选不进入版本控制" },
+    { "kind": "owned-reference", "source": "art/exercise-static/references/approved/character-v1.png", "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590", "rightsBasis": "本项目已批准的原创统一角色母版" },
+    { "kind": "owned-reference", "source": "art/exercise-static/references/approved/style-v1.png", "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0", "rightsBasis": "本项目已批准的原创风格母版" }
+  ],
+  "humanEdits": "无手工像素编辑；候选 02 通过 imagegen edit 清理候选 01 的重复器械误读，确认每只手各持一只哑铃。",
+  "file": "art/exercise-static/masters/approved/DB_FLY-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1024,
+  "sizeBytes": 1896604,
+  "sha256": "82f9e0317519d5b9f3dc1e11147271b4fa17da678d6a1b5b99d13c7b3944fae7",
+  "reviewRecord": "art/exercise-static/reviews/DB_FLY-review.json",
+  "approvedAt": "2026-07-24T16:52:32Z",
+  "reviewerId": "production-autopilot"
+}

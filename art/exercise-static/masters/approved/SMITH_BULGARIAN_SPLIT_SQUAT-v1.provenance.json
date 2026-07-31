@@ -1,0 +1,45 @@
+{
+  "assetId": "SMITH_BULGARIAN_SPLIT_SQUAT-v1",
+  "exerciseCode": "SMITH_BULGARIAN_SPLIT_SQUAT",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T00:56:44.957Z",
+  "promptPath": "art/exercise-static/briefs/SMITH_BULGARIAN_SPLIT_SQUAT.json",
+  "briefPath": "art/exercise-static/briefs/SMITH_BULGARIAN_SPLIT_SQUAT.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/SMITH_BULGARIAN_SPLIT_SQUAT.json",
+      "sha256": "491d099ed78789c7b22cf8e0525eb7b8945334a9bf3ef76079b7d80a6c0dbcbe",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/SMITH_BULGARIAN_SPLIT_SQUAT/SMITH_BULGARIAN_SPLIT_SQUAT-candidate-01.png",
+      "sha256": "7abe90b8feaff32f8eaa58e46d756427e037b46986bf9da977d9facd0b1305f4",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/SMITH_BULGARIAN_SPLIT_SQUAT-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1876502,
+  "sha256": "7abe90b8feaff32f8eaa58e46d756427e037b46986bf9da977d9facd0b1305f4",
+  "reviewRecord": "art/exercise-static/reviews/SMITH_BULGARIAN_SPLIT_SQUAT-review.json",
+  "approvedAt": "2026-07-25T00:56:44.957Z",
+  "reviewerId": "production-autopilot"
+}

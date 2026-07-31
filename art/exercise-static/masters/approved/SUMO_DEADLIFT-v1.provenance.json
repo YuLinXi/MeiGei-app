@@ -1,0 +1,45 @@
+{
+  "assetId": "SUMO_DEADLIFT-v1",
+  "exerciseCode": "SUMO_DEADLIFT",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-27T15:01:37.410Z",
+  "promptPath": "art/exercise-static/briefs/SUMO_DEADLIFT.json",
+  "briefPath": "art/exercise-static/briefs/SUMO_DEADLIFT.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/SUMO_DEADLIFT.json",
+      "sha256": "bc7f10c76b457f76b5559ebd17b085c1a69ef244c371bcba201a39d3e1c1ba41",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/staging/candidates/SUMO_DEADLIFT/SUMO_DEADLIFT-candidate-01.png",
+      "sha256": "592b5a7fbfa1763b729488f70309ed19bbd42429c06ce1c21c3607520785a61d",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/SUMO_DEADLIFT-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1536,
+  "sizeBytes": 1573372,
+  "sha256": "592b5a7fbfa1763b729488f70309ed19bbd42429c06ce1c21c3607520785a61d",
+  "reviewRecord": "art/exercise-static/reviews/SUMO_DEADLIFT-review.json",
+  "approvedAt": "2026-07-27T15:01:37.410Z",
+  "reviewerId": "project-owner"
+}

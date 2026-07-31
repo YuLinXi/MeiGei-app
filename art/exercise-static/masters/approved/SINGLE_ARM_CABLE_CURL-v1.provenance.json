@@ -1,0 +1,45 @@
+{
+  "assetId": "SINGLE_ARM_CABLE_CURL-v1",
+  "exerciseCode": "SINGLE_ARM_CABLE_CURL",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T10:36:25.847Z",
+  "promptPath": "art/exercise-static/briefs/SINGLE_ARM_CABLE_CURL.json",
+  "briefPath": "art/exercise-static/briefs/SINGLE_ARM_CABLE_CURL.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/SINGLE_ARM_CABLE_CURL.json",
+      "sha256": "19403ab126e878be8659a82e4b0fda7321665dcac5486ea83684274f9e212ebe",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/SINGLE_ARM_CABLE_CURL/SINGLE_ARM_CABLE_CURL-candidate-01.png",
+      "sha256": "16682d63801fc526b7ad07f41c7f341ff953868188a41867a6f8b365f62ce0f1",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_CURL-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1718611,
+  "sha256": "16682d63801fc526b7ad07f41c7f341ff953868188a41867a6f8b365f62ce0f1",
+  "reviewRecord": "art/exercise-static/reviews/SINGLE_ARM_CABLE_CURL-review.json",
+  "approvedAt": "2026-07-25T10:36:25.847Z",
+  "reviewerId": "production-autopilot"
+}

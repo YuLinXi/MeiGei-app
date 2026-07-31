@@ -1,0 +1,45 @@
+{
+  "assetId": "SHRUG_DB-v1",
+  "exerciseCode": "SHRUG_DB",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T15:06:04.807Z",
+  "promptPath": "art/exercise-static/briefs/SHRUG_DB.json",
+  "briefPath": "art/exercise-static/briefs/SHRUG_DB.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/SHRUG_DB.json",
+      "sha256": "31cb8eb471e386b1fd6eca1ac0cb22a70dba2ac7180e84eae2154384e871ac24",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/SHRUG_DB/SHRUG_DB-candidate-01.png",
+      "sha256": "587a097f8bac79f85080990879ade8d09ea7be2e91862a414b844e95b5f7bcae",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/SHRUG_DB-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1646445,
+  "sha256": "587a097f8bac79f85080990879ade8d09ea7be2e91862a414b844e95b5f7bcae",
+  "reviewRecord": "art/exercise-static/reviews/SHRUG_DB-review.json",
+  "approvedAt": "2026-07-25T15:06:04.807Z",
+  "reviewerId": "production-autopilot"
+}

@@ -1,0 +1,45 @@
+{
+  "assetId": "SINGLE_ARM_HAMMER_ROW-v1",
+  "exerciseCode": "SINGLE_ARM_HAMMER_ROW",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-24T21:06:27.785Z",
+  "promptPath": "art/exercise-static/briefs/SINGLE_ARM_HAMMER_ROW.json",
+  "briefPath": "art/exercise-static/briefs/SINGLE_ARM_HAMMER_ROW.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/SINGLE_ARM_HAMMER_ROW.json",
+      "sha256": "19ba8e72898ac4ad6bdb64d7f02bd0efec82a0d0eafab21b20ce8c327b2d84e7",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/SINGLE_ARM_HAMMER_ROW/SINGLE_ARM_HAMMER_ROW-candidate-01.png",
+      "sha256": "20f0b35b10003ffe52fa0dff87cb6d5937256a800125ffa4e6c8a2ff2d6b02d3",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/SINGLE_ARM_HAMMER_ROW-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1966905,
+  "sha256": "20f0b35b10003ffe52fa0dff87cb6d5937256a800125ffa4e6c8a2ff2d6b02d3",
+  "reviewRecord": "art/exercise-static/reviews/SINGLE_ARM_HAMMER_ROW-review.json",
+  "approvedAt": "2026-07-24T21:06:27.785Z",
+  "reviewerId": "production-autopilot"
+}

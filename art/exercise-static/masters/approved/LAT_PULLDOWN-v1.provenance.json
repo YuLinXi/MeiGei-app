@@ -1,0 +1,45 @@
+{
+  "assetId": "LAT_PULLDOWN-v1",
+  "exerciseCode": "LAT_PULLDOWN",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-28T07:25:59Z",
+  "promptPath": "art/exercise-static/briefs/LAT_PULLDOWN.json",
+  "briefPath": "art/exercise-static/briefs/LAT_PULLDOWN.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/LAT_PULLDOWN.json",
+      "sha256": "4faac25663d8e860278e402f342542d164417ef0f74f7c22f14ec3befc910960",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/LAT_PULLDOWN/LAT_PULLDOWN-candidate-06.png",
+      "sha256": "9777b036e24168397bbc6f5a3647386f4df48236151eecd148263bb0f6e27ad4",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "为统一方形母图标准，以白色扩边至 1536×1536；无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/LAT_PULLDOWN-v1.png",
+  "pixelWidth": 1536,
+  "pixelHeight": 1536,
+  "sizeBytes": 2072160,
+  "sha256": "9777b036e24168397bbc6f5a3647386f4df48236151eecd148263bb0f6e27ad4",
+  "reviewRecord": "art/exercise-static/reviews/LAT_PULLDOWN-review.json",
+  "approvedAt": "2026-07-28T07:25:59Z",
+  "reviewerId": "project-owner"
+}

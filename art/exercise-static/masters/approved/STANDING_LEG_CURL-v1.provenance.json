@@ -1,0 +1,45 @@
+{
+  "assetId": "STANDING_LEG_CURL-v1",
+  "exerciseCode": "STANDING_LEG_CURL",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T03:20:03.166Z",
+  "promptPath": "art/exercise-static/briefs/STANDING_LEG_CURL.json",
+  "briefPath": "art/exercise-static/briefs/STANDING_LEG_CURL.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/STANDING_LEG_CURL.json",
+      "sha256": "a4ef4d618d4d9bcaf8a60515fcdf267065e6ecabb0d705b03e32b6fb2216ce2a",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/STANDING_LEG_CURL/STANDING_LEG_CURL-candidate-01.png",
+      "sha256": "3b8ce9cf6113d64a068faa692c541accb70e41069b77b189e44cfc3ac81dc93e",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/STANDING_LEG_CURL-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1836802,
+  "sha256": "3b8ce9cf6113d64a068faa692c541accb70e41069b77b189e44cfc3ac81dc93e",
+  "reviewRecord": "art/exercise-static/reviews/STANDING_LEG_CURL-review.json",
+  "approvedAt": "2026-07-25T03:20:03.166Z",
+  "reviewerId": "production-autopilot"
+}

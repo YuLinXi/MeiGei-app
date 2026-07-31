@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "STRAIGHT_ARM_PULLDOWN",
+  "exerciseName": "直臂下压",
+  "variant": "站姿绳索直臂下压，直杆至大腿",
+  "representativePose": "人物站在高位滑轮前，躯干轻微髋铰链；双手正握直杆，肘部近乎固定仅微屈，直杆沿弧线压到大腿前，电缆绷直。",
+  "camera": { "view": "45° 前侧视角，显示近乎直臂、直杆路径和滑轮", "subjectFill": "完整显示人物、直杆、电缆、高位滑轮、配重塔和双脚", "safeMarginPercent": 8 },
+  "equipment": { "family": "高位绳索机与直杆", "recognitionFeatures": ["顶部单滑轮", "直杆附件", "电缆从上向下连接", "站姿无座椅"] },
+  "grip": "双手正握直杆，握距约肩宽，腕中立",
+  "bodyContacts": ["双脚着地", "双手握直杆", "直杆接近大腿", "电缆连接直杆"],
+  "jointDirections": ["肩关节伸展/内收", "肘关节保持轻微屈曲", "髋部轻微后移", "脊柱中立"],
+  "primaryMuscles": ["背阔肌"],
+  "secondaryMuscles": ["三角肌后束"],
+  "rejectionCases": ["肘部大幅屈伸变成下压臂屈伸", "站姿弯举", "直杆拉到胸部", "电缆穿过身体", "座椅或人物被裁切"]
+}

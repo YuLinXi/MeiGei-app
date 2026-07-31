@@ -1,0 +1,45 @@
+{
+  "assetId": "CABLE_CRUNCH-v1",
+  "exerciseCode": "CABLE_CRUNCH",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T15:06:38.622Z",
+  "promptPath": "art/exercise-static/briefs/CABLE_CRUNCH.json",
+  "briefPath": "art/exercise-static/briefs/CABLE_CRUNCH.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/CABLE_CRUNCH.json",
+      "sha256": "902a049b460397ea5d6a104fa8bf6fb5485064fbac2c2af38f7a04dc0b56346c",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/CABLE_CRUNCH/CABLE_CRUNCH-candidate-01.png",
+      "sha256": "75ad749d7cd2ce64e0e4d007526aae28ec24c8b5920f66ce911f43ae9648cd8c",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/CABLE_CRUNCH-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1860336,
+  "sha256": "75ad749d7cd2ce64e0e4d007526aae28ec24c8b5920f66ce911f43ae9648cd8c",
+  "reviewRecord": "art/exercise-static/reviews/CABLE_CRUNCH-review.json",
+  "approvedAt": "2026-07-25T15:06:38.622Z",
+  "reviewerId": "production-autopilot"
+}

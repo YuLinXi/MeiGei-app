@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "MACHINE_ROW",
+  "exerciseName": "坐姿器械划船",
+  "variant": "坐姿胸托双臂中立握器械划船",
+  "representativePose": "人物坐在器械划船座椅，胸部贴靠胸垫；双手握固定中立把手向后拉到肋侧，双肘贴身，左右杠杆和板片对称。",
+  "camera": { "view": "45° 前侧视角，展示胸托、固定握把和板载结构", "subjectFill": "显示完整人物、胸垫、座椅、双侧杠杆、把手和板片", "safeMarginPercent": 8 },
+  "equipment": { "family": "板载双臂胸托器械划船", "recognitionFeatures": ["胸部支撑垫", "左右固定/联动中立握把", "前后杠杆结构", "外侧板载圆片，无绳索"] },
+  "grip": "双手闭合中立握，掌心相对",
+  "bodyContacts": ["胸部贴胸垫", "臀部坐垫", "双手握把", "双脚着地"],
+  "jointDirections": ["肩胛骨后缩", "双肘向后贴身", "躯干由胸托固定", "腕部中立"],
+  "primaryMuscles": ["菱形肌", "背阔肌"],
+  "secondaryMuscles": ["三角肌后束", "肱二头肌"],
+  "rejectionCases": ["低位绳索划船", "悍马机单臂或独立杠杆", "胸推机推向前", "无胸垫或板片", "设备被裁切"]
+}

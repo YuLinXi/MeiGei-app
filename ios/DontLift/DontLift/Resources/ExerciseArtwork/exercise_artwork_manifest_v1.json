@@ -1,0 +1,1020 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "PEC_DECK_FLY": {
+      "file": "exercise_PEC_DECK_FLY.jpg",
+      "sha256": "5f845682e7c75f6e9cca68885432584587332684fcae1556d330edfb70fe006b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 21831
+    },
+    "BB_BENCH_PRESS": {
+      "file": "exercise_BB_BENCH_PRESS.jpg",
+      "sha256": "9111e0b20706d6ea95f15e295473609154342d7e9047a0540e10193f89fb3e08",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18702
+    },
+    "BB_SQUAT": {
+      "file": "exercise_BB_SQUAT.jpg",
+      "sha256": "932a527e5b73a160fb620cf066fbf02f27176a5c33a993431dab0a47b0502e48",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13082
+    },
+    "DEADLIFT": {
+      "file": "exercise_DEADLIFT.jpg",
+      "sha256": "ce9b6f085d151d1dd1ae476af15c12bbe4dbecb93c62ee20cc148b8f4293d8af",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10465
+    },
+    "OHP": {
+      "file": "exercise_OHP.jpg",
+      "sha256": "0e1fd822df62fc6db7fef679235098526680af081969ff0339e7dd028ed30939",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10506
+    },
+    "LATERAL_RAISE": {
+      "file": "exercise_LATERAL_RAISE.jpg",
+      "sha256": "ef10290d19648be7bd18b51091890c16d8c3c8bee4cbaa363221364a66609cdd",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11424
+    },
+    "DB_BENCH_PRESS": {
+      "file": "exercise_DB_BENCH_PRESS.jpg",
+      "sha256": "a199d13e352346dd3fa1f4bda9e705bf51f92a8ee9e9c186cc70400915445d80",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 17932
+    },
+    "INCLINE_DB_PRESS": {
+      "file": "exercise_INCLINE_DB_PRESS.jpg",
+      "sha256": "3008234da4c37c74d543154dcd1a1699f53b0ebb2a415cd63628cb955a2dc556",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 20056
+    },
+    "DB_FLY": {
+      "file": "exercise_DB_FLY.jpg",
+      "sha256": "050c8edc8776e6b04b46793b08fea9e14dd01da854855915f0f096e1705cd70a",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18823
+    },
+    "INCLINE_DB_FLY": {
+      "file": "exercise_INCLINE_DB_FLY.jpg",
+      "sha256": "8fee06f8cd48878792b5873b56d24e6cfb491cb7366d8b1fc9a03c1920b7af40",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18500
+    },
+    "DB_CURL": {
+      "file": "exercise_DB_CURL.jpg",
+      "sha256": "372e91b9f714e0bfcc0218a9f4661167b072582f3baf15398cb6afb83292a35e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13373
+    },
+    "TRICEP_PUSHDOWN": {
+      "file": "exercise_TRICEP_PUSHDOWN.jpg",
+      "sha256": "5b8972754ab828da1666903b0bc58b868cb7432de2fa12517d986c171288f0cd",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 19243
+    },
+    "BB_ROW": {
+      "file": "exercise_BB_ROW.jpg",
+      "sha256": "711f8f5215385abf3f67129f455bcf2f3e7c81ea4d2f366cede40725b95a58ae",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16527
+    },
+    "LAT_PULLDOWN": {
+      "file": "exercise_LAT_PULLDOWN.jpg",
+      "sha256": "2d8444f9379d7aef720bbd0b255af8fd692552dbc4e2784412900614fcd6c0e2",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11895
+    },
+    "FRONT_SQUAT": {
+      "file": "exercise_FRONT_SQUAT.jpg",
+      "sha256": "00d92a3d338fbf513eb685a2c1b7f328ef8df45c383f4aae9d5b56615d704db5",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14374
+    },
+    "SMITH_SQUAT": {
+      "file": "exercise_SMITH_SQUAT.jpg",
+      "sha256": "f126dc9ac1b166ef808a9cf481f2a3858c318dbbcd15d89c35011ade6e0650d6",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 19230
+    },
+    "MACHINE_LEG_PRESS": {
+      "file": "exercise_MACHINE_LEG_PRESS.jpg",
+      "sha256": "60838a44187a6308743a138e41ae9362560395b5f18b54439f107915d12ace59",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16880
+    },
+    "LEG_EXTENSION": {
+      "file": "exercise_LEG_EXTENSION.jpg",
+      "sha256": "614baecaf8e5b7c38e32b73c442d3aab3ccabd7cf47dce17d52872204a827b39",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 20395
+    },
+    "LEG_CURL": {
+      "file": "exercise_LEG_CURL.jpg",
+      "sha256": "ff939689bd33f48ee5addcf09241460f505b98d49962e0058683c210a58b15b1",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 19933
+    },
+    "ROMANIAN_DL": {
+      "file": "exercise_ROMANIAN_DL.jpg",
+      "sha256": "e2ecbf42fbb7951ee74d1094ebbbd18dbd1e49c3ff18c6d243c874a6b4f2720d",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13875
+    },
+    "HIP_THRUST": {
+      "file": "exercise_HIP_THRUST.jpg",
+      "sha256": "08094d70027d2d47aeec1a6f7ee8f695b10d0b842f2bf19c88ffd04666a3c281",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13829
+    },
+    "MACHINE_HIP_THRUST": {
+      "file": "exercise_MACHINE_HIP_THRUST.jpg",
+      "sha256": "1e557b0d6878a78233078f84408ef23932791fca70e164309c21faf1b8a84028",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 22661
+    },
+    "INCLINE_BB_PRESS": {
+      "file": "exercise_INCLINE_BB_PRESS.jpg",
+      "sha256": "6d36116d4fec73362e63347eeb9fe8472a2e6ba6cebc79f04e89186e236e3bfd",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 17724
+    },
+    "DECLINE_BB_PRESS": {
+      "file": "exercise_DECLINE_BB_PRESS.jpg",
+      "sha256": "3d8d8dcbdcd51c0f66209cb8b4cbb9f7c70f126b2f6ad8e450354a822965ff49",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15970
+    },
+    "DECLINE_DB_PRESS": {
+      "file": "exercise_DECLINE_DB_PRESS.jpg",
+      "sha256": "febe9ecb3a10afccd6ce4fadcdddf48ffc2778bfce1ffab6d6f688ecd21ae450",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12188
+    },
+    "SMITH_BENCH_PRESS": {
+      "file": "exercise_SMITH_BENCH_PRESS.jpg",
+      "sha256": "7785b10c4385d280181c8404829c3ac298f58fd8547695a5ec3ac67b5b60026e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18379
+    },
+    "BB_CURL": {
+      "file": "exercise_BB_CURL.jpg",
+      "sha256": "6a9ae612bfd8f826d4622afd8059a74ff15d21fc9ddf98785512a68a803e53a3",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10517
+    },
+    "HAMMER_CURL": {
+      "file": "exercise_HAMMER_CURL.jpg",
+      "sha256": "d551314cc056a8be079c26018369b9736ecc73400dd718cd4bb170854333cae8",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10015
+    },
+    "ROPE_PUSHDOWN": {
+      "file": "exercise_ROPE_PUSHDOWN.jpg",
+      "sha256": "ef82799481b50e90b1c26a11ee760b1f54ad240c7e6e76aa603673d6eba2743c",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11101
+    },
+    "SKULL_CRUSHER": {
+      "file": "exercise_SKULL_CRUSHER.jpg",
+      "sha256": "decf7ec1a4fb9a8351748a5a02c2f99b3ead224e794fa1c097d967d818c69ea9",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15514
+    },
+    "HAMMER_CHEST_PRESS": {
+      "file": "exercise_HAMMER_CHEST_PRESS.jpg",
+      "sha256": "bc4cb9b97094f31a1cdb754ec1935d5abd5de4eeb8e8b5061da8d634a9670edd",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 22997
+    },
+    "CLOSE_LAT_PULLDOWN": {
+      "file": "exercise_CLOSE_LAT_PULLDOWN.jpg",
+      "sha256": "5e1222670780a9244c2f055ac5b89acb858bdfb60b3224d6043f14ab55f646b5",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11848
+    },
+    "NEUTRAL_GRIP_PULLDOWN": {
+      "file": "exercise_NEUTRAL_GRIP_PULLDOWN.jpg",
+      "sha256": "ee305170ec8faa7f8de1181159bfbde462bfb20c26862825fe634ae3ae70f7f8",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16969
+    },
+    "REVERSE_LAT_PULLDOWN": {
+      "file": "exercise_REVERSE_LAT_PULLDOWN.jpg",
+      "sha256": "7e7ba011325b0a5b87af3cd444e85e9120dcab398c76167886a21d7ceba074c7",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12380
+    },
+    "V_BAR_PULLDOWN": {
+      "file": "exercise_V_BAR_PULLDOWN.jpg",
+      "sha256": "842b9fecf6de933a9ec36e731fea1627b34e068d800cf321acb43e4a4de8dea2",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13768
+    },
+    "MACHINE_PULLDOWN": {
+      "file": "exercise_MACHINE_PULLDOWN.jpg",
+      "sha256": "bf54aa7afa5e473cffe8eea50772d3f7572341638256b74417abdf1a5c068663",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13208
+    },
+    "HAMMER_PULLDOWN": {
+      "file": "exercise_HAMMER_PULLDOWN.jpg",
+      "sha256": "24002d845ed1c4cf79492bcd4301d0e7c10dcdca914e248b79a0ef89d0a256d1",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16851
+    },
+    "SINGLE_ARM_HAMMER_PULLDOWN": {
+      "file": "exercise_SINGLE_ARM_HAMMER_PULLDOWN.jpg",
+      "sha256": "67c65072f080bf97143e93ec16385a2d496411b2fb1c48b6d98447a0cb0fa233",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14609
+    },
+    "STRAIGHT_ARM_PULLDOWN": {
+      "file": "exercise_STRAIGHT_ARM_PULLDOWN.jpg",
+      "sha256": "9298c43e9dca0cce554aa61176319e655e83bb5757fcd2ad79dc7d2a82f13070",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11350
+    },
+    "PENDLAY_ROW": {
+      "file": "exercise_PENDLAY_ROW.jpg",
+      "sha256": "f6190f9c455d5015e99450090b7e2ff0e6f49abea4d739c9168de3a1112cfd2e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10457
+    },
+    "T_BAR_ROW": {
+      "file": "exercise_T_BAR_ROW.jpg",
+      "sha256": "fa4d3196c8b75742d27c51e86f79e008d9c3160c436510c64b1f4bf60d097207",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10873
+    },
+    "DB_BENT_OVER_ROW": {
+      "file": "exercise_DB_BENT_OVER_ROW.jpg",
+      "sha256": "4563b2befa789231f3e253fe3047d494db166e37a433988f90b44027dd9a6104",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13434
+    },
+    "SINGLE_ARM_DB_ROW": {
+      "file": "exercise_SINGLE_ARM_DB_ROW.jpg",
+      "sha256": "c21dc685d9ba543ff07a8fc704d0976be7e9b5db50567583ea55bbdf557dcdf0",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14896
+    },
+    "DB_PRONE_ROW": {
+      "file": "exercise_DB_PRONE_ROW.jpg",
+      "sha256": "cd01fac0180b8a38c817850c999cb4a9fa08413b18ad7f0c504c0c9b0ca4724e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16850
+    },
+    "SEATED_CABLE_ROW": {
+      "file": "exercise_SEATED_CABLE_ROW.jpg",
+      "sha256": "d038f0c6e2c4c62a2e140282311fef7ad52e8d4599fd15fb0611b12c91662cba",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14597
+    },
+    "V_BAR_ROW": {
+      "file": "exercise_V_BAR_ROW.jpg",
+      "sha256": "d038f0c6e2c4c62a2e140282311fef7ad52e8d4599fd15fb0611b12c91662cba",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14597
+    },
+    "WIDE_SEATED_ROW": {
+      "file": "exercise_WIDE_SEATED_ROW.jpg",
+      "sha256": "b9b7573b7f1bbcaecb2688a4152dc69cb11a18dffd8fef327425f5064bc73aad",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14757
+    },
+    "MACHINE_ROW": {
+      "file": "exercise_MACHINE_ROW.jpg",
+      "sha256": "9dcfad872d455f80ad0c390aa745c06d86862432f8fc066129293c9b9a4ab386",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18802
+    },
+    "HAMMER_ROW": {
+      "file": "exercise_HAMMER_ROW.jpg",
+      "sha256": "687c72ad8bfe2874c90a8740136d0771edc06b794f383f5389e21f55df39124c",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 21244
+    },
+    "SMITH_OVERHAND_ROW": {
+      "file": "exercise_SMITH_OVERHAND_ROW.jpg",
+      "sha256": "9dd0e503baa0ec7f139ed665b9be430fcd20789428f1ada1d674b79301e24c83",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 20596
+    },
+    "INCLINE_HAMMER_CHEST_PRESS": {
+      "file": "exercise_INCLINE_HAMMER_CHEST_PRESS.jpg",
+      "sha256": "878b90e4c0f99195efc4a4782ea6261c404ad8097d70c5eb4fd5049299265f03",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 19781
+    },
+    "HAMMER_BENCH_PRESS": {
+      "file": "exercise_HAMMER_BENCH_PRESS.jpg",
+      "sha256": "281bf872d3721b629ef201ae5779149647a549de55b17557d199925f35d6415f",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15777
+    },
+    "DB_ALTERNATING_CURL": {
+      "file": "exercise_DB_ALTERNATING_CURL.jpg",
+      "sha256": "ec23b82d6f8567661c0dd65972fc580def79ecf33c93fac3812ca5bcec68370e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10960
+    },
+    "CABLE_V_BAR_PUSHDOWN": {
+      "file": "exercise_CABLE_V_BAR_PUSHDOWN.jpg",
+      "sha256": "a07525320093edd5eddf5b98eb5a46e3a9cb01836a8429dec98604f2d1350a8b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12725
+    },
+    "GOBLET_SQUAT": {
+      "file": "exercise_GOBLET_SQUAT.jpg",
+      "sha256": "2844ffe2099291b334d9d4c8ab9540794caa22e541bc0d7db495978ca85bb4f0",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12073
+    },
+    "BULGARIAN_SPLIT_SQUAT": {
+      "file": "exercise_BULGARIAN_SPLIT_SQUAT.jpg",
+      "sha256": "d49a2223bf2acadd3024af8e2a4770b863911a6f405ce0c9c70f05d62545f1eb",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15572
+    },
+    "DB_RDL": {
+      "file": "exercise_DB_RDL.jpg",
+      "sha256": "94c06051a160b1a5371c9187723dacd3a4006ed3ffb85e47801bcedac5eb6e0f",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12663
+    },
+    "DB_CALF_RAISE": {
+      "file": "exercise_DB_CALF_RAISE.jpg",
+      "sha256": "53e179ed067c33cb9607af9f886467fe4e99da2f29c7495116985b191f81b0c4",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10302
+    },
+    "CABLE_CROSSOVER": {
+      "file": "exercise_CABLE_CROSSOVER.jpg",
+      "sha256": "a988db5fbcd29aebcc2c59ca389c7033a1c472e805d3482fbf939f37df9dd079",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 19546
+    },
+    "HIGH_CABLE_FLY": {
+      "file": "exercise_HIGH_CABLE_FLY.jpg",
+      "sha256": "aaf58f7d48decaacc16c8df218675ce998728f1c996527960eee2b94e76b1999",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15879
+    },
+    "LUNGE": {
+      "file": "exercise_LUNGE.jpg",
+      "sha256": "31f560b7d14564e6cbc8925014be2838181b29651677e3af525062edc3eed07b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12499
+    },
+    "WALKING_LUNGE": {
+      "file": "exercise_WALKING_LUNGE.jpg",
+      "sha256": "0fe96571b86222a2d95048089aacb24f322cfba165dae102dd1e3d5678b139e2",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11631
+    },
+    "STEP_UP": {
+      "file": "exercise_STEP_UP.jpg",
+      "sha256": "bd77cc977edc1983d129bfa661df442a8412b1a8e96209e9050eff188b7bb763",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12712
+    },
+    "DB_GLUTE_BRIDGE": {
+      "file": "exercise_DB_GLUTE_BRIDGE.jpg",
+      "sha256": "2c5d638555b2e6413219ab5497f8e8664aa6c2c5c3f03ef69bf7f6c15c003a3b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13288
+    },
+    "LOW_CABLE_FLY": {
+      "file": "exercise_LOW_CABLE_FLY.jpg",
+      "sha256": "22523557ad24987afb29f894a82cff057f2abd72ff07edf3b1ba16b4e866f69f",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 17878
+    },
+    "KB_DEADLIFT": {
+      "file": "exercise_KB_DEADLIFT.jpg",
+      "sha256": "2dd4f886ea69970665dbe93df70b386a81bff25724eddf875d8cbc93088939e2",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12524
+    },
+    "SMITH_LUNGE": {
+      "file": "exercise_SMITH_LUNGE.jpg",
+      "sha256": "cbe647d10a1a0dbb94c175cc6b7f60a32bc748d2634def44a33e0382c7d15bed",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18306
+    },
+    "SMITH_BULGARIAN_SPLIT_SQUAT": {
+      "file": "exercise_SMITH_BULGARIAN_SPLIT_SQUAT.jpg",
+      "sha256": "9dc0a3c3c576a078f26781e102636b5c3e36f99d13acb40872b1a36702ffd53b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 21614
+    },
+    "SMITH_HIP_THRUST": {
+      "file": "exercise_SMITH_HIP_THRUST.jpg",
+      "sha256": "578070ea7922b06d53d59628dec02b0c01949ea4ee452d508ec451d70df733fe",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18712
+    },
+    "INCLINE_SMITH_BENCH_PRESS": {
+      "file": "exercise_INCLINE_SMITH_BENCH_PRESS.jpg",
+      "sha256": "3f0ab59b5f49d7d20ecbb797f64ebebeccce1d89da54499451218b37b32ad84e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 22191
+    },
+    "CABLE_KICKBACK": {
+      "file": "exercise_CABLE_KICKBACK.jpg",
+      "sha256": "2fe12eb0a7906c681b419fe7452b046362f7842d806b9ba5e584370e34626b2e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15408
+    },
+    "GLUTE_KICKBACK_MACHINE": {
+      "file": "exercise_GLUTE_KICKBACK_MACHINE.jpg",
+      "sha256": "319f5f7926d6928ffe03f8d60eea76d7841f0887be37670fc2180ef904d8ecb0",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16273
+    },
+    "SEATED_CALF_RAISE": {
+      "file": "exercise_SEATED_CALF_RAISE.jpg",
+      "sha256": "510ea224fa17b6712bc8aaffbb4b4c6b5207a5f4911501e8ef8aea4c3d38f232",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18366
+    },
+    "STANDING_LEG_CURL": {
+      "file": "exercise_STANDING_LEG_CURL.jpg",
+      "sha256": "f6b8eaf86b2374ca50e3aaf05ac2e325cbb466044e4f7e142d7c6421c4085480",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16027
+    },
+    "HIP_ADDUCTION": {
+      "file": "exercise_HIP_ADDUCTION.jpg",
+      "sha256": "05157535b91bcbfa1f968942a393083208f8e8547a23345e7e9c2a7037ca425e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 22330
+    },
+    "SEATED_BB_PRESS": {
+      "file": "exercise_SEATED_BB_PRESS.jpg",
+      "sha256": "eb74d85a2851f9e5a81b16a4b5e48d241533ad384e912a0cccb51727d22cdf2e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18259
+    },
+    "DB_OVERHEAD_PRESS": {
+      "file": "exercise_DB_OVERHEAD_PRESS.jpg",
+      "sha256": "4c8957c9b96d139c7cb6ca2ef264f7be91d994527d1946162b1237a80bbacba6",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13705
+    },
+    "SMITH_SHOULDER_PRESS": {
+      "file": "exercise_SMITH_SHOULDER_PRESS.jpg",
+      "sha256": "50d2d8156dd1349e902a5a2a8ea16ee833e3ab636ea11fa06ae66cb6e57505a7",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 22497
+    },
+    "HAMMER_SEATED_PRESS": {
+      "file": "exercise_HAMMER_SEATED_PRESS.jpg",
+      "sha256": "d66c8fae1abea95d3af40a0de5e0396b253c86892674f716eb5db2e70fcf13c7",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 19890
+    },
+    "FRONT_RAISE": {
+      "file": "exercise_FRONT_RAISE.jpg",
+      "sha256": "d44131ff30a87b11f4601904631038236ef5357da9c18f539c88f1356a5d0dc8",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10318
+    },
+    "BB_PLATE_FRONT_RAISE": {
+      "file": "exercise_BB_PLATE_FRONT_RAISE.jpg",
+      "sha256": "b182a778cf42915f8052dac1adb5fc3e58a02264f122f2fda090b02f43772fa7",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10245
+    },
+    "REAR_DELT_FLY": {
+      "file": "exercise_REAR_DELT_FLY.jpg",
+      "sha256": "a1cae3c8e7be5c31ec45f02e17d11b130c68c3df36fbd69289ea95dd3d899538",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13335
+    },
+    "FACE_PULL": {
+      "file": "exercise_FACE_PULL.jpg",
+      "sha256": "a7a47a67db763708f841b66340c41d8c266254603438667164ae8ef7a8ecac5a",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15324
+    },
+    "DB_UPRIGHT_ROW": {
+      "file": "exercise_DB_UPRIGHT_ROW.jpg",
+      "sha256": "40b4385f620806fd41185a7a777c676bebdf486386d754e331dd3bc6315e4bc4",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10793
+    },
+    "BB_HIGH_PULL": {
+      "file": "exercise_BB_HIGH_PULL.jpg",
+      "sha256": "1e52d5f75733740b30b550b180e85970a658e14c203cca24c97d7f80c910f6a7",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13324
+    },
+    "DECLINE_SMITH_BENCH_PRESS": {
+      "file": "exercise_DECLINE_SMITH_BENCH_PRESS.jpg",
+      "sha256": "7abc58dbae6cadd2f559b31cc5635c306b94e6c093ffc1f64c1c0f0a8746c633",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14391
+    },
+    "MACHINE_INCLINE_PRESS": {
+      "file": "exercise_MACHINE_INCLINE_PRESS.jpg",
+      "sha256": "2b56c5691a80ec3a5b2ebf1e7bb8d4b1e13e477ffab4a6cc471f3781ee824e9e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14232
+    },
+    "PARTIAL_DEADLIFT": {
+      "file": "exercise_PARTIAL_DEADLIFT.jpg",
+      "sha256": "595c67ec88a0284c5fb4779436f208d581e59c2b568993bee0eb7d5fd828ef8f",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16411
+    },
+    "EZ_BAR_CURL": {
+      "file": "exercise_EZ_BAR_CURL.jpg",
+      "sha256": "16d2e7aa41074b031f5cef9cfef86df13164d590e184cc94376d8f19007351d5",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11106
+    },
+    "DB_CROSS_HAMMER_CURL": {
+      "file": "exercise_DB_CROSS_HAMMER_CURL.jpg",
+      "sha256": "72bca8b2ab9a26f7f7d8ea0af9b2f1188d021ed95c5fecc8cdde53ce18eec900",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10376
+    },
+    "INCLINE_DB_CURL": {
+      "file": "exercise_INCLINE_DB_CURL.jpg",
+      "sha256": "12bd5b7e96df08fb329a487cb95989689ec315da6aa2988810c51c5fca74ede6",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14656
+    },
+    "CONCENTRATION_CURL": {
+      "file": "exercise_CONCENTRATION_CURL.jpg",
+      "sha256": "5d18c686cec5d98f461e2a8616b988ade4b21f62f5289fcc75dd7f9b70009a9d",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14167
+    },
+    "SPIDER_CURL": {
+      "file": "exercise_SPIDER_CURL.jpg",
+      "sha256": "8717d1496f3948c70e1870e8f37e440a2c237b3c1961cb59c7a9f2df114d6e52",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15550
+    },
+    "EZ_BAR_PREACHER_CURL": {
+      "file": "exercise_EZ_BAR_PREACHER_CURL.jpg",
+      "sha256": "8369aeb49ff652f98139d056491f239e578d1f9fc3ab1c607073ae5f3395862d",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16907
+    },
+    "BB_PREACHER_CURL": {
+      "file": "exercise_BB_PREACHER_CURL.jpg",
+      "sha256": "5fef98d9d811227eaa938caeebce33be8d78950a841f229594afe79b9a473e74",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 17228
+    },
+    "DB_PREACHER_CURL": {
+      "file": "exercise_DB_PREACHER_CURL.jpg",
+      "sha256": "8fdfe5ed85004d144ff94689ec8c04d580715fe8fcc86639b3c8c35be540b235",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14851
+    },
+    "CABLE_CURL": {
+      "file": "exercise_CABLE_CURL.jpg",
+      "sha256": "728015b11c69e4a3f3e47e9a5ce8930d3e5ecec68550cbe4892c2298665c6f46",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15562
+    },
+    "GOOD_MORNING": {
+      "file": "exercise_GOOD_MORNING.jpg",
+      "sha256": "953a57faf19e51ba50e8461b157a272a27285ab556e15e1389e299a145e03cba",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13875
+    },
+    "BB_STRAIGHT_BAR_CURL": {
+      "file": "exercise_BB_STRAIGHT_BAR_CURL.jpg",
+      "sha256": "45fb8be811c3db770f71f29ecd9e403c17ce3230c5640e6e751fb19abaff77d0",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15208
+    },
+    "MACHINE_CURL": {
+      "file": "exercise_MACHINE_CURL.jpg",
+      "sha256": "4a61bf3ce86a85bc98ee7d9d80c437adc00c0cc20f093361dbc147263298ed3e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 19282
+    },
+    "REVERSE_CURL": {
+      "file": "exercise_REVERSE_CURL.jpg",
+      "sha256": "7fa62c73d933090fcd45f302e7dd9920ad13cad297ac6c2790f79edee7060663",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11711
+    },
+    "SINGLE_ARM_CABLE_CURL": {
+      "file": "exercise_SINGLE_ARM_CABLE_CURL.jpg",
+      "sha256": "cace545a9bdd79ec33daf1f99d8053251e015ead34ca12517443a9a4f1fc9fdc",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15651
+    },
+    "RACK_PULL": {
+      "file": "exercise_RACK_PULL.jpg",
+      "sha256": "510e4c79de5bea4aa1100d6de877ab303dfb84a05d053ba032902cb087c7e801",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 19647
+    },
+    "SHRUG_BB": {
+      "file": "exercise_SHRUG_BB.jpg",
+      "sha256": "b2e30d9144ab950d6b7db92dbcc99abf8f6e5cf64a9594bb8fe593bd77cfeb66",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13302
+    },
+    "DECLINE_HAMMER_CHEST_PRESS": {
+      "file": "exercise_DECLINE_HAMMER_CHEST_PRESS.jpg",
+      "sha256": "0979850392b1835c7836bbdee4f015d8315ca820c2115432acf73f41f6dcdf24",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 22260
+    },
+    "BB_STRAIGHT_BAR_PUSHDOWN": {
+      "file": "exercise_BB_STRAIGHT_BAR_PUSHDOWN.jpg",
+      "sha256": "22bb0572fdb6d702e6c0309bb063f7aba3512a197bf606f370072922d09d5776",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14660
+    },
+    "OVERHEAD_TRICEP_EXT": {
+      "file": "exercise_OVERHEAD_TRICEP_EXT.jpg",
+      "sha256": "b78ffee5f42cbaf770ddb260bb243702f35df7eccaa31a683b5df4ddfcad1ecb",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 8917
+    },
+    "SEATED_DB_LATERAL_RAISE": {
+      "file": "exercise_SEATED_DB_LATERAL_RAISE.jpg",
+      "sha256": "c26b7f7fa6c2f347ca4d99197d3e98ef042fdcbae76b945007da6c29e186dfca",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15474
+    },
+    "INCLINE_DB_LATERAL_RAISE": {
+      "file": "exercise_INCLINE_DB_LATERAL_RAISE.jpg",
+      "sha256": "c7bb08cbab9666a2e1999ba417a3190ce376d759af58b584bf8f7fe0696f50bb",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16792
+    },
+    "SINGLE_ARM_DB_LATERAL_RAISE": {
+      "file": "exercise_SINGLE_ARM_DB_LATERAL_RAISE.jpg",
+      "sha256": "84412a6e888f305db8aff914cbce9d2ace98ddd65712e1e47e7f5f7d979d650a",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10991
+    },
+    "STANDING_DB_SHOULDER_PRESS": {
+      "file": "exercise_STANDING_DB_SHOULDER_PRESS.jpg",
+      "sha256": "f481be13f6fe33622f77f40f3a96dfa3ff3110f4aba38f489246f140d2b89afc",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10549
+    },
+    "INCLINE_DB_REAR_DELT_FLY": {
+      "file": "exercise_INCLINE_DB_REAR_DELT_FLY.jpg",
+      "sha256": "7697e42ad7e5ce0a6a68cfebf034075c5f965161645fe4beede70efe2b600631",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16715
+    },
+    "TRICEP_KICKBACK": {
+      "file": "exercise_TRICEP_KICKBACK.jpg",
+      "sha256": "bda64ed6a6c033b55e8369d7ea5ab5fc6723c231778819b47297111f8ffc6fba",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11620
+    },
+    "SINGLE_ARM_DB_TRICEP_EXT": {
+      "file": "exercise_SINGLE_ARM_DB_TRICEP_EXT.jpg",
+      "sha256": "e7ead1f879fea6abf9e3ed75a9dc7c6edeb7ed27e823db0d242d38e40ff78ae0",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 9702
+    },
+    "TRICEP_DIP": {
+      "file": "exercise_TRICEP_DIP.jpg",
+      "sha256": "a84ea241849a1f67909c959e99e309dec54a4ca0f799f0de1e1112a19cf121c5",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13150
+    },
+    "SHRUG_DB": {
+      "file": "exercise_SHRUG_DB.jpg",
+      "sha256": "5a22e450334489fe9c49caec921afb07880d6492d4fca17b542cae51014ccd5c",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11074
+    },
+    "WOODCHOPPER": {
+      "file": "exercise_WOODCHOPPER.jpg",
+      "sha256": "159b4092214ee6ae14046c9f751996fb38a59efc1e89ecfa5bec87dbe5dc530e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16859
+    },
+    "LANDMINE_ROW": {
+      "file": "exercise_LANDMINE_ROW.jpg",
+      "sha256": "0c58beb3050a72d38ee8dc2d72c05011625c356b7b398a473a913258d778443c",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11477
+    },
+    "WEIGHTED_CRUNCH": {
+      "file": "exercise_WEIGHTED_CRUNCH.jpg",
+      "sha256": "a57f846347fd78ec910b5206ae9e771f6ef189cfb68aa631d1b008fdcd71fdad",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15878
+    },
+    "PISTOL_SQUAT": {
+      "file": "exercise_PISTOL_SQUAT.jpg",
+      "sha256": "a43bfb8e124c0e0b3a712366b8a95a5f100d2ecd7caf93278201a8253d67ee63",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13956
+    },
+    "GLUTE_BRIDGE": {
+      "file": "exercise_GLUTE_BRIDGE.jpg",
+      "sha256": "16594e4102014bdc552eabc0354637ed1d2b6b7e3a8c158826c572d939b71a8a",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13528
+    },
+    "FROG_PUMP": {
+      "file": "exercise_FROG_PUMP.jpg",
+      "sha256": "8fa254935af9870d71b628e087d18ed50a5f52d50b876e8fd661cfda9398a08a",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16776
+    },
+    "BAND_LATERAL_WALK": {
+      "file": "exercise_BAND_LATERAL_WALK.jpg",
+      "sha256": "0d29340b0a4a42bada5306953d168cc01bbabc8a8d926ee9f2d9064ba71e3413",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12527
+    },
+    "PULL_UP": {
+      "file": "exercise_PULL_UP.jpg",
+      "sha256": "9cdd5afd869b80b3f714f3bc7ce38db032067664ec7c6601cd318d92d2ee8b15",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12242
+    },
+    "CHIN_UP": {
+      "file": "exercise_CHIN_UP.jpg",
+      "sha256": "e7b4b9602deee226694dcbd2b7fc46f97d3147d5632c5074b175cf70b61af7bc",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10512
+    },
+    "WIDE_PULL_UP": {
+      "file": "exercise_WIDE_PULL_UP.jpg",
+      "sha256": "a0e6959dfa44b6174e927310bf9b8480de66b2c57430d13f1c54f6a2fd52f894",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10247
+    },
+    "ASSISTED_PULL_UP": {
+      "file": "exercise_ASSISTED_PULL_UP.jpg",
+      "sha256": "53fd9235501d9d6179f7fe1f348b23e830c0088d3d9d659d5012f7009b962f5b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16468
+    },
+    "BACK_EXTENSION": {
+      "file": "exercise_BACK_EXTENSION.jpg",
+      "sha256": "58ae8e5e97e5f65bf26fca8678223c30433c1349aff587e9493c5c3147a74434",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14008
+    },
+    "WRIST_CURL": {
+      "file": "exercise_WRIST_CURL.jpg",
+      "sha256": "ad41eacb51999caaad171cbcaf1bdd815aa0eec65d2f00ab5591413f28f167ba",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15096
+    },
+    "REVERSE_WRIST_CURL": {
+      "file": "exercise_REVERSE_WRIST_CURL.jpg",
+      "sha256": "be15149443888052f68c8a8304575932f22cf7904844787b4159fca34cf47531",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11915
+    },
+    "DB_PULLOVER": {
+      "file": "exercise_DB_PULLOVER.jpg",
+      "sha256": "0361a1a29efc6dd8622d9cb7cf5073a26c2d81b18d86150ec050dd6797825fa7",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12971
+    },
+    "CHEST_DIP": {
+      "file": "exercise_CHEST_DIP.jpg",
+      "sha256": "e13aa1f8913e0633e70bd57c9a25c9a11d636fe9712bdd05f5868c605764bc82",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13837
+    },
+    "PUSH_UP": {
+      "file": "exercise_PUSH_UP.jpg",
+      "sha256": "658ea9996e2e7e65a1a39540e42a883f1d543b465249999648c1627c4478ccaf",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13231
+    },
+    "INCLINE_PUSH_UP": {
+      "file": "exercise_INCLINE_PUSH_UP.jpg",
+      "sha256": "aa6ea7f97277571987fae288e47c55fbc1329067aff8d9efdb676b5e6e7ccd11",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13151
+    },
+    "DECLINE_PUSH_UP": {
+      "file": "exercise_DECLINE_PUSH_UP.jpg",
+      "sha256": "71338177c1a24f76245e0e0748d1b1127eef4ea42d75f4bde1ddec3754104732",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13059
+    },
+    "CLOSE_GRIP_BENCH": {
+      "file": "exercise_CLOSE_GRIP_BENCH.jpg",
+      "sha256": "88cb0b96fd8ca16fddac8b5d4c772ad927662cf9114b62d55f32ffbc71ef11d6",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18754
+    },
+    "BENCH_DIP": {
+      "file": "exercise_BENCH_DIP.jpg",
+      "sha256": "ec2fab9173687401809cd3b042b484b30f8954bc1e6a65eb78875619442720b9",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11771
+    },
+    "SEATED_LEG_CURL": {
+      "file": "exercise_SEATED_LEG_CURL.jpg",
+      "sha256": "535e0d4349eeb7208509dd8f87d517742f430d19c3ad5e50fb688de3dd263379",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 21067
+    },
+    "HIP_ABDUCTION": {
+      "file": "exercise_HIP_ABDUCTION.jpg",
+      "sha256": "05a8a999449cf5f8fa4f14184d8a4fdab98f64c419fed7be7f4118cfc6bc2929",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 22927
+    },
+    "DIAMOND_PUSH_UP": {
+      "file": "exercise_DIAMOND_PUSH_UP.jpg",
+      "sha256": "8419bc12eb0adc71d2c20a3ebef562c39b44fe6db9548b8df039fcd74cd40fc2",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12797
+    },
+    "MACHINE_CHEST_PRESS": {
+      "file": "exercise_MACHINE_CHEST_PRESS.jpg",
+      "sha256": "63ec805f1900551bf963c4b1bff88c6d81f148c06beb6ca8d9de114c246541ae",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12802
+    },
+    "PREACHER_BENCH_REAR_DELT_FLY": {
+      "file": "exercise_PREACHER_BENCH_REAR_DELT_FLY.jpg",
+      "sha256": "084728144e88b3dae81b424c81e1aec544209c20fe07d7b7409b9f36198d7336",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12877
+    },
+    "SMITH_REVERSE_ROW": {
+      "file": "exercise_SMITH_REVERSE_ROW.jpg",
+      "sha256": "47356f211ad8fc9bc1179e54f28f736e27b65c385ef7c5a9a0ee7fc06328ce2b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13603
+    },
+    "STANDING_CALF_RAISE": {
+      "file": "exercise_STANDING_CALF_RAISE.jpg",
+      "sha256": "b84b9f12077eb0121c06f24b1a617d3a17bfc0cfa0d9cb1506b5e62501acff97",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15289
+    },
+    "SUMO_DEADLIFT": {
+      "file": "exercise_SUMO_DEADLIFT.jpg",
+      "sha256": "b9a5de1782dee43954bfe0d66f3a6cc54eea4011ad06c7f898e14c354152df7b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12211
+    }
+  }
+}

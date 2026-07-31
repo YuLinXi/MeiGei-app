@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "CABLE_V_BAR_PUSHDOWN",
+  "exerciseName": "V-bar 绳索下压",
+  "variant": "站姿 V-bar 高位绳索下压，肘部固定到底部",
+  "representativePose": "面向高位绳索机站立，双手中立握紧 V 形短杆，双肘贴近躯干，V-bar 下压至髋部前方，肱三头肌收缩。",
+  "camera": { "view": "45° 前侧视角，弱透视，清楚显示 V 形短杆、高位滑轮和肘部路径", "subjectFill": "完整显示人物、绳索机、V-bar、双脚和配重箱", "safeMarginPercent": 8 },
+  "equipment": { "family": "高位绳索机与 V-bar 短杆", "recognitionFeatures": ["顶部滑轮", "单根向下绳索", "V 形中立握短杆", "配重箱和立柱"] },
+  "grip": "双手中立握 V-bar，拇指包住短杆",
+  "bodyContacts": ["双手握 V-bar", "双肘贴近躯干", "双脚全掌接地"],
+  "jointDirections": ["肘关节由屈曲向伸展", "上臂保持垂直", "肩部不耸起"],
+  "primaryMuscles": ["肱三头肌"],
+  "secondaryMuscles": [],
+  "rejectionCases": ["绳柄或直杆替代 V-bar", "过顶臂屈伸", "肘部前移外张", "器械、双手、头部或双脚裁切"]
+}

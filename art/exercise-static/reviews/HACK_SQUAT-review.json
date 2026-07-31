@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "HACK_SQUAT",
+  "candidateId": "HACK_SQUAT-candidate-01",
+  "masterPath": "art/exercise-static/masters/approved/HACK_SQUAT-v1.png",
+  "masterSha256": "943ba5c94e690f2e48cc295668d7df4957226b8589ca30aa1f97fcaee9158dac",
+  "reviews": {
+    "identity": {
+      "status": "approved",
+      "reviewerId": "production-autopilot",
+      "reviewedAt": "2026-07-24T22:29:30.030Z",
+      "evidence": [
+        "art/exercise-static/references/approved/character-v1.png",
+        "art/exercise-static/masters/approved/HACK_SQUAT-v1.png"
+      ],
+      "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+    },
+    "art": {
+      "status": "approved",
+      "reviewerId": "production-autopilot",
+      "reviewedAt": "2026-07-24T22:29:30.030Z",
+      "evidence": [
+        "art/exercise-static/references/approved/style-v1.png",
+        "art/exercise-static/masters/approved/HACK_SQUAT-v1.png"
+      ],
+      "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+    },
+    "movement": {
+      "status": "approved",
+      "reviewerId": "production-autopilot",
+      "reviewedAt": "2026-07-24T22:29:30.030Z",
+      "evidence": [
+        "art/exercise-static/briefs/HACK_SQUAT.json",
+        "art/exercise-static/masters/approved/HACK_SQUAT-v1.png"
+      ],
+      "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+    },
+    "equipment": {
+      "status": "approved",
+      "reviewerId": "production-autopilot",
+      "reviewedAt": "2026-07-24T22:29:30.030Z",
+      "evidence": [
+        "art/exercise-static/briefs/HACK_SQUAT.json",
+        "art/exercise-static/masters/approved/HACK_SQUAT-v1.png"
+      ],
+      "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+    },
+    "rights": {
+      "status": "approved",
+      "reviewerId": "production-autopilot",
+      "reviewedAt": "2026-07-24T22:29:30.030Z",
+      "evidence": [
+        "art/exercise-static/reviews/input-policy-v1.md",
+        "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+        "art/exercise-static/masters/approved/HACK_SQUAT-v1.provenance.json"
+      ],
+      "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+    }
+  }
+}

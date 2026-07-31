@@ -1,0 +1,45 @@
+{
+  "assetId": "BB_BENCH_PRESS-v1",
+  "exerciseCode": "BB_BENCH_PRESS",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-24T09:08:45Z",
+  "promptPath": "art/exercise-static/briefs/BB_BENCH_PRESS.json",
+  "briefPath": "art/exercise-static/briefs/BB_BENCH_PRESS.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/BB_BENCH_PRESS.json",
+      "sha256": "f35fd6d0d2a97eaa74a634adc0ba132d8be5a3fef3f3e086a5448366319f1c26",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "本地未入库的 BB_BENCH_PRESS-candidate-01.png",
+      "sha256": "3a2cad907ff4d9f16f0e4535f56f0aa8a4d73e14cc4e9f1ecff5f1c9d1762f2e",
+      "rightsBasis": "本项目通过 imagegen 生成的前序候选，仅作为候选 02 的 edit target；按候选不入库规则只保留摘要"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑；候选 02 通过 imagegen edit 移除候选 01 的乳头圆点和乳晕特征，保持人物、平板卧推姿势、器械结构与构图。",
+  "file": "art/exercise-static/masters/approved/BB_BENCH_PRESS-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1969412,
+  "sha256": "41f1e8c153ea38454d5ef36b014b488e9605973e2e7591fed77f7d2b832f1400",
+  "reviewRecord": "art/exercise-static/reviews/BB_BENCH_PRESS-candidate-02-review.md",
+  "approvedAt": "2026-07-24T09:12:03Z",
+  "reviewerId": "project-owner"
+}

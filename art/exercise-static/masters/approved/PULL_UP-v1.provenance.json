@@ -1,0 +1,45 @@
+{
+  "assetId": "PULL_UP-v1",
+  "exerciseCode": "PULL_UP",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-26T01:51:04.952Z",
+  "promptPath": "art/exercise-static/briefs/PULL_UP.json",
+  "briefPath": "art/exercise-static/briefs/PULL_UP.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/PULL_UP.json",
+      "sha256": "454019b00f9a1bce836b92d4e9171b6fa9e815989ba3fcf341823cc14d54c0b8",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/PULL_UP/PULL_UP-candidate-01.png",
+      "sha256": "8f3557a4b566224024aba2f9db1585629096aed5f30af5f5503bed501c077192",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/PULL_UP-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1590327,
+  "sha256": "8f3557a4b566224024aba2f9db1585629096aed5f30af5f5503bed501c077192",
+  "reviewRecord": "art/exercise-static/reviews/PULL_UP-review.json",
+  "approvedAt": "2026-07-26T01:51:04.952Z",
+  "reviewerId": "production-autopilot"
+}

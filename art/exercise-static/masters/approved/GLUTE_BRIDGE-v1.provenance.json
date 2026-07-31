@@ -1,0 +1,45 @@
+{
+  "assetId": "GLUTE_BRIDGE-v1",
+  "exerciseCode": "GLUTE_BRIDGE",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T21:58:45.078Z",
+  "promptPath": "art/exercise-static/briefs/GLUTE_BRIDGE.json",
+  "briefPath": "art/exercise-static/briefs/GLUTE_BRIDGE.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/GLUTE_BRIDGE.json",
+      "sha256": "4c3d58cbf704909a7791d4003aa8c364fd9ad1c3a2d1acd52004b114404bf397",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/GLUTE_BRIDGE/GLUTE_BRIDGE-candidate-01.png",
+      "sha256": "14bd9dbedaa59c856e212c32cdb0b6ed851225087ba2e21cbae42a70adc2c22f",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/GLUTE_BRIDGE-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1775750,
+  "sha256": "14bd9dbedaa59c856e212c32cdb0b6ed851225087ba2e21cbae42a70adc2c22f",
+  "reviewRecord": "art/exercise-static/reviews/GLUTE_BRIDGE-review.json",
+  "approvedAt": "2026-07-25T21:58:45.078Z",
+  "reviewerId": "production-autopilot"
+}

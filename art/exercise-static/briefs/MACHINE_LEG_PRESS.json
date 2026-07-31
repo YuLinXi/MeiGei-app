@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "MACHINE_LEG_PRESS",
+  "exerciseName": "器械倒蹬机",
+  "variant": "45° 斜板倒蹬机，膝盖深屈曲的底部代表姿势",
+  "representativePose": "人物背部和髋部贴靠斜躺靠垫，双脚肩宽并排踩在完整脚踏板上，膝盖向胸部屈曲，双手握住座椅两侧把手。",
+  "camera": { "view": "45° 前侧视角，弱透视，兼顾脚踏板、导轨和屈膝姿势", "subjectFill": "完整显示人物、靠垫、脚踏板、导轨、机架和对称配重片；无背景", "safeMarginPercent": 8 },
+  "equipment": { "family": "标准 45° 斜板配重倒蹬机", "recognitionFeatures": ["斜躺靠背与大型脚踏板", "脚踏板沿两条倾斜导轨滑动", "两侧对称圆形配重片", "座椅、滑轨和安全止挡完整可见"] },
+  "grip": "双手闭合握住座椅两侧安全把手",
+  "bodyContacts": ["背部和髋部接触靠垫", "双脚全掌接触脚踏板", "双手接触把手"],
+  "jointDirections": ["髋膝同步屈曲", "膝盖与脚尖同向且不内扣", "腰背贴靠靠垫", "脚跟保持接触脚踏板"],
+  "primaryMuscles": ["股四头肌"],
+  "secondaryMuscles": ["臀大肌", "腘绳肌"],
+  "rejectionCases": ["哈克深蹲、坐姿腿屈伸或自由深蹲", "脚踏板缺失、导轨方向错误或配重不对称", "腰背离开靠垫、膝盖内扣或脚跟悬空", "脚踏板、人物或机器主体被裁切"]
+}

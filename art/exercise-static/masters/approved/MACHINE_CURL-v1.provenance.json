@@ -1,0 +1,45 @@
+{
+  "assetId": "MACHINE_CURL-v1",
+  "exerciseCode": "MACHINE_CURL",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T10:35:28.532Z",
+  "promptPath": "art/exercise-static/briefs/MACHINE_CURL.json",
+  "briefPath": "art/exercise-static/briefs/MACHINE_CURL.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/MACHINE_CURL.json",
+      "sha256": "5b6a5027bcc84b86be25e5d5e0e4f5289e1b36907eb7e0d7598d2527a4ae65fc",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/MACHINE_CURL/MACHINE_CURL-candidate-01.png",
+      "sha256": "162325223c801a5ce57596815855183593cd8f5cccc6932b8add828160d3d029",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/MACHINE_CURL-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1930218,
+  "sha256": "162325223c801a5ce57596815855183593cd8f5cccc6932b8add828160d3d029",
+  "reviewRecord": "art/exercise-static/reviews/MACHINE_CURL-review.json",
+  "approvedAt": "2026-07-25T10:35:28.532Z",
+  "reviewerId": "production-autopilot"
+}

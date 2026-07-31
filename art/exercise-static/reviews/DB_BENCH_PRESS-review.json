@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "DB_BENCH_PRESS",
+  "candidateId": "DB_BENCH_PRESS-candidate-02",
+  "masterPath": "art/exercise-static/masters/approved/DB_BENCH_PRESS-v1.png",
+  "masterSha256": "5e9cd7be5d14a660d37de049bdd840780143b86905217a753d9ca21eabd3819b",
+  "reviews": {
+    "identity": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/references/approved/character-v1.png",
+        "art/exercise-static/masters/approved/DB_BENCH_PRESS-v1.png"
+      ],
+      "notes": "按 character-v1 身份清单检查脸型、短深色发型、体型、黑色短裤、四肢完整性和灰阶线稿；未发现角色漂移。"
+    },
+    "art": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/references/approved/style-v1.png",
+        "art/exercise-static/masters/approved/DB_BENCH_PRESS-v1.png"
+      ],
+      "notes": "灰阶解剖线稿、朱砂红胸大肌、浅红协同肌、白底安全边距和无文字/Logo 通过；无明显乳头或乳晕特征。"
+    },
+    "movement": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/briefs/DB_BENCH_PRESS.json",
+        "art/exercise-static/masters/approved/DB_BENCH_PRESS-v1.png"
+      ],
+      "notes": "平板卧推底部代表姿势：头/上背/臀部接触凳面、双脚着地、双肘屈曲、两只哑铃位于胸部两侧且左右对称。"
+    },
+    "equipment": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/briefs/DB_BENCH_PRESS.json",
+        "art/exercise-static/masters/approved/DB_BENCH_PRESS-v1.png"
+      ],
+      "notes": "只出现标准平板凳和两只等尺寸六角哑铃；无杠铃、卧推架、绳索或第三只哑铃。"
+    },
+    "rights": {
+      "status": "approved",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-29T01:33:18Z",
+      "evidence": [
+        "art/exercise-static/reviews/input-policy-v1.md",
+        "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+        "art/exercise-static/masters/approved/DB_BENCH_PRESS-v1.provenance.json"
+      ],
+      "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 候选链；未使用第三方图片。"
+    }
+  }
+}

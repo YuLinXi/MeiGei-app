@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "SPLIT_HIGH_ROW",
+  "exerciseName": "分动式高位划船",
+  "variant": "胸托板载分动式高位划船，双臂中立握",
+  "representativePose": "人物坐在分动式高位划船机，胸部贴靠靠垫；双手握独立高位中立把手，从肩上方向下后方拉到上肋，左右杠杆和板片分动。",
+  "camera": { "view": "45° 后侧视角，突出左右独立高位杠杆和背部肌群", "subjectFill": "显示完整人物、胸靠、双侧高位臂、握把、转轴、板片和双脚", "safeMarginPercent": 8 },
+  "equipment": { "family": "板载独立杠杆高位划船机", "recognitionFeatures": ["左右独立高位杠杆", "胸部靠垫", "平行中立握把", "外侧板载圆片"] },
+  "grip": "双手闭合中立握，掌心相对",
+  "bodyContacts": ["胸部贴靠垫", "臀部坐垫", "双手握独立把手", "双脚着地"],
+  "jointDirections": ["肩关节由高位向下后方内收", "双肘向下向后", "肩胛骨后缩下压", "躯干由胸垫固定"],
+  "primaryMuscles": ["菱形肌", "背阔肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["普通坐姿低位划船", "高位下拉直杆", "胸推方向", "单侧或非分动杠杆", "设备或人物裁切"]
+}

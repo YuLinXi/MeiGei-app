@@ -1,0 +1,45 @@
+{
+  "assetId": "CABLE_FRONT_RAISE-v1",
+  "exerciseCode": "CABLE_FRONT_RAISE",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-25T04:34:20.125Z",
+  "promptPath": "art/exercise-static/briefs/CABLE_FRONT_RAISE.json",
+  "briefPath": "art/exercise-static/briefs/CABLE_FRONT_RAISE.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/CABLE_FRONT_RAISE.json",
+      "sha256": "4b46fa1f33f16e896b04071b049c9c28b40e4c6dcd218d8fcfbce472aa492cc5",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/CABLE_FRONT_RAISE/CABLE_FRONT_RAISE-candidate-01.png",
+      "sha256": "4d38673a0bf43dfce55621619397df34eab7cf26254ec9944b83f0b07df0b25d",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/CABLE_FRONT_RAISE-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1668690,
+  "sha256": "4d38673a0bf43dfce55621619397df34eab7cf26254ec9944b83f0b07df0b25d",
+  "reviewRecord": "art/exercise-static/reviews/CABLE_FRONT_RAISE-review.json",
+  "approvedAt": "2026-07-25T04:34:20.125Z",
+  "reviewerId": "production-autopilot"
+}

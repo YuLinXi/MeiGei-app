@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "LEG_EXTENSION",
+  "exerciseName": "坐姿腿屈伸",
+  "variant": "选择器械坐姿双腿腿屈伸，膝关节伸直的代表姿势",
+  "representativePose": "人物坐在有靠背的腿屈伸机上，髋部和背部贴靠，双膝由约 90° 伸直到接近直线，胫骨前侧抵住软垫，双手握住侧把手。",
+  "camera": { "view": "45° 前侧视角，弱透视，完整展示膝关节、胫托、座椅和配重", "subjectFill": "完整显示头、躯干、双腿、双脚和腿屈伸机全结构；无背景", "safeMarginPercent": 8 },
+  "equipment": { "family": "标准选择器械坐姿腿屈伸", "recognitionFeatures": ["座椅和靠背", "小腿前方的长圆柱软垫", "以膝关节为轴的摆臂", "后方选择器械配重片或配重箱"] },
+  "grip": "双手闭合握住座椅两侧把手",
+  "bodyContacts": ["背部和髋部接触座椅靠背", "胫骨前侧接触滚筒软垫", "双脚自然伸出、脚背朝上"],
+  "jointDirections": ["双膝由屈曲向伸直", "大腿固定在座椅上", "髋部不离开靠背", "左右腿同步且对称"],
+  "primaryMuscles": ["股四头肌"],
+  "secondaryMuscles": [],
+  "rejectionCases": ["腿弯举、倒蹬机或自由腿摆动", "软垫位于脚后方而非胫骨前方", "缺少座椅靠背或膝轴摆臂", "人物、脚垫、配重或机器被裁切"]
+}

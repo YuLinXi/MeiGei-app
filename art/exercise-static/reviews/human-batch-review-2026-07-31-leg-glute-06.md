@@ -1,0 +1,15 @@
+# 下肢与臀部动作第 6 批人工复核
+
+- 复核方式：本地正式发布 JPG，20 张一组总览
+- 复核时间：2026-07-31
+- 复核结论：19 项通过；1 项待回修。原有单动作审核记录和发布溯源保持不变。
+
+## 待回修项
+
+| 序号 | code | 中文名 |
+| ---: | --- | --- |
+| 03 | `MACHINE_SINGLE_LEG_EXTENSION` | 单腿腿屈伸 |
+
+## 本轮通过项
+
+`MACHINE_LEG_PRESS`、`LEG_EXTENSION`、`BULGARIAN_SPLIT_SQUAT`、`LUNGE`、`WALKING_LUNGE`、`STEP_UP`、`PISTOL_SQUAT`、`LEG_CURL`、`STANDING_LEG_CURL`、`ROMANIAN_DL`、`DB_RDL`、`HIP_ADDUCTION`、`SEATED_CALF_RAISE`、`DB_CALF_RAISE`、`HIP_THRUST`、`MACHINE_HIP_THRUST`、`GLUTE_BRIDGE`、`DB_GLUTE_BRIDGE`、`CABLE_KICKBACK`。

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exerciseCode": "DB_BENT_OVER_ROW",
+  "exerciseName": "哑铃划船",
+  "variant": "站姿俯身双哑铃中立握划船",
+  "representativePose": "人物双脚站立，髋铰链俯身、脊柱中立；双手各握一只哑铃，以中立握将哑铃向髋部拉起，双肘向后。",
+  "camera": { "view": "45° 前侧视角，显示双哑铃和髋铰链", "subjectFill": "完整显示人物、双哑铃、双脚和躯干角度", "safeMarginPercent": 8 },
+  "equipment": { "family": "自由站姿双哑铃", "recognitionFeatures": ["左右各一只等重哑铃", "无训练凳或器械", "哑铃沿身体两侧划向髋部"] },
+  "grip": "双手闭合中立握，掌心相对",
+  "bodyContacts": ["双脚全掌着地", "双手各握一只哑铃"],
+  "jointDirections": ["髋关节屈曲", "膝部微屈", "脊柱中立", "双肘向后靠近躯干"],
+  "primaryMuscles": ["背阔肌", "菱形肌"],
+  "secondaryMuscles": ["肱二头肌", "三角肌后束"],
+  "rejectionCases": ["单臂支撑划船", "俯卧或胸托", "杠铃或 T 杠", "身体直立弯举", "哑铃数量错误或裁切"]
+}

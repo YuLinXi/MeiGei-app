@@ -1,0 +1,45 @@
+{
+  "assetId": "SMITH_SQUAT-v1",
+  "exerciseCode": "SMITH_SQUAT",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-07-24T19:23:11.252Z",
+  "promptPath": "art/exercise-static/briefs/SMITH_SQUAT.json",
+  "briefPath": "art/exercise-static/briefs/SMITH_SQUAT.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/SMITH_SQUAT.json",
+      "sha256": "5526e889f856d60e29eb387f49bfc78e58c1026028d32cbb3908f1f76c746027",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/SMITH_SQUAT/SMITH_SQUAT-candidate-01.png",
+      "sha256": "a528091d684debbbe1ae03b4fb31f9631252acda3d215064d09a9ef454163d2f",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/SMITH_SQUAT-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1723244,
+  "sha256": "a528091d684debbbe1ae03b4fb31f9631252acda3d215064d09a9ef454163d2f",
+  "reviewRecord": "art/exercise-static/reviews/SMITH_SQUAT-review.json",
+  "approvedAt": "2026-07-24T19:23:11.252Z",
+  "reviewerId": "production-autopilot"
+}
