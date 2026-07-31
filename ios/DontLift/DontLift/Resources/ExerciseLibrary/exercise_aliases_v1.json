@@ -621,6 +621,27 @@
         "弹力带肩关节外旋"
       ],
       "requiresNameMatch": false
+    },
+    {
+      "targetCode": "CABLE_UPRIGHT_ROW",
+      "targetName": "绳索直立划船",
+      "legacyCodes": [],
+      "legacyNames": [
+        "绳索站姿提拉",
+        "站姿绳索提拉",
+        "绳索直立提拉"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "SUPINATED_DB_LATERAL_RAISE",
+      "targetName": "掌心向上哑铃侧平举",
+      "legacyCodes": [],
+      "legacyNames": [
+        "反握哑铃侧平举",
+        "哑铃反握侧平举"
+      ],
+      "requiresNameMatch": false
     }
   ]
 }

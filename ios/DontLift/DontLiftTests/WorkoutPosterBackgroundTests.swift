@@ -22,8 +22,7 @@ struct WorkoutPosterBackgroundTests {
         ])
     }
 
-    @Test func everyLayoutSupportsSixExerciseLinesWithMoreTransparentReceipt() {
-        #expect(WorkoutPosterBackground.catalog.allSatisfy { $0.visibleExerciseLimit >= 6 })
+    @Test func everyLayoutUsesMoreTransparentReceipt() {
         #expect(WorkoutPosterBackground.catalog.allSatisfy { (0.80...0.84).contains($0.receiptOpacity) })
     }
 
@@ -156,6 +155,28 @@ struct WorkoutPosterBackgroundTests {
         #expect(data == originalData)
     }
 
+    @Test func exportedPosterIncludesExerciseAfterPreviousSixLineLimit() throws {
+        let originalNames = (1...7).map { "动作 \($0)" } + ["末尾动作甲"]
+        let changedNames = Array(originalNames.dropLast()) + ["末尾动作乙"]
+        let originalData = posterData(exerciseNames: originalNames)
+        let changedData = posterData(exerciseNames: changedNames)
+
+        #expect(originalData.exerciseLines.map(\.name) == originalNames)
+        #expect(changedData.exerciseLines.map(\.name) == changedNames)
+
+        let originalImage = try #require(
+            WorkoutPosterImageRenderer.render(data: originalData, background: .equipmentWreath)
+        )
+        let changedImage = try #require(
+            WorkoutPosterImageRenderer.render(data: changedData, background: .equipmentWreath)
+        )
+        let originalPNG = try #require(originalImage.pngData())
+        let changedPNG = try #require(changedImage.pngData())
+
+        // 仅修改原第 6 条限制之后的动作名；图片变化证明末尾动作真实进入海报，而非只保留在数据中。
+        #expect(originalPNG != changedPNG)
+    }
+
     private func context(
         workoutId: UUID,
         hasPersonalRecord: Bool = false,
@@ -175,6 +196,29 @@ struct WorkoutPosterBackgroundTests {
             setCount: setCount,
             exerciseCount: exerciseCount,
             structuredUnitCount: structuredUnitCount
+        )
+    }
+
+    private func posterData(exerciseNames: [String]) -> WorkoutPosterData {
+        let startedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let workout = Workout(
+            localId: UUID(uuidString: "019f6633-a0e0-74e0-a85f-ad7be94af459")!,
+            title: "全部动作训练",
+            startedAt: startedAt,
+            timerStartedAt: startedAt,
+            endedAt: startedAt.addingTimeInterval(3_600)
+        )
+        workout.exercises = exerciseNames.enumerated().map { index, name in
+            let exercise = WorkoutExercise(exerciseName: name, orderIndex: index)
+            exercise.sets = [WorkoutSet(setIndex: 0,
+                                        weightKg: 60,
+                                        reps: 10,
+                                        completed: true)]
+            return exercise
+        }
+        return WorkoutPosterData(
+            workout: workout,
+            caloriePreferences: WorkoutCaloriePreferences(showsEstimates: false)
         )
     }
 }

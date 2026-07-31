@@ -327,10 +327,15 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
         return Button {
             guard selectable else { return }
             Theme.Haptics.selection()
-            selectedDate = day.date
-            if !calendar.isDate(day.date, equalTo: displayedMonth, toGranularity: .month) {
-                displayedMonth = monthStart(for: day.date)
-                onMonthChange(displayedMonth)
+            var transaction = Transaction(animation: nil)
+            // 相邻月份日期会同时重排月网格；避免按钮松手动画带着选中色块跨格移动。
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                selectedDate = day.date
+                if !calendar.isDate(day.date, equalTo: displayedMonth, toGranularity: .month) {
+                    displayedMonth = monthStart(for: day.date)
+                    onMonthChange(displayedMonth)
+                }
             }
         } label: {
             VStack(alignment: .leading, spacing: compact ? 2 : 4) {

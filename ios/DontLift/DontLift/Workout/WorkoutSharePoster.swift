@@ -72,8 +72,6 @@ enum WorkoutPosterBackground: String, Identifiable, Hashable {
         }
     }
 
-    var visibleExerciseLimit: Int { 6 }
-
     var receiptOpacity: Double {
         switch layoutKind {
         case .topCompact: return 0.80
@@ -770,53 +768,84 @@ private struct WorkoutPosterVisualCardView: View {
     }
 
     private var exerciseSummary: some View {
-        VStack(alignment: .leading, spacing: 3.5) {
-            if visibleExerciseLines.isEmpty {
+        VStack(alignment: .leading, spacing: exerciseRowSpacing) {
+            if data.exerciseLines.isEmpty {
                 Text("本次训练已完成")
                     .font(Theme.Font.body(size: 11.5, weight: .semibold))
                     .foregroundStyle(warmInk.opacity(0.72))
             } else {
-                ForEach(visibleExerciseLines) { line in
-                    HStack(spacing: 6) {
-                        if let kind = line.structureKind {
-                            Image(systemName: kind.systemImage)
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(coral)
-                                .frame(width: 12)
+                LazyVGrid(columns: exerciseColumns,
+                          alignment: .leading,
+                          spacing: exerciseRowSpacing) {
+                    ForEach(data.exerciseLines) { line in
+                        if usesCompactExerciseGrid {
+                            compactExerciseLine(line)
+                        } else {
+                            regularExerciseLine(line)
                         }
-                        Text(line.name)
-                            .font(Theme.Font.body(size: 10.5, weight: .semibold))
-                            .foregroundStyle(warmInk)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.76)
-                        Spacer(minLength: 6)
-                        Text(line.topSetText)
-                            .font(Theme.Font.mono(size: 9.2, weight: .bold))
-                            .foregroundStyle(warmInk.opacity(0.72))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.68)
                     }
                 }
-            }
-
-            if hiddenExerciseCount > 0 {
-                Text("另有 \(hiddenExerciseCount) 个动作")
-                    .font(Theme.Font.mono(size: 8.5, weight: .bold))
-                    .foregroundStyle(coral)
             }
         }
     }
 
-    private var visibleExerciseLines: ArraySlice<WorkoutPosterData.ExerciseLine> {
-        data.exerciseLines.prefix(maxExerciseLines)
+    private func regularExerciseLine(_ line: WorkoutPosterData.ExerciseLine) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            structureIcon(for: line)
+            Text(line.name)
+                .font(Theme.Font.body(size: 10.5, weight: .semibold))
+                .foregroundStyle(warmInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
+            Spacer(minLength: 6)
+            Text(line.topSetText)
+                .font(Theme.Font.mono(size: 9.2, weight: .bold))
+                .foregroundStyle(warmInk.opacity(0.72))
+                .fixedSize(horizontal: true, vertical: true)
+        }
     }
 
-    private var hiddenExerciseCount: Int {
-        max(0, data.exerciseLines.count - visibleExerciseLines.count)
+    private func compactExerciseLine(_ line: WorkoutPosterData.ExerciseLine) -> some View {
+        VStack(alignment: .leading, spacing: 1.5) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                structureIcon(for: line)
+                Text(line.name)
+                    .font(Theme.Font.body(size: 9.2, weight: .semibold))
+                    .foregroundStyle(warmInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text(line.topSetText)
+                .font(Theme.Font.mono(size: 8.1, weight: .bold))
+                .foregroundStyle(warmInk.opacity(0.68))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    private var maxExerciseLines: Int {
-        background.visibleExerciseLimit
+    @ViewBuilder
+    private func structureIcon(for line: WorkoutPosterData.ExerciseLine) -> some View {
+        if let kind = line.structureKind {
+            Image(systemName: kind.systemImage)
+                .font(.system(size: usesCompactExerciseGrid ? 8 : 9, weight: .bold))
+                .foregroundStyle(coral)
+                .frame(width: usesCompactExerciseGrid ? 10 : 12)
+        }
+    }
+
+    private var exerciseColumns: [GridItem] {
+        let count = usesCompactExerciseGrid ? 2 : 1
+        return Array(
+            repeating: GridItem(.flexible(), spacing: 8, alignment: .topLeading),
+            count: count
+        )
+    }
+
+    private var exerciseRowSpacing: CGFloat {
+        usesCompactExerciseGrid ? 4 : 3.5
+    }
+
+    private var usesCompactExerciseGrid: Bool {
+        data.exerciseLines.count > 6
     }
 
     private var receiptWidth: CGFloat {

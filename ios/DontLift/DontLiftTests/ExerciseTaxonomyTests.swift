@@ -203,6 +203,28 @@ struct ExerciseTaxonomyTests {
         #expect(bandExternalRotation?.primaryRegions.isEmpty == true)
     }
 
+    @Test func researchedShoulderAdditions() {
+        let byCode = Dictionary(uniqueKeysWithValues: BuiltinExercise.starter.map { ($0.code, $0) })
+
+        let cableUprightRow = byCode["CABLE_UPRIGHT_ROW"]
+        #expect(cableUprightRow?.name == "绳索直立划船")
+        #expect(cableUprightRow?.category == "肩")
+        #expect(cableUprightRow?.subcategory == "中束")
+        #expect(cableUprightRow?.equipmentType == "绳索")
+        #expect(cableUprightRow?.primaryRegions == [.deltSide])
+        #expect(cableUprightRow?.secondaryRegions == [.deltFront, .traps, .biceps])
+        #expect(ExerciseLibrary.resolve(code: nil, name: "绳索站姿提拉")?.code == "CABLE_UPRIGHT_ROW")
+
+        let supinatedLateralRaise = byCode["SUPINATED_DB_LATERAL_RAISE"]
+        #expect(supinatedLateralRaise?.name == "掌心向上哑铃侧平举")
+        #expect(supinatedLateralRaise?.category == "肩")
+        #expect(supinatedLateralRaise?.subcategory == "前束")
+        #expect(supinatedLateralRaise?.equipmentType == "哑铃")
+        #expect(supinatedLateralRaise?.primaryRegions == [.deltFront])
+        #expect(supinatedLateralRaise?.secondaryRegions == [.deltSide, .deltRear])
+        #expect(ExerciseLibrary.resolve(code: nil, name: "反握哑铃侧平举")?.code == "SUPINATED_DB_LATERAL_RAISE")
+    }
+
     /// V1 收敛为单一预置库，不再把 1000+ 导入动作全量展示。
     @Test func libraryScale() {
         #expect(BuiltinExercise.starter.count >= 200)

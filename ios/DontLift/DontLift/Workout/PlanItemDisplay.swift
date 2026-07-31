@@ -34,6 +34,7 @@ struct PlanItemGroupDisplay: Equatable, Identifiable {
 struct PlanSupersetMemberDisplay: Equatable, Identifiable {
     let id: UUID
     let name: String
+    let equipmentType: String?
     let weightKg: Double?
     let reps: Int?
 }
@@ -70,6 +71,18 @@ enum PlanItemDisplay {
 
     static func planGroups(for item: PlanItem) -> [PlanItemGroupDisplay] {
         groups(from: PlanPrefill.plannedSets(for: item))
+    }
+
+    /// 仅比较会影响详情展示和开始训练落值的字段；展示模型不包含 UUID 等身份字段。
+    static func hasSameArrangement(_ lhs: [WorkoutSet], _ rhs: [WorkoutSet]) -> Bool {
+        groups(from: lhs) == groups(from: rhs)
+    }
+
+    /// 模板和下次安排相同时不展示基准；复杂或逐组不同的设置只给出诚实概括。
+    static func templateBaselineSummary(for item: PlanItem, comparedTo sets: [WorkoutSet]) -> String? {
+        let plannedSets = PlanPrefill.plannedSets(for: item)
+        guard !hasSameArrangement(plannedSets, sets) else { return nil }
+        return baselineSummary(groups: groups(from: plannedSets), equipmentType: item.resolvedEquipmentType)
     }
 
     static func groups(from sets: [WorkoutSet]) -> [PlanItemGroupDisplay] {
@@ -116,8 +129,56 @@ enum PlanItemDisplay {
         item.orderedSupersetMembers.map {
             PlanSupersetMemberDisplay(id: $0.memberId,
                                       name: $0.displayExerciseName,
+                                      equipmentType: $0.resolvedEquipmentType,
                                       weightKg: $0.suggestedWeightKg,
                                       reps: $0.suggestedReps)
         }
+    }
+
+    static func groupValueText(_ value: PlanItemGroupValue?, equipmentType: String?) -> String {
+        guard let value else { return "未设置" }
+        return valueText(weightKg: value.weightKg, reps: value.reps, equipmentType: equipmentType)
+    }
+
+    static func valueText(weightKg: Double?, reps: Int?, equipmentType: String?) -> String {
+        let weightText: String
+        if let weightKg {
+            weightText = "\(formatKg(weightKg)) kg"
+        } else if equipmentType == EquipmentType.bodyweight.rawValue {
+            weightText = "自重"
+        } else {
+            weightText = "训练时填写"
+        }
+        return "\(weightText) × \(reps.map(String.init) ?? "未设置") 次"
+    }
+
+    private static func baselineSummary(groups: [PlanItemGroupDisplay], equipmentType: String?) -> String {
+        guard !groups.isEmpty else { return "未设置组次" }
+
+        let warmupCount = groups.filter { $0.kind == .warmup }.count
+        let formal = groups.filter { $0.kind != .warmup }
+        let countText: String
+        if warmupCount > 0, !formal.isEmpty {
+            countText = "\(warmupCount) 热身组 + \(formal.count) 正式组"
+        } else if warmupCount > 0 {
+            countText = "\(warmupCount) 热身组"
+        } else {
+            countText = "\(formal.count) 组"
+        }
+
+        if groups.contains(where: { $0.kind == .drop }) {
+            let segmentCounts = Set(formal.map(\.values.count))
+            if segmentCounts.count == 1, let segmentCount = segmentCounts.first, segmentCount > 0 {
+                return "\(countText) · 每组 \(segmentCount) 段"
+            }
+            return "\(countText) · 递减结构不同"
+        }
+
+        let values = groups.flatMap(\.values)
+        guard let first = values.first else { return countText }
+        guard values.allSatisfy({ $0.weightKg == first.weightKg && $0.reps == first.reps }) else {
+            return "\(countText) · 各组设置不同"
+        }
+        return "\(countText) · \(groupValueText(first, equipmentType: equipmentType))"
     }
 }
