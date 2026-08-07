@@ -4,7 +4,7 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T04:32:26.845Z",
+  "generatedAt": "2026-08-01T03:23:58.300Z",
   "promptPath": "art/exercise-static/briefs/SINGLE_ARM_CABLE_LATERAL_RAISE.json",
   "briefPath": "art/exercise-static/briefs/SINGLE_ARM_CABLE_LATERAL_RAISE.json",
   "inputs": [
@@ -16,9 +16,9 @@
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/SINGLE_ARM_CABLE_LATERAL_RAISE/SINGLE_ARM_CABLE_LATERAL_RAISE-candidate-01.png",
-      "sha256": "e767ad4c9d417fc1a843e8fb0c89d49c2482c6a6afd99942eb6857087d96d7a6",
-      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+      "source": "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png",
+      "sha256": "84dc1598bce134b4a1a99c33792b6276b56476e09c48f8d80b54faf398ba196d",
+      "rightsBasis": "本项目已确认复用的正式动作图"
     },
     {
       "kind": "owned-reference",
@@ -33,13 +33,13 @@
       "rightsBasis": "本项目已批准的原创风格母版"
     }
   ],
-  "humanEdits": "无手工像素编辑。",
+  "humanEdits": "无手工像素编辑；复用 CABLE_LATERAL_RAISE-v1 正式图。",
   "file": "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_LATERAL_RAISE-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1679436,
-  "sha256": "e767ad4c9d417fc1a843e8fb0c89d49c2482c6a6afd99942eb6857087d96d7a6",
+  "sizeBytes": 1781904,
+  "sha256": "84dc1598bce134b4a1a99c33792b6276b56476e09c48f8d80b54faf398ba196d",
   "reviewRecord": "art/exercise-static/reviews/SINGLE_ARM_CABLE_LATERAL_RAISE-review.json",
-  "approvedAt": "2026-07-25T04:32:26.845Z",
+  "approvedAt": "2026-08-01T03:23:58.300Z",
   "reviewerId": "production-autopilot"
 }

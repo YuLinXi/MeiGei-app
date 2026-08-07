@@ -1,60 +1,60 @@
 {
   "schemaVersion": 1,
   "exerciseCode": "REVERSE_HYPEREXTENSION",
-  "candidateId": "REVERSE_HYPEREXTENSION-candidate-01",
+  "candidateId": "REVERSE_HYPEREXTENSION-candidate-06",
   "masterPath": "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.png",
-  "masterSha256": "8ce313bdb7f6d7411d5b5286237498f65b6e48c69e895b4a954c05f46c9b4a4f",
+  "masterSha256": "d9b9fdf1e365ba9b1c33cfea842eb41fc1b950e235206b19bcf737515f21216b",
   "reviews": {
     "identity": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-26T01:55:05.575Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-31T12:17:10Z",
       "evidence": [
         "art/exercise-static/references/approved/character-v1.png",
         "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.png"
       ],
-      "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+      "notes": "项目负责人确认候选 06 使用统一人物模型。"
     },
     "art": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-26T01:55:05.575Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-31T12:17:10Z",
       "evidence": [
         "art/exercise-static/references/approved/style-v1.png",
         "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.png"
       ],
-      "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+      "notes": "项目负责人确认候选 06 的统一线稿、暖白背景、肌肉高亮和双脚勾脚背表现。"
     },
     "movement": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-26T01:55:05.575Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-31T12:17:10Z",
       "evidence": [
         "art/exercise-static/briefs/REVERSE_HYPEREXTENSION.json",
         "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.png"
       ],
-      "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+      "notes": "项目负责人确认沿用山羊挺身器械、人物仰卧、双脚同向且脚背背屈的动作定义。"
     },
     "equipment": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-26T01:55:05.575Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-31T12:17:10Z",
       "evidence": [
         "art/exercise-static/briefs/REVERSE_HYPEREXTENSION.json",
         "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.png"
       ],
-      "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+      "notes": "项目负责人确认与 BACK_EXTENSION 使用同一 45 度山羊挺身器械、把手和脚踝滚筒。"
     },
     "rights": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-26T01:55:05.575Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-07-31T12:17:10Z",
       "evidence": [
         "art/exercise-static/reviews/input-policy-v1.md",
         "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
         "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.provenance.json"
       ],
-      "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+      "notes": "项目负责人确认候选 06 来自本项目 imagegen 生成链，未使用第三方图片作为成品。"
     }
   }
 }

@@ -3,12 +3,12 @@
   "exerciseCode": "MACHINE_SINGLE_LEG_EXTENSION",
   "candidateId": "MACHINE_SINGLE_LEG_EXTENSION-candidate-01",
   "masterPath": "art/exercise-static/masters/approved/MACHINE_SINGLE_LEG_EXTENSION-v1.png",
-  "masterSha256": "641142506d27970fe97f3891794dd0ad702b26f4483c86050dd637201ac52c33",
+  "masterSha256": "a44f766823eb2193c2a1b0a0cc19515faad526aedc65d9c62000b8ab710493f6",
   "reviews": {
     "identity": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-24T23:16:22.854Z",
+      "reviewedAt": "2026-08-03T08:54:48.000Z",
       "evidence": [
         "art/exercise-static/references/approved/character-v1.png",
         "art/exercise-static/masters/approved/MACHINE_SINGLE_LEG_EXTENSION-v1.png"
@@ -18,7 +18,7 @@
     "art": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-24T23:16:22.854Z",
+      "reviewedAt": "2026-08-03T08:54:48.000Z",
       "evidence": [
         "art/exercise-static/references/approved/style-v1.png",
         "art/exercise-static/masters/approved/MACHINE_SINGLE_LEG_EXTENSION-v1.png"
@@ -28,7 +28,7 @@
     "movement": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-24T23:16:22.854Z",
+      "reviewedAt": "2026-08-03T08:54:48.000Z",
       "evidence": [
         "art/exercise-static/briefs/MACHINE_SINGLE_LEG_EXTENSION.json",
         "art/exercise-static/masters/approved/MACHINE_SINGLE_LEG_EXTENSION-v1.png"
@@ -38,7 +38,7 @@
     "equipment": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-24T23:16:22.854Z",
+      "reviewedAt": "2026-08-03T08:54:48.000Z",
       "evidence": [
         "art/exercise-static/briefs/MACHINE_SINGLE_LEG_EXTENSION.json",
         "art/exercise-static/masters/approved/MACHINE_SINGLE_LEG_EXTENSION-v1.png"
@@ -48,7 +48,7 @@
     "rights": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-24T23:16:22.854Z",
+      "reviewedAt": "2026-08-03T08:54:48.000Z",
       "evidence": [
         "art/exercise-static/reviews/input-policy-v1.md",
         "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",

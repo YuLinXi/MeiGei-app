@@ -6,7 +6,6 @@ import ImageIO
 import UniformTypeIdentifiers
 
 private let outputPixels = 288
-private let jpegQuality = 0.82
 private let whiteBackgroundDistance = 52.0
 
 func fail(_ message: String) -> Never {
@@ -14,9 +13,17 @@ func fail(_ message: String) -> Never {
     exit(1)
 }
 
-guard CommandLine.arguments.count == 3 else {
-    fail("用法：render-thumbnail.swift <input.png> <output.jpg>")
+guard CommandLine.arguments.count == 3 || CommandLine.arguments.count == 4 else {
+    fail("用法：render-thumbnail.swift <input.png> <output.jpg> [jpegQuality]")
 }
+
+let jpegQuality: Double = {
+    guard CommandLine.arguments.count == 4 else { return 0.82 }
+    guard let value = Double(CommandLine.arguments[3]), (0...1).contains(value) else {
+        fail("jpegQuality 必须是 0 到 1 之间的数字")
+    }
+    return value
+}()
 
 let inputURL = URL(fileURLWithPath: CommandLine.arguments[1])
 let outputURL = URL(fileURLWithPath: CommandLine.arguments[2])

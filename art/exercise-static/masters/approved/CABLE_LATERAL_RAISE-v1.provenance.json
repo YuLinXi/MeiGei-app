@@ -4,7 +4,7 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T04:32:04.772Z",
+  "generatedAt": "2026-07-31T14:56:55.300Z",
   "promptPath": "art/exercise-static/briefs/CABLE_LATERAL_RAISE.json",
   "briefPath": "art/exercise-static/briefs/CABLE_LATERAL_RAISE.json",
   "inputs": [
@@ -16,8 +16,8 @@
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/CABLE_LATERAL_RAISE/CABLE_LATERAL_RAISE-candidate-01.png",
-      "sha256": "9475e0089655dd115d7d991dcc00f74ed3115cf0c16ae230eb6d021f59c708dc",
+      "source": "art/exercise-static/candidates/CABLE_LATERAL_RAISE/CABLE_LATERAL_RAISE-candidate-05.png",
+      "sha256": "84dc1598bce134b4a1a99c33792b6276b56476e09c48f8d80b54faf398ba196d",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -37,9 +37,9 @@
   "file": "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1676191,
-  "sha256": "9475e0089655dd115d7d991dcc00f74ed3115cf0c16ae230eb6d021f59c708dc",
+  "sizeBytes": 1781904,
+  "sha256": "84dc1598bce134b4a1a99c33792b6276b56476e09c48f8d80b54faf398ba196d",
   "reviewRecord": "art/exercise-static/reviews/CABLE_LATERAL_RAISE-review.json",
-  "approvedAt": "2026-07-25T04:32:04.772Z",
+  "approvedAt": "2026-07-31T14:56:55.300Z",
   "reviewerId": "production-autopilot"
 }

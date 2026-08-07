@@ -4,7 +4,7 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T04:34:20.125Z",
+  "generatedAt": "2026-08-01T08:58:57.300Z",
   "promptPath": "art/exercise-static/briefs/CABLE_FRONT_RAISE.json",
   "briefPath": "art/exercise-static/briefs/CABLE_FRONT_RAISE.json",
   "inputs": [
@@ -16,8 +16,8 @@
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/CABLE_FRONT_RAISE/CABLE_FRONT_RAISE-candidate-01.png",
-      "sha256": "4d38673a0bf43dfce55621619397df34eab7cf26254ec9944b83f0b07df0b25d",
+      "source": "art/exercise-static/candidates/CABLE_FRONT_RAISE/CABLE_FRONT_RAISE-candidate-03.png",
+      "sha256": "304b1b271db6884d027976a837fa8f03b2b57f4eed8697af2ec3f393b7066cd8",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -37,9 +37,9 @@
   "file": "art/exercise-static/masters/approved/CABLE_FRONT_RAISE-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1668690,
-  "sha256": "4d38673a0bf43dfce55621619397df34eab7cf26254ec9944b83f0b07df0b25d",
+  "sizeBytes": 1652168,
+  "sha256": "304b1b271db6884d027976a837fa8f03b2b57f4eed8697af2ec3f393b7066cd8",
   "reviewRecord": "art/exercise-static/reviews/CABLE_FRONT_RAISE-review.json",
-  "approvedAt": "2026-07-25T04:34:20.125Z",
+  "approvedAt": "2026-08-01T08:58:57.300Z",
   "reviewerId": "production-autopilot"
 }

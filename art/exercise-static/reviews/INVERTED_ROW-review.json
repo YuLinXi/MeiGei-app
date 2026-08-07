@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "exerciseCode": "INVERTED_ROW",
-  "candidateId": "INVERTED_ROW-candidate-01",
+  "candidateId": "INVERTED_ROW-candidate-10",
   "masterPath": "art/exercise-static/masters/approved/INVERTED_ROW-v1.png",
-  "masterSha256": "fd02b11673f11aaf093ccc540f0bd6c11ce56bb381538144b9f8405a8812c63e",
+  "masterSha256": "2b3f59695f1d69fa581703040b2b235cb415f96fa6c5fad70e7ad7d5423103e0",
   "reviews": {
     "identity": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-26T01:53:44.461Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-08-07T02:25:28Z",
       "evidence": [
         "art/exercise-static/references/approved/character-v1.png",
         "art/exercise-static/masters/approved/INVERTED_ROW-v1.png"
@@ -17,8 +17,8 @@
     },
     "art": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-26T01:53:44.461Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-08-07T02:25:28Z",
       "evidence": [
         "art/exercise-static/references/approved/style-v1.png",
         "art/exercise-static/masters/approved/INVERTED_ROW-v1.png"
@@ -27,8 +27,8 @@
     },
     "movement": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-26T01:53:44.461Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-08-07T02:25:28Z",
       "evidence": [
         "art/exercise-static/briefs/INVERTED_ROW.json",
         "art/exercise-static/masters/approved/INVERTED_ROW-v1.png"
@@ -37,8 +37,8 @@
     },
     "equipment": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-26T01:53:44.461Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-08-07T02:25:28Z",
       "evidence": [
         "art/exercise-static/briefs/INVERTED_ROW.json",
         "art/exercise-static/masters/approved/INVERTED_ROW-v1.png"
@@ -47,8 +47,8 @@
     },
     "rights": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-26T01:53:44.461Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-08-07T02:25:28Z",
       "evidence": [
         "art/exercise-static/reviews/input-policy-v1.md",
         "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",

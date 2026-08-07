@@ -48,6 +48,10 @@ node art/exercise-static/scripts/exercise-static-assets.mjs promote PEC_DECK_FLY
 node art/exercise-static/scripts/exercise-static-assets.mjs autopilot-register BB_ROW \
   art/exercise-static/candidates/BB_ROW/BB_ROW-candidate-01.png
 
+# 项目所有者明确确认候选后，以人工审核身份登记、更新母版并正式发布
+node art/exercise-static/scripts/exercise-static-assets.mjs owner-register BB_ROW \
+  art/exercise-static/candidates/BB_ROW/BB_ROW-candidate-02.png
+
 # 为历史人工审核条目完成真实列表验收后，单独将 draft 切为 released
 node art/exercise-static/scripts/exercise-static-assets.mjs release BB_SQUAT
 ```

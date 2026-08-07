@@ -4,7 +4,7 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T14:20:51.468Z",
+  "generatedAt": "2026-08-03T05:42:49.000Z",
   "promptPath": "art/exercise-static/briefs/MACHINE_TRICEP_EXT.json",
   "briefPath": "art/exercise-static/briefs/MACHINE_TRICEP_EXT.json",
   "inputs": [
@@ -17,7 +17,7 @@
     {
       "kind": "owned-reference",
       "source": "art/exercise-static/candidates/MACHINE_TRICEP_EXT/MACHINE_TRICEP_EXT-candidate-01.png",
-      "sha256": "8c4a0bcf974f23e299ac0d68ec18caf310368ceade870e372a60a133e48f22e0",
+      "sha256": "d2716151bc887c035eeb52f46b741f444e4404d6def257459d36713093cd3fe3",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -37,9 +37,9 @@
   "file": "art/exercise-static/masters/approved/MACHINE_TRICEP_EXT-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1878290,
-  "sha256": "8c4a0bcf974f23e299ac0d68ec18caf310368ceade870e372a60a133e48f22e0",
+  "sizeBytes": 2008651,
+  "sha256": "d2716151bc887c035eeb52f46b741f444e4404d6def257459d36713093cd3fe3",
   "reviewRecord": "art/exercise-static/reviews/MACHINE_TRICEP_EXT-review.json",
-  "approvedAt": "2026-07-25T14:20:51.468Z",
+  "approvedAt": "2026-08-03T05:42:49.000Z",
   "reviewerId": "production-autopilot"
 }

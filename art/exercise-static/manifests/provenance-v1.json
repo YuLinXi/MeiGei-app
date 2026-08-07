@@ -2492,7 +2492,7 @@
       "promptPath": "art/exercise-static/briefs/MACHINE_SINGLE_LEG_EXTENSION.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-24T23:16:22.854Z",
+      "generatedAt": "2026-08-03T08:54:48.000Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -2503,7 +2503,7 @@
         {
           "kind": "owned-reference",
           "source": "art/exercise-static/candidates/MACHINE_SINGLE_LEG_EXTENSION/MACHINE_SINGLE_LEG_EXTENSION-candidate-01.png",
-          "sha256": "641142506d27970fe97f3891794dd0ad702b26f4483c86050dd637201ac52c33",
+          "sha256": "a44f766823eb2193c2a1b0a0cc19515faad526aedc65d9c62000b8ab710493f6",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -2520,7 +2520,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "641142506d27970fe97f3891794dd0ad702b26f4483c86050dd637201ac52c33",
+      "sha256": "a44f766823eb2193c2a1b0a0cc19515faad526aedc65d9c62000b8ab710493f6",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/MACHINE_SINGLE_LEG_EXTENSION-review.json"
     },
@@ -3195,7 +3195,7 @@
       "promptPath": "art/exercise-static/briefs/CABLE_LATERAL_RAISE.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-25T04:32:04.772Z",
+      "generatedAt": "2026-07-31T14:56:55.300Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -3205,8 +3205,8 @@
         },
         {
           "kind": "owned-reference",
-          "source": "art/exercise-static/candidates/CABLE_LATERAL_RAISE/CABLE_LATERAL_RAISE-candidate-01.png",
-          "sha256": "9475e0089655dd115d7d991dcc00f74ed3115cf0c16ae230eb6d021f59c708dc",
+          "source": "art/exercise-static/candidates/CABLE_LATERAL_RAISE/CABLE_LATERAL_RAISE-candidate-05.png",
+          "sha256": "84dc1598bce134b4a1a99c33792b6276b56476e09c48f8d80b54faf398ba196d",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -3223,7 +3223,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "9475e0089655dd115d7d991dcc00f74ed3115cf0c16ae230eb6d021f59c708dc",
+      "sha256": "84dc1598bce134b4a1a99c33792b6276b56476e09c48f8d80b54faf398ba196d",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/CABLE_LATERAL_RAISE-review.json"
     },
@@ -3232,7 +3232,7 @@
       "promptPath": "art/exercise-static/briefs/SINGLE_ARM_CABLE_LATERAL_RAISE.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-25T04:32:26.845Z",
+      "generatedAt": "2026-08-01T03:23:58.300Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -3242,9 +3242,9 @@
         },
         {
           "kind": "owned-reference",
-          "source": "art/exercise-static/candidates/SINGLE_ARM_CABLE_LATERAL_RAISE/SINGLE_ARM_CABLE_LATERAL_RAISE-candidate-01.png",
-          "sha256": "e767ad4c9d417fc1a843e8fb0c89d49c2482c6a6afd99942eb6857087d96d7a6",
-          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+          "source": "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png",
+          "sha256": "84dc1598bce134b4a1a99c33792b6276b56476e09c48f8d80b54faf398ba196d",
+          "rightsBasis": "本项目已确认复用的正式动作图"
         },
         {
           "kind": "owned-reference",
@@ -3259,8 +3259,8 @@
           "rightsBasis": "本项目已批准的原创风格母版"
         }
       ],
-      "humanEdits": "无手工像素编辑。",
-      "sha256": "e767ad4c9d417fc1a843e8fb0c89d49c2482c6a6afd99942eb6857087d96d7a6",
+      "humanEdits": "无手工像素编辑；复用 CABLE_LATERAL_RAISE-v1 正式图。",
+      "sha256": "84dc1598bce134b4a1a99c33792b6276b56476e09c48f8d80b54faf398ba196d",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/SINGLE_ARM_CABLE_LATERAL_RAISE-review.json"
     },
@@ -3269,7 +3269,7 @@
       "promptPath": "art/exercise-static/briefs/MACHINE_LATERAL_RAISE.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-25T04:32:49.154Z",
+      "generatedAt": "2026-08-01T04:11:14.300Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -3279,8 +3279,8 @@
         },
         {
           "kind": "owned-reference",
-          "source": "art/exercise-static/candidates/MACHINE_LATERAL_RAISE/MACHINE_LATERAL_RAISE-candidate-01.png",
-          "sha256": "45770b3b76e5b6aab4ff9f8fea2128d04cce3f252a7a061b2b0d05e4aac27bb5",
+          "source": "art/exercise-static/candidates/MACHINE_LATERAL_RAISE/MACHINE_LATERAL_RAISE-candidate-02.png",
+          "sha256": "8b9bc86e89bd88c7f272689d837120844ff37c6de089d51163b70e56995616af",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -3297,7 +3297,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "45770b3b76e5b6aab4ff9f8fea2128d04cce3f252a7a061b2b0d05e4aac27bb5",
+      "sha256": "8b9bc86e89bd88c7f272689d837120844ff37c6de089d51163b70e56995616af",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/MACHINE_LATERAL_RAISE-review.json"
     },
@@ -3306,7 +3306,7 @@
       "promptPath": "art/exercise-static/briefs/HAMMER_LATERAL_RAISE.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-25T04:33:11.521Z",
+      "generatedAt": "2026-08-03T14:35:15.000Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -3316,8 +3316,8 @@
         },
         {
           "kind": "owned-reference",
-          "source": "art/exercise-static/candidates/HAMMER_LATERAL_RAISE/HAMMER_LATERAL_RAISE-candidate-01.png",
-          "sha256": "eba77b7a215e9fcb78ee8f33f69fa372af0b8c089a2750c2dac2af5e1bee66fd",
+          "source": "art/exercise-static/candidates/HAMMER_LATERAL_RAISE/HAMMER_LATERAL_RAISE-candidate-04.png",
+          "sha256": "a368e23535cfed2b888a62f8672c69cf5156f9ac251038d2f2b8f2b16e208fec",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -3334,7 +3334,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "eba77b7a215e9fcb78ee8f33f69fa372af0b8c089a2750c2dac2af5e1bee66fd",
+      "sha256": "a368e23535cfed2b888a62f8672c69cf5156f9ac251038d2f2b8f2b16e208fec",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/HAMMER_LATERAL_RAISE-review.json"
     },
@@ -3417,7 +3417,7 @@
       "promptPath": "art/exercise-static/briefs/CABLE_FRONT_RAISE.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-25T04:34:20.125Z",
+      "generatedAt": "2026-08-01T08:58:57.300Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -3427,8 +3427,8 @@
         },
         {
           "kind": "owned-reference",
-          "source": "art/exercise-static/candidates/CABLE_FRONT_RAISE/CABLE_FRONT_RAISE-candidate-01.png",
-          "sha256": "4d38673a0bf43dfce55621619397df34eab7cf26254ec9944b83f0b07df0b25d",
+          "source": "art/exercise-static/candidates/CABLE_FRONT_RAISE/CABLE_FRONT_RAISE-candidate-03.png",
+          "sha256": "304b1b271db6884d027976a837fa8f03b2b57f4eed8697af2ec3f393b7066cd8",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -3445,7 +3445,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "4d38673a0bf43dfce55621619397df34eab7cf26254ec9944b83f0b07df0b25d",
+      "sha256": "304b1b271db6884d027976a837fa8f03b2b57f4eed8697af2ec3f393b7066cd8",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/CABLE_FRONT_RAISE-review.json"
     },
@@ -3491,7 +3491,7 @@
       "promptPath": "art/exercise-static/briefs/MACHINE_REVERSE_FLY.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-25T04:35:07.290Z",
+      "generatedAt": "2026-08-02T00:51:44.300Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -3501,8 +3501,8 @@
         },
         {
           "kind": "owned-reference",
-          "source": "art/exercise-static/candidates/MACHINE_REVERSE_FLY/MACHINE_REVERSE_FLY-candidate-01.png",
-          "sha256": "5dbcb6068666212bda0a1f6597834b583a406fd6fc45e99908edcac290fe8752",
+          "source": "art/exercise-static/candidates/MACHINE_REVERSE_FLY/MACHINE_REVERSE_FLY-candidate-02.png",
+          "sha256": "ac594ff94883300ae8d92896c3cb11c24f015e567ca1c15f89dde7dded3a77f3",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -3519,7 +3519,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "5dbcb6068666212bda0a1f6597834b583a406fd6fc45e99908edcac290fe8752",
+      "sha256": "ac594ff94883300ae8d92896c3cb11c24f015e567ca1c15f89dde7dded3a77f3",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/MACHINE_REVERSE_FLY-review.json"
     },
@@ -3565,7 +3565,7 @@
       "promptPath": "art/exercise-static/briefs/CABLE_CROSS_REAR_FLY.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-25T04:35:55.691Z",
+      "generatedAt": "2026-08-01T10:41:51.300Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -3575,8 +3575,8 @@
         },
         {
           "kind": "owned-reference",
-          "source": "art/exercise-static/candidates/CABLE_CROSS_REAR_FLY/CABLE_CROSS_REAR_FLY-candidate-01.png",
-          "sha256": "2221b8b606f07bfb24741bf5ba965f083c16f6e966e4723c533d9c43fd91bd4a",
+          "source": "art/exercise-static/candidates/CABLE_CROSS_REAR_FLY/CABLE_CROSS_REAR_FLY-candidate-02.png",
+          "sha256": "e6bba61eab05ae6c740e73d5187ca6670a40672237d7b20e8ba70a49f864740e",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -3593,7 +3593,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "2221b8b606f07bfb24741bf5ba965f083c16f6e966e4723c533d9c43fd91bd4a",
+      "sha256": "e6bba61eab05ae6c740e73d5187ca6670a40672237d7b20e8ba70a49f864740e",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/CABLE_CROSS_REAR_FLY-review.json"
     },
@@ -4194,7 +4194,7 @@
       "promptPath": "art/exercise-static/briefs/CABLE_SEATED_BAR_CURL.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-25T10:35:00.535Z",
+      "generatedAt": "2026-08-02T13:20:15.300Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -4204,8 +4204,8 @@
         },
         {
           "kind": "owned-reference",
-          "source": "art/exercise-static/candidates/CABLE_SEATED_BAR_CURL/CABLE_SEATED_BAR_CURL-candidate-01.png",
-          "sha256": "94e07db8a097c6f96d6e19dd9b36b1a4b66d32568e7cf13c89c9673a4f13a842",
+          "source": "art/exercise-static/candidates/CABLE_SEATED_BAR_CURL/CABLE_SEATED_BAR_CURL-candidate-03.png",
+          "sha256": "61051f240925bba0b0a9f1f28c92dceb7790fabb0034bb7ee642e2aac5cd853b",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -4222,7 +4222,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "94e07db8a097c6f96d6e19dd9b36b1a4b66d32568e7cf13c89c9673a4f13a842",
+      "sha256": "61051f240925bba0b0a9f1f28c92dceb7790fabb0034bb7ee642e2aac5cd853b",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/CABLE_SEATED_BAR_CURL-review.json"
     },
@@ -4490,7 +4490,7 @@
       "promptPath": "art/exercise-static/briefs/SINGLE_ARM_CABLE_PUSHDOWN.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-25T12:45:13.657Z",
+      "generatedAt": "2026-08-03T01:40:40.000Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -4500,8 +4500,8 @@
         },
         {
           "kind": "owned-reference",
-          "source": "art/exercise-static/candidates/SINGLE_ARM_CABLE_PUSHDOWN/SINGLE_ARM_CABLE_PUSHDOWN-candidate-01.png",
-          "sha256": "7491c5ecfdd81cb6a9c5530ce7cd3963ae5c37cc35fd8d8843762391ea1be4b1",
+          "source": "art/exercise-static/candidates/SINGLE_ARM_CABLE_PUSHDOWN/SINGLE_ARM_CABLE_PUSHDOWN-candidate-05.png",
+          "sha256": "e9a07c2d09f09cf7d7c881e92435b861a831138ba63921fdacb271e09a47d1f0",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -4518,7 +4518,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "7491c5ecfdd81cb6a9c5530ce7cd3963ae5c37cc35fd8d8843762391ea1be4b1",
+      "sha256": "e9a07c2d09f09cf7d7c881e92435b861a831138ba63921fdacb271e09a47d1f0",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/SINGLE_ARM_CABLE_PUSHDOWN-review.json"
     },
@@ -4527,7 +4527,7 @@
       "promptPath": "art/exercise-static/briefs/CABLE_TRICEP_EXT.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-25T12:45:43.521Z",
+      "generatedAt": "2026-08-03T02:11:56.000Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -4538,7 +4538,7 @@
         {
           "kind": "owned-reference",
           "source": "art/exercise-static/candidates/CABLE_TRICEP_EXT/CABLE_TRICEP_EXT-candidate-01.png",
-          "sha256": "7aa878440dce1778a4a0cba245c2b8cd0f0be18fcf6ac32f35f958d36140653c",
+          "sha256": "fd6e7335e457fa902ecf9c3c97396abc4f9004bc1249a332ce54b1e946663ba2",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -4555,7 +4555,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "7aa878440dce1778a4a0cba245c2b8cd0f0be18fcf6ac32f35f958d36140653c",
+      "sha256": "fd6e7335e457fa902ecf9c3c97396abc4f9004bc1249a332ce54b1e946663ba2",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/CABLE_TRICEP_EXT-review.json"
     },
@@ -4786,7 +4786,7 @@
       "promptPath": "art/exercise-static/briefs/CABLE_OVERHEAD_EXT.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-25T14:18:40.863Z",
+      "generatedAt": "2026-08-03T06:57:16.000Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -4796,8 +4796,8 @@
         },
         {
           "kind": "owned-reference",
-          "source": "art/exercise-static/candidates/CABLE_OVERHEAD_EXT/CABLE_OVERHEAD_EXT-candidate-01.png",
-          "sha256": "279609dea9b8ddee103706c9b9c7c9e3cd4577e3b13c11ffbdd67e28bd82a69a",
+          "source": "art/exercise-static/candidates/CABLE_OVERHEAD_EXT/CABLE_OVERHEAD_EXT-candidate-05.png",
+          "sha256": "0689373d955f9ed15db1a1d65ee2973f6a97684c6f2d98f8ceeabcb041a940e1",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -4814,7 +4814,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "279609dea9b8ddee103706c9b9c7c9e3cd4577e3b13c11ffbdd67e28bd82a69a",
+      "sha256": "0689373d955f9ed15db1a1d65ee2973f6a97684c6f2d98f8ceeabcb041a940e1",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/CABLE_OVERHEAD_EXT-review.json"
     },
@@ -4934,7 +4934,7 @@
       "promptPath": "art/exercise-static/briefs/MACHINE_TRICEP_EXT.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-25T14:20:51.468Z",
+      "generatedAt": "2026-08-03T05:42:49.000Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -4945,7 +4945,7 @@
         {
           "kind": "owned-reference",
           "source": "art/exercise-static/candidates/MACHINE_TRICEP_EXT/MACHINE_TRICEP_EXT-candidate-01.png",
-          "sha256": "8c4a0bcf974f23e299ac0d68ec18caf310368ceade870e372a60a133e48f22e0",
+          "sha256": "d2716151bc887c035eeb52f46b741f444e4404d6def257459d36713093cd3fe3",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -4962,7 +4962,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "8c4a0bcf974f23e299ac0d68ec18caf310368ceade870e372a60a133e48f22e0",
+      "sha256": "d2716151bc887c035eeb52f46b741f444e4404d6def257459d36713093cd3fe3",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/MACHINE_TRICEP_EXT-review.json"
     },
@@ -5748,7 +5748,7 @@
       "promptPath": "art/exercise-static/briefs/INVERTED_ROW.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-26T01:53:44.461Z",
+      "generatedAt": "2026-08-07T02:25:28Z",
       "inputs": [
         {
           "kind": "original-text",
@@ -5758,8 +5758,8 @@
         },
         {
           "kind": "owned-reference",
-          "source": "art/exercise-static/candidates/INVERTED_ROW/INVERTED_ROW-candidate-01.png",
-          "sha256": "fd02b11673f11aaf093ccc540f0bd6c11ce56bb381538144b9f8405a8812c63e",
+          "source": "art/exercise-static/candidates/INVERTED_ROW/INVERTED_ROW-candidate-10.png",
+          "sha256": "2b3f59695f1d69fa581703040b2b235cb415f96fa6c5fad70e7ad7d5423103e0",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -5776,7 +5776,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "fd02b11673f11aaf093ccc540f0bd6c11ce56bb381538144b9f8405a8812c63e",
+      "sha256": "2b3f59695f1d69fa581703040b2b235cb415f96fa6c5fad70e7ad7d5423103e0",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/INVERTED_ROW-review.json"
     },
@@ -5822,18 +5822,18 @@
       "promptPath": "art/exercise-static/briefs/REVERSE_HYPEREXTENSION.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-26T01:55:05.575Z",
+      "generatedAt": "2026-07-31T12:17:10Z",
       "inputs": [
         {
           "kind": "original-text",
           "source": "art/exercise-static/briefs/REVERSE_HYPEREXTENSION.json",
-          "sha256": "ac8a8d15e23963c1bcfec1447a14ecd663f6d9dd95350e5c21c2b6663349af7d",
+          "sha256": "ac657add4f179e19b83898682c3fc1a44e0510b520dbe68b05b62fc1a723cf8a",
           "rightsBasis": "本项目原创动作与器械 brief"
         },
         {
           "kind": "owned-reference",
-          "source": "art/exercise-static/candidates/REVERSE_HYPEREXTENSION/REVERSE_HYPEREXTENSION-candidate-01.png",
-          "sha256": "8ce313bdb7f6d7411d5b5286237498f65b6e48c69e895b4a954c05f46c9b4a4f",
+          "source": "art/exercise-static/candidates/REVERSE_HYPEREXTENSION/REVERSE_HYPEREXTENSION-candidate-06.png",
+          "sha256": "d9b9fdf1e365ba9b1c33cfea842eb41fc1b950e235206b19bcf737515f21216b",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -5850,7 +5850,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "8ce313bdb7f6d7411d5b5286237498f65b6e48c69e895b4a954c05f46c9b4a4f",
+      "sha256": "d9b9fdf1e365ba9b1c33cfea842eb41fc1b950e235206b19bcf737515f21216b",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/REVERSE_HYPEREXTENSION-review.json"
     },

@@ -21,6 +21,8 @@ const reviewKinds = ["identity", "art", "movement", "equipment", "rights"];
 const runtimePixels = 288;
 const jpegQuality = 82;
 const maximumRuntimeBytes = 24_576;
+// 个别高细节母版在 Q82 下超过单图 24 KiB 上限，保留尺寸并降低其 JPEG 质量。
+const runtimeQualityOverrides = { HAMMER_LATERAL_RAISE: 70 };
 
 function fail(message) {
   throw new Error(message);
@@ -39,6 +41,10 @@ function writeJson(file, value) {
 
 function sha256(file) {
   return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+}
+
+function jpegQualityFor(code) {
+  return runtimeQualityOverrides[code] ?? jpegQuality;
 }
 
 function relative(file) {
@@ -113,10 +119,10 @@ function publicReview(record) {
   }));
 }
 
-function exportThumbnail(code, output) {
+function exportThumbnail(code, output, quality = jpegQualityFor(code)) {
   const master = approvedMaster(code);
   fs.mkdirSync(path.dirname(output), { recursive: true });
-  run("swift", [rendererPath, master, output]);
+  run("swift", [rendererPath, master, output, String(quality / 100)]);
   inspectJpeg(output);
   return output;
 }
@@ -182,11 +188,12 @@ function commandPreflight(code) {
 
 function commandPromote(code) {
   const { review, master, masterDigest } = verifyPromotionGate(code);
+  const assetQuality = jpegQualityFor(code);
 
   const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), "dontlift-exercise-art-"));
   const temporaryJpeg = path.join(temporaryDir, `exercise_${code}.jpg`);
   try {
-    exportThumbnail(code, temporaryJpeg);
+    exportThumbnail(code, temporaryJpeg, assetQuality);
     const runtimeFile = path.join(runtimeDir, `exercise_${code}.jpg`);
     fs.mkdirSync(runtimeDir, { recursive: true });
     fs.copyFileSync(temporaryJpeg, runtimeFile);
@@ -204,7 +211,7 @@ function commandPromote(code) {
       runtimeSha256: runtime.sha256,
       pixelWidth: runtimePixels,
       pixelHeight: runtimePixels,
-      jpegQuality,
+      jpegQuality: assetQuality,
       sizeBytes: runtime.sizeBytes,
       reviews: publicReview(review),
       technicalStatus: "passed",
@@ -234,15 +241,22 @@ function commandPromote(code) {
   }
 }
 
-function commandAutopilotRegister(code, candidateArgument) {
+function commandRegister(code, candidateArgument, reviewerId, allowExistingMaster = false) {
   const candidate = path.resolve(repo, candidateArgument || `art/exercise-static/candidates/${code}/${code}-candidate-01.png`);
   if (!fs.existsSync(candidate)) fail(`缺少候选 PNG：${relative(candidate)}`);
   const masterDirectory = path.join(staticRoot, "masters/approved");
   const existing = fs.readdirSync(masterDirectory)
     .filter((name) => name.startsWith(`${code}-v`) && name.endsWith(".png"));
-  if (existing.length) fail(`${code} 已有正式母版，不能重复 autopilot-register`);
+  if (existing.length > 1) fail(`${code} 必须且只能有一个已批准 PNG 母版，当前为 ${existing.length} 个`);
+  if (existing.length && !allowExistingMaster) {
+    fail(`${code} 已有正式母版，不能重复 autopilot-register`);
+  }
 
-  const master = path.join(masterDirectory, `${code}-v1.png`);
+  const master = existing.length
+    ? path.join(masterDirectory, existing[0])
+    : path.join(masterDirectory, `${code}-v1.png`);
+  const masterAssetId = path.basename(master, path.extname(master));
+  const masterProvenancePath = path.join(masterDirectory, `${masterAssetId}.provenance.json`);
   fs.copyFileSync(candidate, master);
   const masterDigest = sha256(master);
   const reviewedAt = new Date().toISOString();
@@ -252,7 +266,7 @@ function commandAutopilotRegister(code, candidateArgument) {
     : kind === "art"
       ? ["art/exercise-static/references/approved/style-v1.png", relative(master)]
       : kind === "rights"
-        ? ["art/exercise-static/reviews/input-policy-v1.md", "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md", `art/exercise-static/masters/approved/${code}-v1.provenance.json`]
+        ? ["art/exercise-static/reviews/input-policy-v1.md", "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md", relative(masterProvenancePath)]
         : [`art/exercise-static/briefs/${code}.json`, relative(master)];
   const reviewNotes = {
     identity: "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。",
@@ -263,7 +277,7 @@ function commandAutopilotRegister(code, candidateArgument) {
   };
   const reviews = Object.fromEntries(reviewKinds.map((kind) => [kind, {
     status: "approved",
-    reviewerId: "production-autopilot",
+    reviewerId,
     reviewedAt,
     evidence: reviewEvidence(kind),
     notes: reviewNotes[kind],
@@ -278,7 +292,7 @@ function commandAutopilotRegister(code, candidateArgument) {
   });
 
   const provenanceRecord = {
-    assetId: `${code}-v1`,
+    assetId: masterAssetId,
     exerciseCode: code,
     status: "approved-master",
     tool: "Codex built-in imagegen",
@@ -300,12 +314,11 @@ function commandAutopilotRegister(code, candidateArgument) {
     sha256: masterDigest,
     reviewRecord: relative(reviewPath),
     approvedAt: reviewedAt,
-    reviewerId: "production-autopilot",
+    reviewerId,
   };
   const dimensions = run("sips", ["-g", "pixelWidth", "-g", "pixelHeight", master], { capture: true });
   provenanceRecord.pixelWidth = Number(dimensions.match(/pixelWidth: (\d+)/)?.[1] ?? 0);
   provenanceRecord.pixelHeight = Number(dimensions.match(/pixelHeight: (\d+)/)?.[1] ?? 0);
-  const masterProvenancePath = path.join(masterDirectory, `${code}-v1.provenance.json`);
   writeJson(masterProvenancePath, provenanceRecord);
 
   const provenance = readJson(provenancePath);
@@ -330,6 +343,16 @@ function commandAutopilotRegister(code, candidateArgument) {
   commandPromote(code);
 }
 
+function commandAutopilotRegister(code, candidateArgument) {
+  commandRegister(code, candidateArgument, "production-autopilot");
+}
+
+function commandOwnerRegister(code, candidateArgument) {
+  // 仅在项目所有者明确确认当前候选后使用；人工确认允许替换同 code 的现有 v1 母版。
+  commandRegister(code, candidateArgument, "project-owner", true);
+  commandRelease(code);
+}
+
 function commandRelease(code) {
   const { master, masterDigest } = verifyPromotionGate(code);
   const production = readJson(productionPath);
@@ -348,9 +371,9 @@ function commandRelease(code) {
   const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), "dontlift-exercise-release-"));
   try {
     const expected = path.join(temporaryDir, `exercise_${code}.jpg`);
-    exportThumbnail(code, expected);
+    exportThumbnail(code, expected, asset.jpegQuality);
     if (sha256(expected) !== asset.runtimeSha256) {
-      fail(`${code} 的运行时 JPG 不是当前母版按质量 82 确定性导出的结果`);
+      fail(`${code} 的运行时 JPG 不是当前母版按声明质量确定性导出的结果`);
     }
   } finally {
     fs.rmSync(temporaryDir, { recursive: true, force: true });
@@ -379,7 +402,7 @@ function commandValidate() {
     seenCodes.add(asset.exerciseCode);
     if (asset.pixelWidth !== runtimePixels
         || asset.pixelHeight !== runtimePixels
-        || asset.jpegQuality !== jpegQuality) {
+        || asset.jpegQuality !== jpegQualityFor(key)) {
       fail(`${key} 的尺寸或 JPEG 质量声明不符合全局标准`);
     }
     if (asset.technicalStatus !== "passed") fail(`${key} 的 technicalStatus 不是 passed`);
@@ -402,9 +425,9 @@ function commandValidate() {
     const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), "dontlift-exercise-validate-"));
     try {
       const expected = path.join(temporaryDir, `exercise_${key}.jpg`);
-      exportThumbnail(key, expected);
+      exportThumbnail(key, expected, asset.jpegQuality);
       if (sha256(expected) !== asset.runtimeSha256) {
-        fail(`${key} 的运行时 JPG 不是当前母版按质量 82 确定性导出的结果`);
+        fail(`${key} 的运行时 JPG 不是当前母版按声明质量确定性导出的结果`);
       }
     } finally {
       fs.rmSync(temporaryDir, { recursive: true, force: true });
@@ -565,11 +588,12 @@ try {
   else if (command === "preflight") commandPreflight(requireCode(rawCode));
   else if (command === "promote") commandPromote(requireCode(rawCode));
   else if (command === "autopilot-register") commandAutopilotRegister(requireCode(rawCode), process.argv[4]);
+  else if (command === "owner-register") commandOwnerRegister(requireCode(rawCode), process.argv[4]);
   else if (command === "release") commandRelease(requireCode(rawCode));
   else if (command === "validate") commandValidate();
   else if (command === "coverage") commandCoverage();
   else if (command === "review-page") commandReviewPage();
-  else fail("用法：exercise-static-assets.mjs <export CODE|preflight CODE|promote CODE|autopilot-register CODE [candidate.png]|release CODE|validate|coverage|review-page>");
+  else fail("用法：exercise-static-assets.mjs <export CODE|preflight CODE|promote CODE|autopilot-register CODE [candidate.png]|owner-register CODE [candidate.png]|release CODE|validate|coverage|review-page>");
 } catch (error) {
   console.error(`错误：${error.message}`);
   process.exit(1);

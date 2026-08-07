@@ -4,7 +4,7 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T04:32:49.154Z",
+  "generatedAt": "2026-08-01T04:11:14.300Z",
   "promptPath": "art/exercise-static/briefs/MACHINE_LATERAL_RAISE.json",
   "briefPath": "art/exercise-static/briefs/MACHINE_LATERAL_RAISE.json",
   "inputs": [
@@ -16,8 +16,8 @@
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/MACHINE_LATERAL_RAISE/MACHINE_LATERAL_RAISE-candidate-01.png",
-      "sha256": "45770b3b76e5b6aab4ff9f8fea2128d04cce3f252a7a061b2b0d05e4aac27bb5",
+      "source": "art/exercise-static/candidates/MACHINE_LATERAL_RAISE/MACHINE_LATERAL_RAISE-candidate-02.png",
+      "sha256": "8b9bc86e89bd88c7f272689d837120844ff37c6de089d51163b70e56995616af",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -37,9 +37,9 @@
   "file": "art/exercise-static/masters/approved/MACHINE_LATERAL_RAISE-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1847990,
-  "sha256": "45770b3b76e5b6aab4ff9f8fea2128d04cce3f252a7a061b2b0d05e4aac27bb5",
+  "sizeBytes": 1828222,
+  "sha256": "8b9bc86e89bd88c7f272689d837120844ff37c6de089d51163b70e56995616af",
   "reviewRecord": "art/exercise-static/reviews/MACHINE_LATERAL_RAISE-review.json",
-  "approvedAt": "2026-07-25T04:32:49.154Z",
+  "approvedAt": "2026-08-01T04:11:14.300Z",
   "reviewerId": "production-autopilot"
 }

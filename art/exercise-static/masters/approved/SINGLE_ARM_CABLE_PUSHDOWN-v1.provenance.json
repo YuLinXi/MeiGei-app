@@ -4,7 +4,7 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T12:45:13.657Z",
+  "generatedAt": "2026-08-03T01:40:40.000Z",
   "promptPath": "art/exercise-static/briefs/SINGLE_ARM_CABLE_PUSHDOWN.json",
   "briefPath": "art/exercise-static/briefs/SINGLE_ARM_CABLE_PUSHDOWN.json",
   "inputs": [
@@ -16,8 +16,8 @@
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/SINGLE_ARM_CABLE_PUSHDOWN/SINGLE_ARM_CABLE_PUSHDOWN-candidate-01.png",
-      "sha256": "7491c5ecfdd81cb6a9c5530ce7cd3963ae5c37cc35fd8d8843762391ea1be4b1",
+      "source": "art/exercise-static/candidates/SINGLE_ARM_CABLE_PUSHDOWN/SINGLE_ARM_CABLE_PUSHDOWN-candidate-05.png",
+      "sha256": "e9a07c2d09f09cf7d7c881e92435b861a831138ba63921fdacb271e09a47d1f0",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -37,9 +37,9 @@
   "file": "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_PUSHDOWN-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1618673,
-  "sha256": "7491c5ecfdd81cb6a9c5530ce7cd3963ae5c37cc35fd8d8843762391ea1be4b1",
+  "sizeBytes": 1723114,
+  "sha256": "e9a07c2d09f09cf7d7c881e92435b861a831138ba63921fdacb271e09a47d1f0",
   "reviewRecord": "art/exercise-static/reviews/SINGLE_ARM_CABLE_PUSHDOWN-review.json",
-  "approvedAt": "2026-07-25T12:45:13.657Z",
+  "approvedAt": "2026-08-03T01:40:40.000Z",
   "reviewerId": "production-autopilot"
 }

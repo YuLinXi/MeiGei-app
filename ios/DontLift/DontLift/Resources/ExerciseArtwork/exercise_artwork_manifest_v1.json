@@ -1015,6 +1015,230 @@
       "pixelWidth": 288,
       "pixelHeight": 288,
       "sizeBytes": 12211
+    },
+    "REVERSE_HYPEREXTENSION": {
+      "file": "exercise_REVERSE_HYPEREXTENSION.jpg",
+      "sha256": "e000e3efe0d0d5b32a0fd119422cbc682878fda5c9318283299a03d4f6b62c1f",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15001
+    },
+    "CABLE_LATERAL_RAISE": {
+      "file": "exercise_CABLE_LATERAL_RAISE.jpg",
+      "sha256": "39da43c47caeb52e78f5a9bd6474da9f5560a047840d6c008d22207139c3c3b2",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 17847
+    },
+    "SINGLE_ARM_CABLE_LATERAL_RAISE": {
+      "file": "exercise_SINGLE_ARM_CABLE_LATERAL_RAISE.jpg",
+      "sha256": "39da43c47caeb52e78f5a9bd6474da9f5560a047840d6c008d22207139c3c3b2",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 17847
+    },
+    "MACHINE_LATERAL_RAISE": {
+      "file": "exercise_MACHINE_LATERAL_RAISE.jpg",
+      "sha256": "12c05e87e8eb2abc2c8548665db4fe03f7be169b63bcf23cfe70b7835aa9f22d",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18414
+    },
+    "CABLE_FRONT_RAISE": {
+      "file": "exercise_CABLE_FRONT_RAISE.jpg",
+      "sha256": "0ba3edc510503600aae76f7d389d2bf153f509af5ed880791db7dd37c7e5398a",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15527
+    },
+    "CABLE_CROSS_REAR_FLY": {
+      "file": "exercise_CABLE_CROSS_REAR_FLY.jpg",
+      "sha256": "2e61885294698cfe5b4abb674dd03028af5118a6e10054bf19e12091a27ca460",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18204
+    },
+    "MACHINE_REVERSE_FLY": {
+      "file": "exercise_MACHINE_REVERSE_FLY.jpg",
+      "sha256": "9aa589728f7feb88ecf5be7344c9b402877beb6d2008752ef12aeb558177103c",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 21461
+    },
+    "CABLE_SEATED_BAR_CURL": {
+      "file": "exercise_CABLE_SEATED_BAR_CURL.jpg",
+      "sha256": "84a78cf77e67553ca07a2c0f38aa8b70d0669643037f90179f18309caa3f3278",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15914
+    },
+    "SINGLE_ARM_CABLE_PUSHDOWN": {
+      "file": "exercise_SINGLE_ARM_CABLE_PUSHDOWN.jpg",
+      "sha256": "dac6f881fd1a87a8dfa7fea390bedc820f967cdeabab187729daab8ec5d37494",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16614
+    },
+    "CABLE_TRICEP_EXT": {
+      "file": "exercise_CABLE_TRICEP_EXT.jpg",
+      "sha256": "a9af6afe8453a99178d1b39e92632c897f01ee89e2a06353fa2903a1dc14f8db",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15067
+    },
+    "MACHINE_TRICEP_EXT": {
+      "file": "exercise_MACHINE_TRICEP_EXT.jpg",
+      "sha256": "64eed2ab977fd75eb3c55f70adc921561cfde97f5cc12c8ec86a40e679ac9559",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 21861
+    },
+    "CABLE_OVERHEAD_EXT": {
+      "file": "exercise_CABLE_OVERHEAD_EXT.jpg",
+      "sha256": "835bc739c658c3fc66b2d1734a61c37a5717a5a7c3c7fffefe1410afb04e90fb",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15095
+    },
+    "HACK_SQUAT": {
+      "file": "exercise_HACK_SQUAT.jpg",
+      "sha256": "47936bb8a3676eef13f504134723059083b6261a2b91a0cdd8617d92026fb6eb",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 22721
+    },
+    "MACHINE_SINGLE_LEG_EXTENSION": {
+      "file": "exercise_MACHINE_SINGLE_LEG_EXTENSION.jpg",
+      "sha256": "9b3d1548178826eacd7d93a7e52c1059fd7b0409d02c12ac3e715439ef688a18",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18868
+    },
+    "INVERTED_ROW": {
+      "file": "exercise_INVERTED_ROW.jpg",
+      "sha256": "fdc1f8ab6ca50fc7196eec141f7777f49b1dad089708f73070da65a40b7d3cdf",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15682
+    },
+    "HAMMER_LATERAL_RAISE": {
+      "file": "exercise_HAMMER_LATERAL_RAISE.jpg",
+      "sha256": "30f49c06bea846867222cc4662dda3009b6dc6964a3c737cd515a7b8c994166e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 22794
+    },
+    "ARNOLD_PRESS": {
+      "file": "exercise_ARNOLD_PRESS.jpg",
+      "sha256": "889fcb5379ec67956dcf8180d8521b286d296853ff53fbf5ce06008b8b788a18",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12696
+    },
+    "CABLE_CRUNCH": {
+      "file": "exercise_CABLE_CRUNCH.jpg",
+      "sha256": "f77f7e102752da2e218723e787da03879e48f4de34c2b64e098dc90a66dea1dd",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 17103
+    },
+    "CABLE_SINGLE_ARM_PULLDOWN": {
+      "file": "exercise_CABLE_SINGLE_ARM_PULLDOWN.jpg",
+      "sha256": "5f0afaf0ba8b375531c9c1d8a78f36fa1be47d13d3d0bc0a9fa3b46adc4db64b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13758
+    },
+    "CHEST_SUPPORTED_MACHINE_ROW": {
+      "file": "exercise_CHEST_SUPPORTED_MACHINE_ROW.jpg",
+      "sha256": "7bba3e030f3efc175ab6873ae281f6d42f97f751cca474f13f8630f215862057",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 19267
+    },
+    "CHEST_SUPPORTED_T_BAR_ROW": {
+      "file": "exercise_CHEST_SUPPORTED_T_BAR_ROW.jpg",
+      "sha256": "4d190ec63eb6f08be04cc6ec42effea8fa27c764c1ab001b021592eeb93e9e50",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15599
+    },
+    "CLAMSHELL": {
+      "file": "exercise_CLAMSHELL.jpg",
+      "sha256": "b053d2fcc5e9b2b75e88db37ad03af328416b8bc40e55e2070d03810a952aa8e",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14427
+    },
+    "DB_SINGLE_LEG_DEADLIFT": {
+      "file": "exercise_DB_SINGLE_LEG_DEADLIFT.jpg",
+      "sha256": "ea8b050b803ecb3ba5f45256759af846b3534ecd80d4260d86c38ffeab4033af",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11293
+    },
+    "MACHINE_CRUNCH": {
+      "file": "exercise_MACHINE_CRUNCH.jpg",
+      "sha256": "3d25dbb331c77bac4179db1392af8d86f3e49fefc994d239d169bce7b33eca0d",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18209
+    },
+    "MACHINE_SHOULDER_PRESS": {
+      "file": "exercise_MACHINE_SHOULDER_PRESS.jpg",
+      "sha256": "5d5842cef92827a6a33c13ffa171aa5c8e128c0635240bf77c0dd85e61ae8c40",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 19465
+    },
+    "MACHINE_SINGLE_ARM_ROW": {
+      "file": "exercise_MACHINE_SINGLE_ARM_ROW.jpg",
+      "sha256": "467e0b08828d58c8ba6bd7dcd673090aa1bf67d664814357ab6b4dd47b39bbce",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 17825
+    },
+    "MEADOWS_ROW": {
+      "file": "exercise_MEADOWS_ROW.jpg",
+      "sha256": "a14002711d7a387f00785e95c4f02da1b44a6874ea0fe6ccd2ee4ec782998b28",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11843
+    },
+    "NEUTRAL_GRIP_PULL_UP": {
+      "file": "exercise_NEUTRAL_GRIP_PULL_UP.jpg",
+      "sha256": "b8d513e96ceec5704312228adb2e0e15f946c1f94c94b1942c45aadad79c855c",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 11467
+    },
+    "SEAL_ROW": {
+      "file": "exercise_SEAL_ROW.jpg",
+      "sha256": "e5255f45a934502f0bdb9727e6ede2ad6fd53f23fe7fc3053b8fe42f8aa3bea2",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 17061
+    },
+    "SINGLE_ARM_CABLE_ROW": {
+      "file": "exercise_SINGLE_ARM_CABLE_ROW.jpg",
+      "sha256": "eb42f8915a673b0285927cb69e21fae767e688cb513fc0b9c08faf36d7e672bb",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18615
+    },
+    "SINGLE_ARM_HAMMER_ROW": {
+      "file": "exercise_SINGLE_ARM_HAMMER_ROW.jpg",
+      "sha256": "1698668bd48b1608895bc372c8b18c191ae621e8e0ce1e44941c437e180fce9b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 20614
+    },
+    "SPLIT_HIGH_ROW": {
+      "file": "exercise_SPLIT_HIGH_ROW.jpg",
+      "sha256": "6311592ae436062d4f5e48c0d0c1223b4e957f48ae90d48828919585553b77bd",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 19898
     }
   }
 }

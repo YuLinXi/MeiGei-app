@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "exerciseCode": "MACHINE_LATERAL_RAISE",
-  "candidateId": "MACHINE_LATERAL_RAISE-candidate-01",
+  "candidateId": "MACHINE_LATERAL_RAISE-candidate-02",
   "masterPath": "art/exercise-static/masters/approved/MACHINE_LATERAL_RAISE-v1.png",
-  "masterSha256": "45770b3b76e5b6aab4ff9f8fea2128d04cce3f252a7a061b2b0d05e4aac27bb5",
+  "masterSha256": "8b9bc86e89bd88c7f272689d837120844ff37c6de089d51163b70e56995616af",
   "reviews": {
     "identity": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T04:32:49.154Z",
+      "reviewedAt": "2026-08-01T04:11:14.300Z",
       "evidence": [
         "art/exercise-static/references/approved/character-v1.png",
         "art/exercise-static/masters/approved/MACHINE_LATERAL_RAISE-v1.png"
@@ -18,7 +18,7 @@
     "art": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T04:32:49.154Z",
+      "reviewedAt": "2026-08-01T04:11:14.300Z",
       "evidence": [
         "art/exercise-static/references/approved/style-v1.png",
         "art/exercise-static/masters/approved/MACHINE_LATERAL_RAISE-v1.png"
@@ -28,27 +28,27 @@
     "movement": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T04:32:49.154Z",
+      "reviewedAt": "2026-08-01T04:11:14.300Z",
       "evidence": [
         "art/exercise-static/briefs/MACHINE_LATERAL_RAISE.json",
         "art/exercise-static/masters/approved/MACHINE_LATERAL_RAISE-v1.png"
       ],
-      "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+      "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌；确认挡板位于前臂/上臂上方，动作表现为肩外展。"
     },
     "equipment": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T04:32:49.154Z",
+      "reviewedAt": "2026-08-01T04:11:14.300Z",
       "evidence": [
         "art/exercise-static/briefs/MACHINE_LATERAL_RAISE.json",
         "art/exercise-static/masters/approved/MACHINE_LATERAL_RAISE-v1.png"
       ],
-      "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+      "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距；确认两侧黑色挡板从上方压住手臂，不作为下方托臂。"
     },
     "rights": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T04:32:49.154Z",
+      "reviewedAt": "2026-08-01T04:11:14.300Z",
       "evidence": [
         "art/exercise-static/reviews/input-policy-v1.md",
         "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",

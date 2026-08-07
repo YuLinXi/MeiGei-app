@@ -4,7 +4,7 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T10:35:00.535Z",
+  "generatedAt": "2026-08-02T13:20:15.300Z",
   "promptPath": "art/exercise-static/briefs/CABLE_SEATED_BAR_CURL.json",
   "briefPath": "art/exercise-static/briefs/CABLE_SEATED_BAR_CURL.json",
   "inputs": [
@@ -16,8 +16,8 @@
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/CABLE_SEATED_BAR_CURL/CABLE_SEATED_BAR_CURL-candidate-01.png",
-      "sha256": "94e07db8a097c6f96d6e19dd9b36b1a4b66d32568e7cf13c89c9673a4f13a842",
+      "source": "art/exercise-static/candidates/CABLE_SEATED_BAR_CURL/CABLE_SEATED_BAR_CURL-candidate-03.png",
+      "sha256": "61051f240925bba0b0a9f1f28c92dceb7790fabb0034bb7ee642e2aac5cd853b",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -37,9 +37,9 @@
   "file": "art/exercise-static/masters/approved/CABLE_SEATED_BAR_CURL-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1801614,
-  "sha256": "94e07db8a097c6f96d6e19dd9b36b1a4b66d32568e7cf13c89c9673a4f13a842",
+  "sizeBytes": 1725127,
+  "sha256": "61051f240925bba0b0a9f1f28c92dceb7790fabb0034bb7ee642e2aac5cd853b",
   "reviewRecord": "art/exercise-static/reviews/CABLE_SEATED_BAR_CURL-review.json",
-  "approvedAt": "2026-07-25T10:35:00.535Z",
+  "approvedAt": "2026-08-02T13:20:15.300Z",
   "reviewerId": "production-autopilot"
 }

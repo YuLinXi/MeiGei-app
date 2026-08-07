@@ -4,7 +4,7 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-26T01:53:44.461Z",
+  "generatedAt": "2026-08-07T02:25:28Z",
   "promptPath": "art/exercise-static/briefs/INVERTED_ROW.json",
   "briefPath": "art/exercise-static/briefs/INVERTED_ROW.json",
   "inputs": [
@@ -16,8 +16,8 @@
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/INVERTED_ROW/INVERTED_ROW-candidate-01.png",
-      "sha256": "fd02b11673f11aaf093ccc540f0bd6c11ce56bb381538144b9f8405a8812c63e",
+      "source": "art/exercise-static/candidates/INVERTED_ROW/INVERTED_ROW-candidate-10.png",
+      "sha256": "2b3f59695f1d69fa581703040b2b235cb415f96fa6c5fad70e7ad7d5423103e0",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -35,11 +35,11 @@
   ],
   "humanEdits": "无手工像素编辑。",
   "file": "art/exercise-static/masters/approved/INVERTED_ROW-v1.png",
-  "pixelWidth": 1254,
-  "pixelHeight": 1254,
-  "sizeBytes": 1817952,
-  "sha256": "fd02b11673f11aaf093ccc540f0bd6c11ce56bb381538144b9f8405a8812c63e",
+  "pixelWidth": 1444,
+  "pixelHeight": 1089,
+  "sizeBytes": 1492220,
+  "sha256": "2b3f59695f1d69fa581703040b2b235cb415f96fa6c5fad70e7ad7d5423103e0",
   "reviewRecord": "art/exercise-static/reviews/INVERTED_ROW-review.json",
-  "approvedAt": "2026-07-26T01:53:44.461Z",
-  "reviewerId": "production-autopilot"
+  "approvedAt": "2026-08-07T02:25:28Z",
+  "reviewerId": "project-owner"
 }

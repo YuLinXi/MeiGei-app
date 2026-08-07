@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "exerciseCode": "HAMMER_LATERAL_RAISE",
-  "candidateId": "HAMMER_LATERAL_RAISE-candidate-01",
+  "candidateId": "HAMMER_LATERAL_RAISE-candidate-04",
   "masterPath": "art/exercise-static/masters/approved/HAMMER_LATERAL_RAISE-v1.png",
-  "masterSha256": "eba77b7a215e9fcb78ee8f33f69fa372af0b8c089a2750c2dac2af5e1bee66fd",
+  "masterSha256": "a368e23535cfed2b888a62f8672c69cf5156f9ac251038d2f2b8f2b16e208fec",
   "reviews": {
     "identity": {
       "status": "approved",

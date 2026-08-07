@@ -4,20 +4,20 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-26T01:55:05.575Z",
+  "generatedAt": "2026-07-31T12:17:10Z",
   "promptPath": "art/exercise-static/briefs/REVERSE_HYPEREXTENSION.json",
   "briefPath": "art/exercise-static/briefs/REVERSE_HYPEREXTENSION.json",
   "inputs": [
     {
       "kind": "original-text",
       "source": "art/exercise-static/briefs/REVERSE_HYPEREXTENSION.json",
-      "sha256": "ac8a8d15e23963c1bcfec1447a14ecd663f6d9dd95350e5c21c2b6663349af7d",
+      "sha256": "ac657add4f179e19b83898682c3fc1a44e0510b520dbe68b05b62fc1a723cf8a",
       "rightsBasis": "本项目原创动作与器械 brief"
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/REVERSE_HYPEREXTENSION/REVERSE_HYPEREXTENSION-candidate-01.png",
-      "sha256": "8ce313bdb7f6d7411d5b5286237498f65b6e48c69e895b4a954c05f46c9b4a4f",
+      "source": "art/exercise-static/candidates/REVERSE_HYPEREXTENSION/REVERSE_HYPEREXTENSION-candidate-06.png",
+      "sha256": "d9b9fdf1e365ba9b1c33cfea842eb41fc1b950e235206b19bcf737515f21216b",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -37,9 +37,9 @@
   "file": "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1779293,
-  "sha256": "8ce313bdb7f6d7411d5b5286237498f65b6e48c69e895b4a954c05f46c9b4a4f",
+  "sizeBytes": 2023392,
+  "sha256": "d9b9fdf1e365ba9b1c33cfea842eb41fc1b950e235206b19bcf737515f21216b",
   "reviewRecord": "art/exercise-static/reviews/REVERSE_HYPEREXTENSION-review.json",
-  "approvedAt": "2026-07-26T01:55:05.575Z",
-  "reviewerId": "production-autopilot"
+  "approvedAt": "2026-07-31T12:17:10Z",
+  "reviewerId": "project-owner"
 }

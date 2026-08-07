@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "exerciseCode": "CABLE_LATERAL_RAISE",
-  "candidateId": "CABLE_LATERAL_RAISE-candidate-01",
+  "candidateId": "CABLE_LATERAL_RAISE-candidate-05",
   "masterPath": "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png",
-  "masterSha256": "9475e0089655dd115d7d991dcc00f74ed3115cf0c16ae230eb6d021f59c708dc",
+  "masterSha256": "84dc1598bce134b4a1a99c33792b6276b56476e09c48f8d80b54faf398ba196d",
   "reviews": {
     "identity": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T04:32:04.772Z",
+      "reviewedAt": "2026-07-31T14:56:55.300Z",
       "evidence": [
         "art/exercise-static/references/approved/character-v1.png",
         "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png"
@@ -18,7 +18,7 @@
     "art": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T04:32:04.772Z",
+      "reviewedAt": "2026-07-31T14:56:55.300Z",
       "evidence": [
         "art/exercise-static/references/approved/style-v1.png",
         "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png"
@@ -28,27 +28,27 @@
     "movement": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T04:32:04.772Z",
+      "reviewedAt": "2026-07-31T14:56:55.300Z",
       "evidence": [
         "art/exercise-static/briefs/CABLE_LATERAL_RAISE.json",
         "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png"
       ],
-      "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+      "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌；确认单侧肩外展至肩高，绳索从身体后方经过且保持绷直。"
     },
     "equipment": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T04:32:04.772Z",
+      "reviewedAt": "2026-07-31T14:56:55.300Z",
       "evidence": [
         "art/exercise-static/briefs/CABLE_LATERAL_RAISE.json",
         "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png"
       ],
-      "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+      "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距；确认低位滑轮至手柄的绳索连续、无松弛并从身体后方通过。"
     },
     "rights": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T04:32:04.772Z",
+      "reviewedAt": "2026-07-31T14:56:55.300Z",
       "evidence": [
         "art/exercise-static/reviews/input-policy-v1.md",
         "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",

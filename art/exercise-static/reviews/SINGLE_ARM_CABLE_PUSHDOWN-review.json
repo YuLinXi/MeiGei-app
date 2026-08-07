@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "exerciseCode": "SINGLE_ARM_CABLE_PUSHDOWN",
-  "candidateId": "SINGLE_ARM_CABLE_PUSHDOWN-candidate-01",
+  "candidateId": "SINGLE_ARM_CABLE_PUSHDOWN-candidate-05",
   "masterPath": "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_PUSHDOWN-v1.png",
-  "masterSha256": "7491c5ecfdd81cb6a9c5530ce7cd3963ae5c37cc35fd8d8843762391ea1be4b1",
+  "masterSha256": "e9a07c2d09f09cf7d7c881e92435b861a831138ba63921fdacb271e09a47d1f0",
   "reviews": {
     "identity": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T12:45:13.657Z",
+      "reviewedAt": "2026-08-03T01:40:40.000Z",
       "evidence": [
         "art/exercise-static/references/approved/character-v1.png",
         "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_PUSHDOWN-v1.png"
@@ -18,7 +18,7 @@
     "art": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T12:45:13.657Z",
+      "reviewedAt": "2026-08-03T01:40:40.000Z",
       "evidence": [
         "art/exercise-static/references/approved/style-v1.png",
         "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_PUSHDOWN-v1.png"
@@ -28,7 +28,7 @@
     "movement": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T12:45:13.657Z",
+      "reviewedAt": "2026-08-03T01:40:40.000Z",
       "evidence": [
         "art/exercise-static/briefs/SINGLE_ARM_CABLE_PUSHDOWN.json",
         "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_PUSHDOWN-v1.png"
@@ -38,7 +38,7 @@
     "equipment": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T12:45:13.657Z",
+      "reviewedAt": "2026-08-03T01:40:40.000Z",
       "evidence": [
         "art/exercise-static/briefs/SINGLE_ARM_CABLE_PUSHDOWN.json",
         "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_PUSHDOWN-v1.png"
@@ -48,7 +48,7 @@
     "rights": {
       "status": "approved",
       "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T12:45:13.657Z",
+      "reviewedAt": "2026-08-03T01:40:40.000Z",
       "evidence": [
         "art/exercise-static/reviews/input-policy-v1.md",
         "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",

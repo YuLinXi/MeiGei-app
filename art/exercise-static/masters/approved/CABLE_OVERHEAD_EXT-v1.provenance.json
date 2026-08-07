@@ -4,7 +4,7 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T14:18:40.863Z",
+  "generatedAt": "2026-08-03T06:57:16.000Z",
   "promptPath": "art/exercise-static/briefs/CABLE_OVERHEAD_EXT.json",
   "briefPath": "art/exercise-static/briefs/CABLE_OVERHEAD_EXT.json",
   "inputs": [
@@ -16,8 +16,8 @@
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/CABLE_OVERHEAD_EXT/CABLE_OVERHEAD_EXT-candidate-01.png",
-      "sha256": "279609dea9b8ddee103706c9b9c7c9e3cd4577e3b13c11ffbdd67e28bd82a69a",
+      "source": "art/exercise-static/candidates/CABLE_OVERHEAD_EXT/CABLE_OVERHEAD_EXT-candidate-05.png",
+      "sha256": "0689373d955f9ed15db1a1d65ee2973f6a97684c6f2d98f8ceeabcb041a940e1",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -37,9 +37,9 @@
   "file": "art/exercise-static/masters/approved/CABLE_OVERHEAD_EXT-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1623000,
-  "sha256": "279609dea9b8ddee103706c9b9c7c9e3cd4577e3b13c11ffbdd67e28bd82a69a",
+  "sizeBytes": 2013066,
+  "sha256": "0689373d955f9ed15db1a1d65ee2973f6a97684c6f2d98f8ceeabcb041a940e1",
   "reviewRecord": "art/exercise-static/reviews/CABLE_OVERHEAD_EXT-review.json",
-  "approvedAt": "2026-07-25T14:18:40.863Z",
+  "approvedAt": "2026-08-03T06:57:16.000Z",
   "reviewerId": "production-autopilot"
 }

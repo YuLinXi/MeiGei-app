@@ -4,7 +4,7 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T04:35:55.691Z",
+  "generatedAt": "2026-08-01T10:41:51.300Z",
   "promptPath": "art/exercise-static/briefs/CABLE_CROSS_REAR_FLY.json",
   "briefPath": "art/exercise-static/briefs/CABLE_CROSS_REAR_FLY.json",
   "inputs": [
@@ -16,8 +16,8 @@
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/CABLE_CROSS_REAR_FLY/CABLE_CROSS_REAR_FLY-candidate-01.png",
-      "sha256": "2221b8b606f07bfb24741bf5ba965f083c16f6e966e4723c533d9c43fd91bd4a",
+      "source": "art/exercise-static/candidates/CABLE_CROSS_REAR_FLY/CABLE_CROSS_REAR_FLY-candidate-02.png",
+      "sha256": "e6bba61eab05ae6c740e73d5187ca6670a40672237d7b20e8ba70a49f864740e",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -37,9 +37,9 @@
   "file": "art/exercise-static/masters/approved/CABLE_CROSS_REAR_FLY-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1763986,
-  "sha256": "2221b8b606f07bfb24741bf5ba965f083c16f6e966e4723c533d9c43fd91bd4a",
+  "sizeBytes": 1729613,
+  "sha256": "e6bba61eab05ae6c740e73d5187ca6670a40672237d7b20e8ba70a49f864740e",
   "reviewRecord": "art/exercise-static/reviews/CABLE_CROSS_REAR_FLY-review.json",
-  "approvedAt": "2026-07-25T04:35:55.691Z",
+  "approvedAt": "2026-08-01T10:41:51.300Z",
   "reviewerId": "production-autopilot"
 }

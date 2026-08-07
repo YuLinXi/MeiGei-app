@@ -4,7 +4,7 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T04:35:07.290Z",
+  "generatedAt": "2026-08-02T00:51:44.300Z",
   "promptPath": "art/exercise-static/briefs/MACHINE_REVERSE_FLY.json",
   "briefPath": "art/exercise-static/briefs/MACHINE_REVERSE_FLY.json",
   "inputs": [
@@ -16,8 +16,8 @@
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/MACHINE_REVERSE_FLY/MACHINE_REVERSE_FLY-candidate-01.png",
-      "sha256": "5dbcb6068666212bda0a1f6597834b583a406fd6fc45e99908edcac290fe8752",
+      "source": "art/exercise-static/candidates/MACHINE_REVERSE_FLY/MACHINE_REVERSE_FLY-candidate-02.png",
+      "sha256": "ac594ff94883300ae8d92896c3cb11c24f015e567ca1c15f89dde7dded3a77f3",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -37,9 +37,9 @@
   "file": "art/exercise-static/masters/approved/MACHINE_REVERSE_FLY-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1942100,
-  "sha256": "5dbcb6068666212bda0a1f6597834b583a406fd6fc45e99908edcac290fe8752",
+  "sizeBytes": 1982980,
+  "sha256": "ac594ff94883300ae8d92896c3cb11c24f015e567ca1c15f89dde7dded3a77f3",
   "reviewRecord": "art/exercise-static/reviews/MACHINE_REVERSE_FLY-review.json",
-  "approvedAt": "2026-07-25T04:35:07.290Z",
+  "approvedAt": "2026-08-02T00:51:44.300Z",
   "reviewerId": "production-autopilot"
 }

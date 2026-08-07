@@ -4,7 +4,7 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T12:45:43.521Z",
+  "generatedAt": "2026-08-03T02:11:56.000Z",
   "promptPath": "art/exercise-static/briefs/CABLE_TRICEP_EXT.json",
   "briefPath": "art/exercise-static/briefs/CABLE_TRICEP_EXT.json",
   "inputs": [
@@ -17,7 +17,7 @@
     {
       "kind": "owned-reference",
       "source": "art/exercise-static/candidates/CABLE_TRICEP_EXT/CABLE_TRICEP_EXT-candidate-01.png",
-      "sha256": "7aa878440dce1778a4a0cba245c2b8cd0f0be18fcf6ac32f35f958d36140653c",
+      "sha256": "fd6e7335e457fa902ecf9c3c97396abc4f9004bc1249a332ce54b1e946663ba2",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -37,9 +37,9 @@
   "file": "art/exercise-static/masters/approved/CABLE_TRICEP_EXT-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1636473,
-  "sha256": "7aa878440dce1778a4a0cba245c2b8cd0f0be18fcf6ac32f35f958d36140653c",
+  "sizeBytes": 1738038,
+  "sha256": "fd6e7335e457fa902ecf9c3c97396abc4f9004bc1249a332ce54b1e946663ba2",
   "reviewRecord": "art/exercise-static/reviews/CABLE_TRICEP_EXT-review.json",
-  "approvedAt": "2026-07-25T12:45:43.521Z",
+  "approvedAt": "2026-08-03T02:11:56.000Z",
   "reviewerId": "production-autopilot"
 }

@@ -4,7 +4,7 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T04:33:11.521Z",
+  "generatedAt": "2026-08-03T14:35:15.000Z",
   "promptPath": "art/exercise-static/briefs/HAMMER_LATERAL_RAISE.json",
   "briefPath": "art/exercise-static/briefs/HAMMER_LATERAL_RAISE.json",
   "inputs": [
@@ -16,8 +16,8 @@
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/HAMMER_LATERAL_RAISE/HAMMER_LATERAL_RAISE-candidate-01.png",
-      "sha256": "eba77b7a215e9fcb78ee8f33f69fa372af0b8c089a2750c2dac2af5e1bee66fd",
+      "source": "art/exercise-static/candidates/HAMMER_LATERAL_RAISE/HAMMER_LATERAL_RAISE-candidate-04.png",
+      "sha256": "a368e23535cfed2b888a62f8672c69cf5156f9ac251038d2f2b8f2b16e208fec",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -37,9 +37,9 @@
   "file": "art/exercise-static/masters/approved/HAMMER_LATERAL_RAISE-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1942837,
-  "sha256": "eba77b7a215e9fcb78ee8f33f69fa372af0b8c089a2750c2dac2af5e1bee66fd",
+  "sizeBytes": 2078601,
+  "sha256": "a368e23535cfed2b888a62f8672c69cf5156f9ac251038d2f2b8f2b16e208fec",
   "reviewRecord": "art/exercise-static/reviews/HAMMER_LATERAL_RAISE-review.json",
-  "approvedAt": "2026-07-25T04:33:11.521Z",
+  "approvedAt": "2026-08-03T14:35:15.000Z",
   "reviewerId": "production-autopilot"
 }

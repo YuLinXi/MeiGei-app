@@ -4700,17 +4700,17 @@
       "briefPath": "art/exercise-static/briefs/MACHINE_SINGLE_LEG_EXTENSION.json",
       "masterPath": "art/exercise-static/masters/approved/MACHINE_SINGLE_LEG_EXTENSION-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_MACHINE_SINGLE_LEG_EXTENSION.jpg",
-      "masterSha256": "641142506d27970fe97f3891794dd0ad702b26f4483c86050dd637201ac52c33",
-      "runtimeSha256": "500a083f48acfbdfc37a63d4590859a70c1d55ce68e9588305493eb9b4d33e52",
+      "masterSha256": "a44f766823eb2193c2a1b0a0cc19515faad526aedc65d9c62000b8ab710493f6",
+      "runtimeSha256": "9b3d1548178826eacd7d93a7e52c1059fd7b0409d02c12ac3e715439ef688a18",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 17793,
+      "sizeBytes": 18868,
       "reviews": {
         "identity": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-24T23:16:22.854Z",
+          "reviewedAt": "2026-08-03T08:54:48.000Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/MACHINE_SINGLE_LEG_EXTENSION-v1.png"
@@ -4720,7 +4720,7 @@
         "art": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-24T23:16:22.854Z",
+          "reviewedAt": "2026-08-03T08:54:48.000Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/MACHINE_SINGLE_LEG_EXTENSION-v1.png"
@@ -4730,7 +4730,7 @@
         "movement": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-24T23:16:22.854Z",
+          "reviewedAt": "2026-08-03T08:54:48.000Z",
           "evidence": [
             "art/exercise-static/briefs/MACHINE_SINGLE_LEG_EXTENSION.json",
             "art/exercise-static/masters/approved/MACHINE_SINGLE_LEG_EXTENSION-v1.png"
@@ -4740,7 +4740,7 @@
         "equipment": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-24T23:16:22.854Z",
+          "reviewedAt": "2026-08-03T08:54:48.000Z",
           "evidence": [
             "art/exercise-static/briefs/MACHINE_SINGLE_LEG_EXTENSION.json",
             "art/exercise-static/masters/approved/MACHINE_SINGLE_LEG_EXTENSION-v1.png"
@@ -4750,7 +4750,7 @@
         "rights": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-24T23:16:22.854Z",
+          "reviewedAt": "2026-08-03T08:54:48.000Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -6011,17 +6011,17 @@
       "briefPath": "art/exercise-static/briefs/CABLE_LATERAL_RAISE.json",
       "masterPath": "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_CABLE_LATERAL_RAISE.jpg",
-      "masterSha256": "9475e0089655dd115d7d991dcc00f74ed3115cf0c16ae230eb6d021f59c708dc",
-      "runtimeSha256": "789734705b507c07f34e5d27eb9a27ee5e62c80438467f2caeec498b2ee87c0c",
+      "masterSha256": "84dc1598bce134b4a1a99c33792b6276b56476e09c48f8d80b54faf398ba196d",
+      "runtimeSha256": "39da43c47caeb52e78f5a9bd6474da9f5560a047840d6c008d22207139c3c3b2",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 14899,
+      "sizeBytes": 17847,
       "reviews": {
         "identity": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:04.772Z",
+          "reviewedAt": "2026-07-31T14:56:55.300Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png"
@@ -6031,7 +6031,7 @@
         "art": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:04.772Z",
+          "reviewedAt": "2026-07-31T14:56:55.300Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png"
@@ -6041,27 +6041,27 @@
         "movement": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:04.772Z",
+          "reviewedAt": "2026-07-31T14:56:55.300Z",
           "evidence": [
             "art/exercise-static/briefs/CABLE_LATERAL_RAISE.json",
             "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png"
           ],
-          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌；确认单侧肩外展至肩高，绳索从身体后方经过且保持绷直。"
         },
         "equipment": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:04.772Z",
+          "reviewedAt": "2026-07-31T14:56:55.300Z",
           "evidence": [
             "art/exercise-static/briefs/CABLE_LATERAL_RAISE.json",
             "art/exercise-static/masters/approved/CABLE_LATERAL_RAISE-v1.png"
           ],
-          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距；确认低位滑轮至手柄的绳索连续、无松弛并从身体后方通过。"
         },
         "rights": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:04.772Z",
+          "reviewedAt": "2026-07-31T14:56:55.300Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -6080,17 +6080,17 @@
       "briefPath": "art/exercise-static/briefs/SINGLE_ARM_CABLE_LATERAL_RAISE.json",
       "masterPath": "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_LATERAL_RAISE-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_SINGLE_ARM_CABLE_LATERAL_RAISE.jpg",
-      "masterSha256": "e767ad4c9d417fc1a843e8fb0c89d49c2482c6a6afd99942eb6857087d96d7a6",
-      "runtimeSha256": "3938b090b34a73129c8db0e3c88c15e36f3d12426d31b76293e62f0539d236da",
+      "masterSha256": "84dc1598bce134b4a1a99c33792b6276b56476e09c48f8d80b54faf398ba196d",
+      "runtimeSha256": "39da43c47caeb52e78f5a9bd6474da9f5560a047840d6c008d22207139c3c3b2",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 16817,
+      "sizeBytes": 17847,
       "reviews": {
         "identity": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:26.845Z",
+          "reviewedAt": "2026-08-01T03:23:58.300Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_LATERAL_RAISE-v1.png"
@@ -6100,7 +6100,7 @@
         "art": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:26.845Z",
+          "reviewedAt": "2026-08-01T03:23:58.300Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_LATERAL_RAISE-v1.png"
@@ -6110,27 +6110,27 @@
         "movement": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:26.845Z",
+          "reviewedAt": "2026-08-01T03:23:58.300Z",
           "evidence": [
             "art/exercise-static/briefs/SINGLE_ARM_CABLE_LATERAL_RAISE.json",
             "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_LATERAL_RAISE-v1.png"
           ],
-          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌；经项目负责人确认，与绳索侧平举复用同一张正式动作图。"
         },
         "equipment": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:26.845Z",
+          "reviewedAt": "2026-08-01T03:23:58.300Z",
           "evidence": [
             "art/exercise-static/briefs/SINGLE_ARM_CABLE_LATERAL_RAISE.json",
             "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_LATERAL_RAISE-v1.png"
           ],
-          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距；复用已确认的绳索侧平举器械与绷直绳索图。"
         },
         "rights": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:26.845Z",
+          "reviewedAt": "2026-08-01T03:23:58.300Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -6149,17 +6149,17 @@
       "briefPath": "art/exercise-static/briefs/MACHINE_LATERAL_RAISE.json",
       "masterPath": "art/exercise-static/masters/approved/MACHINE_LATERAL_RAISE-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_MACHINE_LATERAL_RAISE.jpg",
-      "masterSha256": "45770b3b76e5b6aab4ff9f8fea2128d04cce3f252a7a061b2b0d05e4aac27bb5",
-      "runtimeSha256": "7d39afc642a144fc31a9a8783f4ba8381177c937fe2096f9587403a9bd72dd7c",
+      "masterSha256": "8b9bc86e89bd88c7f272689d837120844ff37c6de089d51163b70e56995616af",
+      "runtimeSha256": "12c05e87e8eb2abc2c8548665db4fe03f7be169b63bcf23cfe70b7835aa9f22d",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 18208,
+      "sizeBytes": 18414,
       "reviews": {
         "identity": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:49.154Z",
+          "reviewedAt": "2026-08-01T04:11:14.300Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/MACHINE_LATERAL_RAISE-v1.png"
@@ -6169,7 +6169,7 @@
         "art": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:49.154Z",
+          "reviewedAt": "2026-08-01T04:11:14.300Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/MACHINE_LATERAL_RAISE-v1.png"
@@ -6179,27 +6179,27 @@
         "movement": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:49.154Z",
+          "reviewedAt": "2026-08-01T04:11:14.300Z",
           "evidence": [
             "art/exercise-static/briefs/MACHINE_LATERAL_RAISE.json",
             "art/exercise-static/masters/approved/MACHINE_LATERAL_RAISE-v1.png"
           ],
-          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌；确认挡板位于前臂/上臂上方，动作表现为肩外展。"
         },
         "equipment": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:49.154Z",
+          "reviewedAt": "2026-08-01T04:11:14.300Z",
           "evidence": [
             "art/exercise-static/briefs/MACHINE_LATERAL_RAISE.json",
             "art/exercise-static/masters/approved/MACHINE_LATERAL_RAISE-v1.png"
           ],
-          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距；确认两侧黑色挡板从上方压住手臂，不作为下方托臂。"
         },
         "rights": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:32:49.154Z",
+          "reviewedAt": "2026-08-01T04:11:14.300Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -6218,12 +6218,12 @@
       "briefPath": "art/exercise-static/briefs/HAMMER_LATERAL_RAISE.json",
       "masterPath": "art/exercise-static/masters/approved/HAMMER_LATERAL_RAISE-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_HAMMER_LATERAL_RAISE.jpg",
-      "masterSha256": "eba77b7a215e9fcb78ee8f33f69fa372af0b8c089a2750c2dac2af5e1bee66fd",
-      "runtimeSha256": "5ee295d295b097c871ad8a8d580dd786ed69181a174f30ac92665544c21ca8b0",
+      "masterSha256": "a368e23535cfed2b888a62f8672c69cf5156f9ac251038d2f2b8f2b16e208fec",
+      "runtimeSha256": "30f49c06bea846867222cc4662dda3009b6dc6964a3c737cd515a7b8c994166e",
       "pixelWidth": 288,
       "pixelHeight": 288,
-      "jpegQuality": 82,
-      "sizeBytes": 20591,
+      "jpegQuality": 70,
+      "sizeBytes": 22794,
       "reviews": {
         "identity": {
           "status": "approved",
@@ -6425,17 +6425,17 @@
       "briefPath": "art/exercise-static/briefs/CABLE_FRONT_RAISE.json",
       "masterPath": "art/exercise-static/masters/approved/CABLE_FRONT_RAISE-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_CABLE_FRONT_RAISE.jpg",
-      "masterSha256": "4d38673a0bf43dfce55621619397df34eab7cf26254ec9944b83f0b07df0b25d",
-      "runtimeSha256": "b6b11ded8433dec6574116f63e0a764c3bc07d54e95c1072e5f728f1faa0fe68",
+      "masterSha256": "304b1b271db6884d027976a837fa8f03b2b57f4eed8697af2ec3f393b7066cd8",
+      "runtimeSha256": "0ba3edc510503600aae76f7d389d2bf153f509af5ed880791db7dd37c7e5398a",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 15537,
+      "sizeBytes": 15527,
       "reviews": {
         "identity": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:34:20.125Z",
+          "reviewedAt": "2026-08-01T08:58:57.300Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/CABLE_FRONT_RAISE-v1.png"
@@ -6445,7 +6445,7 @@
         "art": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:34:20.125Z",
+          "reviewedAt": "2026-08-01T08:58:57.300Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/CABLE_FRONT_RAISE-v1.png"
@@ -6455,27 +6455,27 @@
         "movement": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:34:20.125Z",
+          "reviewedAt": "2026-08-01T08:58:57.300Z",
           "evidence": [
             "art/exercise-static/briefs/CABLE_FRONT_RAISE.json",
             "art/exercise-static/masters/approved/CABLE_FRONT_RAISE-v1.png"
           ],
-          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌；确认绳索保持从低位滑轮到杠中部的单一直线。"
         },
         "equipment": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:34:20.125Z",
+          "reviewedAt": "2026-08-01T08:58:57.300Z",
           "evidence": [
             "art/exercise-static/briefs/CABLE_FRONT_RAISE.json",
             "art/exercise-static/masters/approved/CABLE_FRONT_RAISE-v1.png"
           ],
-          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距；确认绳索与低位滑轮、杠中部连接连续且保持张力。"
         },
         "rights": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:34:20.125Z",
+          "reviewedAt": "2026-08-01T08:58:57.300Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -6563,17 +6563,17 @@
       "briefPath": "art/exercise-static/briefs/MACHINE_REVERSE_FLY.json",
       "masterPath": "art/exercise-static/masters/approved/MACHINE_REVERSE_FLY-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_MACHINE_REVERSE_FLY.jpg",
-      "masterSha256": "5dbcb6068666212bda0a1f6597834b583a406fd6fc45e99908edcac290fe8752",
-      "runtimeSha256": "9b392ae1e212c44d165499e6b88301d26d00c883ee505a763d808854e8d4e352",
+      "masterSha256": "ac594ff94883300ae8d92896c3cb11c24f015e567ca1c15f89dde7dded3a77f3",
+      "runtimeSha256": "9aa589728f7feb88ecf5be7344c9b402877beb6d2008752ef12aeb558177103c",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 18457,
+      "sizeBytes": 21461,
       "reviews": {
         "identity": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:35:07.290Z",
+          "reviewedAt": "2026-08-02T00:51:44.300Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/MACHINE_REVERSE_FLY-v1.png"
@@ -6583,7 +6583,7 @@
         "art": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:35:07.290Z",
+          "reviewedAt": "2026-08-02T00:51:44.300Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/MACHINE_REVERSE_FLY-v1.png"
@@ -6593,27 +6593,27 @@
         "movement": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:35:07.290Z",
+          "reviewedAt": "2026-08-02T00:51:44.300Z",
           "evidence": [
             "art/exercise-static/briefs/MACHINE_REVERSE_FLY.json",
             "art/exercise-static/masters/approved/MACHINE_REVERSE_FLY-v1.png"
           ],
-          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌；确认复用蝴蝶机夹胸器械并反向坐姿，胸部朝垫、背部朝镜头。"
         },
         "equipment": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:35:07.290Z",
+          "reviewedAt": "2026-08-02T00:51:44.300Z",
           "evidence": [
             "art/exercise-static/briefs/MACHINE_REVERSE_FLY.json",
             "art/exercise-static/masters/approved/MACHINE_REVERSE_FLY-v1.png"
           ],
-          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距；确认与蝴蝶机夹胸同款双摆臂、座椅、胸垫和选择片结构。"
         },
         "rights": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:35:07.290Z",
+          "reviewedAt": "2026-08-02T00:51:44.300Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -6701,17 +6701,17 @@
       "briefPath": "art/exercise-static/briefs/CABLE_CROSS_REAR_FLY.json",
       "masterPath": "art/exercise-static/masters/approved/CABLE_CROSS_REAR_FLY-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_CABLE_CROSS_REAR_FLY.jpg",
-      "masterSha256": "2221b8b606f07bfb24741bf5ba965f083c16f6e966e4723c533d9c43fd91bd4a",
-      "runtimeSha256": "3c2df83c4a739b5de5ca5cc194b53172eadf86d632ab1d469429cb4815824d88",
+      "masterSha256": "e6bba61eab05ae6c740e73d5187ca6670a40672237d7b20e8ba70a49f864740e",
+      "runtimeSha256": "2e61885294698cfe5b4abb674dd03028af5118a6e10054bf19e12091a27ca460",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 19782,
+      "sizeBytes": 18204,
       "reviews": {
         "identity": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:35:55.691Z",
+          "reviewedAt": "2026-08-01T10:41:51.300Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/CABLE_CROSS_REAR_FLY-v1.png"
@@ -6721,7 +6721,7 @@
         "art": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:35:55.691Z",
+          "reviewedAt": "2026-08-01T10:41:51.300Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/CABLE_CROSS_REAR_FLY-v1.png"
@@ -6731,27 +6731,27 @@
         "movement": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:35:55.691Z",
+          "reviewedAt": "2026-08-01T10:41:51.300Z",
           "evidence": [
             "art/exercise-static/briefs/CABLE_CROSS_REAR_FLY.json",
             "art/exercise-static/masters/approved/CABLE_CROSS_REAR_FLY-v1.png"
           ],
-          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌；按项目负责人确认的参考图，采用背对镜头、双臂水平外展的后束飞鸟姿势。"
         },
         "equipment": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:35:55.691Z",
+          "reviewedAt": "2026-08-01T10:41:51.300Z",
           "evidence": [
             "art/exercise-static/briefs/CABLE_CROSS_REAR_FLY.json",
             "art/exercise-static/masters/approved/CABLE_CROSS_REAR_FLY-v1.png"
           ],
-          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距；确认双滑轮高位把手、交叉绳索和双手握持关系。"
         },
         "rights": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T04:35:55.691Z",
+          "reviewedAt": "2026-08-01T10:41:51.300Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -7874,17 +7874,17 @@
       "briefPath": "art/exercise-static/briefs/CABLE_SEATED_BAR_CURL.json",
       "masterPath": "art/exercise-static/masters/approved/CABLE_SEATED_BAR_CURL-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_CABLE_SEATED_BAR_CURL.jpg",
-      "masterSha256": "94e07db8a097c6f96d6e19dd9b36b1a4b66d32568e7cf13c89c9673a4f13a842",
-      "runtimeSha256": "5a275443c833676362d74980147e3a473efe6983ac2ac8432089695d20119a88",
+      "masterSha256": "61051f240925bba0b0a9f1f28c92dceb7790fabb0034bb7ee642e2aac5cd853b",
+      "runtimeSha256": "84a78cf77e67553ca07a2c0f38aa8b70d0669643037f90179f18309caa3f3278",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 18173,
+      "sizeBytes": 15914,
       "reviews": {
         "identity": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T10:35:00.535Z",
+          "reviewedAt": "2026-08-02T13:20:15.300Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/CABLE_SEATED_BAR_CURL-v1.png"
@@ -7894,7 +7894,7 @@
         "art": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T10:35:00.535Z",
+          "reviewedAt": "2026-08-02T13:20:15.300Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/CABLE_SEATED_BAR_CURL-v1.png"
@@ -7904,27 +7904,27 @@
         "movement": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T10:35:00.535Z",
+          "reviewedAt": "2026-08-02T13:20:15.300Z",
           "evidence": [
             "art/exercise-static/briefs/CABLE_SEATED_BAR_CURL.json",
             "art/exercise-static/masters/approved/CABLE_SEATED_BAR_CURL-v1.png"
           ],
-          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌；确认双肘以膝盖为支点，前臂向上卷杆。"
         },
         "equipment": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T10:35:00.535Z",
+          "reviewedAt": "2026-08-02T13:20:15.300Z",
           "evidence": [
             "art/exercise-static/briefs/CABLE_SEATED_BAR_CURL.json",
             "art/exercise-static/masters/approved/CABLE_SEATED_BAR_CURL-v1.png"
           ],
-          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距；确认低位滑轮、绷直绳索、直杆和双手握持关系。"
         },
         "rights": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T10:35:00.535Z",
+          "reviewedAt": "2026-08-02T13:20:15.300Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -8426,17 +8426,17 @@
       "briefPath": "art/exercise-static/briefs/SINGLE_ARM_CABLE_PUSHDOWN.json",
       "masterPath": "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_PUSHDOWN-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_SINGLE_ARM_CABLE_PUSHDOWN.jpg",
-      "masterSha256": "7491c5ecfdd81cb6a9c5530ce7cd3963ae5c37cc35fd8d8843762391ea1be4b1",
-      "runtimeSha256": "965681b34f9208ca020fabd98e480cc5345fd17239d64ba55496196a15c23331",
+      "masterSha256": "e9a07c2d09f09cf7d7c881e92435b861a831138ba63921fdacb271e09a47d1f0",
+      "runtimeSha256": "dac6f881fd1a87a8dfa7fea390bedc820f967cdeabab187729daab8ec5d37494",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 14491,
+      "sizeBytes": 16614,
       "reviews": {
         "identity": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T12:45:13.657Z",
+          "reviewedAt": "2026-08-03T01:40:40.000Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_PUSHDOWN-v1.png"
@@ -8446,7 +8446,7 @@
         "art": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T12:45:13.657Z",
+          "reviewedAt": "2026-08-03T01:40:40.000Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_PUSHDOWN-v1.png"
@@ -8456,7 +8456,7 @@
         "movement": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T12:45:13.657Z",
+          "reviewedAt": "2026-08-03T01:40:40.000Z",
           "evidence": [
             "art/exercise-static/briefs/SINGLE_ARM_CABLE_PUSHDOWN.json",
             "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_PUSHDOWN-v1.png"
@@ -8466,7 +8466,7 @@
         "equipment": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T12:45:13.657Z",
+          "reviewedAt": "2026-08-03T01:40:40.000Z",
           "evidence": [
             "art/exercise-static/briefs/SINGLE_ARM_CABLE_PUSHDOWN.json",
             "art/exercise-static/masters/approved/SINGLE_ARM_CABLE_PUSHDOWN-v1.png"
@@ -8476,7 +8476,7 @@
         "rights": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T12:45:13.657Z",
+          "reviewedAt": "2026-08-03T01:40:40.000Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -8495,17 +8495,17 @@
       "briefPath": "art/exercise-static/briefs/CABLE_TRICEP_EXT.json",
       "masterPath": "art/exercise-static/masters/approved/CABLE_TRICEP_EXT-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_CABLE_TRICEP_EXT.jpg",
-      "masterSha256": "7aa878440dce1778a4a0cba245c2b8cd0f0be18fcf6ac32f35f958d36140653c",
-      "runtimeSha256": "2b657586f56b3a899bdba53483a36e084f6ef5b243ff2da99d5a4c547377f052",
+      "masterSha256": "fd6e7335e457fa902ecf9c3c97396abc4f9004bc1249a332ce54b1e946663ba2",
+      "runtimeSha256": "a9af6afe8453a99178d1b39e92632c897f01ee89e2a06353fa2903a1dc14f8db",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 14049,
+      "sizeBytes": 15067,
       "reviews": {
         "identity": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T12:45:43.521Z",
+          "reviewedAt": "2026-08-03T02:11:56.000Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/CABLE_TRICEP_EXT-v1.png"
@@ -8515,7 +8515,7 @@
         "art": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T12:45:43.521Z",
+          "reviewedAt": "2026-08-03T02:11:56.000Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/CABLE_TRICEP_EXT-v1.png"
@@ -8525,7 +8525,7 @@
         "movement": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T12:45:43.521Z",
+          "reviewedAt": "2026-08-03T02:11:56.000Z",
           "evidence": [
             "art/exercise-static/briefs/CABLE_TRICEP_EXT.json",
             "art/exercise-static/masters/approved/CABLE_TRICEP_EXT-v1.png"
@@ -8535,7 +8535,7 @@
         "equipment": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T12:45:43.521Z",
+          "reviewedAt": "2026-08-03T02:11:56.000Z",
           "evidence": [
             "art/exercise-static/briefs/CABLE_TRICEP_EXT.json",
             "art/exercise-static/masters/approved/CABLE_TRICEP_EXT-v1.png"
@@ -8545,7 +8545,7 @@
         "rights": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T12:45:43.521Z",
+          "reviewedAt": "2026-08-03T02:11:56.000Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -8978,17 +8978,17 @@
       "briefPath": "art/exercise-static/briefs/CABLE_OVERHEAD_EXT.json",
       "masterPath": "art/exercise-static/masters/approved/CABLE_OVERHEAD_EXT-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_CABLE_OVERHEAD_EXT.jpg",
-      "masterSha256": "279609dea9b8ddee103706c9b9c7c9e3cd4577e3b13c11ffbdd67e28bd82a69a",
-      "runtimeSha256": "912c1f5fcb41a05218ae94022ae59016d00aef3ce405bb9f425ee6d18d0e67a5",
+      "masterSha256": "0689373d955f9ed15db1a1d65ee2973f6a97684c6f2d98f8ceeabcb041a940e1",
+      "runtimeSha256": "835bc739c658c3fc66b2d1734a61c37a5717a5a7c3c7fffefe1410afb04e90fb",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 13980,
+      "sizeBytes": 15095,
       "reviews": {
         "identity": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T14:18:40.863Z",
+          "reviewedAt": "2026-08-03T06:57:16.000Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/CABLE_OVERHEAD_EXT-v1.png"
@@ -8998,7 +8998,7 @@
         "art": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T14:18:40.863Z",
+          "reviewedAt": "2026-08-03T06:57:16.000Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/CABLE_OVERHEAD_EXT-v1.png"
@@ -9008,7 +9008,7 @@
         "movement": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T14:18:40.863Z",
+          "reviewedAt": "2026-08-03T06:57:16.000Z",
           "evidence": [
             "art/exercise-static/briefs/CABLE_OVERHEAD_EXT.json",
             "art/exercise-static/masters/approved/CABLE_OVERHEAD_EXT-v1.png"
@@ -9018,7 +9018,7 @@
         "equipment": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T14:18:40.863Z",
+          "reviewedAt": "2026-08-03T06:57:16.000Z",
           "evidence": [
             "art/exercise-static/briefs/CABLE_OVERHEAD_EXT.json",
             "art/exercise-static/masters/approved/CABLE_OVERHEAD_EXT-v1.png"
@@ -9028,7 +9028,7 @@
         "rights": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T14:18:40.863Z",
+          "reviewedAt": "2026-08-03T06:57:16.000Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -9254,17 +9254,17 @@
       "briefPath": "art/exercise-static/briefs/MACHINE_TRICEP_EXT.json",
       "masterPath": "art/exercise-static/masters/approved/MACHINE_TRICEP_EXT-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_MACHINE_TRICEP_EXT.jpg",
-      "masterSha256": "8c4a0bcf974f23e299ac0d68ec18caf310368ceade870e372a60a133e48f22e0",
-      "runtimeSha256": "ccaddf3c6eebae3899bdfb7196524643d830136be64ba2bace32f1a61646206b",
+      "masterSha256": "d2716151bc887c035eeb52f46b741f444e4404d6def257459d36713093cd3fe3",
+      "runtimeSha256": "64eed2ab977fd75eb3c55f70adc921561cfde97f5cc12c8ec86a40e679ac9559",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 19878,
+      "sizeBytes": 21861,
       "reviews": {
         "identity": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T14:20:51.468Z",
+          "reviewedAt": "2026-08-03T05:42:49.000Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/MACHINE_TRICEP_EXT-v1.png"
@@ -9274,7 +9274,7 @@
         "art": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T14:20:51.468Z",
+          "reviewedAt": "2026-08-03T05:42:49.000Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/MACHINE_TRICEP_EXT-v1.png"
@@ -9284,7 +9284,7 @@
         "movement": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T14:20:51.468Z",
+          "reviewedAt": "2026-08-03T05:42:49.000Z",
           "evidence": [
             "art/exercise-static/briefs/MACHINE_TRICEP_EXT.json",
             "art/exercise-static/masters/approved/MACHINE_TRICEP_EXT-v1.png"
@@ -9294,7 +9294,7 @@
         "equipment": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T14:20:51.468Z",
+          "reviewedAt": "2026-08-03T05:42:49.000Z",
           "evidence": [
             "art/exercise-static/briefs/MACHINE_TRICEP_EXT.json",
             "art/exercise-static/masters/approved/MACHINE_TRICEP_EXT-v1.png"
@@ -9304,7 +9304,7 @@
         "rights": {
           "status": "approved",
           "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T14:20:51.468Z",
+          "reviewedAt": "2026-08-03T05:42:49.000Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -10772,17 +10772,17 @@
       "briefPath": "art/exercise-static/briefs/INVERTED_ROW.json",
       "masterPath": "art/exercise-static/masters/approved/INVERTED_ROW-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_INVERTED_ROW.jpg",
-      "masterSha256": "fd02b11673f11aaf093ccc540f0bd6c11ce56bb381538144b9f8405a8812c63e",
-      "runtimeSha256": "5708810e368240e0cc0761b958048933712883985ef628261a6a99d91b44b53a",
+      "masterSha256": "2b3f59695f1d69fa581703040b2b235cb415f96fa6c5fad70e7ad7d5423103e0",
+      "runtimeSha256": "fdc1f8ab6ca50fc7196eec141f7777f49b1dad089708f73070da65a40b7d3cdf",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 18115,
+      "sizeBytes": 15682,
       "reviews": {
         "identity": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-26T01:53:44.461Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T02:25:28Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/INVERTED_ROW-v1.png"
@@ -10791,8 +10791,8 @@
         },
         "art": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-26T01:53:44.461Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T02:25:28Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/INVERTED_ROW-v1.png"
@@ -10801,8 +10801,8 @@
         },
         "movement": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-26T01:53:44.461Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T02:25:28Z",
           "evidence": [
             "art/exercise-static/briefs/INVERTED_ROW.json",
             "art/exercise-static/masters/approved/INVERTED_ROW-v1.png"
@@ -10811,8 +10811,8 @@
         },
         "equipment": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-26T01:53:44.461Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T02:25:28Z",
           "evidence": [
             "art/exercise-static/briefs/INVERTED_ROW.json",
             "art/exercise-static/masters/approved/INVERTED_ROW-v1.png"
@@ -10821,8 +10821,8 @@
         },
         "rights": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-26T01:53:44.461Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T02:25:28Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -10910,63 +10910,63 @@
       "briefPath": "art/exercise-static/briefs/REVERSE_HYPEREXTENSION.json",
       "masterPath": "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_REVERSE_HYPEREXTENSION.jpg",
-      "masterSha256": "8ce313bdb7f6d7411d5b5286237498f65b6e48c69e895b4a954c05f46c9b4a4f",
-      "runtimeSha256": "e5eec4584d10b8768945c545ea0ac64fc483a41e0d946b1ca818d82eba2bf392",
+      "masterSha256": "d9b9fdf1e365ba9b1c33cfea842eb41fc1b950e235206b19bcf737515f21216b",
+      "runtimeSha256": "e000e3efe0d0d5b32a0fd119422cbc682878fda5c9318283299a03d4f6b62c1f",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 16627,
+      "sizeBytes": 15001,
       "reviews": {
         "identity": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-26T01:55:05.575Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-07-31T12:17:10Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.png"
           ],
-          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+          "notes": "项目负责人确认候选 06 使用统一人物模型。"
         },
         "art": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-26T01:55:05.575Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-07-31T12:17:10Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.png"
           ],
-          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+          "notes": "项目负责人确认候选 06 的统一线稿、暖白背景、肌肉高亮和双脚勾脚背表现。"
         },
         "movement": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-26T01:55:05.575Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-07-31T12:17:10Z",
           "evidence": [
             "art/exercise-static/briefs/REVERSE_HYPEREXTENSION.json",
             "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.png"
           ],
-          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+          "notes": "项目负责人确认沿用山羊挺身器械、人物仰卧、双脚同向且脚背背屈的动作定义。"
         },
         "equipment": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-26T01:55:05.575Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-07-31T12:17:10Z",
           "evidence": [
             "art/exercise-static/briefs/REVERSE_HYPEREXTENSION.json",
             "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.png"
           ],
-          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+          "notes": "项目负责人确认与 BACK_EXTENSION 使用同一 45 度山羊挺身器械、把手和脚踝滚筒。"
         },
         "rights": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-26T01:55:05.575Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-07-31T12:17:10Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
             "art/exercise-static/masters/approved/REVERSE_HYPEREXTENSION-v1.provenance.json"
           ],
-          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+          "notes": "项目负责人确认候选 06 来自本项目 imagegen 生成链，未使用第三方图片作为成品。"
         }
       },
       "technicalStatus": "passed",

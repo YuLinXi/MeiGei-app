@@ -1,0 +1,4 @@
+interface:
+  display_name: "制作健身动作图"
+  short_description: "按统一人物、动作与发布规范制作 iOS 健身动作图"
+  default_prompt: "使用 $produce-exercise-artwork 为新增动作制作人物一致、器械准确并可正式进入 iOS 的动作图。"
