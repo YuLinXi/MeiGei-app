@@ -31,7 +31,7 @@ struct WorkoutRestPolicyTests {
         #expect(fetched.actualRestSeconds == 137)
     }
 
-    @Test func warmupPreviousSetUsesFallbackRestSeconds() {
+    @Test func completedWarmupPreviousSetUsesFinalTargetRestSeconds() {
         let exercise = WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0)
         let warmup = WorkoutSet(setIndex: 0,
                                 completed: true,
@@ -45,7 +45,7 @@ struct WorkoutRestPolicyTests {
                                                            in: exercise,
                                                            fallbackSeconds: 90)
 
-        #expect(seconds == 90)
+        #expect(seconds == 45)
     }
 
     @Test func workingPreviousSetUsesPlannedRestSecondsNotActualSeconds() {
@@ -79,6 +79,33 @@ struct WorkoutRestPolicyTests {
                                                            fallbackSeconds: 90)
 
         #expect(seconds == 90)
+    }
+
+    @Test func unfinishedPreviousRestFallsBackInsteadOfUsingProvisionalTarget() {
+        let exercise = WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0)
+        let first = WorkoutSet(setIndex: 0,
+                               completed: true,
+                               plannedRestSeconds: 120,
+                               setType: .working)
+        let second = WorkoutSet(setIndex: 1, completed: true, setType: .working)
+        exercise.sets = [first, second]
+
+        let seconds = WorkoutRestPolicy.plannedRestSeconds(completing: second,
+                                                           in: exercise,
+                                                           fallbackSeconds: 75)
+
+        #expect(seconds == 75)
+    }
+
+    @Test func defaultRestPriorityUsesActionThenGlobalThenNinetySeconds() {
+        #expect(WorkoutRestPolicy.defaultRestSeconds(actionDefaultSeconds: 120, globalDefaultSeconds: 75) == 120)
+        #expect(WorkoutRestPolicy.defaultRestSeconds(actionDefaultSeconds: nil, globalDefaultSeconds: 75) == 75)
+        #expect(WorkoutRestPolicy.defaultRestSeconds(actionDefaultSeconds: nil, globalDefaultSeconds: nil) == 90)
+    }
+
+    @Test func disabledActionRestCanBeEnabledAgain() {
+        #expect(WorkoutRestPolicy.defaultRestSeconds(actionDefaultSeconds: 0, globalDefaultSeconds: 90) == 0)
+        #expect(WorkoutRestPolicy.defaultRestSeconds(actionDefaultSeconds: 75, globalDefaultSeconds: 90) == 75)
     }
 
     @Test func workoutSetDTODecodesRestSecondsFromSyncPayload() throws {
@@ -132,6 +159,26 @@ struct WorkoutRestPolicyTests {
         #expect(seconds == 90)
     }
 
+    @Test func continuationAddsFinalTargetToPlannedRest() {
+        let seconds = WorkoutRestPolicy.finalPlannedRestSeconds(
+            targetSeconds: 30,
+            previousPlannedSeconds: 100,
+            isContinuation: true
+        )
+
+        #expect(seconds == 130)
+    }
+
+    @Test func completedRestUsesAdjustedTargetInsteadOfActualElapsedTime() {
+        let seconds = WorkoutRestPolicy.finalPlannedRestSeconds(
+            targetSeconds: 100,
+            previousPlannedSeconds: 90,
+            isContinuation: false
+        )
+
+        #expect(seconds == 100)
+    }
+
     @Test func workoutFinishUsesRunningRestTargetDuration() throws {
         let restTimer = RestTimerController()
         let setId = UUID()
@@ -142,6 +189,77 @@ struct WorkoutRestPolicyTests {
 
         #expect(event.setId == setId)
         #expect(event.elapsedSeconds == 120)
+        #expect(event.targetSeconds == 120)
+    }
+
+    @Test func adjustedRestKeepsFinalTargetWhenEndedEarly() throws {
+        let restTimer = RestTimerController()
+        let setId = UUID()
+        restTimer.start(duration: 90, setId: setId)
+        defer { restTimer.stop() }
+        restTimer.adjust(by: 10)
+        restTimer.completeEarly()
+
+        let event = try #require(restTimer.consumeCompletionEvent(matching: [setId]))
+        #expect(event.targetSeconds == 100)
+        #expect(event.elapsedSeconds < event.targetSeconds)
+    }
+
+    @Test func adjustedRestUsesFinalTargetWhenNaturallyFinalizedForWorkoutFinish() throws {
+        let restTimer = RestTimerController()
+        let setId = UUID()
+        restTimer.start(duration: 90, setId: setId)
+        defer { restTimer.stop() }
+        restTimer.adjust(by: 10)
+
+        let event = try #require(restTimer.completeForWorkoutFinish())
+        #expect(event.targetSeconds == 100)
+        #expect(event.elapsedSeconds == 100)
+    }
+
+    @Test func supersetNextRoundInheritsPreviousRoundAnchorFinalTarget() {
+        let anchorExercise = WorkoutExercise(exerciseName: "下斜卧推", orderIndex: 1)
+        let firstRound = WorkoutSet(setIndex: 0,
+                                    completed: true,
+                                    plannedRestSeconds: 100,
+                                    actualRestSeconds: 62,
+                                    setType: .working)
+        let secondRound = WorkoutSet(setIndex: 1, completed: true, setType: .working)
+        anchorExercise.sets = [firstRound, secondRound]
+
+        let seconds = WorkoutRestPolicy.plannedRestSeconds(completing: secondRound,
+                                                           in: anchorExercise,
+                                                           fallbackSeconds: 75)
+
+        #expect(seconds == 100)
+    }
+
+    @Test func firstSupersetRoundUsesRoundDefaultFallback() {
+        let anchorExercise = WorkoutExercise(exerciseName: "下斜卧推", orderIndex: 1)
+        let firstRound = WorkoutSet(setIndex: 0, completed: true, setType: .working)
+        anchorExercise.sets = [firstRound]
+
+        let seconds = WorkoutRestPolicy.plannedRestSeconds(completing: firstRound,
+                                                           in: anchorExercise,
+                                                           fallbackSeconds: 75)
+
+        #expect(seconds == 75)
+    }
+
+    @Test func workoutUnitRestDefaultRoundTripsAndLegacyJSONRemainsReadable() throws {
+        let exerciseId = UUID()
+        let unit = WorkoutUnit(kind: .singleExercise,
+                               orderIndex: 0,
+                               singleExerciseId: exerciseId,
+                               restAfterSetSeconds: 120)
+        let json = try #require(Workout.encodeUnits([unit]))
+        let roundTrip = try #require(Workout.decodeUnits(json).first)
+        #expect(roundTrip.restAfterSetSeconds == 120)
+
+        let legacy = """
+        [{"unitId":"\(UUID())","kindRaw":"singleExercise","orderIndex":0,"singleExerciseId":"\(exerciseId)"}]
+        """
+        #expect(Workout.decodeUnits(legacy).first?.restAfterSetSeconds == nil)
     }
 
     @Test func nextSetAfterSkippedEarlierExerciseContinuesWithinCurrentExercise() throws {

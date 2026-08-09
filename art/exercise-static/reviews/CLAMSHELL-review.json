@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "exerciseCode": "CLAMSHELL",
-  "candidateId": "CLAMSHELL-candidate-01",
+  "candidateId": "CLAMSHELL-candidate-04",
   "masterPath": "art/exercise-static/masters/approved/CLAMSHELL-v1.png",
-  "masterSha256": "6e9ad9b4e95a4d84886b27e87000cc271ddca2d79bf78d297d4ad294b48dc3be",
+  "masterSha256": "f58587ad0ac9cc14a3a678c37a5d631cd842e526680ac71c7291f620c892fedb",
   "reviews": {
     "identity": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T21:59:21.016Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-08-08T05:39:46.683Z",
       "evidence": [
         "art/exercise-static/references/approved/character-v1.png",
         "art/exercise-static/masters/approved/CLAMSHELL-v1.png"
@@ -17,8 +17,8 @@
     },
     "art": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T21:59:21.016Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-08-08T05:39:46.683Z",
       "evidence": [
         "art/exercise-static/references/approved/style-v1.png",
         "art/exercise-static/masters/approved/CLAMSHELL-v1.png"
@@ -27,8 +27,8 @@
     },
     "movement": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T21:59:21.016Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-08-08T05:39:46.683Z",
       "evidence": [
         "art/exercise-static/briefs/CLAMSHELL.json",
         "art/exercise-static/masters/approved/CLAMSHELL-v1.png"
@@ -37,8 +37,8 @@
     },
     "equipment": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T21:59:21.016Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-08-08T05:39:46.683Z",
       "evidence": [
         "art/exercise-static/briefs/CLAMSHELL.json",
         "art/exercise-static/masters/approved/CLAMSHELL-v1.png"
@@ -47,8 +47,8 @@
     },
     "rights": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T21:59:21.016Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-08-08T05:39:46.683Z",
       "evidence": [
         "art/exercise-static/reviews/input-policy-v1.md",
         "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",

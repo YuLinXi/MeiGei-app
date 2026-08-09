@@ -141,6 +141,13 @@
       "note": "不进入新预置库",
       "allowNewSelection": false,
       "keepHistoricalDisplay": true
+    },
+    {
+      "name": "卷腹",
+      "reason": "lowValue",
+      "note": "不再作为独立预置动作保留，历史记录保留原名",
+      "allowNewSelection": false,
+      "keepHistoricalDisplay": true
     }
   ]
 }

@@ -601,7 +601,7 @@ extension BuiltinExercise {
             .init(code: "AB_WHEEL_TUCK", name: "腹肌轮收", category: "核心", subcategory: "上腹", equipmentType: "自重"),
             .init(code: "BAR_HANGING_LEG_RAISE", name: "悬挂抬腿", category: "核心", subcategory: "下腹", equipmentType: "自重"),
             .init(code: "WEIGHTED_HANGING_LEG_RAISE", name: "负重悬挂抬腿", category: "核心", subcategory: "下腹", equipmentType: "自重"),
-            .init(code: "INCLINE_CRUNCH_TWIST", name: "上斜卷腹转体", category: "核心", subcategory: "腹斜肌", equipmentType: "自重"),
+            .init(code: "INCLINE_CRUNCH_TWIST", name: "下斜凳卷腹转体", category: "核心", subcategory: "腹斜肌", equipmentType: "自重"),
             .init(code: "BAND_KNEELING_CRUNCH", name: "弹力带-跪姿卷腹", category: "核心", subcategory: "上腹", equipmentType: "弹力带"),
             .init(code: "BAND_LYING_CRUNCH", name: "弹力带-仰卧卷腹", category: "核心", subcategory: "上腹", equipmentType: "弹力带"),
             .init(code: "BAND_LOW_HIGH_TWIST", name: "弹力带-下上转体", category: "核心", subcategory: "腹斜肌", equipmentType: "弹力带"),

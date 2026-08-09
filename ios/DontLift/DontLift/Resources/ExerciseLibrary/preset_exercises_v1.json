@@ -2608,21 +2608,6 @@
       "note": "保留"
     },
     {
-      "code": "CRUNCH",
-      "name": "卷腹",
-      "category": "核心",
-      "subcategory": null,
-      "equipmentType": "自重",
-      "primaryRegions": [
-        "abs"
-      ],
-      "secondaryRegions": [],
-      "formCues": [],
-      "source": "preset-v1",
-      "order": 152,
-      "note": "必留"
-    },
-    {
       "code": "SIT_UP",
       "name": "仰卧起坐",
       "category": "核心",
@@ -2685,7 +2670,7 @@
     },
     {
       "code": "SIDE_PLANK",
-      "name": "侧平板支撑",
+      "name": "侧支撑",
       "category": "核心",
       "subcategory": null,
       "equipmentType": "自重",
@@ -2735,10 +2720,10 @@
     },
     {
       "code": "RUSSIAN_TWIST",
-      "name": "俄罗斯转体",
+      "name": "负重俄罗斯转体",
       "category": "核心",
       "subcategory": null,
-      "equipmentType": "自重",
+      "equipmentType": "杠铃",
       "primaryRegions": [
         "obliques"
       ],
@@ -2799,7 +2784,7 @@
     },
     {
       "code": "INCLINE_CRUNCH",
-      "name": "上斜卷腹",
+      "name": "下斜凳卷腹",
       "category": "核心",
       "subcategory": null,
       "equipmentType": "自重",
@@ -2814,7 +2799,7 @@
     },
     {
       "code": "INCLINE_TWIST_CRUNCH",
-      "name": "上斜卷腹转体",
+      "name": "下斜凳卷腹转体",
       "category": "核心",
       "subcategory": null,
       "equipmentType": "自重",
@@ -3252,6 +3237,24 @@
       "formCues": [],
       "source": "preset-v1",
       "order": 191
+    },
+    {
+      "code": "MACHINE_PULLOVER",
+      "name": "器械上拉",
+      "category": "背",
+      "subcategory": null,
+      "equipmentType": "器械",
+      "primaryRegions": [
+        "lats"
+      ],
+      "secondaryRegions": [
+        "chest",
+        "triceps"
+      ],
+      "note": "扩展新增",
+      "formCues": [],
+      "source": "preset-v1",
+      "order": 192
     },
     {
       "code": "LANDMINE_ROW",

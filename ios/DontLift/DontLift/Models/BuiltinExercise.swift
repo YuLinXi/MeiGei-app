@@ -273,15 +273,14 @@ extension BuiltinExercise {
 
         // MARK: 核心
         .init(code: "PLANK", name: "平板支撑", category: "核心", subcategory: "核心稳定", equipmentType: "自重"),
-        .init(code: "SIDE_PLANK", name: "侧平板支撑", category: "核心", subcategory: "核心稳定", equipmentType: "自重"),
+        .init(code: "SIDE_PLANK", name: "侧支撑", category: "核心", subcategory: "核心稳定", equipmentType: "自重"),
         .init(code: "HANGING_LEG_RAISE", name: "悬垂举腿", category: "核心", subcategory: "下腹", equipmentType: "自重"),
         .init(code: "HANGING_KNEE_RAISE", name: "悬垂提膝", category: "核心", subcategory: "下腹", equipmentType: "自重"),
         .init(code: "LEG_RAISE", name: "仰卧举腿", category: "核心", subcategory: "下腹", equipmentType: "自重"),
-        .init(code: "CRUNCH", name: "卷腹", category: "核心", subcategory: "上腹", equipmentType: "自重"),
         .init(code: "CABLE_CRUNCH", name: "绳索卷腹", category: "核心", subcategory: "上腹", equipmentType: "绳索"),
         .init(code: "BICYCLE_CRUNCH", name: "单车卷腹", category: "核心", subcategory: "腹斜肌", equipmentType: "自重"),
         .init(code: "V_UP", name: "V字两头起", category: "核心", subcategory: "上腹", equipmentType: "自重"),
-        .init(code: "RUSSIAN_TWIST", name: "俄罗斯转体", category: "核心", subcategory: "腹斜肌", equipmentType: "自重"),
+        .init(code: "RUSSIAN_TWIST", name: "负重俄罗斯转体", category: "核心", subcategory: "腹斜肌", equipmentType: "杠铃"),
         .init(code: "AB_WHEEL", name: "健腹轮", category: "核心", subcategory: "上腹", equipmentType: "自重"),
         .init(code: "MOUNTAIN_CLIMBER", name: "登山者", category: "核心", subcategory: "核心稳定", equipmentType: "自重"),
         .init(code: "DEAD_BUG", name: "死虫式", category: "核心", subcategory: "核心稳定", equipmentType: "自重"),

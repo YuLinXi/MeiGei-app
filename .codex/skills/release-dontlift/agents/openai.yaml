@@ -1,0 +1,4 @@
+interface:
+  display_name: "别练了发版"
+  short_description: "按项目门禁准备、验证并记录 TestFlight 与生产发版"
+  default_prompt: "使用 $release-dontlift 准备下一次《别练了》发版，生成清单和功能介绍并核对全部上线门禁。"

@@ -4,20 +4,20 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T21:59:21.016Z",
+  "generatedAt": "2026-08-08T05:39:46.683Z",
   "promptPath": "art/exercise-static/briefs/CLAMSHELL.json",
   "briefPath": "art/exercise-static/briefs/CLAMSHELL.json",
   "inputs": [
     {
       "kind": "original-text",
       "source": "art/exercise-static/briefs/CLAMSHELL.json",
-      "sha256": "9eeb8341c74770a5d37b0be0a562a057714de7c7d5d36adfc1ea449a97e2f716",
+      "sha256": "d417d5939bd62eeb85681a2d52128bc0a81bf64319859fb66ff878d47592f261",
       "rightsBasis": "本项目原创动作与器械 brief"
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/CLAMSHELL/CLAMSHELL-candidate-01.png",
-      "sha256": "6e9ad9b4e95a4d84886b27e87000cc271ddca2d79bf78d297d4ad294b48dc3be",
+      "source": "art/exercise-static/candidates/CLAMSHELL/CLAMSHELL-candidate-04.png",
+      "sha256": "f58587ad0ac9cc14a3a678c37a5d631cd842e526680ac71c7291f620c892fedb",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
@@ -37,9 +37,9 @@
   "file": "art/exercise-static/masters/approved/CLAMSHELL-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1837042,
-  "sha256": "6e9ad9b4e95a4d84886b27e87000cc271ddca2d79bf78d297d4ad294b48dc3be",
+  "sizeBytes": 1235401,
+  "sha256": "f58587ad0ac9cc14a3a678c37a5d631cd842e526680ac71c7291f620c892fedb",
   "reviewRecord": "art/exercise-static/reviews/CLAMSHELL-review.json",
-  "approvedAt": "2026-07-25T21:59:21.016Z",
-  "reviewerId": "production-autopilot"
+  "approvedAt": "2026-08-08T05:39:46.683Z",
+  "reviewerId": "project-owner"
 }

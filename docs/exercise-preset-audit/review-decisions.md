@@ -226,7 +226,7 @@
 - `BIRD_DOG`：鸟狗
 - `RUSSIAN_TWIST`：俄罗斯转体
 - `WOODCHOPPER`：绳索伐木
-- `INCLINE_TWIST_CRUNCH`：上斜卷腹转体
+- `INCLINE_TWIST_CRUNCH`：下斜凳卷腹转体
 - `AB_WHEEL`：健腹轮
 
 回填规则：

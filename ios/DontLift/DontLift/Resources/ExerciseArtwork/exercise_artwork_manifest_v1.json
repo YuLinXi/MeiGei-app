@@ -1165,10 +1165,10 @@
     },
     "CLAMSHELL": {
       "file": "exercise_CLAMSHELL.jpg",
-      "sha256": "b053d2fcc5e9b2b75e88db37ad03af328416b8bc40e55e2070d03810a952aa8e",
+      "sha256": "ac075404ddfd5a641db79e327f6dd47ea9a4225074ec6a36536f242d8f6498bb",
       "pixelWidth": 288,
       "pixelHeight": 288,
-      "sizeBytes": 14427
+      "sizeBytes": 12155
     },
     "DB_SINGLE_LEG_DEADLIFT": {
       "file": "exercise_DB_SINGLE_LEG_DEADLIFT.jpg",
@@ -1239,6 +1239,118 @@
       "pixelWidth": 288,
       "pixelHeight": 288,
       "sizeBytes": 19898
+    },
+    "SUPINATED_DB_LATERAL_RAISE": {
+      "file": "exercise_SUPINATED_DB_LATERAL_RAISE.jpg",
+      "sha256": "9006d2fc8eefaec4f0c6a61cd6b4de5e68c691492023d174e421901388e10f9f",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 15005
+    },
+    "CABLE_UPRIGHT_ROW": {
+      "file": "exercise_CABLE_UPRIGHT_ROW.jpg",
+      "sha256": "d7a74e02d97d7fad5445c64d85e0aec1a1c3f57c3753fdbecfcb3626e64812bb",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16866
+    },
+    "MACHINE_DECLINE_CHEST_PRESS": {
+      "file": "exercise_MACHINE_DECLINE_CHEST_PRESS.jpg",
+      "sha256": "58f58638c837ce19d334d93728b2500c542e674f7aa85cbec51a1f209a5232b7",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 22685
+    },
+    "PLANK": {
+      "file": "exercise_PLANK.jpg",
+      "sha256": "3dff2e82b54fd533e81f9d3dc646596d0acf916899c5ad8fd110a143175482ad",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12734
+    },
+    "RUSSIAN_TWIST": {
+      "file": "exercise_RUSSIAN_TWIST.jpg",
+      "sha256": "99c6565aab916a6b485d7479346a4895732bd3c479d002925af78ecf6a601a2d",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 16037
+    },
+    "DEAD_BUG": {
+      "file": "exercise_DEAD_BUG.jpg",
+      "sha256": "2f0816eb7bfb1d12bafca9c6d8b4f6145170a1328ba99f0097afd7e4ec411162",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 8806
+    },
+    "HANGING_LEG_RAISE": {
+      "file": "exercise_HANGING_LEG_RAISE.jpg",
+      "sha256": "8a5720ebee8ad9e832d2ce4006d0a55782b7fc778922c474e4c841ed044a00a0",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 17952
+    },
+    "SIT_UP": {
+      "file": "exercise_SIT_UP.jpg",
+      "sha256": "067fa0dee53c41c02ced628f3491435f42d956c921323ab9c9cfbfe0d999f6bb",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 14727
+    },
+    "REVERSE_CRUNCH": {
+      "file": "exercise_REVERSE_CRUNCH.jpg",
+      "sha256": "be1998a785e250618606157d546e8f6111417c6eb880b5be1ebd3e1eb81104ef",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 13113
+    },
+    "BIRD_DOG": {
+      "file": "exercise_BIRD_DOG.jpg",
+      "sha256": "5ed6c7a4851ee3e4fad59ad241e38532b26267c013ee7543691757c99447560b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 10439
+    },
+    "PLANK_BUTTERFLY_CRUNCH": {
+      "file": "exercise_PLANK_BUTTERFLY_CRUNCH.jpg",
+      "sha256": "d7e9bc458eeea7ee2ecdaae8743537505d569bd5d7272f3c02622d8e118b3e2b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18113
+    },
+    "INCLINE_TWIST_CRUNCH": {
+      "file": "exercise_INCLINE_TWIST_CRUNCH.jpg",
+      "sha256": "79c743b38d58e81b7624c30a95d8945de499e5f270b561481092f2daf53a08a2",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 17146
+    },
+    "AB_WHEEL": {
+      "file": "exercise_AB_WHEEL.jpg",
+      "sha256": "53b7af2b6906ac61de1bc3a914a7dffef584fa9b6b8c914829060a522a619d2d",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 9178
+    },
+    "LYING_LEG_RAISE": {
+      "file": "exercise_LYING_LEG_RAISE.jpg",
+      "sha256": "f4dc1d0f346ad925201bfb9185a01b4b4f133104a4f1ebde6770d64cd35fede0",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 9902
+    },
+    "INCLINE_CRUNCH": {
+      "file": "exercise_INCLINE_CRUNCH.jpg",
+      "sha256": "a6d272a54ef9e6e8948c5fcbdc70e6043ce44e6e2eb0c39a730fbcd482931644",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 18100
+    },
+    "SIDE_PLANK": {
+      "file": "exercise_SIDE_PLANK.jpg",
+      "sha256": "9e4c120cde6c1be60deab08c11538246e4a45a624c172ca9b77edd48a62d82c3",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "sizeBytes": 12697
     }
   }
 }

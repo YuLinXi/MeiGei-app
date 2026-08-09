@@ -3,6 +3,39 @@
   "generatedFrom": "docs/exercise-library-preset-v1.md",
   "aliases": [
     {
+      "targetCode": "RUSSIAN_TWIST",
+      "targetName": "负重俄罗斯转体",
+      "legacyCodes": [
+        "RUSSIAN_TWIST"
+      ],
+      "legacyNames": [
+        "俄罗斯转体"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "SIDE_PLANK",
+      "targetName": "侧支撑",
+      "legacyCodes": [
+        "SIDE_PLANK"
+      ],
+      "legacyNames": [
+        "侧平板支撑"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "INCLINE_TWIST_CRUNCH",
+      "targetName": "下斜凳卷腹转体",
+      "legacyCodes": [
+        "INCLINE_TWIST_CRUNCH"
+      ],
+      "legacyNames": [
+        "上斜卷腹转体"
+      ],
+      "requiresNameMatch": false
+    },
+    {
       "targetCode": "LAT_PULLDOWN",
       "targetName": "高位下拉",
       "legacyCodes": [
@@ -380,11 +413,12 @@
     },
     {
       "targetCode": "REVERSE_LAT_PULLDOWN",
-      "targetName": "反握高位下拉",
+      "targetName": "窄握反手高位下拉",
       "legacyCodes": [
         "WIDE_REVERSE_PULLDOWN"
       ],
       "legacyNames": [
+        "反握高位下拉",
         "宽握反手下拉"
       ],
       "requiresNameMatch": false
@@ -402,11 +436,12 @@
     },
     {
       "targetCode": "CLOSE_LAT_PULLDOWN",
-      "targetName": "窄握高位下拉",
+      "targetName": "窄握正手高位下拉",
       "legacyCodes": [
         "CLOSE_PULLDOWN"
       ],
       "legacyNames": [
+        "窄握高位下拉",
         "窄距下拉"
       ],
       "requiresNameMatch": false

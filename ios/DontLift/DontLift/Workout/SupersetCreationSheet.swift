@@ -13,6 +13,13 @@ struct SupersetCreationResult {
     var second: Member
 }
 
+/// 训练中创建超级组的历史默认值；计划编辑不传入该值，保持计划处方语义不变。
+struct SupersetCreationPrefill: Equatable {
+    var roundCount: Int?
+    var first: SetSnapshot?
+    var second: SetSnapshot?
+}
+
 struct SupersetCreationSheet: View {
     private enum PickerSlot: Int, Identifiable {
         case first
@@ -20,7 +27,7 @@ struct SupersetCreationSheet: View {
         var id: Int { rawValue }
     }
 
-    private enum InputField: Int, CaseIterable {
+    private enum InputField: Int, CaseIterable, Hashable {
         case firstWeight
         case firstReps
         case secondWeight
@@ -45,6 +52,7 @@ struct SupersetCreationSheet: View {
 
     let title: String
     let initial: SupersetCreationResult?
+    let historyPrefill: ((ExercisePick?, ExercisePick?) -> SupersetCreationPrefill?)?
     let onSave: (SupersetCreationResult) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -60,12 +68,15 @@ struct SupersetCreationSheet: View {
     @State private var pickerSlot: PickerSlot?
     @State private var focusedField: InputField?
     @State private var pendingReplace = false
+    @State private var manuallyEditedFields = Set<InputField>()
 
     init(title: String = "创建超级组",
          initial: SupersetCreationResult? = nil,
+         historyPrefill: ((ExercisePick?, ExercisePick?) -> SupersetCreationPrefill?)? = nil,
          onSave: @escaping (SupersetCreationResult) -> Void) {
         self.title = title
         self.initial = initial
+        self.historyPrefill = historyPrefill
         self.onSave = onSave
         _firstPick = State(initialValue: initial?.first.pick)
         _secondPick = State(initialValue: initial?.second.pick)
@@ -133,6 +144,16 @@ struct SupersetCreationSheet: View {
                     secondPick = pick
                 }
             }
+        }
+        .onChange(of: firstPick?.id) { oldValue, newValue in
+            guard oldValue != newValue, historyPrefill != nil else { return }
+            resetAutomaticValues(for: .first)
+            applyHistoryPrefill()
+        }
+        .onChange(of: secondPick?.id) { oldValue, newValue in
+            guard oldValue != newValue, historyPrefill != nil else { return }
+            resetAutomaticValues(for: .second)
+            applyHistoryPrefill()
         }
     }
 
@@ -268,7 +289,7 @@ struct SupersetCreationSheet: View {
         }
 
         next += String(digit)
-        setText(next, for: field)
+        setUserText(next, for: field)
     }
 
     private func keypadDot() {
@@ -277,7 +298,7 @@ struct SupersetCreationSheet: View {
         pendingReplace = false
         guard !next.contains(".") else { return }
         next = next.isEmpty ? "0." : next + "."
-        setText(next, for: field)
+        setUserText(next, for: field)
     }
 
     private func keypadBackspace() {
@@ -285,7 +306,7 @@ struct SupersetCreationSheet: View {
         pendingReplace = false
         var next = text(for: field)
         if !next.isEmpty { next.removeLast() }
-        setText(next, for: field)
+        setUserText(next, for: field)
     }
 
     private func keypadPrev() {
@@ -326,6 +347,45 @@ struct SupersetCreationSheet: View {
         case .firstReps: firstReps = value
         case .secondWeight: secondWeight = value
         case .secondReps: secondReps = value
+        }
+    }
+
+    private func setUserText(_ value: String, for field: InputField) {
+        manuallyEditedFields.insert(field)
+        setText(value, for: field)
+    }
+
+    private func resetAutomaticValues(for slot: PickerSlot) {
+        switch slot {
+        case .first:
+            firstWeight = ""
+            firstReps = "\(PlanDefaults.suggestedReps)"
+            manuallyEditedFields.remove(.firstWeight)
+            manuallyEditedFields.remove(.firstReps)
+        case .second:
+            secondWeight = ""
+            secondReps = "\(PlanDefaults.suggestedReps)"
+            manuallyEditedFields.remove(.secondWeight)
+            manuallyEditedFields.remove(.secondReps)
+        }
+    }
+
+    private func applyHistoryPrefill() {
+        guard let prefill = historyPrefill?(firstPick, secondPick) else { return }
+        apply(prefill.first, weightField: .firstWeight, repsField: .firstReps)
+        apply(prefill.second, weightField: .secondWeight, repsField: .secondReps)
+        if let roundCount = prefill.roundCount, !manuallyEditedFields.contains(.roundCount) {
+            setText("\(roundCount)", for: .roundCount)
+        }
+    }
+
+    private func apply(_ snapshot: SetSnapshot?, weightField: InputField, repsField: InputField) {
+        guard let snapshot else { return }
+        if !manuallyEditedFields.contains(weightField) {
+            setText(snapshot.weightKg.map { formatKg($0) } ?? "", for: weightField)
+        }
+        if !manuallyEditedFields.contains(repsField) {
+            setText(snapshot.reps.map(String.init) ?? "", for: repsField)
         }
     }
 

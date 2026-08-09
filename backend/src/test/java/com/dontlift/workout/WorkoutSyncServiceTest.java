@@ -160,8 +160,8 @@ class WorkoutSyncServiceTest {
         Workout incoming = workout(now);
         incoming.setId(server.getId());
         String units = """
-                [{"unitId":"%s","kindRaw":"superset","orderIndex":0,"singleExerciseId":null,"superset":{"roundCount":4,"restAfterRoundSeconds":90,"members":[{"memberId":"%s","exerciseId":"%s","orderIndex":0},{"memberId":"%s","exerciseId":"%s","orderIndex":1}]}}]
-                """.formatted(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+                [{"unitId":"%s","kindRaw":"superset","orderIndex":0,"singleExerciseId":null,"superset":{"roundCount":4,"restAfterRoundSeconds":90,"members":[{"memberId":"%s","exerciseId":"%s","orderIndex":0},{"memberId":"%s","exerciseId":"%s","orderIndex":1}]}},{"unitId":"%s","kindRaw":"singleExercise","orderIndex":1,"singleExerciseId":"%s","restAfterSetSeconds":75}]
+                """.formatted(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
         incoming.setUnits(units);
         when(workoutMapper.findByIdIncludingDeleted(incoming.getId())).thenReturn(server);
 

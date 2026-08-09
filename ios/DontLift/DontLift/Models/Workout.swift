@@ -66,7 +66,7 @@ final class Workout: Syncable {
     }
 }
 
-enum WorkoutUnitKind: String, Codable {
+enum WorkoutUnitKind: String, Codable, Hashable {
     case singleExercise
     case dropSet
     case superset
@@ -80,6 +80,8 @@ struct WorkoutUnit: Codable, Identifiable, Hashable {
     var orderIndex: Int
     var singleExerciseId: UUID?
     var superset: WorkoutSupersetUnit?
+    /// 普通动作/递减组的默认休息秒数；nil 时回退用户全局设置。
+    var restAfterSetSeconds: Int?
     /// 含备选的普通动作保存“默认 + 备选”完整候选，供离线/重启后临场切换。
     var exerciseOptions: [PlanExerciseOption]?
     /// 备选落值需要复用来源计划模式；仅含备选的普通动作写入。
@@ -95,6 +97,7 @@ struct WorkoutUnit: Codable, Identifiable, Hashable {
         orderIndex: Int,
         singleExerciseId: UUID? = nil,
         superset: WorkoutSupersetUnit? = nil,
+        restAfterSetSeconds: Int? = nil,
         exerciseOptions: [PlanExerciseOption]? = nil,
         planModeRaw: String? = nil,
         defaultSetSnapshots: [SetSnapshot]? = nil
@@ -104,6 +107,7 @@ struct WorkoutUnit: Codable, Identifiable, Hashable {
         self.orderIndex = orderIndex
         self.singleExerciseId = singleExerciseId
         self.superset = superset
+        self.restAfterSetSeconds = restAfterSetSeconds
         self.exerciseOptions = exerciseOptions
         self.planModeRaw = planModeRaw
         self.defaultSetSnapshots = defaultSetSnapshots

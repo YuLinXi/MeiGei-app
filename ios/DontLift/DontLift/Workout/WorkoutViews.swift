@@ -800,8 +800,6 @@ struct WorkoutLoggingView: View {
         case collapsedAll
     }
     @State private var accordion: AccordionState = .auto
-    /// 动作级组间休息时长（秒，0=关）；会话期内存，按 exercise.localId 键。
-    @State private var restByExercise: [UUID: Int] = [:]
     /// 当前正在编辑自定义休息秒数的动作或超级组。
     @State private var restEditingTarget: WorkoutRestMenuTarget?
     /// 自定义休息秒数输入缓冲（仅整数秒）。
@@ -1300,7 +1298,7 @@ struct WorkoutLoggingView: View {
             ExercisePickerView { pick in addExercise(pick, kind: pendingExerciseUnitKind) }
         }
         .sheet(isPresented: $creatingSuperset) {
-            SupersetCreationSheet { result in addSuperset(result) }
+            SupersetCreationSheet(historyPrefill: supersetHistoryPrefill) { result in addSuperset(result) }
         }
         .sheet(isPresented: $showingOrderEditor) {
             ExerciseOrderEditorSheet(title: "调整动作顺序",
@@ -1348,6 +1346,7 @@ struct WorkoutLoggingView: View {
         }
         .onAppear {
             consumeRestCompletionIfNeeded()
+            historyStore.ensureLoaded(reason: .manual)
             workoutLiveActivity.syncWorkout(workout)
         }
         .onDisappear {
@@ -1529,7 +1528,7 @@ struct WorkoutLoggingView: View {
 
     private var exerciseSectionHeader: some View {
         Group {
-            if canEdit && workout.exercises.count > 1 && workout.supersetExerciseIds.isEmpty {
+            if canEdit && workout.trainingUnits.count > 1 {
                 HStack {
                     Text("训练动作")
                         .font(Theme.Font.body(size: 12, weight: .bold))
@@ -1702,7 +1701,10 @@ struct WorkoutLoggingView: View {
                               onRoundCountChange: { rounds in updateSupersetRoundCount(unit, rounds: rounds) },
                               onChange: touch,
                               onCompleteRound: { anchorSet in
-                                  let fallbackRest = superset.restAfterRoundSeconds ?? Int(restTimer.defaultDuration)
+                                  let fallbackRest = WorkoutRestPolicy.defaultRestSeconds(
+                                      actionDefaultSeconds: superset.restAfterRoundSeconds,
+                                      globalDefaultSeconds: Int(restTimer.defaultDuration)
+                                  )
                                   completeSupersetRound(anchorSet: anchorSet,
                                                         unit: unit,
                                                         fallbackRestSeconds: fallbackRest)
@@ -1718,7 +1720,10 @@ struct WorkoutLoggingView: View {
                                      unitId: UUID,
                                      activeId: UUID?,
                                      isDropSetUnit: Bool = false) -> some View {
-        let fallbackRestSeconds = restByExercise[ex.localId] ?? Int(restTimer.defaultDuration)
+        let fallbackRestSeconds = WorkoutRestPolicy.defaultRestSeconds(
+            actionDefaultSeconds: workout.trainingUnits.first(where: { $0.unitId == unitId })?.restAfterSetSeconds,
+            globalDefaultSeconds: Int(restTimer.defaultDuration)
+        )
         let alternativeCount = max(0, (switchableUnit(for: ex)?.exerciseOptions?.count ?? 1) - 1)
         return ExerciseBlock(exercise: ex,
                              isDropSetUnit: isDropSetUnit,
@@ -1846,7 +1851,7 @@ struct WorkoutLoggingView: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("组间休息").font(Theme.Font.l2).foregroundStyle(Theme.Color.fg)
+                    Text(restMenuTitle(for: target)).font(Theme.Font.l2).foregroundStyle(Theme.Color.fg)
                     Spacer()
                     Text(current == 0 ? "关" : "\(current)s")
                         .font(Theme.Font.mono(size: 15, weight: .bold))
@@ -1904,7 +1909,7 @@ struct WorkoutLoggingView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("自定义组间休息秒数")
+                    .accessibilityLabel("自定义\(restMenuTitle(for: target))秒数")
                     .accessibilityValue(customAccessibilityValue)
                     .accessibilityHint("双击编辑自定义秒数")
                 }
@@ -2006,18 +2011,33 @@ struct WorkoutLoggingView: View {
     private func currentRestSeconds(for target: WorkoutActionMenuTarget) -> Int {
         switch target {
         case .exercise(let ex):
-            return restByExercise[ex.localId] ?? Int(restTimer.defaultDuration)
+            return WorkoutRestPolicy.defaultRestSeconds(
+                actionDefaultSeconds: workout.trainingUnits.first(where: { $0.singleExerciseId == ex.localId })?.restAfterSetSeconds,
+                globalDefaultSeconds: Int(restTimer.defaultDuration)
+            )
         case .superset(let unit, _, _):
-            return max(0, unit.superset?.restAfterRoundSeconds ?? Int(restTimer.defaultDuration))
+            return WorkoutRestPolicy.defaultRestSeconds(
+                actionDefaultSeconds: unit.superset?.restAfterRoundSeconds,
+                globalDefaultSeconds: Int(restTimer.defaultDuration)
+            )
         }
     }
 
     private func restDescription(for target: WorkoutActionMenuTarget, seconds: Int) -> String {
         switch target {
         case .exercise:
-            return seconds == 0 ? "该动作完成后不自动开始休息" : "该动作每组完成后统一休息 \(seconds) 秒"
+            return seconds == 0 ? "该动作完成后不自动开始休息" : "该动作每组完成后默认休息 \(seconds) 秒；已完成的上一组休息优先沿用其最终目标"
         case .superset:
-            return seconds == 0 ? "该超级组完成后不自动开始休息" : "该超级组每组完成后统一休息 \(seconds) 秒"
+            return seconds == 0 ? "该超级组完成后不自动开始休息" : "该超级组每轮完成后默认休息 \(seconds) 秒；已完成的上一轮休息优先沿用其最终目标"
+        }
+    }
+
+    private func restMenuTitle(for target: WorkoutActionMenuTarget) -> String {
+        switch target {
+        case .exercise:
+            return "默认休息"
+        case .superset:
+            return "轮后休息"
         }
     }
 
@@ -2146,6 +2166,7 @@ struct WorkoutLoggingView: View {
         if focused != nil { dismissKeypad() }
         if accordion == .auto { accordion = .expanded(unitId) }
         startTimerIfNeeded()
+        recordActiveRestIfNeeded()
         let secs = WorkoutRestPolicy.plannedRestSeconds(
             completing: set,
             in: ex,
@@ -2154,7 +2175,6 @@ struct WorkoutLoggingView: View {
         set.plannedRestSeconds = secs
         touch()
         if secs > 0 {
-            recordActiveRestIfNeeded()
             continuedRestBaseBySet[set.localId] = nil
             let nextSet = nextSetSummary(after: set.localId)
             workoutLiveActivity.syncWorkout(workout)
@@ -2170,6 +2190,7 @@ struct WorkoutLoggingView: View {
         if focused != nil { dismissKeypad() }
         if accordion == .auto { accordion = .expanded(unit.unitId) }
         startTimerIfNeeded()
+        recordActiveRestIfNeeded()
         let secs: Int
         if let ex = exercise(containing: anchorSet.localId) {
             secs = WorkoutRestPolicy.plannedRestSeconds(
@@ -2183,7 +2204,6 @@ struct WorkoutLoggingView: View {
         anchorSet.plannedRestSeconds = secs
         touch()
         if secs > 0 {
-            recordActiveRestIfNeeded()
             continuedRestBaseBySet[anchorSet.localId] = nil
             let nextSet = nextSetSummary(after: anchorSet.localId)
             workoutLiveActivity.syncWorkout(workout)
@@ -2224,13 +2244,18 @@ struct WorkoutLoggingView: View {
         let ex = WorkoutExercise(builtinExerciseCode: pick.builtinCode, customExerciseId: pick.customId,
                                  exerciseName: pick.name, primaryMuscle: pick.primaryMuscle,
                                  orderIndex: workout.exercises.count)
+        let snapshots = historyStore.planLookup.latestSets(forWorkoutHistoryKey: pick.historyKey, kind: kind)
         switch kind {
         case .dropSet:
-            let set = WorkoutSet(setIndex: 0, setType: .drop)
-            set.configureAsDropSet(defaultWeight: nil, defaultReps: nil)
-            ex.sets = [set]
+            if snapshots.isEmpty {
+                let set = WorkoutSet(setIndex: 0, setType: .drop)
+                set.configureAsDropSet(defaultWeight: nil, defaultReps: nil)
+                ex.sets = [set]
+            } else {
+                ex.sets = PlanPrefill.sets(from: snapshots)
+            }
         case .singleExercise, .superset:
-            ex.sets = [WorkoutSet(setIndex: 0)]
+            ex.sets = snapshots.isEmpty ? [WorkoutSet(setIndex: 0)] : PlanPrefill.sets(from: snapshots)
         }
         workout.exercises.append(ex)
         if kind == .dropSet {
@@ -2250,6 +2275,23 @@ struct WorkoutLoggingView: View {
         workout.exercises.append(second)
         workout.appendSupersetUnit(first: first, second: second, roundCount: result.roundCount)
         touch()
+    }
+
+    private func supersetHistoryPrefill(_ first: ExercisePick?, _ second: ExercisePick?) -> SupersetCreationPrefill? {
+        let lookup = historyStore.planLookup
+        let firstSnapshot = first.flatMap { lookup.latestSupersetMember(forHistoryKey: $0.historyKey) }
+        let secondSnapshot = second.flatMap { lookup.latestSupersetMember(forHistoryKey: $0.historyKey) }
+        guard firstSnapshot != nil || secondSnapshot != nil else { return nil }
+
+        guard let first, let second,
+              let pair = lookup.latestSuperset(firstHistoryKey: first.historyKey, secondHistoryKey: second.historyKey) else {
+            return SupersetCreationPrefill(roundCount: nil, first: firstSnapshot, second: secondSnapshot)
+        }
+        return SupersetCreationPrefill(
+            roundCount: pair.roundCount,
+            first: pair.value(for: first.historyKey),
+            second: pair.value(for: second.historyKey)
+        )
     }
 
     private func workoutExercise(from member: SupersetCreationResult.Member, orderIndex: Int) -> WorkoutExercise {
@@ -2527,7 +2569,10 @@ struct WorkoutLoggingView: View {
     private func setRestDuration(_ seconds: Int, for target: WorkoutRestMenuTarget) {
         switch target {
         case .exercise(let id):
-            restByExercise[id] = seconds
+            guard var unit = workout.trainingUnits.first(where: { $0.singleExerciseId == id }) else { return }
+            unit.restAfterSetSeconds = seconds
+            workout.updateSuperset(unit)
+            touch()
         case .superset(let unitId):
             updateSupersetRest(unitId, seconds: seconds)
         }
@@ -2576,9 +2621,15 @@ struct WorkoutLoggingView: View {
             continuedRestBaseBySet[event.setId] = nil
             return
         }
+        let continuedBase = continuedRestBaseBySet.removeValue(forKey: event.setId)
+        set.plannedRestSeconds = WorkoutRestPolicy.finalPlannedRestSeconds(
+            targetSeconds: event.targetSeconds,
+            previousPlannedSeconds: set.plannedRestSeconds,
+            isContinuation: continuedBase != nil
+        )
         set.actualRestSeconds = WorkoutRestPolicy.actualRestSecondsAfterCompletion(
             elapsedSeconds: event.elapsedSeconds,
-            continuedBaseSeconds: continuedRestBaseBySet.removeValue(forKey: event.setId),
+            continuedBaseSeconds: continuedBase,
             persistedActualRestSeconds: set.actualRestSeconds
         )
         touch()

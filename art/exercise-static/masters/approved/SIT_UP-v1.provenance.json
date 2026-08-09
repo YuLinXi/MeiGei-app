@@ -1,0 +1,45 @@
+{
+  "assetId": "SIT_UP-v1",
+  "exerciseCode": "SIT_UP",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-08-08T02:46:58.543Z",
+  "promptPath": "art/exercise-static/briefs/SIT_UP.json",
+  "briefPath": "art/exercise-static/briefs/SIT_UP.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/SIT_UP.json",
+      "sha256": "f37587212f035279a100ee5e53340dede92ebca919f1ff8c1459acbe67cd3654",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/SIT_UP/SIT_UP-candidate-01.png",
+      "sha256": "c6cbb9b9cd62f5467c1bd9423084ea037a70e6eca5dc51b69576fa0d9ffcda7e",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/SIT_UP-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1823661,
+  "sha256": "c6cbb9b9cd62f5467c1bd9423084ea037a70e6eca5dc51b69576fa0d9ffcda7e",
+  "reviewRecord": "art/exercise-static/reviews/SIT_UP-review.json",
+  "approvedAt": "2026-08-08T02:46:58.543Z",
+  "reviewerId": "project-owner"
+}

@@ -1,0 +1,45 @@
+{
+  "assetId": "REVERSE_CRUNCH-v1",
+  "exerciseCode": "REVERSE_CRUNCH",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-08-08T02:48:38.107Z",
+  "promptPath": "art/exercise-static/briefs/REVERSE_CRUNCH.json",
+  "briefPath": "art/exercise-static/briefs/REVERSE_CRUNCH.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/REVERSE_CRUNCH.json",
+      "sha256": "9a6def42dced2f9964a40b228ce011f57f1c14ef2116f69b9b9e804f1da4f726",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/REVERSE_CRUNCH/REVERSE_CRUNCH-candidate-01.png",
+      "sha256": "098d1eec943f83cffb873e198a31d4b34f47ab82c2de4aa6c2bf08381e497412",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/REVERSE_CRUNCH-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1786960,
+  "sha256": "098d1eec943f83cffb873e198a31d4b34f47ab82c2de4aa6c2bf08381e497412",
+  "reviewRecord": "art/exercise-static/reviews/REVERSE_CRUNCH-review.json",
+  "approvedAt": "2026-08-08T02:48:38.107Z",
+  "reviewerId": "project-owner"
+}

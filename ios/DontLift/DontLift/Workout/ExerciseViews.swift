@@ -10,6 +10,11 @@ struct ExercisePick: Identifiable, Hashable {
     var primaryMuscle: String?
     var equipmentType: String?
     var id: String { builtinCode ?? customId?.uuidString ?? name }
+
+    /// 与训练历史、计划预填共用同一动作归并规则，避免别名造成临时新增动作漏匹配。
+    var historyKey: String {
+        ExerciseLibrary.canonicalHistoryKey(code: builtinCode, name: name, customId: customId)
+    }
 }
 
 // MARK: - 3.4 动作库（Screen 04，Neon 改版）

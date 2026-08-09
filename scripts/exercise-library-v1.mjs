@@ -48,7 +48,7 @@ const manualCodes = new Map(Object.entries({
   "泡沫轴背部放松": "FOAM_ROLL_BACK",
   "泡沫轴小腿放松": "FOAM_ROLL_CALF",
   "平板蝴蝶收腹": "PLANK_BUTTERFLY_CRUNCH",
-  "上斜卷腹转体": "INCLINE_TWIST_CRUNCH",
+  "下斜凳卷腹转体": "INCLINE_TWIST_CRUNCH",
   "反向山羊挺身": "REVERSE_HYPEREXTENSION",
   "史密斯正手划船": "SMITH_OVERHAND_ROW",
   "史密斯反手划船": "SMITH_REVERSE_ROW",
@@ -61,8 +61,10 @@ const manualCodes = new Map(Object.entries({
   "双杠臂屈伸（三头）": "TRICEP_DIP",
   "反握引体向上": "CHIN_UP",
   "宽握引体向上": "WIDE_PULL_UP",
-  "反握高位下拉": "REVERSE_LAT_PULLDOWN",
+  "窄握正手高位下拉": "CLOSE_LAT_PULLDOWN",
+  "窄握反手高位下拉": "REVERSE_LAT_PULLDOWN",
   "单臂高位下拉": "SINGLE_ARM_LAT_PULLDOWN",
+  "器械上拉": "MACHINE_PULLOVER",
   "悍马机下拉": "HAMMER_PULLDOWN",
   "单臂悍马机下拉": "SINGLE_ARM_HAMMER_PULLDOWN",
   "哑铃划船": "DB_BENT_OVER_ROW",
@@ -85,11 +87,15 @@ const manualCodes = new Map(Object.entries({
   "死虫": "DEAD_BUG",
   "鸟狗": "BIRD_DOG",
   "上斜卷腹": "INCLINE_CRUNCH",
+  "负重俄罗斯转体": "RUSSIAN_TWIST",
   "战绳": "BATTLE_ROPE",
   "猫牛式": "CAT_COW",
 }));
 
 const manualAliases = [
+  { targetName: "侧支撑", legacyCodes: ["SIDE_PLANK"], legacyNames: ["侧平板支撑"] },
+  { targetName: "负重俄罗斯转体", legacyCodes: ["RUSSIAN_TWIST"], legacyNames: ["俄罗斯转体"] },
+  { targetName: "下斜凳卷腹转体", legacyCodes: ["INCLINE_TWIST_CRUNCH"], legacyNames: ["上斜卷腹转体"] },
   { targetName: "高位下拉", legacyCodes: ["LAT_PULLDOWN"], legacyNames: ["宽距下拉", "宽握高位下拉", "高位下拉"] },
   { targetName: "绳索臂屈伸", legacyCodes: ["CABLE_TRICEP_EXT"], legacyNames: ["绳索臂屈伸"] },
   { targetName: "蝴蝶机反向飞鸟", legacyCodes: ["MACHINE_REVERSE_FLY", "REVERSE_PEC_DECK"], legacyNames: ["蝴蝶机反向飞鸟", "反向蝴蝶机"] },
@@ -126,9 +132,9 @@ const manualAliases = [
   { targetName: "坐姿绳索拉杆二头弯举", legacyNames: ["坐姿绳索拉杆二头弯举"] },
   { targetName: "牧师凳俯身飞鸟", legacyNames: ["牧师凳 附身飞鸟", "牧师凳俯身飞鸟"] },
   { targetName: "肩部动态热身", legacyNames: ["练肩热身", "肩部热身", "肩部动态热身"] },
-  { targetName: "反握高位下拉", legacyCodes: ["WIDE_REVERSE_PULLDOWN"], legacyNames: ["宽握反手下拉"] },
+  { targetName: "窄握反手高位下拉", legacyCodes: ["WIDE_REVERSE_PULLDOWN"], legacyNames: ["反握高位下拉", "宽握反手下拉"] },
   { targetName: "宽握坐姿划船", legacyCodes: ["BB_WIDE_SEATED_ROW"], legacyNames: ["拉杆坐姿划船(宽握)"] },
-  { targetName: "窄握高位下拉", legacyCodes: ["CLOSE_PULLDOWN"], legacyNames: ["窄距下拉"] },
+  { targetName: "窄握正手高位下拉", legacyCodes: ["CLOSE_PULLDOWN"], legacyNames: ["窄握高位下拉", "窄距下拉"] },
   { targetName: "单臂悍马机划船", legacyCodes: ["HAMMER_SEATED_SINGLE_ARM_ROW"], legacyNames: ["单手坐姿悍马机划船"] },
   { targetName: "单臂绳索下拉", legacyCodes: ["SINGLE_ARM_PULLDOWN"], legacyNames: ["单手下拉", "龙门架绳索单臂侧拉"] },
   { targetName: "俯卧哑铃划船", legacyCodes: ["DB_PRONE_HAMMER_ROW"], legacyNames: ["俯卧哑铃划船（锤式）"] },
@@ -165,6 +171,7 @@ const removedRecords = [
   ["四足向后旋转", "lowValue", "不进入新预置库"],
   ["TraditionalStrengthTraining", "healthKitGeneric", "HealthKit 泛称，不进入动作库"],
   ["沙发伸展", "lowValue", "不进入新预置库"],
+  ["卷腹", "lowValue", "不再作为独立预置动作保留，历史记录保留原名"],
 ].map(([name, reason, note]) => ({ name, reason, note, allowNewSelection: false, keepHistoricalDisplay: true }));
 
 const extraPresetRows = [
@@ -412,10 +419,10 @@ function validateManifests(preset = loadJson(presetPath), aliases = loadJson(ali
       if (removedNames.has(n) && alias.targetName !== n) continue;
     }
   }
-  for (const must of ["下斜史密斯卧推", "悍马机卧推", "绳索面拉", "器械倒蹬机", "坐姿绳索拉杆二头弯举", "农夫行走", "壶铃摆荡"]) {
+  for (const must of ["下斜史密斯卧推", "悍马机卧推", "绳索面拉", "器械倒蹬机", "器械上拉", "坐姿绳索拉杆二头弯举", "农夫行走", "壶铃摆荡"]) {
     if (!names.has(must)) errors.push(`缺关键保留动作: ${must}`);
   }
-  for (const gone of ["派克俯卧撑", "扎特曼弯举", "JM 推", "西西深蹲", "弹力带蚌式", "TraditionalStrengthTraining"]) {
+  for (const gone of ["派克俯卧撑", "扎特曼弯举", "JM 推", "西西深蹲", "弹力带蚌式", "TraditionalStrengthTraining", "卷腹"]) {
     if (names.has(gone)) errors.push(`明确移除动作仍在预置库: ${gone}`);
   }
   return errors;
@@ -476,6 +483,11 @@ if (command === "generate") {
   const errors = validateManifests(preset, aliases, removed);
   if (errors.length) {
     console.error(errors.join("\n"));
+    process.exit(1);
+  }
+  const existingCount = fs.existsSync(presetPath) ? loadJson(presetPath).exercises.length : 0;
+  if (preset.exercises.length < existingCount) {
+    console.error(`拒绝覆盖动作库：生成结果 ${preset.exercises.length} 条，少于现有 ${existingCount} 条。请先补齐来源文档。`);
     process.exit(1);
   }
   writeJson(presetPath, preset);

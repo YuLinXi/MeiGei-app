@@ -22,7 +22,11 @@ const runtimePixels = 288;
 const jpegQuality = 82;
 const maximumRuntimeBytes = 24_576;
 // 个别高细节母版在 Q82 下超过单图 24 KiB 上限，保留尺寸并降低其 JPEG 质量。
-const runtimeQualityOverrides = { HAMMER_LATERAL_RAISE: 70 };
+// MACHINE_DECLINE_CHEST_PRESS 需保留双配重塔和双机械臂细节，Q82/Q70 均超限，Q65 为 22685 bytes。
+const runtimeQualityOverrides = {
+  HAMMER_LATERAL_RAISE: 70,
+  MACHINE_DECLINE_CHEST_PRESS: 65,
+};
 
 function fail(message) {
   throw new Error(message);

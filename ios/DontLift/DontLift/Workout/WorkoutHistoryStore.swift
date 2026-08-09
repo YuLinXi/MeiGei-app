@@ -169,10 +169,45 @@ struct PlanWorkoutCompletionSnapshot: Equatable {
     var completedHistoryKeys: Set<String>
 }
 
+/// 训练中临时创建单元的历史索引键。计划预填沿用既有 planItemId 索引，避免混淆两套语义。
+struct WorkoutUnitHistoryKey: Hashable {
+    var historyKey: String
+    var kind: WorkoutUnitKind
+}
+
+/// 超级组配对忽略选择顺序；成员值仍按各自动作 key 回填。
+struct SupersetHistoryPairKey: Hashable {
+    var firstHistoryKey: String
+    var secondHistoryKey: String
+
+    init(_ firstHistoryKey: String, _ secondHistoryKey: String) {
+        if firstHistoryKey <= secondHistoryKey {
+            self.firstHistoryKey = firstHistoryKey
+            self.secondHistoryKey = secondHistoryKey
+        } else {
+            self.firstHistoryKey = secondHistoryKey
+            self.secondHistoryKey = firstHistoryKey
+        }
+    }
+}
+
+struct SupersetHistoryPrefill: Equatable {
+    var roundCount: Int
+    var memberValues: [String: SetSnapshot]
+
+    func value(for historyKey: String) -> SetSnapshot? {
+        memberValues[historyKey]
+    }
+}
+
 struct PlanHistoryLookup: Equatable {
     var latestByPlanExercise: [PlanExerciseHistoryKey: LatestExercisePerformance]
     var latestByHistoryKey: [String: LatestExercisePerformance]
     var lastWorkoutByPlanId: [UUID: PlanWorkoutCompletionSnapshot]
+    /// 仅供训练中临时新增单元使用；按一级训练单元类型隔离历史。
+    var latestByWorkoutUnit: [WorkoutUnitHistoryKey: LatestExercisePerformance] = [:]
+    var latestSupersetMemberByHistoryKey: [String: LatestExercisePerformance] = [:]
+    var latestSupersetByPair: [SupersetHistoryPairKey: SupersetHistoryPrefill] = [:]
 
     static let empty = PlanHistoryLookup(
         latestByPlanExercise: [:],
@@ -206,6 +241,18 @@ struct PlanHistoryLookup: Equatable {
         if last.completedPlanItemIds.contains(item.itemId) { return nil }
         if last.completedHistoryKeys.contains(item.historyKey) { return nil }
         return last.date
+    }
+
+    func latestSets(forWorkoutHistoryKey historyKey: String, kind: WorkoutUnitKind) -> [SetSnapshot] {
+        latestByWorkoutUnit[WorkoutUnitHistoryKey(historyKey: historyKey, kind: kind)]?.sets ?? []
+    }
+
+    func latestSupersetMember(forHistoryKey historyKey: String) -> SetSnapshot? {
+        latestSupersetMemberByHistoryKey[historyKey]?.sets.last
+    }
+
+    func latestSuperset(firstHistoryKey: String, secondHistoryKey: String) -> SupersetHistoryPrefill? {
+        latestSupersetByPair[SupersetHistoryPairKey(firstHistoryKey, secondHistoryKey)]
     }
 }
 
@@ -748,6 +795,9 @@ extension PlanHistoryLookup {
         var latestByPlanExercise: [PlanExerciseHistoryKey: LatestExercisePerformance] = [:]
         var latestByHistoryKey: [String: LatestExercisePerformance] = [:]
         var lastWorkoutByPlanId: [UUID: PlanWorkoutCompletionSnapshot] = [:]
+        var latestByWorkoutUnit: [WorkoutUnitHistoryKey: LatestExercisePerformance] = [:]
+        var latestSupersetMemberByHistoryKey: [String: LatestExercisePerformance] = [:]
+        var latestSupersetByPair: [SupersetHistoryPairKey: SupersetHistoryPrefill] = [:]
 
         for workout in workouts {
             var completedPlanItemIds = Set<UUID>()
@@ -779,6 +829,60 @@ extension PlanHistoryLookup {
                 completedHistoryKeys.insert(ex.historyKey)
             }
 
+            if workout.isFinished {
+                for unit in workout.trainingUnits {
+                switch unit.kind {
+                case .singleExercise, .dropSet:
+                    guard let exerciseId = unit.singleExerciseId,
+                          let exercise = workout.exercise(id: exerciseId) else { continue }
+                    let completed = unit.kind == .singleExercise
+                        ? completedRegularSets(from: exercise)
+                        : completedDropSets(from: exercise)
+                    guard !completed.isEmpty else { continue }
+                    let key = WorkoutUnitHistoryKey(historyKey: exercise.historyKey, kind: unit.kind)
+                    if latestByWorkoutUnit[key] == nil {
+                        latestByWorkoutUnit[key] = LatestExercisePerformance(
+                            date: workout.startedAt,
+                            sets: completed.map(snapshot(from:))
+                        )
+                    }
+                case .superset:
+                    guard let superset = unit.superset,
+                          superset.members.count == 2,
+                          let first = workout.exercise(id: superset.members[0].exerciseId),
+                          let second = workout.exercise(id: superset.members[1].exerciseId) else { continue }
+                    let rounds = completedSupersetRounds(first: first, second: second, roundCount: superset.roundCount)
+                    guard !rounds.isEmpty else { continue }
+                    let firstKey = first.historyKey
+                    let secondKey = second.historyKey
+                    guard firstKey != secondKey else { continue }
+                    let firstSnapshot = snapshot(from: rounds.last!.first)
+                    let secondSnapshot = snapshot(from: rounds.last!.second)
+
+                    if latestSupersetMemberByHistoryKey[firstKey] == nil {
+                        latestSupersetMemberByHistoryKey[firstKey] = LatestExercisePerformance(
+                            date: workout.startedAt,
+                            sets: [firstSnapshot]
+                        )
+                    }
+                    if latestSupersetMemberByHistoryKey[secondKey] == nil {
+                        latestSupersetMemberByHistoryKey[secondKey] = LatestExercisePerformance(
+                            date: workout.startedAt,
+                            sets: [secondSnapshot]
+                        )
+                    }
+
+                    let pairKey = SupersetHistoryPairKey(firstKey, secondKey)
+                    if latestSupersetByPair[pairKey] == nil {
+                        latestSupersetByPair[pairKey] = SupersetHistoryPrefill(
+                            roundCount: rounds.count,
+                            memberValues: [firstKey: firstSnapshot, secondKey: secondSnapshot]
+                        )
+                    }
+                }
+            }
+            }
+
             if let planId = workout.planId, lastWorkoutByPlanId[planId] == nil {
                 lastWorkoutByPlanId[planId] = PlanWorkoutCompletionSnapshot(
                     date: workout.startedAt,
@@ -791,8 +895,56 @@ extension PlanHistoryLookup {
         return PlanHistoryLookup(
             latestByPlanExercise: latestByPlanExercise,
             latestByHistoryKey: latestByHistoryKey,
-            lastWorkoutByPlanId: lastWorkoutByPlanId
+            lastWorkoutByPlanId: lastWorkoutByPlanId,
+            latestByWorkoutUnit: latestByWorkoutUnit,
+            latestSupersetMemberByHistoryKey: latestSupersetMemberByHistoryKey,
+            latestSupersetByPair: latestSupersetByPair
         )
+    }
+
+    private static func completedRegularSets(from exercise: WorkoutExercise) -> [WorkoutSet] {
+        let regular = exercise.sets
+            .filter { $0.completed && !$0.isDropSet }
+            .sorted {
+                if $0.isWarmupEffective != $1.isWarmupEffective {
+                    return $0.isWarmupEffective && !$1.isWarmupEffective
+                }
+                return $0.setIndex < $1.setIndex
+            }
+        return regular.contains(where: { !$0.isWarmupEffective }) ? regular : []
+    }
+
+    private static func snapshot(from set: WorkoutSet) -> SetSnapshot {
+        let summary = set.summaryWeightReps
+        return SetSnapshot(
+            weightKg: summary.weightKg,
+            reps: summary.reps,
+            setTypeRaw: set.setTypeRaw,
+            isWarmup: set.isWarmupEffective,
+            segments: set.segments
+        )
+    }
+
+    private static func completedDropSets(from exercise: WorkoutExercise) -> [WorkoutSet] {
+        exercise.sets
+            .filter { $0.completed && $0.isDropSet && !$0.isWarmupEffective && !$0.effectiveSegments.isEmpty }
+            .sorted { $0.setIndex < $1.setIndex }
+    }
+
+    private static func completedSupersetRounds(first: WorkoutExercise,
+                                                second: WorkoutExercise,
+                                                roundCount: Int) -> [(first: WorkoutSet, second: WorkoutSet)] {
+        let firstByIndex = Dictionary(uniqueKeysWithValues: first.sets.map { ($0.setIndex, $0) })
+        let secondByIndex = Dictionary(uniqueKeysWithValues: second.sets.map { ($0.setIndex, $0) })
+        return (0..<max(1, roundCount)).compactMap { index in
+            guard let firstSet = firstByIndex[index],
+                  let secondSet = secondByIndex[index],
+                  firstSet.completed,
+                  secondSet.completed,
+                  !firstSet.isWarmupEffective,
+                  !secondSet.isWarmupEffective else { return nil }
+            return (firstSet, secondSet)
+        }
     }
 
     private static func completedExecutionSets(from exercise: WorkoutExercise) -> [WorkoutSet] {

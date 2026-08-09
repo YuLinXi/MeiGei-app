@@ -5489,18 +5489,18 @@
       "promptPath": "art/exercise-static/briefs/CLAMSHELL.json",
       "tool": "Codex built-in imagegen",
       "model": "not exposed by built-in tool",
-      "generatedAt": "2026-07-25T21:59:21.016Z",
+      "generatedAt": "2026-08-08T05:39:46.683Z",
       "inputs": [
         {
           "kind": "original-text",
           "source": "art/exercise-static/briefs/CLAMSHELL.json",
-          "sha256": "9eeb8341c74770a5d37b0be0a562a057714de7c7d5d36adfc1ea449a97e2f716",
+          "sha256": "d417d5939bd62eeb85681a2d52128bc0a81bf64319859fb66ff878d47592f261",
           "rightsBasis": "本项目原创动作与器械 brief"
         },
         {
           "kind": "owned-reference",
-          "source": "art/exercise-static/candidates/CLAMSHELL/CLAMSHELL-candidate-01.png",
-          "sha256": "6e9ad9b4e95a4d84886b27e87000cc271ddca2d79bf78d297d4ad294b48dc3be",
+          "source": "art/exercise-static/candidates/CLAMSHELL/CLAMSHELL-candidate-04.png",
+          "sha256": "f58587ad0ac9cc14a3a678c37a5d631cd842e526680ac71c7291f620c892fedb",
           "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
         },
         {
@@ -5517,7 +5517,7 @@
         }
       ],
       "humanEdits": "无手工像素编辑。",
-      "sha256": "6e9ad9b4e95a4d84886b27e87000cc271ddca2d79bf78d297d4ad294b48dc3be",
+      "sha256": "f58587ad0ac9cc14a3a678c37a5d631cd842e526680ac71c7291f620c892fedb",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/CLAMSHELL-review.json"
     },
@@ -6519,6 +6519,598 @@
       "sha256": "592b5a7fbfa1763b729488f70309ed19bbd42429c06ce1c21c3607520785a61d",
       "rightsStatus": "approved",
       "reviewRecord": "art/exercise-static/reviews/SUMO_DEADLIFT-review.json"
+    },
+    "SUPINATED_DB_LATERAL_RAISE": {
+      "exerciseCode": "SUPINATED_DB_LATERAL_RAISE",
+      "promptPath": "art/exercise-static/briefs/SUPINATED_DB_LATERAL_RAISE.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-07T08:47:19.719Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/SUPINATED_DB_LATERAL_RAISE.json",
+          "sha256": "67fbf5f02ca6ce60b8b5bc4aa0132610065af4c1e9d7603e7c63036bd37b0510",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/SUPINATED_DB_LATERAL_RAISE/SUPINATED_DB_LATERAL_RAISE-candidate-01.png",
+          "sha256": "ab169b1f42b69ed707adb7449bf9f59c0e3d20048c999754422edcfb6ea445bf",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "ab169b1f42b69ed707adb7449bf9f59c0e3d20048c999754422edcfb6ea445bf",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/SUPINATED_DB_LATERAL_RAISE-review.json"
+    },
+    "MACHINE_DECLINE_CHEST_PRESS": {
+      "exerciseCode": "MACHINE_DECLINE_CHEST_PRESS",
+      "promptPath": "art/exercise-static/briefs/MACHINE_DECLINE_CHEST_PRESS.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-07T13:52:38.455Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/MACHINE_DECLINE_CHEST_PRESS.json",
+          "sha256": "976308f8287d19ec8635531f28bf339cd2e4aad0d0de0d1f4cf54ce10e1f0e27",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/MACHINE_DECLINE_CHEST_PRESS/MACHINE_DECLINE_CHEST_PRESS-candidate-01.png",
+          "sha256": "7ddc23d07939c33cc1250ce67120485c75c9c5c1142c37e199b55adbb28fb436",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "7ddc23d07939c33cc1250ce67120485c75c9c5c1142c37e199b55adbb28fb436",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/MACHINE_DECLINE_CHEST_PRESS-review.json"
+    },
+    "CABLE_UPRIGHT_ROW": {
+      "exerciseCode": "CABLE_UPRIGHT_ROW",
+      "promptPath": "art/exercise-static/briefs/CABLE_UPRIGHT_ROW.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-07T13:57:40.595Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/CABLE_UPRIGHT_ROW.json",
+          "sha256": "30b14c872b76739e9630b4ba0eab04f92908e2e42b0ecf6deac465edb983003c",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/CABLE_UPRIGHT_ROW/CABLE_UPRIGHT_ROW-candidate-01.png",
+          "sha256": "ce0dd2107f96582e7b531236f83f28fc79a1949ace6b7a0943dca79097449cfb",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "ce0dd2107f96582e7b531236f83f28fc79a1949ace6b7a0943dca79097449cfb",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/CABLE_UPRIGHT_ROW-review.json"
+    },
+    "PLANK": {
+      "exerciseCode": "PLANK",
+      "promptPath": "art/exercise-static/briefs/PLANK.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-08T02:15:05.013Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/PLANK.json",
+          "sha256": "53a93af12fcefd00df69307a14f52e98fcb82f55a8356546e15db4a228959809",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/PLANK/PLANK-candidate-01.png",
+          "sha256": "33b041c583e920ec8df7cf5d8c50dbb2689616fd5abaa7651c5244ccef24a797",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "33b041c583e920ec8df7cf5d8c50dbb2689616fd5abaa7651c5244ccef24a797",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/PLANK-review.json"
+    },
+    "RUSSIAN_TWIST": {
+      "exerciseCode": "RUSSIAN_TWIST",
+      "promptPath": "art/exercise-static/briefs/RUSSIAN_TWIST.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-08T02:37:04.729Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/RUSSIAN_TWIST.json",
+          "sha256": "374fedb004c638542cfa551607f56919e80b4a09c993dd4a2ed6aea096166a9a",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/RUSSIAN_TWIST/RUSSIAN_TWIST-candidate-01.png",
+          "sha256": "4aa44371e530b55e500bb62384ed0ed86776755139314b39d7e60912774fee81",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "4aa44371e530b55e500bb62384ed0ed86776755139314b39d7e60912774fee81",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/RUSSIAN_TWIST-review.json"
+    },
+    "DEAD_BUG": {
+      "exerciseCode": "DEAD_BUG",
+      "promptPath": "art/exercise-static/briefs/DEAD_BUG.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-08T02:37:15.227Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/DEAD_BUG.json",
+          "sha256": "5575fc71bb41a9a78d10506139fea9184669e23a4b54ffea67a197195df144cb",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/DEAD_BUG/DEAD_BUG-candidate-01.png",
+          "sha256": "3036f990d43e8ff8b3994dcd57aaa4670e79330835161e0509816b58b904e910",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "3036f990d43e8ff8b3994dcd57aaa4670e79330835161e0509816b58b904e910",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/DEAD_BUG-review.json"
+    },
+    "HANGING_LEG_RAISE": {
+      "exerciseCode": "HANGING_LEG_RAISE",
+      "promptPath": "art/exercise-static/briefs/HANGING_LEG_RAISE.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-08T02:41:20.360Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/HANGING_LEG_RAISE.json",
+          "sha256": "af6f14156eb42ea419936854c7e4fd47af38b1947bf0df44614b9d4700f31d36",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/HANGING_LEG_RAISE/HANGING_LEG_RAISE-candidate-02.png",
+          "sha256": "0e8e6ebd744a764ef3afd528cef2b6ec56de88d823f98d2b8ae1e9b8c27f9aea",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "0e8e6ebd744a764ef3afd528cef2b6ec56de88d823f98d2b8ae1e9b8c27f9aea",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/HANGING_LEG_RAISE-review.json"
+    },
+    "SIT_UP": {
+      "exerciseCode": "SIT_UP",
+      "promptPath": "art/exercise-static/briefs/SIT_UP.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-08T02:46:58.543Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/SIT_UP.json",
+          "sha256": "f37587212f035279a100ee5e53340dede92ebca919f1ff8c1459acbe67cd3654",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/SIT_UP/SIT_UP-candidate-01.png",
+          "sha256": "c6cbb9b9cd62f5467c1bd9423084ea037a70e6eca5dc51b69576fa0d9ffcda7e",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "c6cbb9b9cd62f5467c1bd9423084ea037a70e6eca5dc51b69576fa0d9ffcda7e",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/SIT_UP-review.json"
+    },
+    "REVERSE_CRUNCH": {
+      "exerciseCode": "REVERSE_CRUNCH",
+      "promptPath": "art/exercise-static/briefs/REVERSE_CRUNCH.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-08T02:48:38.107Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/REVERSE_CRUNCH.json",
+          "sha256": "9a6def42dced2f9964a40b228ce011f57f1c14ef2116f69b9b9e804f1da4f726",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/REVERSE_CRUNCH/REVERSE_CRUNCH-candidate-01.png",
+          "sha256": "098d1eec943f83cffb873e198a31d4b34f47ab82c2de4aa6c2bf08381e497412",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "098d1eec943f83cffb873e198a31d4b34f47ab82c2de4aa6c2bf08381e497412",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/REVERSE_CRUNCH-review.json"
+    },
+    "BIRD_DOG": {
+      "exerciseCode": "BIRD_DOG",
+      "promptPath": "art/exercise-static/briefs/BIRD_DOG.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-08T02:48:53.392Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/BIRD_DOG.json",
+          "sha256": "278b52082fb41ad57ce2d46f69309ca59d800e53d61c2e3a066546447ab23b85",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/BIRD_DOG/BIRD_DOG-candidate-01.png",
+          "sha256": "620550725eda46bff098a6d6740dff86758355a5424f7866075c68792d51d82b",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "620550725eda46bff098a6d6740dff86758355a5424f7866075c68792d51d82b",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/BIRD_DOG-review.json"
+    },
+    "PLANK_BUTTERFLY_CRUNCH": {
+      "exerciseCode": "PLANK_BUTTERFLY_CRUNCH",
+      "promptPath": "art/exercise-static/briefs/PLANK_BUTTERFLY_CRUNCH.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-08T03:00:00.356Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/PLANK_BUTTERFLY_CRUNCH.json",
+          "sha256": "33081afcfefd695853451807af62677f960837aad774d5bcc9d07ee54665ce71",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/PLANK_BUTTERFLY_CRUNCH/PLANK_BUTTERFLY_CRUNCH-candidate-02.png",
+          "sha256": "acb086dc43b79e249d42ee2f88e71ecfa85a66b675d72ae57486635e660caf9e",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "acb086dc43b79e249d42ee2f88e71ecfa85a66b675d72ae57486635e660caf9e",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/PLANK_BUTTERFLY_CRUNCH-review.json"
+    },
+    "INCLINE_TWIST_CRUNCH": {
+      "exerciseCode": "INCLINE_TWIST_CRUNCH",
+      "promptPath": "art/exercise-static/briefs/INCLINE_TWIST_CRUNCH.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-08T03:00:56.148Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/INCLINE_TWIST_CRUNCH.json",
+          "sha256": "a229a522dde6b7e1c1b56144ef041943af3d8bc6d0af8096f7bfa4dc665534d8",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/INCLINE_TWIST_CRUNCH/INCLINE_TWIST_CRUNCH-candidate-03.png",
+          "sha256": "265ac6bccb05b6f76f989e3c744116ef950bb38ccd62d124af6445e3ce2d4d92",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "265ac6bccb05b6f76f989e3c744116ef950bb38ccd62d124af6445e3ce2d4d92",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/INCLINE_TWIST_CRUNCH-review.json"
+    },
+    "AB_WHEEL": {
+      "exerciseCode": "AB_WHEEL",
+      "promptPath": "art/exercise-static/briefs/AB_WHEEL.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-08T03:03:32.787Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/AB_WHEEL.json",
+          "sha256": "4d352b1b8a375678a374546511055fc0404c93a6c0f1f21298ef41c91266e5e7",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/AB_WHEEL/AB_WHEEL-candidate-02.png",
+          "sha256": "a8cfcbb3ca7495967448cc055baf67448c0924fb95f827f3c7bcd562d87529f3",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "a8cfcbb3ca7495967448cc055baf67448c0924fb95f827f3c7bcd562d87529f3",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/AB_WHEEL-review.json"
+    },
+    "LYING_LEG_RAISE": {
+      "exerciseCode": "LYING_LEG_RAISE",
+      "promptPath": "art/exercise-static/briefs/LYING_LEG_RAISE.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-08T03:04:09.124Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/LYING_LEG_RAISE.json",
+          "sha256": "3fad470fa180ff73e8cb280fdae54bf6b1fa013d93689cdc9e7ff616c0242d01",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/LYING_LEG_RAISE/LYING_LEG_RAISE-candidate-01.png",
+          "sha256": "611a3310e165ba5f1070c8d776bd1600a3f076a744fbb86b98e0b8de48938332",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "611a3310e165ba5f1070c8d776bd1600a3f076a744fbb86b98e0b8de48938332",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/LYING_LEG_RAISE-review.json"
+    },
+    "INCLINE_CRUNCH": {
+      "exerciseCode": "INCLINE_CRUNCH",
+      "promptPath": "art/exercise-static/briefs/INCLINE_CRUNCH.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-08T05:41:08.778Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/INCLINE_CRUNCH.json",
+          "sha256": "7cc78497e8fd3b4ab9e7f4a5a70032639f6b6e1a3d6faaf6f2b13c932e56cf98",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/INCLINE_CRUNCH/INCLINE_CRUNCH-candidate-04.png",
+          "sha256": "a6843b6803687faa988abbe38caffc308fa3ed9de2f8e7c41b95c88e5c06f5a3",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "a6843b6803687faa988abbe38caffc308fa3ed9de2f8e7c41b95c88e5c06f5a3",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/INCLINE_CRUNCH-review.json"
+    },
+    "SIDE_PLANK": {
+      "exerciseCode": "SIDE_PLANK",
+      "promptPath": "art/exercise-static/briefs/SIDE_PLANK.json",
+      "tool": "Codex built-in imagegen",
+      "model": "not exposed by built-in tool",
+      "generatedAt": "2026-08-08T15:03:18.864Z",
+      "inputs": [
+        {
+          "kind": "original-text",
+          "source": "art/exercise-static/briefs/SIDE_PLANK.json",
+          "sha256": "75123ecb4cbacbabf45a626d29e4cf63583fbf3679274316c16dd9173cb8ad76",
+          "rightsBasis": "本项目原创动作与器械 brief"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/candidates/SIDE_PLANK/SIDE_PLANK-candidate-01.png",
+          "sha256": "b2e833ce56e81e2cf82b43ddc465a7fafde1486410d90def9236a1a70ac91302",
+          "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/character-v1.png",
+          "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+          "rightsBasis": "本项目已批准的原创统一角色母版"
+        },
+        {
+          "kind": "owned-reference",
+          "source": "art/exercise-static/references/approved/style-v1.png",
+          "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+          "rightsBasis": "本项目已批准的原创风格母版"
+        }
+      ],
+      "humanEdits": "无手工像素编辑。",
+      "sha256": "b2e833ce56e81e2cf82b43ddc465a7fafde1486410d90def9236a1a70ac91302",
+      "rightsStatus": "approved",
+      "reviewRecord": "art/exercise-static/reviews/SIDE_PLANK-review.json"
     }
   }
 }

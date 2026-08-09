@@ -10,16 +10,30 @@ enum WorkoutRestPolicy {
     }
 
     /// 完成某组后启动休息的预计秒数。
-    /// 同一动作内按展示顺序看上一组：上一组是正式组时继承其预计休息；上一组是热身或不存在时走动作默认值。
+    /// 同一动作内仅继承上一组已完成休息的最终目标；未完成休息和无休息记录都走当前默认值。
     static func plannedRestSeconds(completing set: WorkoutSet,
                                    in exercise: WorkoutExercise,
                                    fallbackSeconds: Int) -> Int {
         guard let previous = previousDisplaySet(before: set, in: exercise),
-              !previous.isWarmupEffective,
+              previous.actualRestSeconds != nil,
               let planned = previous.plannedRestSeconds else {
             return fallbackSeconds
         }
         return planned
+    }
+
+    /// 动作/训练单元的设置缺失时，才回退用户全局默认；两者都缺失时使用产品默认值。
+    static func defaultRestSeconds(actionDefaultSeconds: Int?, globalDefaultSeconds: Int?) -> Int {
+        max(0, actionDefaultSeconds ?? globalDefaultSeconds ?? 90)
+    }
+
+    /// 继续休息会扩展同一次休息的最终目标；普通完成则以当前段目标覆盖旧值。
+    static func finalPlannedRestSeconds(targetSeconds: Int,
+                                        previousPlannedSeconds: Int?,
+                                        isContinuation: Bool) -> Int {
+        let target = max(0, targetSeconds)
+        guard isContinuation else { return target }
+        return max(0, previousPlannedSeconds ?? 0) + target
     }
 
     /// 休息完成后的真实秒数写回值。

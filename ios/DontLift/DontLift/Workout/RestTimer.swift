@@ -29,6 +29,11 @@ final class RestTimerController {
         let startedAt: Date
         let completedAt: Date
         let plannedEndDate: Date
+
+        /// 用户调时后的最终目标，和实际流逝时间分开保存。
+        var targetSeconds: Int {
+            max(0, Int(plannedEndDate.timeIntervalSince(startedAt).rounded()))
+        }
     }
 
     /// 默认休息时长（秒），持久化到 UserDefaults。

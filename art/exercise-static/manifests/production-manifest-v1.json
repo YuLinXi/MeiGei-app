@@ -10289,17 +10289,17 @@
       "briefPath": "art/exercise-static/briefs/CLAMSHELL.json",
       "masterPath": "art/exercise-static/masters/approved/CLAMSHELL-v1.png",
       "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_CLAMSHELL.jpg",
-      "masterSha256": "6e9ad9b4e95a4d84886b27e87000cc271ddca2d79bf78d297d4ad294b48dc3be",
-      "runtimeSha256": "b053d2fcc5e9b2b75e88db37ad03af328416b8bc40e55e2070d03810a952aa8e",
+      "masterSha256": "f58587ad0ac9cc14a3a678c37a5d631cd842e526680ac71c7291f620c892fedb",
+      "runtimeSha256": "ac075404ddfd5a641db79e327f6dd47ea9a4225074ec6a36536f242d8f6498bb",
       "pixelWidth": 288,
       "pixelHeight": 288,
       "jpegQuality": 82,
-      "sizeBytes": 14427,
+      "sizeBytes": 12155,
       "reviews": {
         "identity": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T21:59:21.016Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T05:39:46.683Z",
           "evidence": [
             "art/exercise-static/references/approved/character-v1.png",
             "art/exercise-static/masters/approved/CLAMSHELL-v1.png"
@@ -10308,8 +10308,8 @@
         },
         "art": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T21:59:21.016Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T05:39:46.683Z",
           "evidence": [
             "art/exercise-static/references/approved/style-v1.png",
             "art/exercise-static/masters/approved/CLAMSHELL-v1.png"
@@ -10318,8 +10318,8 @@
         },
         "movement": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T21:59:21.016Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T05:39:46.683Z",
           "evidence": [
             "art/exercise-static/briefs/CLAMSHELL.json",
             "art/exercise-static/masters/approved/CLAMSHELL-v1.png"
@@ -10328,8 +10328,8 @@
         },
         "equipment": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T21:59:21.016Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T05:39:46.683Z",
           "evidence": [
             "art/exercise-static/briefs/CLAMSHELL.json",
             "art/exercise-static/masters/approved/CLAMSHELL-v1.png"
@@ -10338,8 +10338,8 @@
         },
         "rights": {
           "status": "approved",
-          "reviewerId": "production-autopilot",
-          "reviewedAt": "2026-07-25T21:59:21.016Z",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T05:39:46.683Z",
           "evidence": [
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
@@ -12207,6 +12207,1110 @@
             "art/exercise-static/reviews/input-policy-v1.md",
             "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
             "art/exercise-static/masters/approved/SUMO_DEADLIFT-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "SUPINATED_DB_LATERAL_RAISE": {
+      "exerciseCode": "SUPINATED_DB_LATERAL_RAISE",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/SUPINATED_DB_LATERAL_RAISE.json",
+      "masterPath": "art/exercise-static/masters/approved/SUPINATED_DB_LATERAL_RAISE-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_SUPINATED_DB_LATERAL_RAISE.jpg",
+      "masterSha256": "ab169b1f42b69ed707adb7449bf9f59c0e3d20048c999754422edcfb6ea445bf",
+      "runtimeSha256": "9006d2fc8eefaec4f0c6a61cd6b4de5e68c691492023d174e421901388e10f9f",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 15005,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T08:47:19.719Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/SUPINATED_DB_LATERAL_RAISE-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T08:47:19.719Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/SUPINATED_DB_LATERAL_RAISE-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T08:47:19.719Z",
+          "evidence": [
+            "art/exercise-static/briefs/SUPINATED_DB_LATERAL_RAISE.json",
+            "art/exercise-static/masters/approved/SUPINATED_DB_LATERAL_RAISE-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T08:47:19.719Z",
+          "evidence": [
+            "art/exercise-static/briefs/SUPINATED_DB_LATERAL_RAISE.json",
+            "art/exercise-static/masters/approved/SUPINATED_DB_LATERAL_RAISE-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T08:47:19.719Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/SUPINATED_DB_LATERAL_RAISE-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "CABLE_UPRIGHT_ROW": {
+      "exerciseCode": "CABLE_UPRIGHT_ROW",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/CABLE_UPRIGHT_ROW.json",
+      "masterPath": "art/exercise-static/masters/approved/CABLE_UPRIGHT_ROW-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_CABLE_UPRIGHT_ROW.jpg",
+      "masterSha256": "ce0dd2107f96582e7b531236f83f28fc79a1949ace6b7a0943dca79097449cfb",
+      "runtimeSha256": "d7a74e02d97d7fad5445c64d85e0aec1a1c3f57c3753fdbecfcb3626e64812bb",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 16866,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T13:57:40.595Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/CABLE_UPRIGHT_ROW-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T13:57:40.595Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/CABLE_UPRIGHT_ROW-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T13:57:40.595Z",
+          "evidence": [
+            "art/exercise-static/briefs/CABLE_UPRIGHT_ROW.json",
+            "art/exercise-static/masters/approved/CABLE_UPRIGHT_ROW-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T13:57:40.595Z",
+          "evidence": [
+            "art/exercise-static/briefs/CABLE_UPRIGHT_ROW.json",
+            "art/exercise-static/masters/approved/CABLE_UPRIGHT_ROW-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T13:57:40.595Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/CABLE_UPRIGHT_ROW-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "MACHINE_DECLINE_CHEST_PRESS": {
+      "exerciseCode": "MACHINE_DECLINE_CHEST_PRESS",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/MACHINE_DECLINE_CHEST_PRESS.json",
+      "masterPath": "art/exercise-static/masters/approved/MACHINE_DECLINE_CHEST_PRESS-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_MACHINE_DECLINE_CHEST_PRESS.jpg",
+      "masterSha256": "7ddc23d07939c33cc1250ce67120485c75c9c5c1142c37e199b55adbb28fb436",
+      "runtimeSha256": "58f58638c837ce19d334d93728b2500c542e674f7aa85cbec51a1f209a5232b7",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 65,
+      "sizeBytes": 22685,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T13:52:38.455Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/MACHINE_DECLINE_CHEST_PRESS-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T13:52:38.455Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/MACHINE_DECLINE_CHEST_PRESS-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T13:52:38.455Z",
+          "evidence": [
+            "art/exercise-static/briefs/MACHINE_DECLINE_CHEST_PRESS.json",
+            "art/exercise-static/masters/approved/MACHINE_DECLINE_CHEST_PRESS-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T13:52:38.455Z",
+          "evidence": [
+            "art/exercise-static/briefs/MACHINE_DECLINE_CHEST_PRESS.json",
+            "art/exercise-static/masters/approved/MACHINE_DECLINE_CHEST_PRESS-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-07T13:52:38.455Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/MACHINE_DECLINE_CHEST_PRESS-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "PLANK": {
+      "exerciseCode": "PLANK",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/PLANK.json",
+      "masterPath": "art/exercise-static/masters/approved/PLANK-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_PLANK.jpg",
+      "masterSha256": "33b041c583e920ec8df7cf5d8c50dbb2689616fd5abaa7651c5244ccef24a797",
+      "runtimeSha256": "3dff2e82b54fd533e81f9d3dc646596d0acf916899c5ad8fd110a143175482ad",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 12734,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:15:05.013Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/PLANK-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:15:05.013Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/PLANK-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:15:05.013Z",
+          "evidence": [
+            "art/exercise-static/briefs/PLANK.json",
+            "art/exercise-static/masters/approved/PLANK-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:15:05.013Z",
+          "evidence": [
+            "art/exercise-static/briefs/PLANK.json",
+            "art/exercise-static/masters/approved/PLANK-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:15:05.013Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/PLANK-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "RUSSIAN_TWIST": {
+      "exerciseCode": "RUSSIAN_TWIST",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/RUSSIAN_TWIST.json",
+      "masterPath": "art/exercise-static/masters/approved/RUSSIAN_TWIST-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_RUSSIAN_TWIST.jpg",
+      "masterSha256": "4aa44371e530b55e500bb62384ed0ed86776755139314b39d7e60912774fee81",
+      "runtimeSha256": "99c6565aab916a6b485d7479346a4895732bd3c479d002925af78ecf6a601a2d",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 16037,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:37:04.729Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/RUSSIAN_TWIST-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:37:04.729Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/RUSSIAN_TWIST-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:37:04.729Z",
+          "evidence": [
+            "art/exercise-static/briefs/RUSSIAN_TWIST.json",
+            "art/exercise-static/masters/approved/RUSSIAN_TWIST-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:37:04.729Z",
+          "evidence": [
+            "art/exercise-static/briefs/RUSSIAN_TWIST.json",
+            "art/exercise-static/masters/approved/RUSSIAN_TWIST-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:37:04.729Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/RUSSIAN_TWIST-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "DEAD_BUG": {
+      "exerciseCode": "DEAD_BUG",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/DEAD_BUG.json",
+      "masterPath": "art/exercise-static/masters/approved/DEAD_BUG-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_DEAD_BUG.jpg",
+      "masterSha256": "3036f990d43e8ff8b3994dcd57aaa4670e79330835161e0509816b58b904e910",
+      "runtimeSha256": "2f0816eb7bfb1d12bafca9c6d8b4f6145170a1328ba99f0097afd7e4ec411162",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 8806,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:37:15.227Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/DEAD_BUG-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:37:15.227Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/DEAD_BUG-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:37:15.227Z",
+          "evidence": [
+            "art/exercise-static/briefs/DEAD_BUG.json",
+            "art/exercise-static/masters/approved/DEAD_BUG-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:37:15.227Z",
+          "evidence": [
+            "art/exercise-static/briefs/DEAD_BUG.json",
+            "art/exercise-static/masters/approved/DEAD_BUG-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:37:15.227Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/DEAD_BUG-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "HANGING_LEG_RAISE": {
+      "exerciseCode": "HANGING_LEG_RAISE",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/HANGING_LEG_RAISE.json",
+      "masterPath": "art/exercise-static/masters/approved/HANGING_LEG_RAISE-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_HANGING_LEG_RAISE.jpg",
+      "masterSha256": "0e8e6ebd744a764ef3afd528cef2b6ec56de88d823f98d2b8ae1e9b8c27f9aea",
+      "runtimeSha256": "8a5720ebee8ad9e832d2ce4006d0a55782b7fc778922c474e4c841ed044a00a0",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 17952,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:41:20.360Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/HANGING_LEG_RAISE-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:41:20.360Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/HANGING_LEG_RAISE-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:41:20.360Z",
+          "evidence": [
+            "art/exercise-static/briefs/HANGING_LEG_RAISE.json",
+            "art/exercise-static/masters/approved/HANGING_LEG_RAISE-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:41:20.360Z",
+          "evidence": [
+            "art/exercise-static/briefs/HANGING_LEG_RAISE.json",
+            "art/exercise-static/masters/approved/HANGING_LEG_RAISE-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:41:20.360Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/HANGING_LEG_RAISE-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "SIT_UP": {
+      "exerciseCode": "SIT_UP",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/SIT_UP.json",
+      "masterPath": "art/exercise-static/masters/approved/SIT_UP-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_SIT_UP.jpg",
+      "masterSha256": "c6cbb9b9cd62f5467c1bd9423084ea037a70e6eca5dc51b69576fa0d9ffcda7e",
+      "runtimeSha256": "067fa0dee53c41c02ced628f3491435f42d956c921323ab9c9cfbfe0d999f6bb",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 14727,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:46:58.543Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/SIT_UP-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:46:58.543Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/SIT_UP-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:46:58.543Z",
+          "evidence": [
+            "art/exercise-static/briefs/SIT_UP.json",
+            "art/exercise-static/masters/approved/SIT_UP-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:46:58.543Z",
+          "evidence": [
+            "art/exercise-static/briefs/SIT_UP.json",
+            "art/exercise-static/masters/approved/SIT_UP-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:46:58.543Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/SIT_UP-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "REVERSE_CRUNCH": {
+      "exerciseCode": "REVERSE_CRUNCH",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/REVERSE_CRUNCH.json",
+      "masterPath": "art/exercise-static/masters/approved/REVERSE_CRUNCH-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_REVERSE_CRUNCH.jpg",
+      "masterSha256": "098d1eec943f83cffb873e198a31d4b34f47ab82c2de4aa6c2bf08381e497412",
+      "runtimeSha256": "be1998a785e250618606157d546e8f6111417c6eb880b5be1ebd3e1eb81104ef",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 13113,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:48:38.107Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/REVERSE_CRUNCH-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:48:38.107Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/REVERSE_CRUNCH-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:48:38.107Z",
+          "evidence": [
+            "art/exercise-static/briefs/REVERSE_CRUNCH.json",
+            "art/exercise-static/masters/approved/REVERSE_CRUNCH-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:48:38.107Z",
+          "evidence": [
+            "art/exercise-static/briefs/REVERSE_CRUNCH.json",
+            "art/exercise-static/masters/approved/REVERSE_CRUNCH-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:48:38.107Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/REVERSE_CRUNCH-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "BIRD_DOG": {
+      "exerciseCode": "BIRD_DOG",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/BIRD_DOG.json",
+      "masterPath": "art/exercise-static/masters/approved/BIRD_DOG-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_BIRD_DOG.jpg",
+      "masterSha256": "620550725eda46bff098a6d6740dff86758355a5424f7866075c68792d51d82b",
+      "runtimeSha256": "5ed6c7a4851ee3e4fad59ad241e38532b26267c013ee7543691757c99447560b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 10439,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:48:53.392Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/BIRD_DOG-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:48:53.392Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/BIRD_DOG-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:48:53.392Z",
+          "evidence": [
+            "art/exercise-static/briefs/BIRD_DOG.json",
+            "art/exercise-static/masters/approved/BIRD_DOG-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:48:53.392Z",
+          "evidence": [
+            "art/exercise-static/briefs/BIRD_DOG.json",
+            "art/exercise-static/masters/approved/BIRD_DOG-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T02:48:53.392Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/BIRD_DOG-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "PLANK_BUTTERFLY_CRUNCH": {
+      "exerciseCode": "PLANK_BUTTERFLY_CRUNCH",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/PLANK_BUTTERFLY_CRUNCH.json",
+      "masterPath": "art/exercise-static/masters/approved/PLANK_BUTTERFLY_CRUNCH-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_PLANK_BUTTERFLY_CRUNCH.jpg",
+      "masterSha256": "acb086dc43b79e249d42ee2f88e71ecfa85a66b675d72ae57486635e660caf9e",
+      "runtimeSha256": "d7e9bc458eeea7ee2ecdaae8743537505d569bd5d7272f3c02622d8e118b3e2b",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 18113,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:00:00.356Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/PLANK_BUTTERFLY_CRUNCH-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:00:00.356Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/PLANK_BUTTERFLY_CRUNCH-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:00:00.356Z",
+          "evidence": [
+            "art/exercise-static/briefs/PLANK_BUTTERFLY_CRUNCH.json",
+            "art/exercise-static/masters/approved/PLANK_BUTTERFLY_CRUNCH-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:00:00.356Z",
+          "evidence": [
+            "art/exercise-static/briefs/PLANK_BUTTERFLY_CRUNCH.json",
+            "art/exercise-static/masters/approved/PLANK_BUTTERFLY_CRUNCH-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:00:00.356Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/PLANK_BUTTERFLY_CRUNCH-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "INCLINE_TWIST_CRUNCH": {
+      "exerciseCode": "INCLINE_TWIST_CRUNCH",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/INCLINE_TWIST_CRUNCH.json",
+      "masterPath": "art/exercise-static/masters/approved/INCLINE_TWIST_CRUNCH-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_INCLINE_TWIST_CRUNCH.jpg",
+      "masterSha256": "265ac6bccb05b6f76f989e3c744116ef950bb38ccd62d124af6445e3ce2d4d92",
+      "runtimeSha256": "79c743b38d58e81b7624c30a95d8945de499e5f270b561481092f2daf53a08a2",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 17146,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:00:56.148Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/INCLINE_TWIST_CRUNCH-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:00:56.148Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/INCLINE_TWIST_CRUNCH-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:00:56.148Z",
+          "evidence": [
+            "art/exercise-static/briefs/INCLINE_TWIST_CRUNCH.json",
+            "art/exercise-static/masters/approved/INCLINE_TWIST_CRUNCH-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:00:56.148Z",
+          "evidence": [
+            "art/exercise-static/briefs/INCLINE_TWIST_CRUNCH.json",
+            "art/exercise-static/masters/approved/INCLINE_TWIST_CRUNCH-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:00:56.148Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/INCLINE_TWIST_CRUNCH-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "AB_WHEEL": {
+      "exerciseCode": "AB_WHEEL",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/AB_WHEEL.json",
+      "masterPath": "art/exercise-static/masters/approved/AB_WHEEL-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_AB_WHEEL.jpg",
+      "masterSha256": "a8cfcbb3ca7495967448cc055baf67448c0924fb95f827f3c7bcd562d87529f3",
+      "runtimeSha256": "53b7af2b6906ac61de1bc3a914a7dffef584fa9b6b8c914829060a522a619d2d",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 9178,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:03:32.787Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/AB_WHEEL-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:03:32.787Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/AB_WHEEL-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:03:32.787Z",
+          "evidence": [
+            "art/exercise-static/briefs/AB_WHEEL.json",
+            "art/exercise-static/masters/approved/AB_WHEEL-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:03:32.787Z",
+          "evidence": [
+            "art/exercise-static/briefs/AB_WHEEL.json",
+            "art/exercise-static/masters/approved/AB_WHEEL-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:03:32.787Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/AB_WHEEL-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "draft"
+    },
+    "LYING_LEG_RAISE": {
+      "exerciseCode": "LYING_LEG_RAISE",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/LYING_LEG_RAISE.json",
+      "masterPath": "art/exercise-static/masters/approved/LYING_LEG_RAISE-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_LYING_LEG_RAISE.jpg",
+      "masterSha256": "611a3310e165ba5f1070c8d776bd1600a3f076a744fbb86b98e0b8de48938332",
+      "runtimeSha256": "f4dc1d0f346ad925201bfb9185a01b4b4f133104a4f1ebde6770d64cd35fede0",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 9902,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:04:09.124Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/LYING_LEG_RAISE-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:04:09.124Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/LYING_LEG_RAISE-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:04:09.124Z",
+          "evidence": [
+            "art/exercise-static/briefs/LYING_LEG_RAISE.json",
+            "art/exercise-static/masters/approved/LYING_LEG_RAISE-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:04:09.124Z",
+          "evidence": [
+            "art/exercise-static/briefs/LYING_LEG_RAISE.json",
+            "art/exercise-static/masters/approved/LYING_LEG_RAISE-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T03:04:09.124Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/LYING_LEG_RAISE-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "INCLINE_CRUNCH": {
+      "exerciseCode": "INCLINE_CRUNCH",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/INCLINE_CRUNCH.json",
+      "masterPath": "art/exercise-static/masters/approved/INCLINE_CRUNCH-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_INCLINE_CRUNCH.jpg",
+      "masterSha256": "a6843b6803687faa988abbe38caffc308fa3ed9de2f8e7c41b95c88e5c06f5a3",
+      "runtimeSha256": "a6d272a54ef9e6e8948c5fcbdc70e6043ce44e6e2eb0c39a730fbcd482931644",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 18100,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T05:41:08.778Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/INCLINE_CRUNCH-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T05:41:08.778Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/INCLINE_CRUNCH-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T05:41:08.778Z",
+          "evidence": [
+            "art/exercise-static/briefs/INCLINE_CRUNCH.json",
+            "art/exercise-static/masters/approved/INCLINE_CRUNCH-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T05:41:08.778Z",
+          "evidence": [
+            "art/exercise-static/briefs/INCLINE_CRUNCH.json",
+            "art/exercise-static/masters/approved/INCLINE_CRUNCH-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T05:41:08.778Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/INCLINE_CRUNCH-v1.provenance.json"
+          ],
+          "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+        }
+      },
+      "technicalStatus": "passed",
+      "releaseStatus": "released"
+    },
+    "SIDE_PLANK": {
+      "exerciseCode": "SIDE_PLANK",
+      "characterVersion": "character-v1",
+      "styleVersion": "style-v1",
+      "briefPath": "art/exercise-static/briefs/SIDE_PLANK.json",
+      "masterPath": "art/exercise-static/masters/approved/SIDE_PLANK-v1.png",
+      "runtimePath": "ios/DontLift/DontLift/Resources/ExerciseArtwork/exercise_SIDE_PLANK.jpg",
+      "masterSha256": "b2e833ce56e81e2cf82b43ddc465a7fafde1486410d90def9236a1a70ac91302",
+      "runtimeSha256": "9e4c120cde6c1be60deab08c11538246e4a45a624c172ca9b77edd48a62d82c3",
+      "pixelWidth": 288,
+      "pixelHeight": 288,
+      "jpegQuality": 82,
+      "sizeBytes": 12697,
+      "reviews": {
+        "identity": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T15:03:18.864Z",
+          "evidence": [
+            "art/exercise-static/references/approved/character-v1.png",
+            "art/exercise-static/masters/approved/SIDE_PLANK-v1.png"
+          ],
+          "notes": "按 character-v1 身份清单核对脸型、发型、体型、服装、四肢完整性和线稿一致性。"
+        },
+        "art": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T15:03:18.864Z",
+          "evidence": [
+            "art/exercise-static/references/approved/style-v1.png",
+            "art/exercise-static/masters/approved/SIDE_PLANK-v1.png"
+          ],
+          "notes": "按 style-v1 核对灰阶线稿、主动肌朱砂红、协同肌浅红、白底安全边距、无文字/Logo/水印及弱化乳头特征。"
+        },
+        "movement": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T15:03:18.864Z",
+          "evidence": [
+            "art/exercise-static/briefs/SIDE_PLANK.json",
+            "art/exercise-static/masters/approved/SIDE_PLANK-v1.png"
+          ],
+          "notes": "按动作 brief 核对代表姿势、关节方向、握法、身体接触点和目标肌。"
+        },
+        "equipment": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T15:03:18.864Z",
+          "evidence": [
+            "art/exercise-static/briefs/SIDE_PLANK.json",
+            "art/exercise-static/masters/approved/SIDE_PLANK-v1.png"
+          ],
+          "notes": "按动作 brief 核对器械类别、关键结构、握持关系、连接连续性和安全边距。"
+        },
+        "rights": {
+          "status": "approved",
+          "reviewerId": "project-owner",
+          "reviewedAt": "2026-08-08T15:03:18.864Z",
+          "evidence": [
+            "art/exercise-static/reviews/input-policy-v1.md",
+            "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
+            "art/exercise-static/masters/approved/SIDE_PLANK-v1.provenance.json"
           ],
           "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
         }

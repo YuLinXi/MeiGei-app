@@ -85,7 +85,7 @@
 705,imported,AB_WHEEL_TUCK,腹肌轮收,自重,核心,上腹,核心,腹直肌,上腹,核心 > 腹直肌 > 上腹,abs,,,,,,,,
 706,imported,BAR_HANGING_LEG_RAISE,悬挂抬腿,自重,核心,下腹,核心,腹直肌,下腹,核心 > 腹直肌 > 下腹,abs,,,,,,,,
 707,imported,WEIGHTED_HANGING_LEG_RAISE,负重悬挂抬腿,自重,核心,下腹,核心,腹直肌,下腹,核心 > 腹直肌 > 下腹,abs,,,,,,,,
-708,imported,INCLINE_CRUNCH_TWIST,上斜卷腹转体,自重,核心,腹斜肌,核心,腹斜肌,,核心 > 腹斜肌,obliques,,,,,,,,
+708,imported,INCLINE_CRUNCH_TWIST,下斜凳卷腹转体,自重,核心,腹斜肌,核心,腹斜肌,,核心 > 腹斜肌,obliques,,,,,,,,
 709,imported,BAND_KNEELING_CRUNCH,弹力带-跪姿卷腹,弹力带,核心,上腹,核心,腹直肌,上腹,核心 > 腹直肌 > 上腹,abs,,,,,,,,
 710,imported,BAND_LYING_CRUNCH,弹力带-仰卧卷腹,弹力带,核心,上腹,核心,腹直肌,上腹,核心 > 腹直肌 > 上腹,abs,,,,,,,,
 711,imported,BAND_LOW_HIGH_TWIST,弹力带-下上转体,弹力带,核心,腹斜肌,核心,腹斜肌,,核心 > 腹斜肌,obliques,,,,,,,,

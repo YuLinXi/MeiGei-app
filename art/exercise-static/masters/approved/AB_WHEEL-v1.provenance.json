@@ -1,0 +1,45 @@
+{
+  "assetId": "AB_WHEEL-v1",
+  "exerciseCode": "AB_WHEEL",
+  "status": "approved-master",
+  "tool": "Codex built-in imagegen",
+  "model": "not exposed by built-in tool",
+  "generatedAt": "2026-08-08T03:03:32.787Z",
+  "promptPath": "art/exercise-static/briefs/AB_WHEEL.json",
+  "briefPath": "art/exercise-static/briefs/AB_WHEEL.json",
+  "inputs": [
+    {
+      "kind": "original-text",
+      "source": "art/exercise-static/briefs/AB_WHEEL.json",
+      "sha256": "4d352b1b8a375678a374546511055fc0404c93a6c0f1f21298ef41c91266e5e7",
+      "rightsBasis": "本项目原创动作与器械 brief"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/candidates/AB_WHEEL/AB_WHEEL-candidate-02.png",
+      "sha256": "a8cfcbb3ca7495967448cc055baf67448c0924fb95f827f3c7bcd562d87529f3",
+      "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/character-v1.png",
+      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
+      "rightsBasis": "本项目已批准的原创统一角色母版"
+    },
+    {
+      "kind": "owned-reference",
+      "source": "art/exercise-static/references/approved/style-v1.png",
+      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
+      "rightsBasis": "本项目已批准的原创风格母版"
+    }
+  ],
+  "humanEdits": "无手工像素编辑。",
+  "file": "art/exercise-static/masters/approved/AB_WHEEL-v1.png",
+  "pixelWidth": 1254,
+  "pixelHeight": 1254,
+  "sizeBytes": 1367841,
+  "sha256": "a8cfcbb3ca7495967448cc055baf67448c0924fb95f827f3c7bcd562d87529f3",
+  "reviewRecord": "art/exercise-static/reviews/AB_WHEEL-review.json",
+  "approvedAt": "2026-08-08T03:03:32.787Z",
+  "reviewerId": "project-owner"
+}

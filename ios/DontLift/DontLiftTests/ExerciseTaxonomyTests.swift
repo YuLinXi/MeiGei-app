@@ -149,9 +149,9 @@ struct ExerciseTaxonomyTests {
 
     /// curated code 集合仍作为旧库回滚/排序参考；V1 预置库只保留已确认动作。
     @Test func curatedCodesRemainAvailableForFallback() {
-        #expect(BuiltinExercise.curatedCodes.count == 153)
+        #expect(BuiltinExercise.curatedCodes.count == 152)
         let codes = Set(BuiltinExercise.starter.map(\.code))
-        for anchor in ["BB_BENCH_PRESS", "BB_SQUAT", "DEADLIFT", "PULL_UP", "HIP_THRUST", "PLANK"] {
+        for anchor in ["BB_BENCH_PRESS", "BB_SQUAT", "DEADLIFT", "PULL_UP", "MACHINE_PULLOVER", "HIP_THRUST", "PLANK"] {
             #expect(codes.contains(anchor), "缺失 V1 必留 code: \(anchor)")
         }
     }
@@ -233,11 +233,13 @@ struct ExerciseTaxonomyTests {
 
     @Test func removedExercisesAreNotPresetSelectable() {
         let names = Set(BuiltinExercise.starter.map(\.name))
-        for gone in ["派克俯卧撑", "扎特曼弯举", "JM 推", "西西深蹲", "弹力带蚌式", "TraditionalStrengthTraining", "沙发伸展"] {
+        for gone in ["派克俯卧撑", "扎特曼弯举", "JM 推", "西西深蹲", "弹力带蚌式", "TraditionalStrengthTraining", "沙发伸展", "卷腹"] {
             #expect(!names.contains(gone), "明确移除动作不应在 V1 预置库: \(gone)")
             #expect(ExerciseLibrary.isRemovedFromNewSelection(gone))
         }
         #expect(ExerciseLibrary.isRemovedFromNewSelection("跑步（有氧）"))
+        #expect(BuiltinExercise.starter.first { $0.code == "SIDE_PLANK" }?.name == "侧支撑")
+        #expect(ExerciseLibrary.resolve(code: nil, name: "侧平板支撑")?.name == "侧支撑")
     }
 
     @Test func aliasesResolveToStandardExercises() {
@@ -251,6 +253,8 @@ struct ExerciseTaxonomyTests {
         #expect(ExerciseLibrary.resolve(code: nil, name: "肩关节外旋训练")?.name == "弹力带肩外旋")
         #expect(ExerciseLibrary.resolve(code: nil, name: "招财猫式肩外旋")?.name == "招财猫")
         #expect(ExerciseLibrary.resolve(code: "SHOULDER_WARMUP", name: "练肩热身")?.name == "肩部动态热身")
+        #expect(ExerciseLibrary.resolve(code: nil, name: "反握高位下拉")?.name == "窄握反手高位下拉")
+        #expect(ExerciseLibrary.resolve(code: nil, name: "窄握高位下拉")?.name == "窄握正手高位下拉")
     }
 
     @Test func aliasSearchReturnsOnlyStandardExercise() {
