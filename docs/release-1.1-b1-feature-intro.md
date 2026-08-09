@@ -15,8 +15,8 @@
 | 工程内实际版本 | App、Widget 与测试 target 均为 `1.1 (build 1)` |
 | 后端部署 | 本次不需要。候选改动没有后端运行时代码、配置、API 或 Flyway 迁移 |
 | iOS 验证 | `1.1 (build 1)` 下 216 项测试通过；远端 fresh clone 的 Release Simulator 构建成功 |
-| TestFlight | 尚未上传 |
-| 发布结论 | iOS 候选源码已冻结并推送，LFS 与干净构建验证通过；仍待 TestFlight 与真机回归 |
+| TestFlight | 尚未上传；Archive 成功，但 App Store export 被 Xcode 凭据和分发证书阻断 |
+| 发布结论 | iOS 候选源码已冻结并推送，LFS 与干净构建验证通过；恢复 Xcode Apple Developer 登录态后才能上传 TestFlight |
 
 ## 一句话摘要
 
@@ -81,13 +81,14 @@
 - 动作库长列表完成连续 80 次滚动；memgraph 物理占用峰值 168.6 MiB，仅见 1056 bytes 的 CoreGraphics/allocator 噪声，未发现 App 自有泄漏根。
 - 正式动作 JPG 入包 193 张、2.82 MiB；Release Simulator App 为 42.54 MiB。新增高分辨率 PNG 均命中 Git LFS，`git lfs fsck` 通过。
 - 从 GitHub 远端 fresh clone 后，`git lfs fsck` 通过；193 张正式 JPG 均可由批准母版确定性重导出并与 manifest 一致，未写入候选目录，Release Simulator 构建成功。
+- 设备版 Xcode Archive 成功，App 与 Widget 均为 `1.1 (1)`；当前仅有 Apple Development 身份，App Store export 未能取得 `iOS Distribution` 证书，尚未上传。
 - 休息计时 Simulator 人工回归已覆盖自然结束、提前结束、继续休息、活动休息中完成下一组、关闭后重启、最小化恢复和超级组下一轮继承。
 - 生产环境健康检查连续 3 次返回 `UP`；`/privacy`、`/terms` 返回 200；生产 `/auth/dev/token` 返回 404。
 - 生产 Flyway 最新记录读取正常，最新版本为成功执行的 `V20__team_member_preferences_default_enabled.sql`。
 
 ## 尚未完成的发布门禁
 
-- [ ] 上传 TestFlight、确认构建状态为 `VALID`，完成真机冒烟与本轮重点回归。
+- [ ] 在 Xcode 恢复 Apple Developer 登录态与分发签名后上传 TestFlight，确认构建状态为 `VALID`，完成真机冒烟与本轮重点回归。
 
 ## TestFlight 回归重点
 

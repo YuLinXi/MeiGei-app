@@ -18,7 +18,7 @@
 | iOS 构建与测试 | ✅ 通过 | `1.1 (build 1)` 下 216 项测试通过，Release Simulator 构建成功 |
 | 动作图门禁 | ✅ 通过 | 远端 fresh clone 已完成 LFS、193 张 JPG 确定性重导出、manifest 对照及 Release 构建 |
 | 人工回归 | ⚠️ 部分通过 | 休息继承 Simulator 全场景通过；动作历史、计划详情、海报、日历和兼容性待真机验证 |
-| TestFlight | ⏳ 未上传 | 未执行 Archive/上传 |
+| TestFlight | ⚠️ 签名阻断 | Archive 成功，但 App Store export 因 Xcode 凭据失效且缺少 `iOS Distribution` 证书失败；未上传 |
 | 发布 tag | ⏳ 禁止创建 | 仅在 TestFlight `VALID` 且真机回归完成后创建 `v1.1-b1` |
 
 ## 1. 发布范围与冻结
@@ -102,7 +102,7 @@
 
 - [x] 修改发版文档前执行 `git diff --check`，通过。
 - [x] 冻结候选后已执行 `git diff --check`，通过。
-- [ ] 检查 App Store Connect 所需签名、entitlements、隐私清单和导出合规信息。
+- [x] 已检查签名：`1.1 (1)` 的设备版 Archive 成功，App 使用 Apple Development 身份；App Store export 预检因 Xcode Keychain 凭据失效且没有 `iOS Distribution` 证书失败，未执行上传。
 
 ## 4. 后端生产状态
 
@@ -159,8 +159,8 @@
 
 ## 6. TestFlight 上传
 
-- [ ] 候选 SHA 已冻结，工作区干净，版本号为 `1.1 (build 1)`。
-- [ ] Xcode Archive 成功，Archive 中 App 与 extension 的版本号一致。
+- [x] 候选 SHA 已冻结，工作区干净，版本号为 `1.1 (build 1)`。
+- [x] Xcode Archive 成功，Archive 中 App 与 extension 的版本号均为 `1.1 (1)`；当前 Archive 为 Apple Development 签名，尚不能导出 TestFlight 包。
 - [ ] 上传 App Store Connect/TestFlight 成功。
 - [ ] 构建处理完成，状态为 `VALID`，无 ITMS 阻塞警告。
 - [ ] 在 TestFlight 安装该构建，确认版本页显示 `1.1 (1)`。
@@ -180,6 +180,6 @@
 
 候选 iOS 源码 `1b66e16` 已推送并完成干净环境验证，已具备进入 TestFlight 上传的条件，但仍不得创建 `v1.1-b1` tag。最短收口顺序：
 
-1. Archive、上传 TestFlight，并等待构建状态为 `VALID`。
+1. 在 Xcode 恢复 Apple Developer 登录态，取得 App Store 分发所需身份后重新导出并上传 TestFlight，等待构建状态为 `VALID`。
 2. 完成真机重点回归和上一版客户端兼容冒烟。
 3. TestFlight `VALID` 且真机回归通过后，再合并 `main` 并创建 `v1.1-b1` tag。
