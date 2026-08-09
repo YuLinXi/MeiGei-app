@@ -3,6 +3,7 @@
 > 发布基线：`v1.0-b21`
 > 目标版本：`MARKETING_VERSION = 1.1`，`CURRENT_PROJECT_VERSION = 1`
 > 候选分支：`feature/v1.1-b01`
+> iOS 候选源码 SHA：`1b66e16cc2e4476a8998b910e6ebaee24de99326`
 > 文档状态：发版准备中，尚未上传 TestFlight
 > 关联清单：[release-1.1-b1-checklist.md](release-1.1-b1-checklist.md)
 
@@ -13,9 +14,9 @@
 | iOS 目标版本 | `1.1 (build 1)` |
 | 工程内实际版本 | App、Widget 与测试 target 均为 `1.1 (build 1)` |
 | 后端部署 | 本次不需要。候选改动没有后端运行时代码、配置、API 或 Flyway 迁移 |
-| iOS 本地验证 | `1.1 (build 1)` 下 216 项测试通过，Release Simulator 构建成功 |
+| iOS 验证 | `1.1 (build 1)` 下 216 项测试通过；远端 fresh clone 的 Release Simulator 构建成功 |
 | TestFlight | 尚未上传 |
-| 发布结论 | 本地候选门禁已基本收口；仍待提交推送、fresh clone LFS、TestFlight 与真机回归 |
+| 发布结论 | iOS 候选源码已冻结并推送，LFS 与干净构建验证通过；仍待 TestFlight 与真机回归 |
 
 ## 一句话摘要
 
@@ -79,14 +80,13 @@
 - 动作图严格校验通过：193 个正式运行时条目；专属图范围覆盖 182/182，其中 181 个正式发布、1 个已记录跳过，0 个草稿或未覆盖动作。
 - 动作库长列表完成连续 80 次滚动；memgraph 物理占用峰值 168.6 MiB，仅见 1056 bytes 的 CoreGraphics/allocator 噪声，未发现 App 自有泄漏根。
 - 正式动作 JPG 入包 193 张、2.82 MiB；Release Simulator App 为 42.54 MiB。新增高分辨率 PNG 均命中 Git LFS，`git lfs fsck` 通过。
+- 从 GitHub 远端 fresh clone 后，`git lfs fsck` 通过；193 张正式 JPG 均可由批准母版确定性重导出并与 manifest 一致，未写入候选目录，Release Simulator 构建成功。
 - 休息计时 Simulator 人工回归已覆盖自然结束、提前结束、继续休息、活动休息中完成下一组、关闭后重启、最小化恢复和超级组下一轮继承。
 - 生产环境健康检查连续 3 次返回 `UP`；`/privacy`、`/terms` 返回 200；生产 `/auth/dev/token` 返回 404。
 - 生产 Flyway 最新记录读取正常，最新版本为成功执行的 `V20__team_member_preferences_default_enabled.sql`。
 
 ## 尚未完成的发布门禁
 
-- [ ] 从远端 fresh clone 完成 Git LFS 对象拉取、正式 JPG 重导出、manifest/摘要一致性和无 AI 工具环境构建验证。
-- [ ] 清理并冻结当前工作区，提交和推送候选版本；当前本地分支相对远端领先 9 个提交，且仍有未提交改动。
 - [ ] 上传 TestFlight、确认构建状态为 `VALID`，完成真机冒烟与本轮重点回归。
 
 ## TestFlight 回归重点

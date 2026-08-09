@@ -3,6 +3,7 @@
 > 发布基线：`v1.0-b21`
 > 目标版本：`1.1 (build 1)`
 > 候选分支：`feature/v1.1-b01`
+> iOS 候选源码 SHA：`1b66e16cc2e4476a8998b910e6ebaee24de99326`
 > 当前结论：**暂不可发布**
 > 功能介绍：[release-1.1-b1-feature-intro.md](release-1.1-b1-feature-intro.md)
 
@@ -10,12 +11,12 @@
 
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
-| 发布范围 | ⚠️ 待冻结 | 本地分支相对远端领先 9 个提交，且存在待提交的候选改动 |
+| 发布范围 | ✅ 已冻结并推送 | iOS 候选源码为 `1b66e16`；后续仅提交发版记录，不改变 App 代码或资源 |
 | 版本号 | ✅ 已更新 | App、Widget 与测试 target 均为 `1.1 (build 1)` |
 | 后端部署 | ✅ 不需要 | 没有后端运行时代码、配置、API 或 Flyway 迁移 |
 | 后端验证 | ✅ 通过 | 80 项测试通过；生产 health 与 Flyway 只读检查正常 |
 | iOS 构建与测试 | ✅ 通过 | `1.1 (build 1)` 下 216 项测试通过，Release Simulator 构建成功 |
-| 动作图门禁 | ⚠️ 待远端验证 | 严格校验、覆盖率、别名、长列表和峰值内存通过；fresh clone 待推送后执行 |
+| 动作图门禁 | ✅ 通过 | 远端 fresh clone 已完成 LFS、193 张 JPG 确定性重导出、manifest 对照及 Release 构建 |
 | 人工回归 | ⚠️ 部分通过 | 休息继承 Simulator 全场景通过；动作历史、计划详情、海报、日历和兼容性待真机验证 |
 | TestFlight | ⏳ 未上传 | 未执行 Archive/上传 |
 | 发布 tag | ⏳ 禁止创建 | 仅在 TestFlight `VALID` 且真机回归完成后创建 `v1.1-b1` |
@@ -29,9 +30,9 @@
 - [x] 已将 `REVERSE_LAT_PULLDOWN`、`CLOSE_LAT_PULLDOWN` 别名目标更新为当前标准名，并保留旧名称解析。
 - [x] 已恢复 `v1.0-b21` 发布过的「器械上拉」预置动作；当前使用肌群图降级，不伪造未审核动作图。
 - [x] 已将所有 App、Widget 与测试 target 的 `MARKETING_VERSION` 改为 `1.1`，`CURRENT_PROJECT_VERSION` 改为 `1`。
-- [ ] 重新检查工作区 diff，确保没有密钥、临时文件、个人绝对路径或无关改动进入候选版本。
-- [ ] 提交并推送全部确认范围，冻结 TestFlight 候选 SHA。
-- [ ] 在候选 SHA 上重新生成或更新本次两份发版文档，记录最终 commit。
+- [x] 已重新检查候选 diff，确认没有密钥、临时文件、个人绝对路径或无关改动进入 iOS 候选源码。
+- [x] 已提交并推送全部确认范围，冻结 TestFlight iOS 候选 SHA `1b66e16cc2e4476a8998b910e6ebaee24de99326`。
+- [x] 已在候选 SHA 验证后更新本次两份发版文档；后续仅记录验证与发布状态，不改变 App 代码或资源。
 
 ## 2. 本次功能范围
 
@@ -76,9 +77,9 @@
 - [x] 覆盖率校验通过：225 个预置动作，182 个纳入专属图范围，181 个已发布，1 个已记录跳过，0 个草稿或未覆盖。
 - [x] `node scripts/exercise-library-v1.mjs validate` 通过。
 - [x] 动作库真路径加载、连续 80 次滚动与峰值内存检查完成；宿主 RSS 峰值约 460.3 MiB，memgraph 物理占用峰值 168.6 MiB，未发现 App 自有类型泄漏。
-- [ ] 从全新 clone 验证 Git LFS 母版拉取、重新导出、manifest 一致性及无 AI 工具环境构建。
+- [x] 已从 GitHub 远端 `feature/v1.1-b01` 全新 clone；`git lfs fsck` 通过，193 张正式 JPG 可由批准母版确定性重导出并与 manifest 一致，干净目录 Release Simulator 构建通过。
 - [x] 运行时正式 JPG 193 张、入包 2.82 MiB；Release Simulator App 为 42.54 MiB。相对 `v1.0-b21` 的完整候选 Debug App 增量约 28.48 MiB，其中动作 JPG 仅占 2.82 MiB。
-- [x] 新增高分辨率 PNG 均命中路径限定 Git LFS，`git lfs fsck` 通过；远端可用性仍待 fresh clone。
+- [x] 新增高分辨率 PNG 均命中路径限定 Git LFS；远端 fresh clone 的 `git lfs fsck` 通过并完成可用性验证。
 - [x] 动作库生成器增加防缩减门禁：来源文档当前只能生成 188 条时会拒绝覆盖现有 225 条 manifest；该工具债不影响已校验的运行时数据。
 
 ### 后端
@@ -100,7 +101,7 @@
 ### 通用检查
 
 - [x] 修改发版文档前执行 `git diff --check`，通过。
-- [ ] 冻结候选 diff 后重新执行 `git diff --check`。
+- [x] 冻结候选后已执行 `git diff --check`，通过。
 - [ ] 检查 App Store Connect 所需签名、entitlements、隐私清单和导出合规信息。
 
 ## 4. 后端生产状态
@@ -177,10 +178,8 @@
 
 ## 8. 发布负责人结论
 
-当前已具备冻结候选并进入 TestFlight 上传准备的本地条件，但仍不得创建 `v1.1-b1` tag。最短收口顺序：
+候选 iOS 源码 `1b66e16` 已推送并完成干净环境验证，已具备进入 TestFlight 上传的条件，但仍不得创建 `v1.1-b1` tag。最短收口顺序：
 
-1. 复核并提交、推送候选范围，冻结候选 SHA。
-2. 从远端 fresh clone 完成 Git LFS、重导出、manifest 与无 AI 工具构建验证。
-3. Archive、上传 TestFlight，并等待构建状态为 `VALID`。
-4. 完成真机重点回归和上一版客户端兼容冒烟。
-5. TestFlight `VALID` 且真机回归通过后，再合并 `main` 并创建 `v1.1-b1` tag。
+1. Archive、上传 TestFlight，并等待构建状态为 `VALID`。
+2. 完成真机重点回归和上一版客户端兼容冒烟。
+3. TestFlight `VALID` 且真机回归通过后，再合并 `main` 并创建 `v1.1-b1` tag。
