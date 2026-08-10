@@ -4,8 +4,10 @@
 > 目标版本：`1.1 (build 1)`
 > 候选分支：`feature/v1.1-b01`
 > iOS 候选源码 SHA：`1b66e16cc2e4476a8998b910e6ebaee24de99326`
-> 当前结论：**暂不可发布**
+> 当前结论：**已上线，发布负责人已确认验证完成**
+> 发布确认：`2026-08-10`（未提供精确时刻、设备型号与 iOS 版本）
 > 功能介绍：[release-1.1-b1-feature-intro.md](release-1.1-b1-feature-intro.md)
+> 用户公告：[release-1.1-b1-user-announcement.md](release-1.1-b1-user-announcement.md)
 
 ## 0. 当前发布摘要
 
@@ -17,22 +19,22 @@
 | 后端验证 | ✅ 通过 | 80 项测试通过；生产 health 与 Flyway 只读检查正常 |
 | iOS 构建与测试 | ✅ 通过 | `1.1 (build 1)` 下 216 项测试通过，Release Simulator 构建成功 |
 | 动作图门禁 | ✅ 通过 | 远端 fresh clone 已完成 LFS、193 张 JPG 确定性重导出、manifest 对照及 Release 构建 |
-| 人工回归 | ⚠️ 部分通过 | 休息继承 Simulator 全场景通过；动作历史、计划详情、海报、日历和兼容性待真机验证 |
-| TestFlight | ⚠️ 签名阻断 | Archive 成功，但 App Store export 因 Xcode 凭据失效且缺少 `iOS Distribution` 证书失败；未上传 |
-| 发布 tag | ⏳ 禁止创建 | 仅在 TestFlight `VALID` 且真机回归完成后创建 `v1.1-b1` |
+| 人工回归 | ✅ 已完成 | 发布负责人于 2026-08-10 确认真机重点回归和兼容性验证完成；设备明细未回填 |
+| TestFlight | ✅ 已上线 | 发布负责人于 2026-08-10 确认 `1.1 (build 1)` 已可安装并完成验证 |
+| 发布 tag | ⏳ 待执行 | 本次收口将合并 `main` 后创建 `v1.1-b1` |
 
 ## 1. 发布范围与冻结
 
 - [x] 已确认最近一个完成 TestFlight/生产发布并打 tag 的基线为 `v1.0-b21`。
 - [x] 已按 `v1.0-b21...当前工作区` 盘点最终用户行为，不使用分支起点或单个中间 commit 作为发布基线。
 - [x] 已确认目标版本为 `1.1 (build 1)`，目标 tag 为 `v1.1-b1`。
-- [x] 已生成本 Checklist 与[发版功能介绍](release-1.1-b1-feature-intro.md)。
+- [x] 已生成本 Checklist、[发版功能介绍](release-1.1-b1-feature-intro.md)与[用户公告](release-1.1-b1-user-announcement.md)。
 - [x] 已将 `REVERSE_LAT_PULLDOWN`、`CLOSE_LAT_PULLDOWN` 别名目标更新为当前标准名，并保留旧名称解析。
 - [x] 已恢复 `v1.0-b21` 发布过的「器械上拉」预置动作；当前使用肌群图降级，不伪造未审核动作图。
 - [x] 已将所有 App、Widget 与测试 target 的 `MARKETING_VERSION` 改为 `1.1`，`CURRENT_PROJECT_VERSION` 改为 `1`。
 - [x] 已重新检查候选 diff，确认没有密钥、临时文件、个人绝对路径或无关改动进入 iOS 候选源码。
 - [x] 已提交并推送全部确认范围，冻结 TestFlight iOS 候选 SHA `1b66e16cc2e4476a8998b910e6ebaee24de99326`。
-- [x] 已在候选 SHA 验证后更新本次两份发版文档；后续仅记录验证与发布状态，不改变 App 代码或资源。
+- [x] 已在候选 SHA 验证后更新本次三份发版文档；后续仅记录验证与发布状态，不改变 App 代码或资源。
 
 ## 2. 本次功能范围
 
@@ -113,9 +115,11 @@
 - [x] 生产 `POST /auth/dev/token` 返回 404，开发 token 未开启。
 - [x] 生产 Flyway 最新记录读取正常，`V16` 至 `V20` 均为成功状态，最新为 `V20__team_member_preferences_default_enabled.sql`。
 - [x] 已确认旧版 `v1.0-b21` 不需要等待新后端即可继续使用现有 API。
-- [ ] 发版当天再次执行一次只读 health 检查并将时间、响应写入发版记录。
+- [x] 发布负责人于 2026-08-10 确认本次上线验证已完成；本次无后端部署，未补录当天 health 响应详情。
 
 ## 5. TestFlight 前人工回归
+
+> 发布负责人于 2026-08-10 确认本节重点已在真机完成，且无阻塞问题；未提供逐项设备型号、iOS 版本和执行时间，因此下列条目保留为回归范围留档。
 
 ### 动作库与历史兼容
 
@@ -160,16 +164,14 @@
 ## 6. TestFlight 上传
 
 - [x] 候选 SHA 已冻结，工作区干净，版本号为 `1.1 (build 1)`。
-- [x] Xcode Archive 成功，Archive 中 App 与 extension 的版本号均为 `1.1 (1)`；当前 Archive 为 Apple Development 签名，尚不能导出 TestFlight 包。
-- [ ] 上传 App Store Connect/TestFlight 成功。
-- [ ] 构建处理完成，状态为 `VALID`，无 ITMS 阻塞警告。
-- [ ] 在 TestFlight 安装该构建，确认版本页显示 `1.1 (1)`。
-- [ ] 完成本清单第 5 节真机回归，并记录设备型号与 iOS 版本。
-- [ ] 更新[发版功能介绍](release-1.1-b1-feature-intro.md)中的 iOS 上传状态和已完成验证。
+- [x] Xcode Archive 成功，Archive 中 App 与 extension 的版本号均为 `1.1 (1)`。
+- [x] 发布负责人于 2026-08-10 确认 App Store Connect/TestFlight 上传成功，构建已可安装且无阻塞问题。
+- [x] 发布负责人于 2026-08-10 确认 TestFlight 真机重点回归完成；设备型号与 iOS 版本未回填。
+- [x] 已更新[发版功能介绍](release-1.1-b1-feature-intro.md)和[用户公告](release-1.1-b1-user-announcement.md)的 iOS 上线状态。
 
 ## 7. 合并、tag 与发布记录
 
-- [ ] TestFlight 构建已确认可安装，真机冒烟与重点回归完成。
+- [x] 发布负责人于 2026-08-10 确认 TestFlight 构建可安装，真机冒烟与重点回归完成。
 - [ ] 候选分支合并 `main`，合并后再次确认目标 SHA。
 - [ ] 在最终发布 SHA 创建 tag `v1.1-b1`。
 - [ ] 推送 tag，并确认 GitHub 上 tag 指向正确提交。
@@ -178,8 +180,7 @@
 
 ## 8. 发布负责人结论
 
-候选 iOS 源码 `1b66e16` 已推送并完成干净环境验证，已具备进入 TestFlight 上传的条件，但仍不得创建 `v1.1-b1` tag。最短收口顺序：
+候选 iOS 源码 `1b66e16` 已上线，发布负责人已确认 TestFlight 可安装与真机验证完成。当前只剩 Git 收口：
 
-1. 在 Xcode 恢复 Apple Developer 登录态，取得 App Store 分发所需身份后重新导出并上传 TestFlight，等待构建状态为 `VALID`。
-2. 完成真机重点回归和上一版客户端兼容冒烟。
-3. TestFlight `VALID` 且真机回归通过后，再合并 `main` 并创建 `v1.1-b1` tag。
+1. 合并候选分支至 `main`，确认最终 SHA。
+2. 在最终发布 SHA 创建并推送 `v1.1-b1` tag。

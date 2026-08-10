@@ -1,6 +1,6 @@
 ---
 name: release-dontlift
-description: 为《别练了》（DontLift）准备、核验、执行和收口 iOS TestFlight 与后端生产发版。用于用户要求盘点本次上线功能、判断是否需要后端部署、递增版本或 build、生成发版 checklist 与功能介绍、运行发布门禁、部署后端、上传 TestFlight、完成真机回归、合并 main、创建发布 tag，或更新既有发版记录时。
+description: 为《别练了》（DontLift）准备、核验、执行和收口 iOS TestFlight 与后端生产发版。用于用户要求盘点本次上线功能、判断是否需要后端部署、递增版本或 build、生成发版 checklist、功能介绍和可直接发送用户的简洁公告、运行发布门禁、部署后端、上传 TestFlight、完成真机回归、合并 main、创建发布 tag，或更新既有发版记录时。
 ---
 
 # 发布《别练了》
@@ -51,11 +51,12 @@ git status --short
 
 从 `ios/DontLift/DontLift.xcodeproj/project.pbxproj` 读取所有 target 的 `MARKETING_VERSION` 与 `CURRENT_PROJECT_VERSION`。主 App、widget extension 和测试 target 必须保持一致。不要复用已经上传到 App Store Connect 的 build 号；若上传失败或真机发现阻塞问题，递增 build。
 
-每次发版创建或更新以下两份简体中文文档：
+每次发版创建或更新以下三份简体中文文档：
 
 ```text
 docs/release-<version>-b<build>-checklist.md
 docs/release-<version>-b<build>-feature-intro.md
+docs/release-<version>-b<build>-user-announcement.md
 ```
 
 Checklist 至少包含：
@@ -77,7 +78,15 @@ Checklist 至少包含：
 - 已完成验证；
 - TestFlight 回归重点。
 
-两份文档互相链接。状态必须使用当前事实：未执行写“待执行”，未通过写“未通过”，无法验证写明原因。不要复制上一版本的测试数量、迁移版本、时间、commit 或设备信息。
+用户公告必须满足：
+
+- 文件全文可直接复制粘贴发送，不写 Markdown 标题、表格、目录、checklist、内部备注或链接元数据；
+- 以一句短标题或开场、2–5 条用户可感知变化和一句当前可用状态组成；
+- 只写相对最近已发布 tag 的最终用户行为，不写 commit、开发过程、API、迁移、LFS、测试数量或未落地方案；
+- 状态严格匹配事实：未上传时写“测试版预告，尚未可安装”；处理中写“已提交 TestFlight，正在处理”；`VALID` 后写“TestFlight 已可安装”；完成正式发布后才写“已发布”；
+- 无法确认的功能不写入公告，不把本地验证、Archive 成功或候选推送表述为已上线。
+
+Checklist 与功能介绍必须链接用户公告。状态必须使用当前事实：未执行写“待执行”，未通过写“未通过”，无法验证写明原因。不要复制上一版本的测试数量、迁移版本、时间、commit 或设备信息。
 
 ## 3. 判断后端是否需要发布
 
@@ -164,7 +173,7 @@ git push origin v<version>-b<build>
 
 ## 交付格式
 
-最终回复必须同时提供 checklist 与功能介绍的可点击链接，并简要列出：
+最终回复必须同时提供 checklist、功能介绍与用户公告的可点击链接；并将用户公告全文原样放入一个 Markdown 代码块，方便用户直接复制发送。另简要列出：
 
 - 本次最终用户功能；
 - 是否涉及后端部署及证据；
