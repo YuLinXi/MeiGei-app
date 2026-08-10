@@ -17,7 +17,7 @@
 | 后端部署 | 本次不需要。候选改动没有后端运行时代码、配置、API 或 Flyway 迁移 |
 | iOS 验证 | `1.1 (build 1)` 下 216 项测试通过；远端 fresh clone 的 Release Simulator 构建成功 |
 | TestFlight | 发布负责人于 2026-08-10 确认 `1.1 (build 1)` 已上线、可安装且验证完成 |
-| 发布结论 | iOS 候选源码已完成发布验证；待合并 `main` 并创建发布 tag |
+| 发布结论 | iOS 候选源码已完成发布验证，已合并 `main` 并创建 `v1.1-b1` tag |
 
 ## 一句话摘要
 
@@ -87,9 +87,9 @@
 - 生产环境健康检查连续 3 次返回 `UP`；`/privacy`、`/terms` 返回 200；生产 `/auth/dev/token` 返回 404。
 - 生产 Flyway 最新记录读取正常，最新版本为成功执行的 `V20__team_member_preferences_default_enabled.sql`。
 
-## 剩余 Git 收口
+## 发布收口
 
-- [ ] 候选分支合并 `main`，并在最终发布 SHA 创建、推送 `v1.1-b1` tag。
+- [x] 候选分支已 fast-forward 合并 `main`；`v1.1-b1` annotated tag 已创建并推送。
 
 ## TestFlight 回归重点
 
@@ -102,4 +102,4 @@
 7. 在日历中选择上月或下月日期，确认月份切换后选中状态不再跨网格跳动。
 8. 使用上一已发布版本连接当前生产后端完成登录、拉取和训练同步，确认后端兼容未升级用户。
 
-发布负责人已确认 TestFlight 构建可用并完成上述真机回归；本次将创建发布 tag：`v1.1-b1`。
+发布负责人已确认 TestFlight 构建可用并完成上述真机回归；本次发布 tag：`v1.1-b1` 已创建。
