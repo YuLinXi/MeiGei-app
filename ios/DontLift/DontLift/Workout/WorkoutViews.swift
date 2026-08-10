@@ -1311,6 +1311,7 @@ struct WorkoutLoggingView: View {
         .sheet(isPresented: $showingSaveAsPlan) {
             SaveWorkoutAsPlanSheet(workout: workout) { plan in
                 savedAsPlan = true
+                historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
                 globalMessage.show("已保存为「\(plan.name)」", style: .success)
             }
         }
@@ -3197,6 +3198,8 @@ private struct SaveWorkoutAsPlanSheet: View {
                                groupId: groupId,
                                sortOrder: nextSortOrder(in: groupId))
         modelContext.insert(plan)
+        workout.title = trimmed
+        workout.markDirty()
         try? modelContext.save()
         onSaved(plan)
         dismiss()
