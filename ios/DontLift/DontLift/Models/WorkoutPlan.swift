@@ -158,6 +158,8 @@ struct PlanItem: Codable, Identifiable, Hashable {
     var suggestedSets: Int?
     var suggestedReps: Int?
     var suggestedWeightKg: Double?
+    /// 普通动作/递减组的默认休息；nil 跟随全局，0 关闭自动休息。
+    var restAfterSetSeconds: Int?
     /// 可选逐组处方；缺失时继续使用 `suggested*` 兼容旧计划。
     var setPrescriptions: [PlanSetPrescription]?
     /// 普通单动作的备选动作快照；nil/空数组保持旧计划行为。
@@ -183,6 +185,7 @@ struct PlanItem: Codable, Identifiable, Hashable {
         suggestedSets: Int? = nil,
         suggestedReps: Int? = nil,
         suggestedWeightKg: Double? = nil,
+        restAfterSetSeconds: Int? = nil,
         setPrescriptions: [PlanSetPrescription]? = nil,
         alternatives: [PlanExerciseOption]? = nil,
         supersetMembers: [PlanSupersetMember]? = nil,
@@ -200,6 +203,7 @@ struct PlanItem: Codable, Identifiable, Hashable {
         self.suggestedSets = suggestedSets
         self.suggestedReps = suggestedReps
         self.suggestedWeightKg = suggestedWeightKg
+        self.restAfterSetSeconds = restAfterSetSeconds
         self.setPrescriptions = setPrescriptions
         self.alternatives = alternatives
         self.supersetMembers = supersetMembers

@@ -185,6 +185,7 @@ struct SupersetTrainingUnitTests {
             itemId: itemId,
             orderIndex: 0,
             roundCount: 4,
+            restAfterRoundSeconds: 90,
             members: [
                 planMember(id: firstMemberId, name: "夹胸", orderIndex: 0, weight: 50, reps: 10),
                 planMember(id: secondMemberId, name: "下斜卧推", orderIndex: 1, weight: 30, reps: 12)
@@ -201,6 +202,11 @@ struct SupersetTrainingUnitTests {
         first.sets.first { $0.setIndex == 2 }?.reps = 8
         second.sets.first { $0.setIndex == 3 }?.weightKg = 42.5
         second.sets.first { $0.setIndex == 3 }?.reps = 14
+        var unit = try #require(workout.trainingUnits.first)
+        var superset = try #require(unit.superset)
+        superset.restAfterRoundSeconds = 120
+        unit.superset = superset
+        workout.updateTrainingUnits([unit])
 
         let result = PlanWriteback.merge(planItems: [item], workout: workout)
         let updated = try #require(result.newItems.first)
@@ -211,6 +217,7 @@ struct SupersetTrainingUnitTests {
         #expect(updated.itemId == itemId)
         #expect(updated.isSuperset)
         #expect(updated.supersetRounds == 4)
+        #expect(updated.supersetRestAfterRoundSeconds == 120)
         #expect(members.map(\.memberId) == [firstMemberId, secondMemberId])
         #expect(members.map(\.exerciseName) == ["夹胸", "下斜卧推"])
         #expect(members.map(\.suggestedWeightKg) == [Double?](arrayLiteral: 62.5, 42.5))
@@ -257,6 +264,7 @@ struct SupersetTrainingUnitTests {
         #expect(items.count == 1)
         #expect(item.isSuperset)
         #expect(item.supersetRounds == 3)
+        #expect(item.supersetRestAfterRoundSeconds == 90)
         #expect(item.totalMemberSuggestionTexts == ["夹胸:60×12", "下斜卧推:40×15"])
     }
 
@@ -316,7 +324,8 @@ struct SupersetTrainingUnitTests {
         let second = workoutExercise(name: "下斜卧推", orderIndex: 1)
         second.sets = completedSets(rounds: rounds, weight: 40, reps: 15)
         workout.exercises = [first, second]
-        workout.appendSupersetUnit(first: first, second: second, roundCount: rounds)
+        workout.appendSupersetUnit(first: first, second: second, roundCount: rounds,
+                                   restAfterRoundSeconds: 90)
         workout.endedAt = startedAt.addingTimeInterval(3600)
         return workout
     }

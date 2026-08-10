@@ -259,11 +259,13 @@ extension Workout {
     }
 
     func appendSingleExerciseUnit(for exercise: WorkoutExercise,
+                                  restAfterSetSeconds: Int? = nil,
                                   exerciseOptions: [PlanExerciseOption]? = nil,
                                   planMode: WorkoutPlanMode? = nil,
                                   defaultSetSnapshots: [SetSnapshot]? = nil) {
         var units = trainingUnits
         if let index = units.firstIndex(where: { $0.singleExerciseId == exercise.localId }) {
+            units[index].restAfterSetSeconds = restAfterSetSeconds
             units[index].exerciseOptions = exerciseOptions
             units[index].planModeRaw = planMode?.rawValue
             units[index].defaultSetSnapshots = defaultSetSnapshots
@@ -273,13 +275,14 @@ extension Workout {
         units.append(WorkoutUnit(kind: .singleExercise,
                                  orderIndex: (units.map(\.orderIndex).max() ?? -1) + 1,
                                  singleExerciseId: exercise.localId,
+                                 restAfterSetSeconds: restAfterSetSeconds,
                                  exerciseOptions: exerciseOptions,
                                  planModeRaw: planMode?.rawValue,
                                  defaultSetSnapshots: defaultSetSnapshots))
         updateTrainingUnits(units)
     }
 
-    func appendDropSetUnit(for exercise: WorkoutExercise) {
+    func appendDropSetUnit(for exercise: WorkoutExercise, restAfterSetSeconds: Int? = nil) {
         var units = trainingUnits.filter { unit in
             switch unit.kind {
             case .singleExercise, .dropSet:
@@ -291,7 +294,8 @@ extension Workout {
         }
         units.append(WorkoutUnit(kind: .dropSet,
                                  orderIndex: (units.map(\.orderIndex).max() ?? -1) + 1,
-                                 singleExerciseId: exercise.localId))
+                                 singleExerciseId: exercise.localId,
+                                 restAfterSetSeconds: restAfterSetSeconds))
         updateTrainingUnits(units)
     }
 

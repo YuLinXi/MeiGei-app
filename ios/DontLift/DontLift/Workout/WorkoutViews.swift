@@ -1793,8 +1793,8 @@ struct WorkoutLoggingView: View {
 
     // MARK: 动作 ⋯ 组间休息菜单（顶层浮层，放大版）
 
-    /// 组间休息分段可选值（关 / 60 / 90 / 120），更长时间走自定义输入。
-    private static let restOptions: [Int] = [0, 60, 90, 120]
+    /// 组间休息分段可选值（跟随全局 / 关 / 60 / 90 / 120），更长时间走自定义输入。
+    private static let restOptions: [Int?] = [nil, 0, 60, 90, 120]
 
     @ViewBuilder
     private var restDurationKeypadOverlay: some View {
@@ -1837,33 +1837,35 @@ struct WorkoutLoggingView: View {
     @ViewBuilder
     private func actionMenuCard(for target: WorkoutActionMenuTarget) -> some View {
         let restTarget = restMenuTarget(for: target)
+        let configured = configuredRestSeconds(for: target)
         let current = currentRestSeconds(for: target)
         let editingCustom = restEditingTarget == restTarget
-        let isCustom = current > 0 && !Self.restOptions.contains(current)
+        let isCustom = configured.map { $0 > 0 && !Self.restOptions.contains(.some($0)) } ?? false
         let customHighlighted = editingCustom || isCustom
         let customValueText = editingCustom
             ? (restEditBuffer.isEmpty ? "输入秒数" : "\(restEditBuffer)s")
-            : (isCustom ? "\(current)s" : "")
+            : (isCustom ? "\(configured ?? current)s" : "")
         let customAccessibilityValue = editingCustom && !restEditBuffer.isEmpty
             ? "当前 \(restEditBuffer) 秒"
-            : (isCustom ? "当前 \(current) 秒" : "未设置")
+            : (isCustom ? "当前 \(configured ?? current) 秒" : "未设置")
         let noteExists = actionMenuNoteExists(for: target)
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(restMenuTitle(for: target)).font(Theme.Font.l2).foregroundStyle(Theme.Color.fg)
                     Spacer()
-                    Text(current == 0 ? "关" : "\(current)s")
+                    Text(configured == nil ? "全局 · \(current)s" : (current == 0 ? "关" : "\(current)s"))
                         .font(Theme.Font.mono(size: 15, weight: .bold))
                         .foregroundStyle(Theme.Color.accent)
                 }
                 HStack(spacing: 5) {
-                    ForEach(Self.restOptions, id: \.self) { opt in
-                        let on = current == opt
+                    ForEach(Self.restOptions.indices, id: \.self) { index in
+                        let opt = Self.restOptions[index]
+                        let on = configured == opt
                         Button {
                             selectPresetRestDuration(opt, for: restTarget)
                         } label: {
-                            Text(opt == 0 ? "关" : "\(opt)")
+                            Text(opt.map { $0 == 0 ? "关" : "\($0)" } ?? "全局")
                                 .font(Theme.Font.mono(size: 14, weight: .bold))
                                 .foregroundStyle(on ? .white : Theme.Color.fg2)
                                 .frame(width: 40)
@@ -1875,6 +1877,8 @@ struct WorkoutLoggingView: View {
                                         .stroke(on ? Theme.Color.accent : Theme.Color.border, lineWidth: 1)
                                 )
                         }.buttonStyle(.plain)
+                            .accessibilityLabel(opt.map { $0 == 0 ? "关闭自动休息" : "默认休息 \($0) 秒" } ?? "跟随全局休息")
+                            .accessibilityValue(on ? "已选择" : "未选择")
                     }
                     Button {
                         beginRestDurationEditing(for: restTarget, current: current, isCustom: isCustom)
@@ -1913,7 +1917,7 @@ struct WorkoutLoggingView: View {
                     .accessibilityValue(customAccessibilityValue)
                     .accessibilityHint("双击编辑自定义秒数")
                 }
-                Text(restDescription(for: target, seconds: current))
+                Text(restDescription(for: target, configured: configured, resolved: current))
                     .font(Theme.Font.l4).foregroundStyle(Theme.Color.muted)
             }
             .padding(16)
@@ -2023,12 +2027,30 @@ struct WorkoutLoggingView: View {
         }
     }
 
-    private func restDescription(for target: WorkoutActionMenuTarget, seconds: Int) -> String {
+    private func configuredRestSeconds(for target: WorkoutActionMenuTarget) -> Int? {
+        switch target {
+        case .exercise(let ex):
+            return workout.trainingUnits.first(where: { $0.singleExerciseId == ex.localId })?.restAfterSetSeconds
+        case .superset(let unit, _, _):
+            return unit.superset?.restAfterRoundSeconds
+        }
+    }
+
+    private func restDescription(for target: WorkoutActionMenuTarget,
+                                 configured: Int?,
+                                 resolved: Int) -> String {
+        let inheritance = switch target {
+        case .exercise: "已完成的上一组休息优先沿用其最终目标"
+        case .superset: "已完成的上一轮休息优先沿用其最终目标"
+        }
+        if configured == nil {
+            return "跟随全局设置，当前 \(resolved) 秒；\(inheritance)"
+        }
         switch target {
         case .exercise:
-            return seconds == 0 ? "该动作完成后不自动开始休息" : "该动作每组完成后默认休息 \(seconds) 秒；已完成的上一组休息优先沿用其最终目标"
+            return resolved == 0 ? "该动作完成后不自动开始休息" : "该动作每组完成后默认休息 \(resolved) 秒；\(inheritance)"
         case .superset:
-            return seconds == 0 ? "该超级组完成后不自动开始休息" : "该超级组每轮完成后默认休息 \(seconds) 秒；已完成的上一轮休息优先沿用其最终目标"
+            return resolved == 0 ? "该超级组完成后不自动开始休息" : "该超级组每轮完成后默认休息 \(resolved) 秒；\(inheritance)"
         }
     }
 
@@ -2533,7 +2555,7 @@ struct WorkoutLoggingView: View {
         }
     }
 
-    private func selectPresetRestDuration(_ seconds: Int, for target: WorkoutRestMenuTarget) {
+    private func selectPresetRestDuration(_ seconds: Int?, for target: WorkoutRestMenuTarget) {
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
@@ -2566,7 +2588,7 @@ struct WorkoutLoggingView: View {
         }
     }
 
-    private func setRestDuration(_ seconds: Int, for target: WorkoutRestMenuTarget) {
+    private func setRestDuration(_ seconds: Int?, for target: WorkoutRestMenuTarget) {
         switch target {
         case .exercise(let id):
             guard var unit = workout.trainingUnits.first(where: { $0.singleExerciseId == id }) else { return }

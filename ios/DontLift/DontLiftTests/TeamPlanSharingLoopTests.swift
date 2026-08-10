@@ -18,7 +18,8 @@ struct TeamPlanSharingLoopTests {
                          orderIndex: 1,
                          suggestedSets: 4,
                          suggestedReps: 8,
-                         suggestedWeightKg: 80),
+                         suggestedWeightKg: 80,
+                         restAfterSetSeconds: 120),
                 PlanItem(itemId: secondId,
                          builtinExerciseCode: "LAT_PULLDOWN",
                          exerciseName: "高位下拉",
@@ -38,6 +39,7 @@ struct TeamPlanSharingLoopTests {
         #expect(items.count == 2)
         #expect(items.map(\.itemId) == [firstId, secondId])
         #expect(items.map(\.suggestedWeightKg) == [nil, nil])
+        #expect(items.map(\.restAfterSetSeconds) == [120, nil])
         #expect(items[0].exerciseName == "杠铃卧推")
         #expect(items[0].primaryMuscle == "胸")
         #expect(items[0].equipmentType == "杠铃")
@@ -56,6 +58,7 @@ struct TeamPlanSharingLoopTests {
                     suggestedSets: 1,
                     suggestedReps: 8,
                     suggestedWeightKg: 80,
+                    restAfterSetSeconds: 0,
                     setPrescriptions: [
                         PlanSetPrescription(
                             setType: .drop,
@@ -78,6 +81,7 @@ struct TeamPlanSharingLoopTests {
 
         let prescription = try #require(items.first?.setPrescriptions?.first)
         #expect(items.first?.suggestedWeightKg == nil)
+        #expect(items.first?.restAfterSetSeconds == 0)
         #expect(prescription.setType == .drop)
         #expect(prescription.weightKg == nil)
         #expect(prescription.reps == 8)
@@ -174,19 +178,16 @@ struct TeamPlanSharingLoopTests {
                             exerciseName: "杠铃卧推",
                             orderIndex: 0,
                             suggestedSets: 2,
-                            suggestedReps: 8)
+                            suggestedReps: 8,
+                            restAfterSetSeconds: 120)
 
-        let workout = Workout(planId: nil,
-                              sourceShareId: shareId,
-                              sourceShareVersionId: versionId,
-                              sourcePlanNameSnapshot: "Team 胸推",
-                              title: "Team 胸推")
-        let exercise = WorkoutExercise(builtinExerciseCode: item.builtinExerciseCode,
-                                       exerciseName: item.displayExerciseName,
-                                       orderIndex: 0,
-                                       planItemId: item.itemId)
-        exercise.sets = PlanPrefill.sets(for: item, mode: .adaptive, history: [])
-        workout.exercises = [exercise]
+        let workout = PlanWorkoutBuilder.workout(title: "Team 胸推",
+                                                 items: [item],
+                                                 mode: .adaptive,
+                                                 lookup: .empty)
+        workout.sourceShareId = shareId
+        workout.sourceShareVersionId = versionId
+        workout.sourcePlanNameSnapshot = "Team 胸推"
 
         #expect(workout.planId == nil)
         #expect(workout.sourceShareId == shareId)
@@ -195,6 +196,7 @@ struct TeamPlanSharingLoopTests {
         #expect(workout.exercises.first?.planItemId == item.itemId)
         #expect(workout.exercises.first?.sets.count == 2)
         #expect(workout.exercises.first?.sets.allSatisfy { !$0.completed } == true)
+        #expect(workout.trainingUnits.first?.restAfterSetSeconds == 120)
     }
 
     @Test func checkinSummaryPreservesDropSetSegments() {

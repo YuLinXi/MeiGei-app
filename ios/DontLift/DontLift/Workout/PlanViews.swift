@@ -1034,6 +1034,9 @@ struct PlanDetailView: View {
                 }
             }
 
+            detailDivider
+            detailKeyValue(label: "默认休息", value: planRestText(item.restAfterSetSeconds))
+
             if let baselineSummary {
                 detailDivider
                 detailKeyValue(label: "模板基准", value: baselineSummary)
@@ -1055,6 +1058,14 @@ struct PlanDetailView: View {
         .cardStyle(padding: 14)
     }
 
+    private func planRestText(_ seconds: Int?) -> String {
+        switch seconds {
+        case nil: "跟随全局"
+        case 0: "关闭自动休息"
+        case let seconds?: "\(seconds) 秒"
+        }
+    }
+
     private func supersetPlanItemDetail(_ item: PlanItem) -> some View {
         let members = PlanItemDisplay.supersetMembers(for: item)
         return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
@@ -1074,7 +1085,7 @@ struct PlanDetailView: View {
 
             detailDivider
             detailKeyValue(label: "轮后休息",
-                           value: item.supersetRestAfterRoundSeconds.map { "\($0) 秒" } ?? "未设置")
+                           value: planRestText(item.supersetRestAfterRoundSeconds))
             if plan.mode == .strict {
                 Label("严格模式 · 完成后不更新", systemImage: "lock")
                     .font(Theme.Font.body(size: detailBodyFontSize, weight: .semibold))
@@ -1399,7 +1410,7 @@ struct PlanDetailView: View {
     private func duplicate() {
         // Fork 规则（design.md D8）：复制 动作 + 组数 + 次数，清空重量（重量最私人）；副本默认自适应。
         let copy = WorkoutPlan(name: plan.name + " · 副本",
-                               items: plan.items.map(weightlessCopyForDuplicate(_:)),
+                               items: plan.items.map { Self.weightlessCopyForDuplicate($0) },
                                mode: .adaptive,
                                forkedFrom: plan.localId,
                                groupId: nil,
@@ -1416,7 +1427,7 @@ struct PlanDetailView: View {
         return (sameGroup.map(\.sortOrder).max() ?? -1) + 1
     }
 
-    private func weightlessCopyForDuplicate(_ item: PlanItem) -> PlanItem {
+    static func weightlessCopyForDuplicate(_ item: PlanItem) -> PlanItem {
         if item.isSuperset {
             return PlanItem.superset(
                 itemId: UUID(),
@@ -1463,6 +1474,7 @@ struct PlanDetailView: View {
                             suggestedSets: max(1, item.suggestedSets ?? prescriptions.count),
                             suggestedReps: item.suggestedReps,
                             suggestedWeightKg: nil,
+                            restAfterSetSeconds: item.restAfterSetSeconds,
                             setPrescriptions: prescriptions.isEmpty ? nil : prescriptions)
         }
         return PlanItem(itemId: UUID(),
@@ -1475,6 +1487,7 @@ struct PlanDetailView: View {
                         suggestedSets: item.suggestedSets,
                         suggestedReps: item.suggestedReps,
                         suggestedWeightKg: nil,
+                        restAfterSetSeconds: item.restAfterSetSeconds,
                         setPrescriptions: PlanItem.reindexRegularPrescriptions(item.regularSetPrescriptions).map {
                             PlanSetPrescription(prescriptionId: UUID(),
                                                 setType: $0.setType,
@@ -2276,18 +2289,21 @@ private enum PlanItemEditorField: Hashable {
     case dropChildGroupCount
     case dropSegmentWeight(UUID)
     case dropSegmentReps(UUID)
+    case restSeconds
 
     var allowsDecimal: Bool {
         switch self {
         case .workingWeight, .warmupWeight, .dropSegmentWeight:
             return true
-        case .workingGroupCount, .workingReps, .warmupReps, .dropOuterGroupCount, .dropChildGroupCount, .dropSegmentReps:
+        case .workingGroupCount, .workingReps, .warmupReps, .dropOuterGroupCount, .dropChildGroupCount, .dropSegmentReps, .restSeconds:
             return false
         }
     }
 }
 
 struct PlanItemEditorView: View {
+    private static let restPresets = [60, 90, 120]
+
     @Environment(\.dismiss) private var dismiss
     @State private var prescriptions: [EditablePlanPrescription]
     @State private var warmupPrescriptions: [EditablePlanPrescription]
@@ -2295,6 +2311,8 @@ struct PlanItemEditorView: View {
     @State private var focusedField: PlanItemEditorField?
     @State private var replaceOnInput = false
     @State private var dropOuterGroupCountText: String
+    @State private var restAfterSetSeconds: Int?
+    @State private var restCustomText: String
     @State private var alternatives: [PlanExerciseOption]
     @State private var pickingAlternative = false
     @State private var alternativeError: String?
@@ -2314,6 +2332,10 @@ struct PlanItemEditorView: View {
         ])
         _warmupPrescriptions = State(initialValue: item.isDropSet ? [] : warmups)
         _dropOuterGroupCountText = State(initialValue: "\(max(1, item.suggestedSets ?? 1))")
+        _restAfterSetSeconds = State(initialValue: item.restAfterSetSeconds)
+        _restCustomText = State(initialValue: item.restAfterSetSeconds.flatMap {
+            $0 > 0 && !Self.restPresets.contains($0) ? String($0) : nil
+        } ?? "")
         _alternatives = State(initialValue: item.usableAlternatives)
     }
 
@@ -2333,6 +2355,7 @@ struct PlanItemEditorView: View {
                     VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                         editorTitle
                         prescriptionEditor
+                        restEditor
                         if !original.isDropSet {
                             alternativeEditor
                         }
@@ -2399,6 +2422,7 @@ struct PlanItemEditorView: View {
             updated.applyManualSetPrescriptions(warmupModels + workingModels)
             updated.alternatives = alternatives.isEmpty ? nil : alternatives
         }
+        updated.restAfterSetSeconds = restAfterSetSeconds
         onSave(updated)
         dismiss()
     }
@@ -2412,6 +2436,80 @@ struct PlanItemEditorView: View {
                 warmupPrescriptionSection
             }
         }
+    }
+
+    private var restEditor: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text("默认休息")
+                .font(Theme.Font.l2)
+                .foregroundStyle(Theme.Color.fg)
+
+            HStack(spacing: 6) {
+                restOptionButton(title: "全局", value: nil, accessibilityLabel: "跟随全局休息")
+                restOptionButton(title: "关", value: 0, accessibilityLabel: "关闭自动休息")
+                ForEach(Self.restPresets, id: \.self) { seconds in
+                    restOptionButton(title: "\(seconds)", value: seconds,
+                                     accessibilityLabel: "默认休息 \(seconds) 秒")
+                }
+            }
+
+            Button {
+                if !isCustomRest {
+                    restCustomText = ""
+                }
+                focus(.restSeconds)
+            } label: {
+                HStack {
+                    Text("自定义")
+                    Spacer()
+                    Text(restCustomText.isEmpty ? "输入秒数" : "\(restCustomText) 秒")
+                        .font(Theme.Font.mono(size: 13, weight: .bold))
+                        .foregroundStyle(isCustomRest ? Theme.Color.accent : Theme.Color.muted)
+                }
+                .font(Theme.Font.body(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg)
+                .padding(.horizontal, 12)
+                .frame(height: 42)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                        .stroke(focusedField == .restSeconds ? Theme.Color.accent : Theme.Color.border, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .id(PlanItemEditorField.restSeconds)
+            .accessibilityLabel("自定义默认休息秒数")
+            .accessibilityValue(restCustomText.isEmpty ? "未设置" : "\(restCustomText) 秒")
+        }
+    }
+
+    private func restOptionButton(title: String, value: Int?, accessibilityLabel: String) -> some View {
+        let selected = restAfterSetSeconds == value
+        return Button {
+            focusedField = nil
+            restAfterSetSeconds = value
+            restCustomText = ""
+        } label: {
+            Text(title)
+                .font(Theme.Font.mono(size: 13, weight: .bold))
+                .foregroundStyle(selected ? .white : Theme.Color.fg2)
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
+                .background(selected ? Theme.Color.accent : Theme.Color.surface,
+                            in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .stroke(selected ? Theme.Color.accent : Theme.Color.border, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(selected ? "已选择" : "未选择")
+    }
+
+    private var isCustomRest: Bool {
+        guard let seconds = restAfterSetSeconds else { return false }
+        return seconds > 0 && !Self.restPresets.contains(seconds)
     }
 
     private var alternativeEditor: some View {
@@ -2934,11 +3032,11 @@ struct PlanItemEditorView: View {
         if original.isDropSet {
             return [.dropOuterGroupCount] + dropSegments.flatMap {
                 [PlanItemEditorField.dropSegmentWeight($0.id), .dropSegmentReps($0.id)]
-            }
+            } + [.restSeconds]
         }
         return [.workingGroupCount, .workingWeight, .workingReps] + warmupPrescriptions.flatMap {
             [PlanItemEditorField.warmupWeight($0.id), .warmupReps($0.id)]
-        }
+        } + [.restSeconds]
     }
 
     private func focusPreviousField() {
@@ -2962,6 +3060,9 @@ struct PlanItemEditorView: View {
     private func keypadDigit(_ digit: Int) {
         guard let field = focusedField else { return }
         let prefix = replaceOnInput ? "" : text(for: field)
+        if field == .restSeconds {
+            guard prefix.count < 3, !(prefix.isEmpty && digit == 0) else { return }
+        }
         setText(prefix + "\(digit)", for: field)
         replaceOnInput = false
     }
@@ -3006,6 +3107,8 @@ struct PlanItemEditorView: View {
             return dropSegments.first(where: { $0.id == id })?.weight ?? ""
         case .dropSegmentReps(let id):
             return dropSegments.first(where: { $0.id == id })?.reps ?? ""
+        case .restSeconds:
+            return restCustomText
         }
     }
 
@@ -3029,6 +3132,9 @@ struct PlanItemEditorView: View {
             setDropSegmentWeight(value, segmentId: id)
         case .dropSegmentReps(let id):
             setDropSegmentReps(value, segmentId: id)
+        case .restSeconds:
+            restCustomText = String(value.prefix(3))
+            restAfterSetSeconds = Int(restCustomText).flatMap { $0 > 0 ? $0 : nil }
         }
     }
 }

@@ -432,6 +432,7 @@ final class TeamService {
                                 suggestedSets: max(1, item.suggestedSets ?? prescriptions.count),
                                 suggestedReps: item.suggestedReps,
                                 suggestedWeightKg: nil,
+                                restAfterSetSeconds: item.restAfterSetSeconds,
                                 setPrescriptions: prescriptions)
             }
             return PlanItem(itemId: item.itemId,
@@ -444,6 +445,7 @@ final class TeamService {
                             suggestedSets: item.suggestedSets,
                             suggestedReps: item.suggestedReps,
                             suggestedWeightKg: nil,
+                            restAfterSetSeconds: item.restAfterSetSeconds,
                             setPrescriptions: weightlessPrescriptions(item.orderedSetPrescriptions),
                             alternatives: item.alternatives)
         }

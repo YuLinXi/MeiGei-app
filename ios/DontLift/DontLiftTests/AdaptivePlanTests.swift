@@ -46,6 +46,25 @@ struct AdaptivePlanTests {
         return set
     }
 
+    @Test func planWorkoutBuilderCarriesRestDefaultsForEveryModeAndUnitKind() {
+        let single = PlanItem(exerciseName: "卧推", orderIndex: 0,
+                              suggestedSets: 1, suggestedReps: 8, restAfterSetSeconds: 120)
+        var drop = PlanItem.dropSet(orderIndex: 1, exerciseName: "飞鸟",
+                                    segments: [WorkoutSetSegment(segmentIndex: 0, reps: 10)])
+        drop.restAfterSetSeconds = 0
+        let followsGlobal = PlanItem(exerciseName: "深蹲", orderIndex: 2,
+                                     suggestedSets: 1, suggestedReps: 5)
+
+        for mode in [WorkoutPlanMode.strict, .adaptive] {
+            let workout = PlanWorkoutBuilder.workout(title: "训练",
+                                                     items: [single, drop, followsGlobal],
+                                                     mode: mode,
+                                                     lookup: .empty)
+            let units = workout.trainingUnits.sorted { $0.orderIndex < $1.orderIndex }
+            #expect(units.map(\.restAfterSetSeconds) == [120, 0, nil])
+        }
+    }
+
     // MARK: - countsForStats 收紧
 
     @Test func countsForStatsRequiresCompletedAndNonWarmup() {
@@ -484,6 +503,50 @@ struct AdaptivePlanTests {
 
     // MARK: - PlanWriteback 回写合并
 
+    @Test func mergeWritesUnitRestAndIgnoresPerSetRestFacts() throws {
+        let itemId = UUID()
+        let prescription = PlanSetPrescription(orderIndex: 0, weightKg: 60, reps: 8)
+        let plan = [PlanItem(itemId: itemId, builtinExerciseCode: "BB_BENCH", exerciseName: "卧推",
+                             orderIndex: 0, suggestedSets: 1, suggestedReps: 8, suggestedWeightKg: 60,
+                             restAfterSetSeconds: 90, setPrescriptions: [prescription])]
+        let workout = makeWorkout(historyKey: "BB_BENCH", startedAt: Date(timeIntervalSince1970: 2000),
+                                  sets: [(60, 8, true, .working)], planItemId: itemId)
+        let exercise = try #require(workout.exercises.first)
+        exercise.sets[0].plannedRestSeconds = 100
+        exercise.sets[0].actualRestSeconds = 40
+        workout.appendSingleExerciseUnit(for: exercise, restAfterSetSeconds: 120)
+
+        let result = PlanWriteback.merge(planItems: plan, workout: workout)
+
+        #expect(result.newItems.first?.restAfterSetSeconds == 120)
+        #expect(plan.first?.restAfterSetSeconds == 90)
+        #expect(result.changed)
+        #expect(result.diffs.contains { $0.oldText?.contains("休息 90 秒") == true
+            && $0.newText?.contains("休息 120 秒") == true })
+
+        workout.appendSingleExerciseUnit(for: exercise, restAfterSetSeconds: 90)
+        let unchanged = PlanWriteback.merge(planItems: plan, workout: workout)
+        #expect(unchanged.newItems.first?.restAfterSetSeconds == 90)
+        #expect(!unchanged.changed)
+    }
+
+    @Test func mergeWritesDropSetRestDefault() {
+        let itemId = UUID()
+        var item = PlanItem.dropSet(itemId: itemId, orderIndex: 0, exerciseName: "卧推",
+                                    segments: [WorkoutSetSegment(segmentIndex: 0, weightKg: 80, reps: 8)])
+        item.restAfterSetSeconds = 60
+        let workout = Workout()
+        let exercise = WorkoutExercise(exerciseName: "卧推", orderIndex: 0, planItemId: itemId)
+        exercise.sets = [dropSet(segments: [(80, 8)])]
+        workout.exercises = [exercise]
+        workout.appendDropSetUnit(for: exercise, restAfterSetSeconds: 120)
+
+        let result = PlanWriteback.merge(planItems: [item], workout: workout)
+
+        #expect(result.newItems.first?.restAfterSetSeconds == 120)
+        #expect(result.changed)
+    }
+
     /// 重量/次数如实写回顶组；组数只增不减。
     @Test func mergeWritesTopSetAndMaxSets() {
         let key = "BB_BENCH"
@@ -654,10 +717,12 @@ struct AdaptivePlanTests {
         // 本次没练深蹲，却练了一个不在计划里的新动作。
         let w = makeWorkout(historyKey: "CURL", name: "弯举", startedAt: Date(timeIntervalSince1970: 2000),
                             sets: [(20, 12, true, .working)], planItemId: nil)
+        w.appendSingleExerciseUnit(for: w.exercises[0], restAfterSetSeconds: 60)
         let result = PlanWriteback.merge(planItems: plan, workout: w)
         #expect(result.newItems.count == 2)                                   // 深蹲保留 + 弯举新增
         #expect(result.newItems.contains { $0.exerciseName == "深蹲" })        // 跳过的保留
         #expect(result.newItems.contains { $0.exerciseName == "弯举" })        // 新增 append
+        #expect(result.newItems.first { $0.exerciseName == "弯举" }?.restAfterSetSeconds == 60)
         #expect(result.diffs.contains { $0.kind == .added && $0.exerciseName == "弯举" })
         #expect(result.diffs.contains { $0.kind == .kept && $0.exerciseName == "杠铃深蹲" })
     }

@@ -73,6 +73,7 @@ class TeamPlanServiceTest {
         assertThat(item.has("suggestedWeightKg")).isFalse();
         assertThat(item.get("exerciseName").asText()).isEqualTo("新版动作");
         assertThat(item.get("primaryMuscle").asText()).isEqualTo("胸");
+        assertThat(item.get("restAfterSetSeconds").asInt()).isEqualTo(120);
     }
 
     @Test
@@ -140,6 +141,7 @@ class TeamPlanServiceTest {
                   "suggestedSets":1,
                   "suggestedReps":8,
                   "suggestedWeightKg":90,
+                  "restAfterSetSeconds":0,
                   "setPrescriptions":[{
                     "prescriptionId":"%s",
                     "setType":"drop",
@@ -160,6 +162,7 @@ class TeamPlanServiceTest {
         JsonNode item = objectMapper.readTree(versionCaptor.getValue().getItems()).get(0);
         JsonNode prescription = item.get("setPrescriptions").get(0);
         assertThat(item.has("suggestedWeightKg")).isFalse();
+        assertThat(item.get("restAfterSetSeconds").asInt()).isZero();
         assertThat(prescription.has("weightKg")).isFalse();
         assertThat(prescription.get("segments").get(0).has("weightKg")).isFalse();
         assertThat(prescription.get("segments").get(1).has("weight")).isFalse();
@@ -271,6 +274,7 @@ class TeamPlanServiceTest {
         assertThat(copy.getMode()).isEqualTo("adaptive");
         assertThat(copy.getSortOrder()).isEqualTo(3);
         assertThat(item.has("suggestedWeightKg")).isFalse();
+        assertThat(item.get("restAfterSetSeconds").asInt()).isZero();
 
         ArgumentCaptor<TeamPlanShareEvent> eventCaptor = ArgumentCaptor.forClass(TeamPlanShareEvent.class);
         verify(eventMapper).insertIgnoreDuplicate(eventCaptor.capture());
@@ -417,7 +421,8 @@ class TeamPlanServiceTest {
                   "orderIndex":0,
                   "suggestedSets":4,
                   "suggestedReps":8,
-                  "suggestedWeightKg":80
+                  "suggestedWeightKg":80,
+                  "restAfterSetSeconds":120
                 }]
                 """.formatted(UUID.randomUUID()));
         return source;
@@ -446,7 +451,8 @@ class TeamPlanServiceTest {
                   "exerciseName":"新版动作",
                   "orderIndex":0,
                   "suggestedSets":4,
-                  "suggestedReps":8
+                  "suggestedReps":8,
+                  "restAfterSetSeconds":0
                 }]
                 """.formatted(UUID.randomUUID()));
         return version;

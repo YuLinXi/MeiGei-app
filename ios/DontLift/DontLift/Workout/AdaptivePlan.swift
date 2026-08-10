@@ -367,11 +367,12 @@ enum PlanWorkoutBuilder {
             exercise.sets = PlanPrefill.sets(for: item, mode: mode, lookup: lookup)
             workout.exercises.append(exercise)
             if item.isDropSet {
-                workout.appendDropSetUnit(for: exercise)
+                workout.appendDropSetUnit(for: exercise, restAfterSetSeconds: item.restAfterSetSeconds)
             } else {
                 let options = item.exerciseOptions
                 workout.appendSingleExerciseUnit(
                     for: exercise,
+                    restAfterSetSeconds: item.restAfterSetSeconds,
                     exerciseOptions: options.isEmpty ? nil : options,
                     planMode: options.isEmpty ? nil : mode,
                     defaultSetSnapshots: options.isEmpty ? nil : exercise.sets
@@ -603,13 +604,14 @@ enum PlanWriteback {
                 if let weight = member.suggestedWeightKg { parts.append("\(formatKg(weight)) kg") }
                 return parts.joined(separator: " · ")
             }.joined(separator: " / ")
-            return "超级组 · \(i.supersetRounds) 组 · \(memberText)"
+            return "超级组 · \(i.supersetRounds) 组 · \(memberText) · \(restSummary(i.supersetRestAfterRoundSeconds))"
         }
         if i.isDropSet {
             var parts: [String] = ["递减组"]
             if let s = i.suggestedSets { parts.append("\(s) 组") }
             if let r = i.suggestedReps { parts.append("\(r) 次") }
             if let w = i.suggestedWeightKg { parts.append("\(formatKg(w)) kg") }
+            parts.append(restSummary(i.restAfterSetSeconds))
             return parts.joined(separator: " · ")
         }
         var parts: [String] = []
@@ -617,7 +619,16 @@ enum PlanWriteback {
         if let r = i.suggestedReps { parts.append("\(r) 次") }
         if let w = i.suggestedWeightKg { parts.append("\(formatKg(w)) kg") }
         if i.orderedSetPrescriptions.contains(where: { $0.setType == .drop }) { parts.append("含递减组") }
-        return parts.isEmpty ? "未设建议" : parts.joined(separator: " × ")
+        let base = parts.isEmpty ? "未设建议" : parts.joined(separator: " × ")
+        return "\(base) · \(restSummary(i.restAfterSetSeconds))"
+    }
+
+    private static func restSummary(_ seconds: Int?) -> String {
+        switch seconds {
+        case nil: "休息跟随全局"
+        case 0: "关闭休息"
+        case let seconds?: "休息 \(seconds) 秒"
+        }
     }
 
     /// 合并。仅依据本次 `completed` 正式组（`countsForStats`）。
@@ -627,6 +638,7 @@ enum PlanWriteback {
         var touchedItemIds = Set<UUID>()          // 被 UPDATE 命中的原计划项 itemId
         var nextOrder = (items.map(\.orderIndex).max() ?? -1) + 1
         let supersetExerciseIds = workout.supersetExerciseIds
+        let units = workout.trainingUnits
 
         for ex in workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }) {
             if ex.planItemId == nil && supersetExerciseIds.contains(ex.localId) {
@@ -636,6 +648,7 @@ enum PlanWriteback {
                 .filter { $0.countsForStats }
                 .sorted { $0.setIndex < $1.setIndex }
             let isDropSetUnit = workout.dropSetExerciseIds.contains(ex.localId) || working.contains(where: \.isDropSet)
+            let restAfterSetSeconds = units.first { $0.singleExerciseId == ex.localId }?.restAfterSetSeconds
 
             if let target = supersetMemberTarget(for: ex, in: items) {
                 guard let top = topStatEntry(in: working) else { continue }
@@ -645,6 +658,9 @@ enum PlanWriteback {
                 members[target.memberIndex].suggestedWeightKg = top.weightKg
                 members[target.memberIndex].suggestedReps = top.reps
                 item.supersetMembers = members
+                item.supersetRestAfterRoundSeconds = units
+                    .first { $0.superset?.members.contains(where: { $0.exerciseId == ex.localId }) == true }?
+                    .superset?.restAfterRoundSeconds
                 items[target.itemIndex] = item
                 touchedItemIds.insert(item.itemId)
                 let after = summary(item)
@@ -664,7 +680,14 @@ enum PlanWriteback {
                ex.planItemId != nil,
                ex.historyKey != items[idx].historyKey {
                 guard !working.isEmpty else { continue }
+                let before = summary(items[idx])
+                items[idx].restAfterSetSeconds = restAfterSetSeconds
                 touchedItemIds.insert(items[idx].itemId)
+                let after = summary(items[idx])
+                if after != before {
+                    diffs.append(ItemDiff(kind: .updated, exerciseName: items[idx].displayExerciseName,
+                                          oldText: before, newText: after))
+                }
                 continue
             }
             let existingPrescriptions = matchIdx.map { items[$0].orderedSetPrescriptions } ?? []
@@ -687,6 +710,7 @@ enum PlanWriteback {
                     items[idx].suggestedSets = targetSetCount
                     items[idx].suggestedWeightKg = top.weightKg
                     items[idx].suggestedReps = top.reps
+                    items[idx].restAfterSetSeconds = restAfterSetSeconds
                     items[idx].setPrescriptions = mergedDropPrescriptions(observed: prescriptions,
                                                                           existing: existingDrops,
                                                                           targetCount: targetSetCount)
@@ -708,6 +732,7 @@ enum PlanWriteback {
                                            suggestedSets: setCount,
                                            suggestedReps: top.reps,
                                            suggestedWeightKg: top.weightKg,
+                                           restAfterSetSeconds: restAfterSetSeconds,
                                            setPrescriptions: prescriptions)
                     nextOrder += 1
                     items.append(newItem)
@@ -734,6 +759,7 @@ enum PlanWriteback {
                     items[idx].suggestedWeightKg = top.weightKg
                     items[idx].suggestedReps = top.reps
                 }
+                items[idx].restAfterSetSeconds = restAfterSetSeconds
                 items[idx].setPrescriptions = prescriptions
                 touchedItemIds.insert(items[idx].itemId)
                 let after = summary(items[idx])
@@ -753,6 +779,7 @@ enum PlanWriteback {
                                        suggestedSets: setCount,
                                        suggestedReps: top.reps,
                                        suggestedWeightKg: top.weightKg,
+                                       restAfterSetSeconds: restAfterSetSeconds,
                                        setPrescriptions: prescriptions)
                 nextOrder += 1
                 items.append(newItem)

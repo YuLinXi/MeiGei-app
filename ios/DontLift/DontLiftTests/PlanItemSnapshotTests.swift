@@ -24,6 +24,19 @@ struct PlanItemSnapshotTests {
         #expect(encoded["equipmentType"] as? String == "器械")
     }
 
+    @Test func restDefaultRoundTripsAndLegacyDefaultsToGlobal() throws {
+        let configured = PlanItem(exerciseName: "卧推", orderIndex: 0, restAfterSetSeconds: 120)
+        let disabled = PlanItem(exerciseName: "划船", orderIndex: 1, restAfterSetSeconds: 0)
+
+        let data = try JSONCoding.encoder.encode([configured, disabled])
+        let decoded = try JSONCoding.decoder.decode([PlanItem].self, from: data)
+
+        #expect(decoded.map(\.restAfterSetSeconds) == [120, 0])
+        #expect(try JSONCoding.decoder.decode([PlanItem].self, from: Data("""
+        [{"itemId":"\(UUID().uuidString)","exerciseName":"深蹲","orderIndex":0}]
+        """.utf8)).first?.restAfterSetSeconds == nil)
+    }
+
     @Test func unknownBuiltinUsesSnapshotName() throws {
         let json = """
         [{
@@ -43,6 +56,7 @@ struct PlanItemSnapshotTests {
         #expect(items.first?.displayExerciseName == "新版动作")
         #expect(items.first?.resolvedPrimaryMuscle == "胸")
         #expect(items.first?.resolvedEquipmentType == "哑铃")
+        #expect(items.first?.restAfterSetSeconds == nil)
         #expect(PlanItem.unstartableItems(in: items).isEmpty)
     }
 

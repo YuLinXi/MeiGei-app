@@ -16,12 +16,16 @@ extension Workout {
             case .singleExercise:
                 guard let exerciseId = unit.singleExerciseId,
                       let ex = exercise(id: exerciseId),
-                      let item = planItem(from: ex, orderIndex: items.count) else { continue }
+                      let item = planItem(from: ex,
+                                          restAfterSetSeconds: unit.restAfterSetSeconds,
+                                          orderIndex: items.count) else { continue }
                 items.append(item)
             case .dropSet:
                 guard let exerciseId = unit.singleExerciseId,
                       let ex = exercise(id: exerciseId),
-                      let item = dropSetPlanItem(from: ex, orderIndex: items.count) else { continue }
+                      let item = dropSetPlanItem(from: ex,
+                                                 restAfterSetSeconds: unit.restAfterSetSeconds,
+                                                 orderIndex: items.count) else { continue }
                 items.append(item)
             case .superset:
                 guard let superset = unit.superset,
@@ -48,7 +52,9 @@ extension Workout {
         return items
     }
 
-    private func planItem(from ex: WorkoutExercise, orderIndex: Int) -> PlanItem? {
+    private func planItem(from ex: WorkoutExercise,
+                          restAfterSetSeconds: Int?,
+                          orderIndex: Int) -> PlanItem? {
             let executionSets = ex.sets
                 .filter { $0.completed && !$0.isDropSet }
                 .sorted {
@@ -69,13 +75,16 @@ extension Workout {
                 suggestedSets: formalSets.count,
                 suggestedReps: top?.reps,
                 suggestedWeightKg: top?.weightKg,
+                restAfterSetSeconds: restAfterSetSeconds,
                 setPrescriptions: executionSets.enumerated().map { idx, set in
                     Self.planPrescription(from: set, orderIndex: idx)
                 }
             )
     }
 
-    private func dropSetPlanItem(from ex: WorkoutExercise, orderIndex: Int) -> PlanItem? {
+    private func dropSetPlanItem(from ex: WorkoutExercise,
+                                 restAfterSetSeconds: Int?,
+                                 orderIndex: Int) -> PlanItem? {
         let dropSets = ex.sets
             .sorted(by: { $0.setIndex < $1.setIndex })
             .filter { $0.isDropSet && $0.countsForStats }
@@ -93,6 +102,7 @@ extension Workout {
                         suggestedSets: dropSets.count,
                         suggestedReps: top?.reps,
                         suggestedWeightKg: top?.weightKg,
+                        restAfterSetSeconds: restAfterSetSeconds,
                         setPrescriptions: dropSets.enumerated().map { idx, set in
                             Self.planPrescription(from: set, orderIndex: idx)
                         })
