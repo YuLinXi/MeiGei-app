@@ -292,7 +292,7 @@ struct WorkoutDetailView: View {
         )
     }
 
-    // MARK: 动作日志（全部展开的只读账本）
+    // MARK: 动作日志（可收起的只读账本）
 
     private var logSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
@@ -310,7 +310,11 @@ struct WorkoutDetailView: View {
         case .singleExercise, .dropSet:
             if let id = unit.singleExerciseId,
                let ex = workout.exercise(id: id) {
-                ExerciseLogCard(exercise: ex, prMaxWeight: prMaxByKey[ex.historyKey])
+                ExerciseLogCard(
+                    exercise: ex,
+                    prMaxWeight: prMaxByKey[ex.historyKey],
+                    isDropSet: unit.kind == .dropSet
+                )
             }
         case .superset:
             if let superset = unit.superset,
@@ -356,47 +360,58 @@ private struct SupersetLogCard: View {
     let first: WorkoutExercise
     let second: WorkoutExercise
     let roundCount: Int
+    @State private var isExpanded = true
 
     private var firstSets: [WorkoutSet] { first.sets.sorted { $0.setIndex < $1.setIndex } }
     private var secondSets: [WorkoutSet] { second.sets.sorted { $0.setIndex < $1.setIndex } }
     private var effectiveRoundCount: Int { min(roundCount, min(firstSets.count, secondSets.count)) }
-    private var completedRounds: Int {
-        (0..<effectiveRoundCount).filter { firstSets[$0].completed && secondSets[$0].completed }.count
-    }
+    private var titleText: String { "\(first.displayExerciseName) + \(second.displayExerciseName)" }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        WorkoutStructureIcon(kind: .superset)
-                        Text("\(completedRounds)/\(effectiveRoundCount) 组")
-                            .font(Theme.Font.mono(size: 11, weight: .semibold))
-                            .foregroundStyle(Theme.Color.muted)
-                    }
-                    Text("\(first.displayExerciseName) + \(second.displayExerciseName)")
+            Button {
+                isExpanded.toggle()
+            } label: {
+                HStack(spacing: 8) {
+                    WorkoutStructureIcon(kind: .superset)
+                    Text(titleText)
                         .font(Theme.Font.l2)
                         .foregroundStyle(Theme.Color.fg)
                         .lineLimit(1)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 15)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
-
-            Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.horizontal, 15)
-
-            VStack(spacing: 0) {
-                ForEach(Array(0..<effectiveRoundCount), id: \.self) { index in
-                    if index > 0 {
-                        Rectangle().fill(Theme.Color.border.opacity(0.55)).frame(height: 1)
-                            .padding(.horizontal, 15)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 8)
+                    HStack(spacing: 8) {
+                        Text("\(effectiveRoundCount) 组")
+                            .font(Theme.Font.mono(size: 11, weight: .medium))
+                            .foregroundStyle(Theme.Color.muted)
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.Color.muted)
                     }
-                    roundRow(index)
+                    .fixedSize(horizontal: true, vertical: false)
                 }
+                .padding(.horizontal, 15)
+                .padding(.vertical, 12)
+                .contentShape(Rectangle())
             }
-            .padding(.vertical, 3)
+            .buttonStyle(.plain)
+            .accessibilityLabel("超级组，\(titleText)，\(effectiveRoundCount) 组，\(isExpanded ? "已展开" : "已收起")")
+            .accessibilityHint("点按\(isExpanded ? "收起" : "展开")动作明细")
+
+            if isExpanded {
+                Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.horizontal, 15)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(0..<effectiveRoundCount), id: \.self) { index in
+                        if index > 0 {
+                            Rectangle().fill(Theme.Color.border.opacity(0.55)).frame(height: 1)
+                                .padding(.horizontal, 15)
+                        }
+                        roundRow(index)
+                    }
+                }
+                .padding(.vertical, 3)
+            }
         }
         .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .overlay(
@@ -445,6 +460,8 @@ private struct ExerciseLogCard: View {
     let exercise: WorkoutExercise
     /// 该动作本次的 PR 重量（非 nil 时，等于此重量的首个组标 ▲ PR）。
     var prMaxWeight: Double?
+    var isDropSet = false
+    @State private var isExpanded = true
     @State private var showingFullNote = false
 
     private var sortedSets: [WorkoutSet] {
@@ -490,43 +507,66 @@ private struct ExerciseLogCard: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text(exercise.displayExerciseName)
-                    .font(Theme.Font.l2)
-                    .foregroundStyle(Theme.Color.fg)
-                Spacer()
-                Text(aggText)
-                    .font(Theme.Font.mono(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.Color.muted)
-            }
-            .padding(.horizontal, 15)
-            .padding(.top, 12).padding(.bottom, 10)
-
-            if let noteText {
-                Button {
-                    showingFullNote = true
-                } label: {
-                    notePreview(noteText)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 15)
-                .padding(.bottom, 10)
-                .accessibilityLabel("查看动作备注")
-                .accessibilityHint(noteText)
-            }
-
-            Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.horizontal, 15)
-
-            VStack(spacing: 0) {
-                ForEach(Array(sortedSets.enumerated()), id: \.element.localId) { idx, set in
-                    if idx > 0 {
-                        Rectangle().fill(Theme.Color.border.opacity(0.55)).frame(height: 1)
-                            .padding(.horizontal, 15)
+            Button {
+                isExpanded.toggle()
+            } label: {
+                HStack {
+                    HStack(spacing: 6) {
+                        if isDropSet {
+                            WorkoutStructureIcon(kind: .dropSet)
+                        }
+                        Text(exercise.displayExerciseName)
+                            .font(Theme.Font.l2)
+                            .foregroundStyle(Theme.Color.fg)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
-                    LogSetRow(set: set, badgeText: badgeText(for: set), isPR: set.setIndex == prSetIndex)
+                    Spacer(minLength: 8)
+                    HStack(spacing: 8) {
+                        Text(aggText)
+                            .font(Theme.Font.mono(size: 11, weight: .medium))
+                            .foregroundStyle(Theme.Color.muted)
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.Color.muted)
+                    }
+                    .fixedSize(horizontal: true, vertical: false)
                 }
+                .padding(.horizontal, 15)
+                .padding(.vertical, 12)
+                .contentShape(Rectangle())
             }
-            .padding(.vertical, 3)
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(isDropSet ? "递减组，" : "")\(exercise.displayExerciseName)，\(aggText)，\(isExpanded ? "已展开" : "已收起")")
+            .accessibilityHint("点按\(isExpanded ? "收起" : "展开")动作明细")
+
+            if isExpanded {
+                if let noteText {
+                    Button {
+                        showingFullNote = true
+                    } label: {
+                        notePreview(noteText)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 15)
+                    .padding(.bottom, 10)
+                    .accessibilityLabel("查看动作备注")
+                    .accessibilityHint(noteText)
+                }
+
+                Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.horizontal, 15)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(sortedSets.enumerated()), id: \.element.localId) { idx, set in
+                        if idx > 0 {
+                            Rectangle().fill(Theme.Color.border.opacity(0.55)).frame(height: 1)
+                                .padding(.horizontal, 15)
+                        }
+                        LogSetRow(set: set, badgeText: badgeText(for: set), isPR: set.setIndex == prSetIndex)
+                    }
+                }
+                .padding(.vertical, 3)
+            }
         }
         .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .overlay(
@@ -645,9 +685,6 @@ private struct LogSetRow: View {
     private var valueContent: some View {
         if set.isDropSet {
             VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 6) {
-                    WorkoutStructureIcon(kind: .dropSet)
-                }
                 ForEach(set.effectiveSegments) { segment in
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
                         Text(segment.weightKg.map(formatKg) ?? "—")
