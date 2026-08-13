@@ -39,7 +39,7 @@ struct MainTabView: View {
         var id: String { rawValue }
     }
 
-    /// 休息全屏弹窗开/关动画：纯渐隐（无位移）。
+    /// 休息计时卡片开/关动画：纯渐隐（无位移）。
     private var restAnim: Animation { .easeInOut(duration: reduceMotion ? 0.2 : 0.3) }
 
     init() {
@@ -150,8 +150,8 @@ struct MainTabView: View {
         .overlay {
             WorkoutLiveOverlayContainer(activeSession: activeSession)
         }
-        // 休息全屏弹窗：挂在全局 NavigationStack 之上的 overlay，层级高于 push 页与 Tab Bar；
-        // 纯 .opacity 渐隐、无位移。
+        // 休息计时浮层：挂在全局 NavigationStack 之上的 overlay，层级高于 push 页与 Tab Bar；
+        // 卡片与背景遮罩同步淡入淡出，收起后回到训练页 FAB。
         .overlay {
             if restTimer.isExpanded {
                 RestTimerSheet(controller: restTimer) {

@@ -1042,7 +1042,7 @@ struct WorkoutLoggingView: View {
     }
 
     /// 休息弹窗开合动画：尊重「减弱动态效果」，开启时退化为短淡变而非弹簧。
-    // 休息全屏弹窗开/关：渐显/渐隐（配合 RestTimerSheet 的 .opacity 过渡）。
+    // 休息计时卡片开/关：渐显/渐隐（配合 RestTimerSheet 的 .opacity 过渡）。
     private var sheetAnim: Animation { .easeInOut(duration: reduceMotion ? 0.2 : 0.3) }
 
     /// PR 庆祝弹窗副标题：`title · N 动作 · N 组 · N 分钟`（title 为空则省略首段；
@@ -1161,7 +1161,7 @@ struct WorkoutLoggingView: View {
                 }
             }
             // 浮动 FAB（rest 进行中且未展开即显示）：可在页面内自由拖动；键盘升起时被顶到键盘上方，
-            // 不侵占键盘激活区。本屏无 Tab Bar，默认贴右下角。全屏休息弹窗已上提到全局 overlay。
+            // 不侵占键盘激活区。本屏无 Tab Bar，默认贴右下角。休息计时卡片已上提到全局 overlay。
             if restTimer.isRunning && !restTimer.isExpanded {
                 GeometryReader { geo in
                     ZStack { restFAB }

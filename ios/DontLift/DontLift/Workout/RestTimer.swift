@@ -41,7 +41,7 @@ final class RestTimerController {
         didSet { UserDefaults.standard.set(defaultDuration, forKey: Self.durationKey) }
     }
 
-    /// 休息结束/完成时是否在前台震动（由全屏弹窗底部「震动」开关控制），持久化到 UserDefaults，默认开。
+    /// 休息结束/完成时是否在前台震动（由计时卡片底部图标开关控制），持久化到 UserDefaults，默认开。
     /// 仅作用于前台 `Theme.Haptics`；后台本地通知的震动由系统设置裁决，不在此范围。
     var hapticsEnabled: Bool {
         didSet { UserDefaults.standard.set(hapticsEnabled, forKey: Self.hapticsKey) }
@@ -71,9 +71,9 @@ final class RestTimerController {
     /// 等待训练页消费的休息完成事件；页面切换/销毁期间保留，避免实际休息回写丢失。
     private(set) var completionEvent: CompletionEvent?
 
-    /// 全屏休息弹窗是否展开（共享态：训练页 FAB 触发置真，根层 overlay 渲染，层级天然高于 Tab/Nav）。
+    /// 休息计时卡片是否展开（共享态：训练页 FAB 触发置真，根层 overlay 渲染，层级天然高于 Tab/Nav）。
     var isExpanded = false
-    /// 下一组提示（markdown「下一组 · **动作名** 第 N 组」），由训练会话页在启动休息时写入，供全屏弹窗显示。
+    /// 下一组提示（markdown「下一组 · **动作名** 第 N 组」），由训练会话页在启动休息时写入，供计时卡片显示。
     var nextHint: String?
 
     private var ticker: Timer?

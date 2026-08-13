@@ -1,14 +1,12 @@
 import SwiftUI
 import UIKit
 
-/// 休息计时 · 全屏弹窗（严格对齐原型 `dontlift-c-rest-timer.html`，整体放大并垂直居中）。
+/// 组间休息计时浮层：全屏遮罩承接背景点击，计时内容以居中卡片展示。
 ///
-/// 由 `WorkoutSessionView` 通过 `if isRestExpanded` 条件渲染，ZStack overlay 在训练页之上；
-/// 展开时上层会隐藏标题栏/Tab Bar 形成真全屏。磨砂遮罩虚化下方训练页但不离场，
-/// 点击空白不关闭，必须点「最小化」回到 FAB。开/关均为渐显/渐隐。
-/// 结构（自上而下，主簇垂直居中）：脉冲点 + 「组间休息 · REST」eyebrow → 大圆环
+/// 由根层 overlay 挂在训练页之上；收起只改变展示状态，不停止计时，回到训练页的 FAB。
+/// 卡片结构（自上而下）：右上角小化按钮 + 「组间休息 · REST」eyebrow → 大圆环
 /// （墙钟驱动消耗式红弧 + 读数 + 总时长 + 下一组预告）→ 调时三件套（−10s / 完成 ✓ / +10s，无文案）
-/// → 底部 pill（震动开关 / 最小化，常驻底部）。
+/// → 底部图标开关（震动 / 声音）。
 struct RestTimerSheet: View {
     let controller: RestTimerController
     let onDismiss: () -> Void
@@ -21,27 +19,63 @@ struct RestTimerSheet: View {
 
     var body: some View {
         ZStack {
-            // 磨砂遮罩：material 模糊下层训练页 + 0.72 纸白底轻染（对齐原型 .scrim）。
-            Theme.Color.bg.opacity(0.72)
-                .background(.ultraThinMaterial)
-                .ignoresSafeArea()
+            dismissBackground
             content
         }
         .transition(.opacity)
     }
 
+    /// 卡片外的遮罩是独立命中区，点击后收起浮层但不影响计时。
+    private var dismissBackground: some View {
+        Button(action: onDismiss) {
+            // 黑色遮罩：不做模糊，保留下层训练页状态，同时增强卡片对比度。
+            Color.black.opacity(0.35)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("收起休息计时")
+        .accessibilityHint("返回训练页面，计时继续")
+    }
+
     private var content: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            eyebrow
-            ring.padding(.top, 38 * k)
-            controls.padding(.top, 42 * k)
-            Spacer(minLength: 0)
-            footer
+            header
+            ring.padding(.top, 34 * k)
+            controls.padding(.top, 38 * k)
+            footer.padding(.top, 32 * k)
         }
-        .padding(.top, 16)
-        .padding(.horizontal, 22)
-        .padding(.bottom, 8)
+        .padding(.top, 18)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 18)
+        .frame(maxWidth: 360)
+        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(Theme.Color.border, lineWidth: 1)
+        }
+        .shadow(color: Theme.Color.fg.opacity(0.12), radius: 24, x: 0, y: 10)
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - 顶部标题与小化
+
+    private var header: some View {
+        ZStack(alignment: .topTrailing) {
+            eyebrow
+                .frame(maxWidth: .infinity, minHeight: 44)
+
+            Button(action: onDismiss) {
+                Image(systemName: "arrow.down.right.and.arrow.up.left")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PressableButtonStyle())
+            .accessibilityLabel("最小化休息计时")
+            .accessibilityHint("返回训练页面，计时继续")
+        }
     }
 
     // MARK: - Eyebrow（脉冲点 + 组间休息 · REST）
@@ -145,7 +179,7 @@ struct RestTimerSheet: View {
         .accessibilityLabel("完成休息")
     }
 
-    // MARK: - 底部 pill（震动开关 / 最小化）
+    // MARK: - 底部 pill（图标开关）
 
     private var footer: some View {
         HStack(spacing: 10) {
@@ -154,7 +188,7 @@ struct RestTimerSheet: View {
                 controller.hapticsEnabled.toggle()
                 if controller.hapticsEnabled { Theme.Haptics.impact(.light) }
             } label: {
-                footPillLabel(icon: "iphone", text: "震动") {
+                footPillLabel(icon: "iphone") {
                     toggleSwitch(on: controller.hapticsEnabled)
                 }
             }
@@ -165,25 +199,19 @@ struct RestTimerSheet: View {
                 controller.soundEnabled.toggle()
                 if controller.soundEnabled { Theme.Haptics.impact(.light) }
             } label: {
-                footPillLabel(icon: "speaker.wave.2", text: "声音") {
+                footPillLabel(icon: "speaker.wave.2") {
                     toggleSwitch(on: controller.soundEnabled)
                 }
             }
             .buttonStyle(PressableButtonStyle())
 
-            // 最小化：收回 FAB。
-            Button(action: onDismiss) {
-                footPillLabel(icon: "arrow.down.right.and.arrow.up.left", text: "最小化") { EmptyView() }
-            }
-            .buttonStyle(PressableButtonStyle())
         }
     }
 
-    private func footPillLabel<Trailing: View>(icon: String, text: String,
+    private func footPillLabel<Trailing: View>(icon: String,
                                                @ViewBuilder trailing: () -> Trailing) -> some View {
         HStack(spacing: 7) {
             Image(systemName: icon).font(.system(size: 14, weight: .semibold))
-            Text(text).font(Theme.Font.body(size: 12, weight: .semibold))
             trailing()
         }
         .foregroundStyle(Theme.Color.fg2)
