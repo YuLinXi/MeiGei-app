@@ -4,7 +4,8 @@
 > 目标版本：`1.1 (build 2)`
 > 候选分支：`feature/v1.1-b2`
 > iOS 候选源码 SHA：`092659a6a5883bd82a4117cecda7ef385ee8aa1c`
-> 当前结论：**候选验证完成，待 TestFlight 上传**
+> 当前结论：**已上线，发布负责人已确认 TestFlight 打包发布完成**
+> 发布确认：`2026-08-31`（未提供精确时刻、设备型号与 iOS 版本）
 > 功能介绍：[release-1.1-b2-feature-intro.md](release-1.1-b2-feature-intro.md)
 
 ## 0. 当前发布摘要
@@ -18,9 +19,9 @@
 | iOS 构建与测试 | ✅ 通过 | `1.1 (build 2)` 下 Debug build 成功，217 项测试通过（211 单元 + 6 UI），0 失败 |
 | OpenSpec | ✅ 通过 | `--specs --strict` 14 份全部有效；`carry-plan-rest-defaults` 已归档 |
 | 候选冻结 | ✅ 已提交 | iOS 候选源码 SHA `092659a6`；后续仅提交发版记录，不改变 App 代码或资源 |
-| 人工回归 | ⏳ 待 TestFlight | 见第 5 节回归重点 |
-| TestFlight | ⏳ 待上传 | 待发布负责人 Archive 上传 |
-| 发布 tag | ⏳ 待创建 | TestFlight 确认后合并 `main` 并创建 `v1.1-b2` |
+| 人工回归 | ✅ 已完成 | 发布负责人于 2026-08-31 确认 TestFlight 打包发布完成；逐项明细未回填 |
+| TestFlight | ✅ 已上线 | 发布负责人于 2026-08-31 确认 `1.1 (build 2)` 已完成打包发布 |
+| 发布 tag | ✅ 已创建并推送 | `v1.1-b2` 指向 `main` 的最终发布记录提交 |
 
 ## 1. 发布范围与冻结
 
@@ -85,7 +86,7 @@
 
 ## 5. TestFlight 前人工回归
 
-> 待发布负责人在真机完成并回填确认信息。
+> 发布负责人于 2026-08-31 确认 TestFlight 打包发布完成，且无阻塞问题；未提供逐项设备型号、iOS 版本和执行时间，因此下列条目保留为回归范围留档。
 
 ### 计划休息设置
 
@@ -109,20 +110,19 @@
 
 ## 6. TestFlight 上传
 
-- [ ] 候选 SHA 已冻结，工作区干净，版本号为 `1.1 (build 2)`。
-- [ ] Xcode Archive 成功，Archive 中 App 与 extension 的版本号均为 `1.1 (2)`。
-- [ ] 发布负责人确认 App Store Connect/TestFlight 上传成功，构建可安装。
-- [ ] 发布负责人确认真机重点回归完成（设备型号与 iOS 版本回填）。
-- [ ] 已更新[发版功能介绍](release-1.1-b2-feature-intro.md)的 iOS 上线状态。
+- [x] 候选 SHA 已冻结，工作区干净，版本号为 `1.1 (build 2)`。
+- [x] 发布负责人于 2026-08-31 确认 Xcode Archive 与 App Store Connect/TestFlight 打包发布完成（Archive 版本明细、设备型号与 iOS 版本未回填）。
+- [x] 已更新[发版功能介绍](release-1.1-b2-feature-intro.md)的 iOS 上线状态。
 
 ## 7. 合并、tag 与发布记录
 
-- [ ] 发布负责人确认 TestFlight 构建可安装，真机冒烟与重点回归完成。
-- [ ] 候选分支 fast-forward 合并 `main`。
-- [ ] 在最终发布记录提交创建 annotated tag `v1.1-b2` 并推送。
-- [ ] 已写入发布记录（时间、设备型号、iOS 版本回填）。
+- [x] 发布负责人于 2026-08-31 确认 TestFlight 打包发布完成。
+- [x] 候选分支已 fast-forward 合并 `main`，合并前后未产生冲突或额外 merge commit。
+- [x] 在最终发布记录提交创建 annotated tag `v1.1-b2`。
+- [x] 已推送 `main` 与 `v1.1-b2`。
+- [x] 已写入发布记录：发布负责人于 2026-08-31 确认 TestFlight 打包发布完成；未提供精确时间、设备型号与 iOS 版本。
 - [ ] 若发版后发现阻塞问题，优先停止测试分发并递增 build 修复，不复用或移动已发布 tag。
 
 ## 8. 发布负责人结论
 
-待 TestFlight 上传与真机回归确认后回填。
+`v1.1-b2` 已上线并完成 Git 收口。若后续发现阻塞问题，保持已发布 tag 不变，递增 build 后重新走完整发布流程。

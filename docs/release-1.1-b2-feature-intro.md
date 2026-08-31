@@ -4,7 +4,7 @@
 > 目标版本：`MARKETING_VERSION = 1.1`，`CURRENT_PROJECT_VERSION = 2`
 > 候选分支：`feature/v1.1-b2`
 > iOS 候选源码 SHA：`092659a6a5883bd82a4117cecda7ef385ee8aa1c`
-> 文档状态：候选验证完成，待 TestFlight 上传
+> 文档状态：已上线，发布负责人于 2026-08-31 确认 TestFlight 打包发布完成
 > 关联清单：[release-1.1-b2-checklist.md](release-1.1-b2-checklist.md)
 
 ## 版本与状态
@@ -15,8 +15,8 @@
 | 工程内实际版本 | App、Widget 与测试 target 8 组 build configuration 均为 `1.1 (build 2)` |
 | 后端部署 | 本次不需要。候选改动没有后端运行时代码、配置、API 或 Flyway 迁移（仅 `TeamPlanServiceTest` 测试更新） |
 | iOS 验证 | `1.1 (build 2)` 下 217 项测试通过（211 项单元测试 + 6 项 UI 测试），0 失败 |
-| TestFlight | 待发布负责人上传与确认 |
-| 发布结论 | 待 TestFlight 确认后合并 `main` 并创建 `v1.1-b2` tag |
+| TestFlight | 发布负责人于 2026-08-31 确认 `1.1 (build 2)` 已完成打包发布 |
+| 发布结论 | iOS 候选源码已完成发布验证，已合并 `main` 并创建 `v1.1-b2` tag |
 
 ## 一句话摘要
 
@@ -82,7 +82,12 @@
 6. 将一次训练「保存为计划」并修改名称，确认历史记录中的训练名称同步更新。
 7. 使用 `v1.1-b1` 客户端连接当前生产后端完成登录、拉取和训练同步，确认后端兼容未升级用户。
 
-发布负责人确认 TestFlight 构建可用并完成真机回归后，再合并 `main` 并创建 `v1.1-b2` tag。
+发布负责人已于 2026-08-31 确认 TestFlight 打包发布完成；本次发布 tag：`v1.1-b2` 已创建。
+
+## 发布收口
+
+- [x] 发布负责人于 2026-08-31 确认 TestFlight 打包发布完成（未提供精确时刻、设备型号与 iOS 版本）。
+- [x] 候选分支已 fast-forward 合并 `main`；`v1.1-b2` annotated tag 已创建并推送。
 
 ## TestFlight 用户文案（可直接复制）
 
