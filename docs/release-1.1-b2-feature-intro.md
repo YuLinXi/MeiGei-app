@@ -3,7 +3,7 @@
 > 发布基线：`v1.1-b1`
 > 目标版本：`MARKETING_VERSION = 1.1`，`CURRENT_PROJECT_VERSION = 2`
 > 候选分支：`feature/v1.1-b2`
-> iOS 候选源码 SHA：冻结后回填
+> iOS 候选源码 SHA：`092659a6a5883bd82a4117cecda7ef385ee8aa1c`
 > 文档状态：候选验证完成，待 TestFlight 上传
 > 关联清单：[release-1.1-b2-checklist.md](release-1.1-b2-checklist.md)
 

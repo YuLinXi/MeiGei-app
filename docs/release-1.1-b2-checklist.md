@@ -3,7 +3,7 @@
 > 发布基线：`v1.1-b1`
 > 目标版本：`1.1 (build 2)`
 > 候选分支：`feature/v1.1-b2`
-> iOS 候选源码 SHA：冻结后回填
+> iOS 候选源码 SHA：`092659a6a5883bd82a4117cecda7ef385ee8aa1c`
 > 当前结论：**候选验证完成，待 TestFlight 上传**
 > 功能介绍：[release-1.1-b2-feature-intro.md](release-1.1-b2-feature-intro.md)
 
@@ -17,7 +17,7 @@
 | 后端验证 | ✅ 通过 | 80 项测试通过；生产 health、privacy、terms、dev token 只读检查正常 |
 | iOS 构建与测试 | ✅ 通过 | `1.1 (build 2)` 下 Debug build 成功，217 项测试通过（211 单元 + 6 UI），0 失败 |
 | OpenSpec | ✅ 通过 | `--specs --strict` 14 份全部有效；`carry-plan-rest-defaults` 已归档 |
-| 候选冻结 | ⏳ 待提交 | 版本号与发版文档待提交并推送，冻结 SHA 后回填 |
+| 候选冻结 | ✅ 已提交 | iOS 候选源码 SHA `092659a6`；后续仅提交发版记录，不改变 App 代码或资源 |
 | 人工回归 | ⏳ 待 TestFlight | 见第 5 节回归重点 |
 | TestFlight | ⏳ 待上传 | 待发布负责人 Archive 上传 |
 | 发布 tag | ⏳ 待创建 | TestFlight 确认后合并 `main` 并创建 `v1.1-b2` |
@@ -30,7 +30,7 @@
 - [x] 已生成本 Checklist 与[发版功能介绍](release-1.1-b2-feature-intro.md)。
 - [x] 已将所有 App、Widget 与测试 target 的 `MARKETING_VERSION` 保持 `1.1`，`CURRENT_PROJECT_VERSION` 改为 `2`。
 - [x] 已重新检查候选 diff，确认没有密钥、临时文件、个人绝对路径或无关改动进入 iOS 候选源码。
-- [ ] 已提交并推送全部确认范围，冻结 TestFlight iOS 候选 SHA 并回填两份文档。
+- [x] 已提交并推送全部确认范围，冻结 TestFlight iOS 候选 SHA `092659a6a5883bd82a4117cecda7ef385ee8aa1c` 并回填两份文档。
 
 ## 2. 本次功能范围
 
