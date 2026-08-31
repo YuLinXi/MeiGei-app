@@ -67,11 +67,13 @@ struct RestTimerSheet: View {
 
             Button(action: onDismiss) {
                 Image(systemName: "arrow.down.right.and.arrow.up.left")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg2)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
+            .padding(.top, -4)
+            .padding(.trailing, -4)
             .buttonStyle(PressableButtonStyle())
             .accessibilityLabel("最小化休息计时")
             .accessibilityHint("返回训练页面，计时继续")
