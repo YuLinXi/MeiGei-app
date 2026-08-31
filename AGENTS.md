@@ -73,6 +73,7 @@ xcodebuild -project DontLift.xcodeproj -scheme DontLift \
 - 兼容性说明：说明后端先发是否影响未升级 iOS 用户，哪些能力需要新版客户端。
 - 已完成验证：后端构建、iOS 构建/测试、生产 health、Flyway、dev token 等结果。
 - TestFlight 回归重点：列出本次最需要人工真机验证的路径。
+- TestFlight 用户文案：一段可直接复制到 App Store Connect「测试内容 / What to Test」的更新介绍，面向测试用户，使用简体中文与用户语言，只含本次版本最终可感知的新增、优化和修复点，不含内部技术细节；控制在 TestFlight 字数限制内，必要时附 1-2 句重点验证请求。
 
 生成“面向测试用户的更新说明”时必须遵守以下规则：
 
