@@ -106,4 +106,46 @@ struct WorkoutPlanTemplateFactoryTests {
         #expect(copies[1].dropSetPrescriptions.flatMap(\.segments).allSatisfy { $0.weightKg == nil })
         #expect(copies[2].orderedSupersetMembers.allSatisfy { $0.suggestedWeightKg == nil })
     }
+
+    @Test func personalPlanDuplicateKeepsNotes() {
+        let regular = PlanItem(exerciseName: "卧推", orderIndex: 0,
+                               suggestedWeightKg: 80, note: "顶峰收缩")
+        var drop = PlanItem.dropSet(orderIndex: 1, exerciseName: "飞鸟",
+                                    segments: [WorkoutSetSegment(segmentIndex: 0, weightKg: 20, reps: 10)])
+        drop.note = "控制离心"
+        var superset = PlanItem.superset(orderIndex: 2, roundCount: 3,
+                                         members: [
+                                            PlanSupersetMember(exerciseName: "下拉", orderIndex: 0),
+                                            PlanSupersetMember(exerciseName: "弯举", orderIndex: 1)
+                                         ])
+        superset.note = "组间不休息"
+
+        let copies = [regular, drop, superset].map(PlanDetailView.weightlessCopyForDuplicate(_:))
+
+        #expect(copies.map(\.note) == ["顶峰收缩", "控制离心", "组间不休息"])
+    }
+
+    @Test func planTemplateItemsCarryWorkoutNotes() {
+        let workout = Workout(planId: nil, title: "胸推", endedAt: Date())
+        workout.note = "本周减载"
+        let single = WorkoutExercise(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0)
+        single.note = "顶峰收缩 1 秒"
+        single.sets = [WorkoutSet(setIndex: 0, weightKg: 80, reps: 8, completed: true, setType: .working)]
+        let first = WorkoutExercise(exerciseName: "弯举", orderIndex: 1)
+        first.sets = [WorkoutSet(setIndex: 0, weightKg: 20, reps: 10, completed: true, setType: .working),
+                      WorkoutSet(setIndex: 1, weightKg: 20, reps: 10, completed: true, setType: .working)]
+        let second = WorkoutExercise(exerciseName: "臂屈伸", orderIndex: 2)
+        second.sets = [WorkoutSet(setIndex: 0, weightKg: 30, reps: 10, completed: true, setType: .working),
+                       WorkoutSet(setIndex: 1, weightKg: 30, reps: 10, completed: true, setType: .working)]
+        workout.exercises = [single, first, second]
+        workout.appendSingleExerciseUnit(for: single)
+        workout.appendSupersetUnit(first: first, second: second, roundCount: 2, note: "组间不休息")
+
+        let items = workout.planTemplateItems()
+
+        #expect(workout.note == "本周减载")
+        #expect(items.count == 2)
+        #expect(items.first { !$0.isSuperset }?.note == "顶峰收缩 1 秒")
+        #expect(items.first { $0.isSuperset }?.note == "组间不休息")
+    }
 }

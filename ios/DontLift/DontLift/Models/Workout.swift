@@ -302,7 +302,8 @@ extension Workout {
     func appendSupersetUnit(first: WorkoutExercise,
                             second: WorkoutExercise,
                             roundCount: Int,
-                            restAfterRoundSeconds: Int? = nil) {
+                            restAfterRoundSeconds: Int? = nil,
+                            note: String? = nil) {
         let memberIds = Set([first.localId, second.localId])
         var units = trainingUnits.filter { unit in
             switch unit.kind {
@@ -320,6 +321,7 @@ extension Workout {
             superset: WorkoutSupersetUnit(
                 roundCount: roundCount,
                 restAfterRoundSeconds: restAfterRoundSeconds,
+                note: note,
                 members: [
                     WorkoutSupersetMember(exerciseId: first.localId, orderIndex: 0),
                     WorkoutSupersetMember(exerciseId: second.localId, orderIndex: 1)

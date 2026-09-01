@@ -733,6 +733,8 @@ private enum WorkoutRestMenuTarget: Equatable {
 private enum WorkoutNoteTarget: Equatable {
     case exercise(UUID)
     case superset(UUID)
+    /// 训练整体备注（`Workout.note`）。
+    case workout
 }
 
 private enum WorkoutDeleteTarget {
@@ -874,7 +876,14 @@ struct WorkoutLoggingView: View {
             return workout.exercise(id: id)?.displayExerciseName
         case .superset(let unitId):
             return supersetTitle(unitId: unitId)
+        case .workout:
+            return workout.title ?? "本次训练"
         }
+    }
+
+    /// 备注编辑 sheet 的标题：训练整体备注与动作/超级组备注区分。
+    private var noteEditorSheetTitle: String {
+        noteEditingTarget == .workout ? "训练备注" : "动作备注"
     }
 
     private var noteEditorBinding: Binding<Bool> {
@@ -1035,6 +1044,10 @@ struct WorkoutLoggingView: View {
 
     private var loggingMenuItems: [PaperMenuItem] {
         [
+            PaperMenuItem(title: workout.note?.isEmpty == false ? "编辑训练备注" : "添加训练备注",
+                          systemImage: "note.text") {
+                beginNoteEditing(for: .workout)
+            },
             PaperMenuItem(title: "放弃此次训练", systemImage: "trash", role: .destructive) {
                 presentDiscardConfirmation()
             }
@@ -1093,6 +1106,9 @@ struct WorkoutLoggingView: View {
                                            onStart: { startTimerIfNeeded() },
                                            onFinish: presentFinishConfirmation)
                             triadStats
+                            if workout.isActive, let note = workout.note, !note.isEmpty {
+                                workoutNoteStrip(note)
+                            }
                             if workout.isFinished {
                                 WorkoutPosterShareButton {
                                     prepareForPresentation()
@@ -1318,6 +1334,7 @@ struct WorkoutLoggingView: View {
         .sheet(isPresented: noteEditorBinding) {
             if let title = noteEditorTitle {
                 ExerciseNoteEditorSheet(
+                    title: noteEditorSheetTitle,
                     exerciseName: title,
                     note: $noteDraft,
                     limit: Self.exerciseNoteLimit,
@@ -1493,8 +1510,42 @@ struct WorkoutLoggingView: View {
 
     // MARK: 三联数
 
-    private var triadStats: some View {
-        HStack(spacing: 0) {
+    /// 训练整体备注条：训练中展示计划带入或手动记录的整体备注，点击可编辑。
+    private func workoutNoteStrip(_ note: String) -> some View {
+        Button {
+            beginNoteEditing(for: .workout)
+        } label: {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "note.text")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .padding(.top, 2)
+                Text(note)
+                    .font(Theme.Font.body(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .padding(.top, 2)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .stroke(Theme.Color.border, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("训练备注，\(note)")
+        .accessibilityHint("点按编辑训练备注")
+    }
+
+    private var triadStats: some View {        HStack(spacing: 0) {
             triadCell(value: "\(completedSetCount)", label: "已完成组")
             divider
             triadCell(value: "\(remainingExerciseCount)", label: "剩余动作")
@@ -2517,6 +2568,8 @@ struct WorkoutLoggingView: View {
             return workout.exercise(id: id)?.note
         case .superset(let unitId):
             return workout.trainingUnits.first(where: { $0.unitId == unitId })?.superset?.note
+        case .workout:
+            return workout.note
         }
     }
 
@@ -2527,6 +2580,9 @@ struct WorkoutLoggingView: View {
             touch()
         case .superset(let unitId):
             updateSupersetNote(unitId, note: note)
+        case .workout:
+            workout.note = note
+            touch()
         }
     }
 
@@ -3193,6 +3249,7 @@ private struct SaveWorkoutAsPlanSheet: View {
             return
         }
         let plan = WorkoutPlan(name: trimmed,
+                               note: workout.note,
                                items: items,
                                mode: mode,
                                groupId: groupId,
@@ -3387,6 +3444,7 @@ private struct RestMenuSizeKey: PreferenceKey {
 }
 
 private struct ExerciseNoteEditorSheet: View {
+    var title: String = "动作备注"
     let exerciseName: String
     @Binding var note: String
     let limit: Int
@@ -3410,7 +3468,7 @@ private struct ExerciseNoteEditorSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             PaperSheetHeader(
-                title: "动作备注",
+                title: title,
                 cancelTitle: "取消",
                 confirmTitle: "完成",
                 background: Theme.Color.surface,

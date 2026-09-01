@@ -22,6 +22,9 @@ public class TeamPlanShareVersion {
 
     private String planNameSnapshot;
 
+    /** 分享版本中的计划整体备注快照；null 表示无备注。 */
+    private String planNoteSnapshot;
+
     private String mode;
 
     private String items;

@@ -21,6 +21,9 @@ public class WorkoutPlan extends BaseEntity implements UserOwned {
 
     private String name;
 
+    /** 计划整体备注（纯文本，≤200 字符由客户端约束）；null 表示无备注。 */
+    private String note;
+
     /** jsonb：[{itemId, exerciseRef, order, suggestedSets, suggestedReps, suggestedWeight}]。 */
     private String items;
 

@@ -24,8 +24,45 @@ struct PlanItemSnapshotTests {
         #expect(encoded["equipmentType"] as? String == "器械")
     }
 
-    @Test func restDefaultRoundTripsAndLegacyDefaultsToGlobal() throws {
-        let configured = PlanItem(exerciseName: "卧推", orderIndex: 0, restAfterSetSeconds: 120)
+    @Test func noteRoundTripsAndLegacyDecodesNil() throws {
+        let noted = PlanItem(exerciseName: "卧推", orderIndex: 0, note: "顶峰收缩 1 秒")
+        let superset = PlanItem.superset(orderIndex: 1, roundCount: 3,
+                                         members: [
+                                            PlanSupersetMember(exerciseName: "卧推", orderIndex: 0),
+                                            PlanSupersetMember(exerciseName: "划船", orderIndex: 1)
+                                         ])
+        var notedSuperset = superset
+        notedSuperset.note = "两个动作间不休息"
+
+        let data = try JSONCoding.encoder.encode([noted, notedSuperset])
+        let decoded = try JSONCoding.decoder.decode([PlanItem].self, from: data)
+
+        #expect(decoded.map(\.note) == ["顶峰收缩 1 秒", "两个动作间不休息"])
+        // 旧计划 JSON 无 note 键，解码为 nil
+        #expect(try JSONCoding.decoder.decode([PlanItem].self, from: Data("""
+        [{"itemId":"\(UUID().uuidString)","exerciseName":"深蹲","orderIndex":0}]
+        """.utf8)).first?.note == nil)
+    }
+
+    @Test func planNoteRoundTripsInSyncEnvelopeAndLegacyDecodesNil() throws {
+        let noted = WorkoutPlanDTO(id: UUID(), userId: nil, name: "胸背", note: "本周减载",
+                                   items: "[]", mode: "adaptive", forkedFrom: nil,
+                                   forkedFromShareVersionId: nil, sharedToTeamId: nil,
+                                   groupId: nil, sortOrder: 0, createdAt: nil,
+                                   updatedAt: .now, deletedAt: nil, version: 1)
+
+        let data = try JSONCoding.encoder.encode(noted)
+        let decoded = try JSONCoding.decoder.decode(WorkoutPlanDTO.self, from: data)
+
+        #expect(decoded.note == "本周减载")
+        // 旧后端信封无 note 键，解码为 nil
+        let legacy = """
+        {"id":"\(UUID().uuidString)","name":"旧计划","items":"[]","updatedAt":"\(JSONCoding.string(from: .now))"}
+        """
+        #expect(try JSONCoding.decoder.decode(WorkoutPlanDTO.self, from: Data(legacy.utf8)).note == nil)
+    }
+
+    @Test func restDefaultRoundTripsAndLegacyDefaultsToGlobal() throws {        let configured = PlanItem(exerciseName: "卧推", orderIndex: 0, restAfterSetSeconds: 120)
         let disabled = PlanItem(exerciseName: "划船", orderIndex: 1, restAfterSetSeconds: 0)
 
         let data = try JSONCoding.encoder.encode([configured, disabled])

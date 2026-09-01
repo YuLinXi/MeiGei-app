@@ -65,6 +65,62 @@ struct AdaptivePlanTests {
         }
     }
 
+    // MARK: - 计划备注带入训练
+
+    @Test func planWorkoutBuilderCarriesNotesForEveryModeAndUnitKind() {
+        let single = PlanItem(exerciseName: "卧推", orderIndex: 0,
+                              suggestedSets: 1, suggestedReps: 8, note: "顶峰收缩 1 秒")
+        var drop = PlanItem.dropSet(orderIndex: 1, exerciseName: "飞鸟",
+                                    segments: [WorkoutSetSegment(segmentIndex: 0, reps: 10)])
+        drop.note = "控制离心"
+        var superset = PlanItem.superset(orderIndex: 2, roundCount: 2,
+                                         members: [
+                                            PlanSupersetMember(exerciseName: "弯举", orderIndex: 0),
+                                            PlanSupersetMember(exerciseName: "臂屈伸", orderIndex: 1)
+                                         ])
+        superset.note = "组间不休息"
+        let plain = PlanItem(exerciseName: "深蹲", orderIndex: 3, suggestedSets: 1, suggestedReps: 5)
+
+        for mode in [WorkoutPlanMode.strict, .adaptive] {
+            let workout = PlanWorkoutBuilder.workout(title: "训练",
+                                                     items: [single, drop, superset, plain],
+                                                     mode: mode,
+                                                     lookup: .empty)
+            let exercises = workout.exercises.sorted { $0.orderIndex < $1.orderIndex }
+            #expect(exercises.map(\.note) == ["顶峰收缩 1 秒", "控制离心", nil, nil, nil])
+            let supersetUnit = workout.trainingUnits.first { $0.kind == .superset }
+            #expect(supersetUnit?.superset?.note == "组间不休息")
+        }
+    }
+
+    @Test func mergePreservesPlanNotesAndNeverWritesTrainingNotesBack() {
+        let single = PlanItem(exerciseName: "卧推", orderIndex: 0,
+                              suggestedSets: 1, suggestedReps: 8, note: "计划备注")
+        var supersetWithNote = PlanItem.superset(orderIndex: 1, roundCount: 2,
+                                                 members: [
+                                                    PlanSupersetMember(exerciseName: "弯举", orderIndex: 0),
+                                                    PlanSupersetMember(exerciseName: "臂屈伸", orderIndex: 1)
+                                                 ])
+        supersetWithNote.note = "超级组备注"
+
+        // 从计划开始训练（带入备注），训练中修改备注后完成一组正式组
+        let workout = PlanWorkoutBuilder.workout(title: "训练", items: [single, supersetWithNote],
+                                                 mode: .adaptive, lookup: .empty)
+        let bench = workout.exercises.first { $0.exerciseName == "卧推" }!
+        bench.note = "训练中改的备注"
+        bench.sets[0].completed = true
+        bench.sets[0].weightKg = 80
+        bench.sets[0].reps = 8
+
+        let result = PlanWriteback.merge(planItems: [single, supersetWithNote], workout: workout)
+        let mergedSingle = result.newItems.first { $0.itemId == single.itemId }
+        let mergedSuperset = result.newItems.first { $0.itemId == supersetWithNote.itemId }
+
+        // 计划原有备注保留；训练中的备注修改不回写
+        #expect(mergedSingle?.note == "计划备注")
+        #expect(mergedSuperset?.note == "超级组备注")
+    }
+
     // MARK: - countsForStats 收紧
 
     @Test func countsForStatsRequiresCompletedAndNonWarmup() {

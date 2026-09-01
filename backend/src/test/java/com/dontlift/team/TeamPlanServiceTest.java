@@ -105,7 +105,7 @@ class TeamPlanServiceTest {
         UUID teamId = UUID.randomUUID();
         UUID planId = UUID.randomUUID();
         when(versionMapper.nextVersionNumber(any())).thenReturn(1);
-        SharePlan req = new SharePlan(planId, "客户端新版", """
+        SharePlan req = new SharePlan(planId, "客户端新版", null, """
                 [{
                   "itemId":"%s",
                   "exerciseName":"客户端动作",
@@ -133,7 +133,7 @@ class TeamPlanServiceTest {
         UUID teamId = UUID.randomUUID();
         UUID planId = UUID.randomUUID();
         when(versionMapper.nextVersionNumber(any())).thenReturn(1);
-        SharePlan req = new SharePlan(planId, "递减计划", """
+        SharePlan req = new SharePlan(planId, "递减计划", null, """
                 [{
                   "itemId":"%s",
                   "exerciseName":"卧推",
@@ -175,7 +175,7 @@ class TeamPlanServiceTest {
         UUID teamId = UUID.randomUUID();
         UUID planId = UUID.randomUUID();
         when(versionMapper.nextVersionNumber(any())).thenReturn(1);
-        SharePlan req = new SharePlan(planId, "备选动作计划", """
+        SharePlan req = new SharePlan(planId, "备选动作计划", null, """
                 [{
                   "itemId":"%s",
                   "exerciseName":"杠铃卧推",
@@ -200,6 +200,96 @@ class TeamPlanServiceTest {
         assertThat(alternative.get("exerciseName").asText()).isEqualTo("哑铃卧推");
         assertThat(alternative.get("equipmentType").asText()).isEqualTo("哑铃");
         assertThat(alternative.has("weightKg")).isFalse();
+    }
+
+    @Test
+    void shareToTeam_preservesPlanNoteAndItemNotes() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID teamId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        WorkoutPlan source = sourcePlan(userId, planId, teamId);
+        source.setNote("本周减载");
+        source.setItems("""
+                [{
+                  "itemId":"%s",
+                  "exerciseName":"卧推",
+                  "orderIndex":0,
+                  "suggestedSets":4,
+                  "suggestedReps":8,
+                  "suggestedWeightKg":80,
+                  "note":"顶峰收缩 1 秒"
+                }]
+                """.formatted(UUID.randomUUID()));
+        when(planMapper.selectById(planId)).thenReturn(source);
+        when(versionMapper.nextVersionNumber(any())).thenReturn(1);
+
+        service.shareToTeam(userId, teamId, planId);
+
+        ArgumentCaptor<TeamPlanShareVersion> versionCaptor = ArgumentCaptor.forClass(TeamPlanShareVersion.class);
+        verify(versionMapper).insert(versionCaptor.capture());
+        TeamPlanShareVersion version = versionCaptor.getValue();
+        JsonNode item = objectMapper.readTree(version.getItems()).get(0);
+        assertThat(version.getPlanNoteSnapshot()).isEqualTo("本周减载");
+        assertThat(item.get("note").asText()).isEqualTo("顶峰收缩 1 秒");
+        assertThat(item.has("suggestedWeightKg")).isFalse();
+    }
+
+    @Test
+    void shareToTeam_usesClientSnapshotPlanNote() {
+        UUID userId = UUID.randomUUID();
+        UUID teamId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        when(versionMapper.nextVersionNumber(any())).thenReturn(1);
+        SharePlan req = new SharePlan(planId, "客户端新版", "客户端备注", """
+                [{"itemId":"%s","exerciseName":"客户端动作","orderIndex":0}]
+                """.formatted(UUID.randomUUID()));
+
+        service.shareToTeam(userId, teamId, req);
+
+        ArgumentCaptor<TeamPlanShareVersion> versionCaptor = ArgumentCaptor.forClass(TeamPlanShareVersion.class);
+        verify(versionMapper).insert(versionCaptor.capture());
+        assertThat(versionCaptor.getValue().getPlanNoteSnapshot()).isEqualTo("客户端备注");
+    }
+
+    @Test
+    void forkVersion_copiesPlanNote() {
+        UUID userId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        UUID teamId = UUID.randomUUID();
+        UUID shareId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        TeamPlanShare share = share(shareId, teamId, ownerId, UUID.randomUUID());
+        TeamPlanShareVersion version = version(versionId, shareId);
+        version.setPlanNoteSnapshot("分享备注");
+        when(versionMapper.selectById(versionId)).thenReturn(version);
+        when(shareMapper.selectById(shareId)).thenReturn(share);
+        when(planMapper.nextUngroupedSortOrder(userId)).thenReturn(0);
+
+        service.forkVersion(userId, versionId);
+
+        ArgumentCaptor<WorkoutPlan> planCaptor = ArgumentCaptor.forClass(WorkoutPlan.class);
+        verify(planMapper).insert(planCaptor.capture());
+        assertThat(planCaptor.getValue().getNote()).isEqualTo("分享备注");
+    }
+
+    @Test
+    void forkVersion_withoutPlanNoteLeavesNoteNull() {
+        UUID userId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        UUID teamId = UUID.randomUUID();
+        UUID shareId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        TeamPlanShare share = share(shareId, teamId, ownerId, UUID.randomUUID());
+        TeamPlanShareVersion version = version(versionId, shareId);
+        when(versionMapper.selectById(versionId)).thenReturn(version);
+        when(shareMapper.selectById(shareId)).thenReturn(share);
+        when(planMapper.nextUngroupedSortOrder(userId)).thenReturn(0);
+
+        service.forkVersion(userId, versionId);
+
+        ArgumentCaptor<WorkoutPlan> planCaptor = ArgumentCaptor.forClass(WorkoutPlan.class);
+        verify(planMapper).insert(planCaptor.capture());
+        assertThat(planCaptor.getValue().getNote()).isNull();
     }
 
     @Test

@@ -74,6 +74,9 @@ struct WorkoutDetailView: View {
             ScrollView {
                 VStack(spacing: Theme.Spacing.md) {
                     summaryCard
+                    if let note = workout.note, !note.isEmpty {
+                        noteCard(note)
+                    }
                     triadStats
                     if let calorieEstimate { calorieEstimateRow(calorieEstimate) }
                     if !personalRecords.isEmpty { prStrip }
@@ -122,6 +125,24 @@ struct WorkoutDetailView: View {
     }
 
     // MARK: 完成头卡（替换记录中 REC 计时条）
+
+    /// 训练整体备注卡：只读展示，不提供编辑入口。
+    private func noteCard(_ note: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "note.text")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg2)
+                .padding(.top, 2)
+            Text(note)
+                .font(Theme.Font.body(size: 13, weight: .medium))
+                .foregroundStyle(Theme.Color.fg2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .cardStyle()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("训练备注，\(note)")
+    }
 
     private var summaryCard: some View {
         HStack(spacing: Theme.Spacing.md) {

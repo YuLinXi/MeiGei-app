@@ -344,6 +344,8 @@ enum PlanWorkoutBuilder {
                               mode: plan.mode,
                               lookup: lookup)
         workout.planId = plan.localId
+        // 计划整体备注一次性预填为训练整体备注；训练中的后续编辑不回写计划。
+        workout.note = plan.note
         return workout
     }
 
@@ -364,6 +366,8 @@ enum PlanWorkoutBuilder {
                                            primaryMuscle: item.resolvedPrimaryMuscle,
                                            orderIndex: exerciseOrder,
                                            planItemId: item.itemId)
+            // 计划动作备注一次性预填；训练中的后续编辑不回写计划。
+            exercise.note = item.note
             exercise.sets = PlanPrefill.sets(for: item, mode: mode, lookup: lookup)
             workout.exercises.append(exercise)
             if item.isDropSet {
@@ -401,7 +405,8 @@ enum PlanWorkoutBuilder {
         workout.appendSupersetUnit(first: first,
                                    second: second,
                                    roundCount: item.supersetRounds,
-                                   restAfterRoundSeconds: item.supersetRestAfterRoundSeconds)
+                                   restAfterRoundSeconds: item.supersetRestAfterRoundSeconds,
+                                   note: item.note)
     }
 
     private static func workoutExercise(from member: PlanSupersetMember, orderIndex: Int) -> WorkoutExercise {

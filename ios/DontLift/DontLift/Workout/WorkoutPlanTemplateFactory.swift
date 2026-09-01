@@ -43,10 +43,12 @@ extension Workout {
                                               suggestedReps: summary.reps)
                 }
                 guard planMembers.count == 2 else { continue }
-                items.append(PlanItem.superset(orderIndex: items.count,
-                                               roundCount: superset.roundCount,
-                                               restAfterRoundSeconds: superset.restAfterRoundSeconds,
-                                               members: planMembers))
+                var supersetItem = PlanItem.superset(orderIndex: items.count,
+                                                     roundCount: superset.roundCount,
+                                                     restAfterRoundSeconds: superset.restAfterRoundSeconds,
+                                                     members: planMembers)
+                supersetItem.note = superset.note
+                items.append(supersetItem)
             }
         }
         return items
@@ -76,6 +78,7 @@ extension Workout {
                 suggestedReps: top?.reps,
                 suggestedWeightKg: top?.weightKg,
                 restAfterSetSeconds: restAfterSetSeconds,
+                note: ex.note,
                 setPrescriptions: executionSets.enumerated().map { idx, set in
                     Self.planPrescription(from: set, orderIndex: idx)
                 }
@@ -103,6 +106,7 @@ extension Workout {
                         suggestedReps: top?.reps,
                         suggestedWeightKg: top?.weightKg,
                         restAfterSetSeconds: restAfterSetSeconds,
+                        note: ex.note,
                         setPrescriptions: dropSets.enumerated().map { idx, set in
                             Self.planPrescription(from: set, orderIndex: idx)
                         })

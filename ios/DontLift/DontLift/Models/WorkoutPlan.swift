@@ -160,6 +160,8 @@ struct PlanItem: Codable, Identifiable, Hashable {
     var suggestedWeightKg: Double?
     /// 普通动作/递减组的默认休息；nil 跟随全局，0 关闭自动休息。
     var restAfterSetSeconds: Int?
+    /// 计划项动作备注（普通动作/递减组/超级组均挂在计划项级别）；nil 表示无备注。
+    var note: String?
     /// 可选逐组处方；缺失时继续使用 `suggested*` 兼容旧计划。
     var setPrescriptions: [PlanSetPrescription]?
     /// 普通单动作的备选动作快照；nil/空数组保持旧计划行为。
@@ -186,6 +188,7 @@ struct PlanItem: Codable, Identifiable, Hashable {
         suggestedReps: Int? = nil,
         suggestedWeightKg: Double? = nil,
         restAfterSetSeconds: Int? = nil,
+        note: String? = nil,
         setPrescriptions: [PlanSetPrescription]? = nil,
         alternatives: [PlanExerciseOption]? = nil,
         supersetMembers: [PlanSupersetMember]? = nil,
@@ -204,6 +207,7 @@ struct PlanItem: Codable, Identifiable, Hashable {
         self.suggestedReps = suggestedReps
         self.suggestedWeightKg = suggestedWeightKg
         self.restAfterSetSeconds = restAfterSetSeconds
+        self.note = note
         self.setPrescriptions = setPrescriptions
         self.alternatives = alternatives
         self.supersetMembers = supersetMembers
@@ -707,6 +711,8 @@ final class WorkoutPlan: Syncable {
     var syncStatusRaw: String
 
     var name: String
+    /// 计划整体备注；nil 表示无备注。SwiftData 轻量迁移：可选存储属性，旧本地记录读出即 nil。
+    var note: String?
     var items: [PlanItem]
     /// 计划模式 raw（默认 "adaptive"）。SwiftData 轻量迁移：存储属性带默认值，旧本地记录读出即 adaptive。
     var modeRaw: String = WorkoutPlanMode.adaptive.rawValue
@@ -724,6 +730,7 @@ final class WorkoutPlan: Syncable {
     init(
         localId: UUID = UUID(),
         name: String,
+        note: String? = nil,
         items: [PlanItem] = [],
         mode: WorkoutPlanMode = .adaptive,
         forkedFrom: UUID? = nil,
@@ -740,6 +747,7 @@ final class WorkoutPlan: Syncable {
         self.version = 0
         self.syncStatusRaw = SyncStatus.pendingCreate.rawValue
         self.name = name
+        self.note = note
         self.items = items
         self.modeRaw = mode.rawValue
         self.forkedFrom = forkedFrom

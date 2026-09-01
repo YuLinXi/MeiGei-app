@@ -46,6 +46,7 @@ public final class TeamRequests {
     public record SharePlan(
             @NotNull UUID sourcePlanId,
             String planNameSnapshot,
+            String planNoteSnapshot,
             String items
     ) {
     }

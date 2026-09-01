@@ -11,6 +11,8 @@ struct SupersetCreationResult {
     var roundCount: Int
     var first: Member
     var second: Member
+    /// 超级组备注（仅计划编辑链路使用）；nil 表示无备注。
+    var note: String? = nil
 }
 
 /// 训练中创建超级组的历史默认值；计划编辑不传入该值，保持计划处方语义不变。
@@ -69,6 +71,8 @@ struct SupersetCreationSheet: View {
     @State private var focusedField: InputField?
     @State private var pendingReplace = false
     @State private var manuallyEditedFields = Set<InputField>()
+    @State private var note: String
+    @State private var editingNote = false
 
     init(title: String = "创建超级组",
          initial: SupersetCreationResult? = nil,
@@ -87,6 +91,7 @@ struct SupersetCreationSheet: View {
         _secondWeight = State(initialValue: initial?.second.weightKg.map { formatKg($0) } ?? "")
         _secondReps = State(initialValue: initial?.second.reps.map(String.init) ?? "\(PlanDefaults.suggestedReps)")
         _roundText = State(initialValue: "\(initial?.roundCount ?? PlanDefaults.suggestedSets)")
+        _note = State(initialValue: initial?.note ?? "")
     }
 
     var body: some View {
@@ -114,6 +119,7 @@ struct SupersetCreationSheet: View {
                                  weightField: .secondWeight,
                                  repsField: .secondReps)
                     roundEditor
+                    noteEditor
                     Color.clear.frame(height: 18)
                 }
                 .padding(Theme.Spacing.lg)
@@ -171,6 +177,48 @@ struct SupersetCreationSheet: View {
                         height: 42,
                         cornerRadius: Theme.Radius.sm,
                         fontSize: 18)
+        }
+    }
+
+    /// 备注入口：打开独立编辑 sheet，避开数字小键盘与系统键盘的冲突。
+    private var noteEditor: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text("备注").eyebrowStyle()
+            Button {
+                dismissKeypad()
+                editingNote = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(note.isEmpty ? Theme.Color.muted : Theme.Color.accent)
+                    Text(note.isEmpty ? "添加备注" : note)
+                        .font(Theme.Font.body(size: 13, weight: .semibold))
+                        .foregroundStyle(note.isEmpty ? Theme.Color.muted : Theme.Color.fg)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    Image(systemName: note.isEmpty ? "plus.circle" : "square.and.pencil")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(note.isEmpty ? Theme.Color.accent : Theme.Color.muted)
+                }
+                .padding(.horizontal, 12)
+                .frame(minHeight: 42)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                        .stroke(note.isEmpty ? Theme.Color.border : Theme.Color.accent.opacity(0.35), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(note.isEmpty ? "添加备注" : "编辑备注，\(note)")
+            .accessibilityHint("为该超级组记录计划备注")
+        }
+        .sheet(isPresented: $editingNote) {
+            PlanNoteEditorSheet(title: "超级组备注", initial: note) { saved in
+                note = saved ?? ""
+            }
         }
     }
 
@@ -410,7 +458,8 @@ struct SupersetCreationSheet: View {
             second: .init(memberId: secondMemberId,
                           pick: secondPick,
                           weightKg: supersetDecimalValue(secondWeight),
-                          reps: supersetIntValue(secondReps))
+                          reps: supersetIntValue(secondReps)),
+            note: PlanNoteEditorSheet.normalize(note)
         )
         onSave(result)
         dismiss()

@@ -4,6 +4,38 @@ import Testing
 
 @MainActor
 struct TeamPlanSharingLoopTests {
+    @Test func shareSnapshotPreservesNotesWhileStrippingWeights() throws {
+        var drop = PlanItem.dropSet(orderIndex: 1, exerciseName: "飞鸟",
+                                    segments: [WorkoutSetSegment(segmentIndex: 0, weightKg: 20, reps: 10)])
+        drop.note = "控制离心"
+        var superset = PlanItem.superset(orderIndex: 2, roundCount: 3,
+                                         members: [
+                                            PlanSupersetMember(exerciseName: "下拉", orderIndex: 0, suggestedWeightKg: 50),
+                                            PlanSupersetMember(exerciseName: "弯举", orderIndex: 1, suggestedWeightKg: 20)
+                                         ])
+        superset.note = "组间不休息"
+        let plan = WorkoutPlan(
+            name: "胸背",
+            note: "本周减载",
+            items: [
+                PlanItem(exerciseName: "杠铃卧推", orderIndex: 0,
+                         suggestedSets: 4, suggestedReps: 8, suggestedWeightKg: 80,
+                         restAfterSetSeconds: 120, note: "顶峰收缩 1 秒"),
+                drop,
+                superset
+            ],
+            mode: .strict
+        )
+
+        let json = TeamService.weightlessItemsJSON(from: plan)
+        let items = try JSONCoding.decoder.decode([PlanItem].self, from: Data(json.utf8))
+
+        #expect(plan.note == "本周减载")
+        #expect(items.map(\.note) == ["顶峰收缩 1 秒", "控制离心", "组间不休息"])
+        #expect(items[0].suggestedWeightKg == nil)
+        #expect(items[2].orderedSupersetMembers.allSatisfy { $0.suggestedWeightKg == nil })
+    }
+
     @Test func shareSnapshotStripsWeightsButKeepsExercisePrescription() throws {
         let firstId = UUID()
         let secondId = UUID()

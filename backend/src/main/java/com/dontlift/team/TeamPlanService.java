@@ -67,17 +67,17 @@ public class TeamPlanService {
     /** 创建或追加 Team 分享计划版本。 */
     @Transactional
     public TeamPlanShareVersion shareToTeam(UUID userId, UUID teamId, UUID planId) {
-        return shareToTeam(userId, teamId, planId, null, null);
+        return shareToTeam(userId, teamId, planId, null, null, null);
     }
 
     /** 创建或追加 Team 分享计划版本；新版客户端可直接携带当前无重量快照，避免弱网下固化旧同步版本。 */
     @Transactional
     public TeamPlanShareVersion shareToTeam(UUID userId, UUID teamId, SharePlan req) {
-        return shareToTeam(userId, teamId, req.sourcePlanId(), req.planNameSnapshot(), req.items());
+        return shareToTeam(userId, teamId, req.sourcePlanId(), req.planNameSnapshot(), req.planNoteSnapshot(), req.items());
     }
 
     private TeamPlanShareVersion shareToTeam(UUID userId, UUID teamId, UUID planId,
-                                             String planNameSnapshot, String snapshotItems) {
+                                             String planNameSnapshot, String planNoteSnapshot, String snapshotItems) {
         WorkoutPlan plan = planMapper.selectById(planId);
         boolean hasSnapshot = hasText(planNameSnapshot) && hasText(snapshotItems);
         if (plan != null && !plan.getUserId().equals(userId)) {
@@ -88,6 +88,7 @@ public class TeamPlanService {
         }
         teamService.requireMember(teamId, userId);
         String planName = hasSnapshot ? planNameSnapshot.trim() : plan.getName();
+        String planNote = hasSnapshot ? planNoteSnapshot : plan.getNote();
         String itemsJson = hasSnapshot ? snapshotItems : plan.getItems();
 
         TeamPlanShare share = shareMapper.findByTeamOwnerSourceForUpdate(teamId, userId, planId);
@@ -114,6 +115,7 @@ public class TeamPlanService {
         version.setShareId(share.getId());
         version.setVersionNumber(versionMapper.nextVersionNumber(share.getId()));
         version.setPlanNameSnapshot(planName);
+        version.setPlanNoteSnapshot(planNote);
         version.setMode("adaptive");
         version.setItems(stripWeights(itemsJson));
         version.setCreatedAt(now);
@@ -185,6 +187,7 @@ public class TeamPlanService {
         copy.setId(Uuid7.generate());
         copy.setUserId(userId);
         copy.setName(version.getPlanNameSnapshot());
+        copy.setNote(version.getPlanNoteSnapshot());
         copy.setItems(stripWeights(version.getItems()));
         copy.setMode("adaptive");
         copy.setForkedFrom(share.getSourcePlanId());
@@ -312,6 +315,7 @@ public class TeamPlanService {
         plan.setId(card.getVersionId());
         plan.setUserId(card.getOwnerUserId());
         plan.setName(card.getPlanNameSnapshot());
+        plan.setNote(card.getPlanNoteSnapshot());
         plan.setItems(card.getItems());
         plan.setMode(normalizedMode(card.getMode()));
         plan.setForkedFrom(card.getSourcePlanId());

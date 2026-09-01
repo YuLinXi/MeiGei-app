@@ -50,6 +50,7 @@ public interface TeamPlanShareMapper extends BaseMapper<TeamPlanShare> {
                 s.title,
                 v.version_number,
                 v.plan_name_snapshot,
+                v.plan_note_snapshot,
                 v.mode,
                 v.items::text AS items,
                 v.created_at,

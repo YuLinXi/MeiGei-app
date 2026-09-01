@@ -2113,6 +2113,7 @@ struct TeamPlansView: View {
                                            items: share.decodedItems,
                                            mode: share.planMode,
                                            lookup: historyStore.planLookup)
+        w.note = share.planNoteSnapshot
         w.sourceShareId = share.shareId
         w.sourceShareVersionId = share.versionId
         w.sourcePlanNameSnapshot = share.planNameSnapshot

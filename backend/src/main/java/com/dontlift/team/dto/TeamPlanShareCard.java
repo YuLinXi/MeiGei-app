@@ -17,6 +17,8 @@ public class TeamPlanShareCard {
     private String title;
     private Integer versionNumber;
     private String planNameSnapshot;
+    /** 最新分享版本的计划整体备注快照；null 表示无备注。 */
+    private String planNoteSnapshot;
     private String mode;
     private String items;
     private OffsetDateTime createdAt;

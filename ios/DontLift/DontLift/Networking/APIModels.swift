@@ -128,6 +128,8 @@ struct WorkoutPlanDTO: Codable {
     var id: UUID
     var userId: UUID?
     var name: String
+    /// 计划整体备注；解码缺失兼容旧后端/旧数据。
+    var note: String?
     /// 注意：后端 items 是 jsonb **字符串**，非数组。
     var items: String
     /// 计划模式 raw（"strict"/"adaptive"）。解码缺失时兜底 `adaptive`，兼容旧后端/旧数据。
@@ -358,6 +360,8 @@ struct TeamPlanShareCardDTO: Decodable, Identifiable, Hashable {
     var title: String
     var versionNumber: Int?
     var planNameSnapshot: String
+    /// 最新分享版本的计划整体备注快照；nil 表示无备注或旧版本。
+    var planNoteSnapshot: String?
     var mode: String?
     var items: String
     var createdAt: Date?
@@ -400,6 +404,7 @@ struct TeamPlanShareVersionDTO: Decodable, Identifiable, Hashable {
     var shareId: UUID
     var versionNumber: Int?
     var planNameSnapshot: String
+    var planNoteSnapshot: String?
     var mode: String?
     var items: String
     var createdAt: Date?
@@ -427,6 +432,8 @@ struct UpdateTeamNotificationPreferenceRequest: Encodable { let receiveTeamNotif
 struct SharePlanRequest: Encodable {
     let sourcePlanId: UUID
     let planNameSnapshot: String?
+    /// 计划整体备注快照；nil 表示无备注或旧客户端。
+    let planNoteSnapshot: String?
     let items: String?
 }
 struct TeamPlanShareEventRequest: Encodable {

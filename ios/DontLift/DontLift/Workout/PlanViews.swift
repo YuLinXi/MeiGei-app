@@ -625,6 +625,8 @@ struct PlanDetailView: View {
     @State private var expandedItemId: UUID?
     /// 待删除动作行；由卡片更多菜单触发，再走统一纸感二次确认。
     @State private var pendingDeleteItem: PlanItem?
+    /// 计划整体备注编辑 sheet 显隐（点按详情头部备注直接进入编辑）。
+    @State private var editingPlanNote = false
     /// 显式动作排序面板。
     @State private var showingOrderEditor = false
     /// 单一活跃会话守卫：冲突态 + 待新建闭包。
@@ -780,6 +782,15 @@ struct PlanDetailView: View {
         .sheet(isPresented: $editing) {
             PlanRenameSheet(plan: plan)
         }
+        .sheet(isPresented: $editingPlanNote) {
+            PlanNoteEditorSheet(title: "计划备注",
+                                placeholder: "记录这份计划的整体安排、周期或注意事项…",
+                                initial: plan.note) { saved in
+                plan.note = saved
+                plan.markDirty()
+                try? modelContext.save()
+            }
+        }
         .sheet(isPresented: $movingGroup) {
             PlanMoveGroupSheet(plan: plan, groups: sortedPlanGroups(planGroups))
         }
@@ -839,12 +850,38 @@ struct PlanDetailView: View {
                 .tracking(-0.9)
                 .foregroundStyle(Theme.Color.fg)
                 .fixedSize(horizontal: false, vertical: true)
+            if let note = plan.note, !note.isEmpty {
+                // 点按即改：查看态直接进入编辑，无需绕道 ⋯ 菜单。
+                Button {
+                    editingPlanNote = true
+                } label: {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(note)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: 0)
+                        Image(systemName: "square.and.pencil")
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.top, 1)
+                    }
+                    .font(Theme.Font.body(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .padding(.top, 8)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("计划备注，\(note)")
+                .accessibilityHint("点按编辑计划备注")
+            }
         }
     }
 
     private var detailMenuItems: [PaperMenuItem] {
         [
-            PaperMenuItem(title: "重命名计划", systemImage: "pencil") { editing = true },
+            PaperMenuItem(title: "编辑计划", systemImage: "pencil") { editing = true },
             PaperMenuItem(title: "移动到分组", systemImage: "folder") { movingGroup = true },
             PaperMenuItem(title: "分享到 Team", systemImage: "square.and.arrow.up") { sharingToTeam = true },
             PaperMenuItem(title: "删除计划", systemImage: "trash", role: .destructive) { confirmingDelete = true }
@@ -1037,6 +1074,11 @@ struct PlanDetailView: View {
             detailDivider
             detailKeyValue(label: "默认休息", value: planRestText(item.restAfterSetSeconds))
 
+            if let note = item.note, !note.isEmpty {
+                detailDivider
+                detailNoteBlock(note)
+            }
+
             if let baselineSummary {
                 detailDivider
                 detailKeyValue(label: "模板基准", value: baselineSummary)
@@ -1086,6 +1128,10 @@ struct PlanDetailView: View {
             detailDivider
             detailKeyValue(label: "轮后休息",
                            value: planRestText(item.supersetRestAfterRoundSeconds))
+            if let note = item.note, !note.isEmpty {
+                detailDivider
+                detailNoteBlock(note)
+            }
             if plan.mode == .strict {
                 Label("严格模式 · 完成后不更新", systemImage: "lock")
                     .font(Theme.Font.body(size: detailBodyFontSize, weight: .semibold))
@@ -1173,6 +1219,24 @@ struct PlanDetailView: View {
                     .layoutPriority(1)
             }
         }
+    }
+
+    /// 备注块状展示：图标 + 左对齐全文换行，比 key-value 行更适合长文本阅读。
+    private func detailNoteBlock(_ note: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "note.text")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+                .padding(.top, 2)
+            Text(note)
+                .font(Theme.Font.body(size: detailTitleFontSize))
+                .foregroundStyle(Theme.Color.fg2)
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.leading)
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("备注，\(note)")
     }
 
     private func detailLabel(_ text: String) -> some View {
@@ -1409,7 +1473,9 @@ struct PlanDetailView: View {
 
     private func duplicate() {
         // Fork 规则（design.md D8）：复制 动作 + 组数 + 次数，清空重量（重量最私人）；副本默认自适应。
+        // 备注属于教学内容，随副本保留。
         let copy = WorkoutPlan(name: plan.name + " · 副本",
+                               note: plan.note,
                                items: plan.items.map { Self.weightlessCopyForDuplicate($0) },
                                mode: .adaptive,
                                forkedFrom: plan.localId,
@@ -1429,7 +1495,7 @@ struct PlanDetailView: View {
 
     static func weightlessCopyForDuplicate(_ item: PlanItem) -> PlanItem {
         if item.isSuperset {
-            return PlanItem.superset(
+            var superset = PlanItem.superset(
                 itemId: UUID(),
                 orderIndex: item.orderIndex,
                 roundCount: item.supersetRounds,
@@ -1446,6 +1512,8 @@ struct PlanDetailView: View {
                                        suggestedReps: $0.suggestedReps)
                 }
             )
+            superset.note = item.note
+            return superset
         }
         if item.isDropSet {
             let prescriptions = item.dropSetPrescriptions.enumerated().map { idx, prescription in
@@ -1475,6 +1543,7 @@ struct PlanDetailView: View {
                             suggestedReps: item.suggestedReps,
                             suggestedWeightKg: nil,
                             restAfterSetSeconds: item.restAfterSetSeconds,
+                            note: item.note,
                             setPrescriptions: prescriptions.isEmpty ? nil : prescriptions)
         }
         return PlanItem(itemId: UUID(),
@@ -1488,6 +1557,7 @@ struct PlanDetailView: View {
                         suggestedReps: item.suggestedReps,
                         suggestedWeightKg: nil,
                         restAfterSetSeconds: item.restAfterSetSeconds,
+                        note: item.note,
                         setPrescriptions: PlanItem.reindexRegularPrescriptions(item.regularSetPrescriptions).map {
                             PlanSetPrescription(prescriptionId: UUID(),
                                                 setType: $0.setType,
@@ -1571,7 +1641,7 @@ struct PlanDetailView: View {
                                   itemId: UUID,
                                   orderIndex: Int,
                                   existing: PlanItem?) -> PlanItem {
-        PlanItem.superset(
+        var item = PlanItem.superset(
             itemId: itemId,
             orderIndex: orderIndex,
             roundCount: result.roundCount,
@@ -1581,6 +1651,8 @@ struct PlanDetailView: View {
                 planSupersetMember(from: result.second, orderIndex: 1)
             ]
         )
+        item.note = result.note
+        return item
     }
 
     private func planSupersetMember(from member: SupersetCreationResult.Member, orderIndex: Int) -> PlanSupersetMember {
@@ -1601,7 +1673,8 @@ struct PlanDetailView: View {
         return SupersetCreationResult(
             roundCount: item.supersetRounds,
             first: supersetResultMember(from: members[0]),
-            second: supersetResultMember(from: members[1])
+            second: supersetResultMember(from: members[1]),
+            note: item.note
         )
     }
 
@@ -1933,15 +2006,25 @@ struct PlanEditorView: View {
 
     private let existing: WorkoutPlan?
     @State private var name: String
+    @State private var note: String
     @State private var mode: WorkoutPlanMode
     @State private var groupId: UUID?
     @State private var choosingGroup = false
+    @FocusState private var noteFocused: Bool
 
     init(plan: WorkoutPlan?, initialGroupId: UUID? = nil) {
         self.existing = plan
         _name = State(initialValue: plan?.name ?? "")
+        _note = State(initialValue: plan?.note ?? "")
         _mode = State(initialValue: plan?.mode ?? .adaptive)
         _groupId = State(initialValue: plan?.groupId ?? initialGroupId)
+    }
+
+    private var limitedNote: Binding<String> {
+        Binding(
+            get: { note },
+            set: { note = String($0.prefix(PlanNoteEditorSheet.limit)) }
+        )
     }
 
     var body: some View {
@@ -1959,6 +2042,39 @@ struct PlanEditorView: View {
                     Text("计划模式").eyebrowStyle()
                     modeOption(.adaptive)
                     modeOption(.strict)
+                }
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    HStack {
+                        Text("计划备注").eyebrowStyle()
+                        Spacer()
+                        Text("\(note.count)/\(PlanNoteEditorSheet.limit)")
+                            .font(Theme.Font.mono(size: 12, weight: .medium))
+                            .foregroundStyle(note.count >= PlanNoteEditorSheet.limit ? Theme.Color.fg2 : Theme.Color.muted)
+                    }
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: limitedNote)
+                            .font(Theme.Font.body(size: 15, weight: .medium))
+                            .foregroundStyle(Theme.Color.fg)
+                            .scrollContentBackground(.hidden)
+                            .focused($noteFocused)
+                            .padding(10)
+                            .frame(minHeight: 88)
+                            .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                    .stroke(noteFocused ? Theme.Color.accent : Theme.Color.border,
+                                            lineWidth: noteFocused ? 1.7 : 1)
+                            )
+                            .accessibilityLabel("计划备注输入框")
+                        if note.isEmpty {
+                            Text("记录这份计划的整体安排、周期或注意事项…")
+                                .font(Theme.Font.body(size: 15, weight: .medium))
+                                .foregroundStyle(Theme.Color.muted)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 18)
+                                .allowsHitTesting(false)
+                        }
+                    }
                 }
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                     Text("分组").eyebrowStyle()
@@ -1985,13 +2101,16 @@ struct PlanEditorView: View {
 
     private func save() {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
+        let normalizedNote = PlanNoteEditorSheet.normalize(note)
         if let existing {
             existing.name = trimmed
+            existing.note = normalizedNote
             existing.mode = mode
             existing.groupId = groupId
             existing.markDirty()
         } else {
             let plan = WorkoutPlan(name: trimmed,
+                                   note: normalizedNote,
                                    mode: mode,
                                    groupId: groupId,
                                    sortOrder: nextSortOrder(in: groupId))
@@ -2059,21 +2178,31 @@ struct PlanEditorView: View {
     }
 }
 
-/// 重命名 sheet（PlanDetailView 三点菜单触发）。
+/// 计划名称与整体备注编辑 sheet（PlanDetailView 三点菜单触发）。
 struct PlanRenameSheet: View {
     @Bindable var plan: WorkoutPlan
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
+    @State private var note: String
+    @FocusState private var noteFocused: Bool
 
     init(plan: WorkoutPlan) {
         self.plan = plan
         _name = State(initialValue: plan.name)
+        _note = State(initialValue: plan.note ?? "")
+    }
+
+    private var limitedNote: Binding<String> {
+        Binding(
+            get: { note },
+            set: { note = String($0.prefix(PlanNoteEditorSheet.limit)) }
+        )
     }
 
     var body: some View {
         VStack(spacing: 0) {
             PaperSheetHeader(
-                title: "重命名",
+                title: "编辑计划",
                 cancelTitle: "取消",
                 confirmTitle: "完成",
                 confirmEnabled: !name.trimmingCharacters(in: .whitespaces).isEmpty,
@@ -2082,18 +2211,55 @@ struct PlanRenameSheet: View {
                 onConfirm: save
             )
 
-            VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                Text("重命名").eyebrowStyle()
-                TextField("", text: $name)
-                    .font(Theme.Font.display(size: 22, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg)
-                    .padding(Theme.Spacing.md)
-                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
-                Spacer()
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        Text("计划名称").eyebrowStyle()
+                        TextField("", text: $name)
+                            .font(Theme.Font.display(size: 22, weight: .bold))
+                            .foregroundStyle(Theme.Color.fg)
+                            .padding(Theme.Spacing.md)
+                            .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
+                    }
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        HStack {
+                            Text("计划备注").eyebrowStyle()
+                            Spacer()
+                            Text("\(note.count)/\(PlanNoteEditorSheet.limit)")
+                                .font(Theme.Font.mono(size: 12, weight: .medium))
+                                .foregroundStyle(note.count >= PlanNoteEditorSheet.limit ? Theme.Color.fg2 : Theme.Color.muted)
+                        }
+                        ZStack(alignment: .topLeading) {
+                            TextEditor(text: limitedNote)
+                                .font(Theme.Font.body(size: 16, weight: .medium))
+                                .foregroundStyle(Theme.Color.fg)
+                                .scrollContentBackground(.hidden)
+                                .focused($noteFocused)
+                                .padding(10)
+                                .frame(minHeight: 100)
+                                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                        .stroke(noteFocused ? Theme.Color.accent : Theme.Color.border,
+                                                lineWidth: noteFocused ? 1.7 : 1)
+                                )
+                                .accessibilityLabel("计划备注输入框")
+                            if note.isEmpty {
+                                Text("记录这份计划的整体安排、周期或注意事项…")
+                                    .font(Theme.Font.body(size: 16, weight: .medium))
+                                    .foregroundStyle(Theme.Color.muted)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 18)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                    }
+                }
+                .padding(Theme.Spacing.lg)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(Theme.Spacing.lg)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .scrollDismissesKeyboard(.interactively)
             .background(Theme.Color.bg)
         }
         .background(Theme.Color.bg.ignoresSafeArea())
@@ -2104,8 +2270,124 @@ struct PlanRenameSheet: View {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         plan.name = trimmed
+        plan.note = PlanNoteEditorSheet.normalize(note)
         plan.markDirty()
         dismiss()
+    }
+}
+
+/// 计划整体备注 / 计划动作备注编辑 sheet：保存时去除首尾空白，空值回调 nil，最多 200 字符。
+struct PlanNoteEditorSheet: View {
+    static let limit = 200
+
+    let title: String
+    let placeholder: String
+    let initial: String?
+    let onSave: (String?) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var draft: String
+    @FocusState private var editorFocused: Bool
+
+    init(title: String,
+         placeholder: String = "记录要点、提醒或注意事项…",
+         initial: String?,
+         onSave: @escaping (String?) -> Void) {
+        self.title = title
+        self.placeholder = placeholder
+        self.initial = initial
+        self.onSave = onSave
+        _draft = State(initialValue: initial ?? "")
+    }
+
+    private var limitedDraft: Binding<String> {
+        Binding(
+            get: { draft },
+            set: { draft = String($0.prefix(Self.limit)) }
+        )
+    }
+
+    private var hasDraftText: Bool {
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 备注归一化：trim 后为空存 nil；超限截断兜底（编辑 sheet 已实时限制，此处为数据层防线）。
+    static func normalize(_ text: String?) -> String? {
+        guard let text else { return nil }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return String(trimmed.prefix(limit))
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PaperSheetHeader(
+                title: title,
+                cancelTitle: "取消",
+                confirmTitle: "完成",
+                background: Theme.Color.surface,
+                onCancel: { dismiss() },
+                onConfirm: {
+                    onSave(Self.normalize(draft))
+                    dismiss()
+                }
+            )
+            VStack(alignment: .leading, spacing: 14) {
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: limitedDraft)
+                        .font(Theme.Font.body(size: 16, weight: .medium))
+                        .foregroundStyle(Theme.Color.fg)
+                        .scrollContentBackground(.hidden)
+                        .focused($editorFocused)
+                        .padding(10)
+                        .frame(minHeight: 180)
+                        .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                .stroke(editorFocused ? Theme.Color.accent : Theme.Color.border2,
+                                        lineWidth: editorFocused ? 1.7 : 1)
+                        )
+                        .accessibilityLabel("\(title)输入框")
+                    if draft.isEmpty {
+                        Text(placeholder)
+                            .font(Theme.Font.body(size: 16, weight: .medium))
+                            .foregroundStyle(Theme.Color.muted)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 18)
+                            .allowsHitTesting(false)
+                    }
+                }
+
+                HStack {
+                    Text("\(draft.count)/\(Self.limit)")
+                        .font(Theme.Font.mono(size: 12, weight: .medium))
+                        .foregroundStyle(draft.count >= Self.limit ? Theme.Color.fg2 : Theme.Color.muted)
+                    Spacer()
+                    Button("清空备注") {
+                        draft = ""
+                    }
+                    .font(Theme.Font.body(size: 14, weight: .bold))
+                    .foregroundStyle(hasDraftText ? Theme.Color.fg2 : Theme.Color.muted)
+                    .disabled(!hasDraftText)
+                    .accessibilityHint("清空并保存为空备注")
+                }
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.top, Theme.Spacing.lg)
+            Spacer(minLength: 0)
+        }
+        .background(Theme.Color.surface.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        // 打开即聚焦弹键盘，减少一次点击；键盘工具条提供「完成」收起键。
+        .onAppear { editorFocused = true }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("完成") { editorFocused = false }
+                    .font(Theme.Font.body(size: 15, weight: .semibold))
+            }
+        }
     }
 }
 
@@ -2313,6 +2595,8 @@ struct PlanItemEditorView: View {
     @State private var dropOuterGroupCountText: String
     @State private var restAfterSetSeconds: Int?
     @State private var restCustomText: String
+    @State private var note: String
+    @State private var editingNote = false
     @State private var alternatives: [PlanExerciseOption]
     @State private var pickingAlternative = false
     @State private var alternativeError: String?
@@ -2336,6 +2620,7 @@ struct PlanItemEditorView: View {
         _restCustomText = State(initialValue: item.restAfterSetSeconds.flatMap {
             $0 > 0 && !Self.restPresets.contains($0) ? String($0) : nil
         } ?? "")
+        _note = State(initialValue: item.note ?? "")
         _alternatives = State(initialValue: item.usableAlternatives)
     }
 
@@ -2356,6 +2641,7 @@ struct PlanItemEditorView: View {
                         editorTitle
                         prescriptionEditor
                         restEditor
+                        noteEditor
                         if !original.isDropSet {
                             alternativeEditor
                         }
@@ -2423,6 +2709,7 @@ struct PlanItemEditorView: View {
             updated.alternatives = alternatives.isEmpty ? nil : alternatives
         }
         updated.restAfterSetSeconds = restAfterSetSeconds
+        updated.note = PlanNoteEditorSheet.normalize(note)
         onSave(updated)
         dismiss()
     }
@@ -2510,6 +2797,51 @@ struct PlanItemEditorView: View {
     private var isCustomRest: Bool {
         guard let seconds = restAfterSetSeconds else { return false }
         return seconds > 0 && !Self.restPresets.contains(seconds)
+    }
+
+    /// 备注入口：打开独立编辑 sheet，避开数字小键盘与系统键盘的冲突。
+    private var noteEditor: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text("备注")
+                .font(Theme.Font.l2)
+                .foregroundStyle(Theme.Color.fg)
+
+            Button {
+                focusedField = nil
+                editingNote = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(note.isEmpty ? Theme.Color.muted : Theme.Color.accent)
+                    Text(note.isEmpty ? "添加备注" : note)
+                        .font(Theme.Font.body(size: 13, weight: .semibold))
+                        .foregroundStyle(note.isEmpty ? Theme.Color.muted : Theme.Color.fg)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    Image(systemName: note.isEmpty ? "plus.circle" : "square.and.pencil")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(note.isEmpty ? Theme.Color.accent : Theme.Color.muted)
+                }
+                .padding(.horizontal, 12)
+                .frame(minHeight: 42)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                        .stroke(note.isEmpty ? Theme.Color.border : Theme.Color.accent.opacity(0.35), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(note.isEmpty ? "添加备注" : "编辑备注，\(note)")
+            .accessibilityHint("为该动作记录计划备注")
+        }
+        .sheet(isPresented: $editingNote) {
+            PlanNoteEditorSheet(title: "动作备注", initial: note) { saved in
+                note = saved ?? ""
+            }
+        }
     }
 
     private var alternativeEditor: some View {

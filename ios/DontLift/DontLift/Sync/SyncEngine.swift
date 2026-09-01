@@ -358,7 +358,7 @@ final class SyncEngine {
 
     private func dto(from m: WorkoutPlan) -> WorkoutPlanDTO {
         let itemsJSON = (try? String(data: JSONCoding.encoder.encode(m.items), encoding: .utf8)) ?? "[]"
-        return WorkoutPlanDTO(id: m.localId, userId: nil, name: m.name, items: itemsJSON,
+        return WorkoutPlanDTO(id: m.localId, userId: nil, name: m.name, note: m.note, items: itemsJSON,
                               mode: m.modeRaw,
                               forkedFrom: m.forkedFrom,
                               forkedFromShareVersionId: m.forkedFromShareVersionId,
@@ -369,6 +369,7 @@ final class SyncEngine {
 
     private func applyServer(_ dto: WorkoutPlanDTO, to m: WorkoutPlan) {
         m.name = dto.name
+        m.note = dto.note
         m.items = decodeItems(dto.items)
         // 解码缺失/未识别值兜底 adaptive（兼容旧后端、旧数据）。
         m.modeRaw = dto.mode.flatMap(WorkoutPlanMode.init(rawValue:))?.rawValue ?? WorkoutPlanMode.adaptive.rawValue

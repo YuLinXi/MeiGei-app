@@ -128,6 +128,7 @@ final class TeamService {
         return try await api.send("POST", "/teams/\(teamId)/plan-shares",
                                   body: SharePlanRequest(sourcePlanId: planId,
                                                          planNameSnapshot: nil,
+                                                         planNoteSnapshot: nil,
                                                          items: nil),
                                   idempotencyKey: "team-plan-share-\(teamId.uuidString):\(planId.uuidString):\(token)")
     }
@@ -138,6 +139,7 @@ final class TeamService {
         return try await api.send("POST", "/teams/\(teamId)/plan-shares",
                                   body: SharePlanRequest(sourcePlanId: plan.localId,
                                                          planNameSnapshot: plan.name,
+                                                         planNoteSnapshot: plan.note,
                                                          items: Self.weightlessItemsJSON(from: plan)),
                                   idempotencyKey: "team-plan-share-\(teamId.uuidString):\(plan.localId.uuidString):\(token)")
     }
@@ -396,7 +398,7 @@ final class TeamService {
     static func weightlessItemsJSON(from plan: WorkoutPlan) -> String {
         let items = plan.items.map { item in
             if item.isSuperset {
-                return PlanItem.superset(
+                var superset = PlanItem.superset(
                     itemId: item.itemId,
                     orderIndex: item.orderIndex,
                     roundCount: item.supersetRounds,
@@ -413,6 +415,9 @@ final class TeamService {
                                            suggestedReps: $0.suggestedReps)
                     }
                 )
+                // 备注属于计划教学内容，随分享保留；剥离的仅是重量。
+                superset.note = item.note
+                return superset
             }
             if item.isDropSet {
                 let prescriptions = weightlessPrescriptions(item.dropSetPrescriptions) ?? [
@@ -433,6 +438,7 @@ final class TeamService {
                                 suggestedReps: item.suggestedReps,
                                 suggestedWeightKg: nil,
                                 restAfterSetSeconds: item.restAfterSetSeconds,
+                                note: item.note,
                                 setPrescriptions: prescriptions)
             }
             return PlanItem(itemId: item.itemId,
@@ -446,6 +452,7 @@ final class TeamService {
                             suggestedReps: item.suggestedReps,
                             suggestedWeightKg: nil,
                             restAfterSetSeconds: item.restAfterSetSeconds,
+                            note: item.note,
                             setPrescriptions: weightlessPrescriptions(item.orderedSetPrescriptions),
                             alternatives: item.alternatives)
         }
