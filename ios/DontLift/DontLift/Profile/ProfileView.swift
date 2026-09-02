@@ -18,6 +18,10 @@ struct ProfileView: View {
     @State private var confirmDelete = false
     @State private var versionTapCount = 0
     @State private var showDesignSystem = false
+    #if DEBUG
+    /// 演示数据生成结果提示（仅 DEBUG）。
+    @State private var seedResult: String?
+    #endif
 
     // 称呼行内编辑态
     @State private var editingName = false
@@ -100,6 +104,16 @@ struct ProfileView: View {
         } message: {
             Text(deleteError ?? "")
         }
+        #if DEBUG
+        .alert("演示数据", isPresented: Binding(
+            get: { seedResult != nil },
+            set: { if !$0 { seedResult = nil } }
+        )) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(seedResult ?? "")
+        }
+        #endif
         #if DEBUG
         // DEBUG-only 开发工具页：用自带 NavigationStack 的 fullScreenCover 独立呈现，
         // 而非挂在「全局 NavigationStack 包 TabView」的栈上 —— 后者会让 navigationDestination
@@ -570,8 +584,41 @@ struct ProfileView: View {
             legalRow(icon: "hand.raised", title: "隐私政策", url: AppConfig.privacyPolicyURL)
             rowDivider
             legalRow(icon: "doc.text", title: "服务条款", url: AppConfig.termsOfServiceURL)
+            #if DEBUG
+            rowDivider
+            // DEBUG-only：为 Simulator 测试账号一键生成近 6 周演示训练与计划。
+            HStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "hammer").foregroundStyle(Theme.Color.fg2).frame(width: 24)
+                Text("生成演示数据")
+                    .font(Theme.Font.body(size: 14))
+                    .foregroundStyle(Theme.Color.fg)
+                Spacer()
+                Text("开发")
+                    .font(Theme.Font.mono(size: 11))
+                    .foregroundStyle(Theme.Color.muted)
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .frame(height: 48)
+            .contentShape(Rectangle())
+            .onTapGesture { seedDemoData() }
+            .accessibilityLabel("生成演示数据")
+            .accessibilityHint("生成近 6 周演示训练与计划（仅开发环境）")
+            #endif
         }
     }
+
+    #if DEBUG
+    /// 生成演示数据并立即触发历史投影重建，首页与复盘页即刻可见。
+    private func seedDemoData() {
+        do {
+            let result = try WorkoutDemoSeedData.seed(in: modelContext)
+            historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
+            seedResult = "已生成 \(result.workouts) 次训练、\(result.plans) 个计划。回到首页即可查看肌群负荷与历史。"
+        } catch {
+            seedResult = "生成失败：\(error.localizedDescription)"
+        }
+    }
+    #endif
 
     private func legalRow(icon: String, title: String, url: URL) -> some View {
         HStack(spacing: Theme.Spacing.md) {

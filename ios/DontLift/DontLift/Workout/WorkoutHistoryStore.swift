@@ -266,6 +266,7 @@ struct WorkoutHistorySnapshot: Equatable {
     var planLookup: PlanHistoryLookup
     var planUsage: [UUID: PlanUsageSummary]
     var profile: ProfileWorkoutSnapshot
+    var muscleLoad: MuscleLoadSnapshot
 
     static let empty = WorkoutHistorySnapshot(
         home: .empty,
@@ -276,7 +277,8 @@ struct WorkoutHistorySnapshot: Equatable {
         bestWeightByExerciseKey: [:],
         planLookup: .empty,
         planUsage: [:],
-        profile: .empty
+        profile: .empty,
+        muscleLoad: .empty
     )
 }
 
@@ -295,6 +297,8 @@ final class WorkoutHistoryStore {
     var planLookup: PlanHistoryLookup { snapshot.planLookup }
     var planUsage: [UUID: PlanUsageSummary] { snapshot.planUsage }
     var profile: ProfileWorkoutSnapshot { snapshot.profile }
+    /// 肌群周负荷快照（本周/上周看板、同期基准、近 4 周趋势与贡献明细）。
+    var muscleLoad: MuscleLoadSnapshot { snapshot.muscleLoad }
     var lastRefreshReason: WorkoutHistoryRefreshReason?
     var lastRefreshFinishedAt: Date?
     var isRefreshing = false
@@ -383,7 +387,8 @@ final class WorkoutHistoryStore {
                 bestWeightByExerciseKey: projection.bestWeightByExerciseKey,
                 planLookup: projection.planLookup,
                 planUsage: projection.planUsage,
-                profile: projection.profile
+                profile: projection.profile,
+                muscleLoad: projection.muscleLoad
             )
             lastBuiltGeneration = generation
             lastRefreshReason = reason
@@ -494,6 +499,7 @@ final class WorkoutHistoryStore {
         var planLookup: PlanHistoryLookup
         var planUsage: [UUID: PlanUsageSummary]
         var profile: ProfileWorkoutSnapshot
+        var muscleLoad: MuscleLoadSnapshot
         var scale: DataScale
     }
 
@@ -708,6 +714,9 @@ final class WorkoutHistoryStore {
         }
 
         let planLookup = PlanHistoryLookup.build(from: finishedDesc)
+        let muscleLoad = MuscleLoadAggregator.snapshot(workouts: finishedDesc,
+                                                       reference: now,
+                                                       calendar: calendar)
         let scale = DataScale(
             workouts: workouts.count,
             finished: finishedDesc.count,
@@ -727,6 +736,7 @@ final class WorkoutHistoryStore {
             planLookup: planLookup,
             planUsage: planUsage,
             profile: profile,
+            muscleLoad: muscleLoad,
             scale: scale
         )
     }

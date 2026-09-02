@@ -40,6 +40,8 @@ struct WorkoutListView: View {
     @State private var swipe = SwipeRowCoordinator()
     /// 历史日历入口：轻量月历 + 当日训练抽屉。
     @State private var showHistoryCalendar = false
+    /// 肌群负荷复盘页入口。
+    @State private var showingMuscleLoadReview = false
 
     private var stats: WeeklyStats {
         historyStore.home.currentWeekStats
@@ -62,6 +64,7 @@ struct WorkoutListView: View {
                     VStack(spacing: Theme.Spacing.lg) {
                         heroSection
                         weekCompletionSection
+                        muscleLoadSection
                         weekTrainingSection
                         Color.clear.frame(height: 80) // 给底部 CTA 留位
                     }
@@ -80,10 +83,18 @@ struct WorkoutListView: View {
         .onAppear {
             WorkoutPerformanceMonitor.event("home.appear")
             historyStore.ensureLoaded(reason: .manual)
+            // 快照跨周过期兜底：无数据变化时 ensureLoaded 不会重建，需按周起点手动标脏。
+            if historyStore.muscleLoad.weekStart
+                != MuscleLoadAggregator.weekRange(for: .now).lowerBound {
+                historyStore.scheduleRefresh(reason: .manual, delayNanoseconds: 0)
+            }
         }
         .navigationDestination(item: $openedSession) { WorkoutDetailView(workout: $0) }
         .navigationDestination(isPresented: $showHistoryCalendar) {
             WorkoutCalendarView()
+        }
+        .navigationDestination(isPresented: $showingMuscleLoadReview) {
+            MuscleLoadReviewView()
         }
         // 训练冲突二次确认：统一为纸感弹窗。无独立取消按钮，点蒙层即取消；
         // 「丢弃并开始新训练」为主（红填充）、「继续训练」为次（描边）。
@@ -223,6 +234,52 @@ struct WorkoutListView: View {
             return "本周第 \(weeklyDoneCount) 次 · \(stats.setCount) 组"
         }
         return "本周第 \(weeklyDoneCount) 次"
+    }
+
+    // MARK: 肌群负荷小卡（本周摘要 + Top 条目，点按进入复盘页）
+
+    /// 本周无有效组时整卡隐藏：周一/新用户首页不再空态三连，小卡的出现本身即「练过了」的反馈。
+    @ViewBuilder
+    private var muscleLoadSection: some View {
+        let snapshot = historyStore.muscleLoad
+        let board = snapshot.board
+        let totalSets = MuscleLoadAggregator.totalWorkingSets(board)
+        if totalSets > 0 {
+            let topEntries = board.filter { $0.workingSets > 0 }.prefix(3)
+            let maxSets = max(board.map(\.workingSets).max() ?? 0, 1)
+
+            Button {
+                showingMuscleLoadReview = true
+            } label: {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("本周肌群负荷").eyebrowStyle()
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Theme.Color.muted)
+                    }
+                    VStack(spacing: 8) {
+                        ForEach(topEntries) { entry in
+                            MuscleLoadRowView(
+                                name: entry.category?.rawValue ?? "其他",
+                                entry: entry,
+                                baselineSets: nil,
+                                barFraction: Double(entry.workingSets) / Double(maxSets)
+                            )
+                        }
+                    }
+                    Text("共 \(totalSets) 组 · 全部 →")
+                        .font(Theme.Font.body(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.Color.muted)
+                }
+                .cardStyle(padding: Theme.Spacing.md)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("本周肌群负荷，共 \(totalSets) 有效组")
+            .accessibilityHint("点按查看肌群负荷复盘")
+        }
     }
 
     // MARK: 一周训练勾选
