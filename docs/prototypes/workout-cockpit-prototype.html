@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>训练中驾驶舱 · 交互原型（原型，勿当真机实现）</title>
+<style>
+  :root {
+    --bg: #F4F1EA;        /* 纸面 */
+    --surface: #FDFBF7;   /* 卡片 */
+    --border: #E3DED3;
+    --border2: #D4CDBE;
+    --fg: #26241F;        /* 墨色 */
+    --fg2: #5C574C;
+    --muted: #9A9384;
+    --accent: #C8402A;    /* 朱砂红 */
+    --accentSoft: #F3DCD6;
+    --ok: #3E7C4F;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #E9E4D8;
+    display: flex; justify-content: center; padding: 24px 12px;
+    color: var(--fg);
+  }
+  .phone {
+    width: 390px; height: 780px; background: var(--bg);
+    border-radius: 40px; overflow: hidden; position: relative;
+    box-shadow: 0 24px 64px rgba(38,36,31,.25);
+    display: flex; flex-direction: column;
+  }
+  /* 顶部 REC 条 */
+  .rec-bar {
+    height: 56px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 18px; flex: none;
+  }
+  .rec { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; }
+  .rec-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+  .rec-time { font-variant-numeric: tabular-nums; }
+  .finish-btn {
+    border: 1px solid var(--border2); background: var(--surface); color: var(--fg);
+    border-radius: 18px; height: 36px; padding: 0 16px; font-weight: 700; font-size: 13px; cursor: pointer;
+  }
+  /* 统计三联 */
+  .triad { display: flex; gap: 10px; padding: 4px 18px 12px; flex: none; }
+  .triad div { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 0; text-align: center; }
+  .triad b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .triad span { font-size: 10px; color: var(--muted); }
+  /* 动作卡列表 */
+  .cards { flex: 1; overflow-y: auto; padding: 2px 18px 12px; display: flex; flex-direction: column; gap: 12px; }
+  .ex-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; flex: none; }
+  .ex-card.done { opacity: .55; }
+  .ex-head {
+    display: flex; align-items: center; gap: 10px; padding: 14px 14px; min-height: 52px;
+    cursor: pointer; user-select: none;
+  }
+  .ex-head .name { font-weight: 800; font-size: 15px; flex: 1; }
+  .ex-head .meta { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ex-head .chev { color: var(--muted); font-size: 12px; transition: transform .2s; }
+  .ex-card.collapsed .chev { transform: rotate(-90deg); }
+  /* 卡片头动作菜单（44pt 触控目标）：休息/备注/换动作/删除动作 */
+  .ex-menu-btn {
+    min-width: 44px; height: 44px; border-radius: 10px;
+    border: none; background: none;
+    font-weight: 800; font-size: 16px; color: var(--muted); cursor: pointer; flex: none;
+  }
+  /* 组行 */
+  .set-row-wrap { position: relative; overflow: hidden; }
+  .set-row-actions { position: absolute; inset: 0; display: flex; }
+  .swipe-complete, .swipe-delete {
+    display: flex; align-items: center; font-weight: 800; font-size: 13px; padding: 0 18px; color: #fff;
+  }
+  .swipe-complete { background: var(--accent); justify-content: flex-start; }
+  .swipe-delete { background: #B03A25; justify-content: flex-end; margin-left: auto; }
+  .set-row {
+    position: relative; background: var(--surface);
+    display: flex; align-items: center; gap: 8px; padding: 8px 14px; min-height: 52px;
+    touch-action: pan-y; cursor: grab; transition: transform .18s ease-out;
+  }
+  .set-row + .set-row, .set-row-wrap + .set-row-wrap { border-top: 1px solid var(--border); }
+  .badge {
+    width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; flex: none;
+    border-radius: 10px; cursor: pointer; border: none; background: none;
+  }
+  .badge.warmup { color: var(--accent); background: var(--accentSoft); }
+  .val {
+    width: 72px; height: 44px; border: 1px solid var(--border); border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; gap: 2px;
+    font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; background: var(--bg); flex: none;
+    cursor: pointer;
+  }
+  .val span { font-size: 10px; color: var(--muted); font-weight: 600; }
+  .x-sign { color: var(--muted); font-size: 11px; flex: none; }
+  .spacer { flex: 1; }
+  /* 行尾完成区：48x48 大目标 */
+  .check {
+    width: 48px; height: 48px; border-radius: 12px; border: 1.5px solid var(--border2);
+    background: var(--surface); display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 900; color: var(--border2); cursor: pointer; flex: none;
+    transition: all .15s;
+  }
+  .set-row.done .check { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 3px 8px rgba(200,64,42,.3); }
+  .set-row.done .val, .set-row.done .badge { opacity: .5; }
+  .set-row.current { background: #F8F3EA; }
+  .set-row.current::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent);
+  }
+  .add-set {
+    margin: 10px 14px 14px; height: 44px; border: 1.5px dashed var(--accentSoft); border-radius: 12px;
+    color: var(--accent); font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;
+    gap: 6px; cursor: pointer; background: none; width: calc(100% - 28px);
+  }
+  /* 底部动作区 */
+  .bottom-zone { flex: none; padding: 10px 18px 18px; display: flex; flex-direction: column; gap: 10px; background: linear-gradient(transparent, var(--bg) 22%); }
+  .add-ex {
+    height: 48px; border-radius: 14px; border: 1px solid var(--border2); background: var(--surface);
+    font-weight: 700; font-size: 14px; cursor: pointer; color: var(--fg);
+  }
+  /* 全宽主按钮：完成本组 / 下一个动作 */
+  .hero-cta {
+    height: 60px; border-radius: 16px; border: none; background: var(--fg); color: var(--bg);
+    font-weight: 900; font-size: 17px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 8px 20px rgba(38,36,31,.25);
+    transition: transform .08s;
+  }
+  .hero-cta:active { transform: scale(.98); }
+  .hero-cta.next { background: var(--accent); }
+  .hero-cta:disabled { background: var(--muted); }
+  .hero-cta small { font-weight: 600; font-size: 12px; opacity: .75; }
+  /* 数字键盘（模拟） */
+  .keypad { position: absolute; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 10px 14px 22px; display: none; z-index: 30; }
+  .keypad.show { display: block; }
+  .keypad .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .keypad button { height: 52px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); font-size: 18px; font-weight: 800; cursor: pointer; }
+  /* 休息浮层（卡片式，点遮罩收起） */
+  .rest-overlay {
+    position: absolute; inset: 0; background: rgba(38,36,31,.35); display: none;
+    align-items: center; justify-content: center; z-index: 40;
+  }
+  .rest-overlay.show { display: flex; }
+  .rest-card {
+    width: 82%; background: var(--surface); border-radius: 24px; padding: 22px 20px 18px;
+    text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,.3);
+  }
+  .rest-card .eyebrow { font-size: 10px; letter-spacing: 2px; color: var(--muted); font-weight: 800; }
+  .rest-time { font-size: 56px; font-weight: 900; font-variant-numeric: tabular-nums; margin: 8px 0 2px; color: var(--fg); }
+  .rest-next { font-size: 12px; color: var(--fg2); margin-bottom: 16px; }
+  .rest-controls { display: flex; justify-content: center; gap: 14px; }
+  .rest-controls button {
+    width: 64px; height: 52px; border-radius: 14px; border: 1px solid var(--border2); background: var(--bg);
+    font-weight: 800; font-size: 14px; cursor: pointer;
+  }
+  .rest-controls .done-btn { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .rest-min { position: absolute; top: 8px; right: 10px; font-size: 16px; color: var(--muted); background: none; border: none; cursor: pointer; padding: 8px; }
+  /* 编辑引导 toast */
+  .toast {
+    position: absolute; bottom: 170px; left: 50%; transform: translateX(-50%);
+    background: var(--fg); color: var(--bg); font-size: 12px; font-weight: 700;
+    padding: 8px 16px; border-radius: 20px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 50;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+  .proto-note { max-width: 390px; margin: 14px auto 0; font-size: 12px; color: #6b6557; line-height: 1.7; }
+  .proto-note b { color: var(--accent); }
+  code { background: #efe9db; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div>
+  <div class="phone" id="phone">
+    <!-- REC 条 -->
+    <div class="rec-bar">
+      <div class="rec"><div class="rec-dot"></div>REC <span class="rec-time" id="recTime">00:00</span></div>
+      <button class="finish-btn">结束</button>
+    </div>
+    <!-- 三联统计 -->
+    <div class="triad">
+      <div><b id="statSets">0</b><span>已完成组</span></div>
+      <div><b id="statRemain">-</b><span>剩余动作</span></div>
+      <div><b id="statVol">0</b><span>容量 kg</span></div>
+    </div>
+    <!-- 动作卡 -->
+    <div class="cards" id="cards"></div>
+    <!-- 底部动作区 -->
+    <div class="bottom-zone" id="bottomZone">
+      <button class="add-ex">＋ 加动作</button>
+      <button class="hero-cta" id="heroCta"></button>
+    </div>
+    <!-- 数字键盘 -->
+    <div class="keypad" id="keypad">
+      <div class="keys">
+        <button>1</button><button>2</button><button>3</button>
+        <button>4</button><button>5</button><button>6</button>
+        <button>7</button><button>8</button><button>9</button>
+        <button>.</button><button>0</button><button>⌫</button>
+      </div>
+    </div>
+    <!-- 休息浮层 -->
+    <div class="rest-overlay" id="restOverlay">
+      <div class="rest-card">
+        <button class="rest-min" id="restMin">⤡</button>
+        <div class="eyebrow">组间休息 · REST</div>
+        <div class="rest-time" id="restTime">90</div>
+        <div class="rest-next" id="restNext"></div>
+        <div class="rest-controls">
+          <button id="restMinus">−10s</button>
+          <button class="done-btn" id="restDone">✓</button>
+          <button id="restPlus">+10s</button>
+        </div>
+      </div>
+    </div>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div class="proto-note">
+    <b>原型 · 训练中驾驶舱</b>（回答的问题：底部全宽「完成本组」+ 滑动手势 + 长按编辑态，能否覆盖训练中全部操作且单手友好）<br>
+    试试：<b>①</b> 拍底部大按钮完成当前组（自动进休息，点遮罩/⤡ 收起）<b>②</b> 组行<b>右滑</b>完成、<b>左滑</b>删除 <b>③</b> 点<b>序号</b>切换热身/正式 <b>④</b> 卡片头 <b>⋯</b>（44pt）打开动作菜单、点头部其余区域折叠 <b>⑤</b> 点数字格弹键盘 <b>⑥</b> 练完一个动作，主按钮预告「下一个动作」手动推进。
+  </div>
+</div>
+
+<script>
+// ================= 纯状态模块（可移植部分，与 DOM 无关） =================
+const Cockpit = {
+  state: null,
+
+  init() {
+    const mkSets = (n, kg, reps) => Array.from({length: n}, (_, i) => ({
+      id: crypto.randomUUID(), kg, reps, done: false, warmup: false
+    }));
+    this.state = {
+      units: [
+        { id: 'u1', name: '杠铃卧推', collapsed: false,
+          sets: mkSets(4, 60, 8), note: '顶峰收缩 1 秒' },
+        { id: 'u2', name: '平躺哑铃飞鸟', collapsed: false,
+          sets: mkSets(3, 12.5, 10) },
+        { id: 'u3', name: '对握高位下拉', collapsed: true,
+          sets: mkSets(4, 55, 8) },
+      ],
+      rest: null, // { seconds, total, nextLabel }
+      toast: null,
+    };
+  },
+
+  // 当前组 = 第一个未完成组（展开卡优先，顺序推进模型）
+  currentSet() {
+    for (const u of this.state.units) {
+      const s = u.sets.find(s => !s.done);
+      if (s) return { unit: u, set: s };
+    }
+    return null;
+  },
+
+  // 当前动作是否全部完成
+  unitDone(u) { return u.sets.every(s => s.done); },
+
+  // 下一个未完成的动作（从当前动作之后找，找不到则从头找）
+  nextUnit(afterId) {
+    const units = this.state.units;
+    const idx = units.findIndex(u => u.id === afterId);
+    const ordered = [...units.slice(idx + 1), ...units.slice(0, idx + 1)];
+    return ordered.find(u => !this.unitDone(u) && u.sets.length > 0) || null;
+  },
+
+  completeCurrent() {
+    const cur = this.currentSet();
+    if (!cur) return { kind: 'all-done' };
+    cur.set.done = true;
+    const unitJustFinished = this.unitDone(cur.unit);
+    const next = this.currentSet();
+    this.state.rest = {
+      seconds: 90, total: 90,
+      nextLabel: next ? `下一组 · ${next.unit.name} 第 ${next.unit.sets.indexOf(next.set) + 1} 组` : '最后一组已完成',
+    };
+    if (unitJustFinished) {
+      const nxt = this.nextUnit(cur.unit.id);
+      return { kind: 'unit-done', unit: cur.unit, next: nxt };
+    }
+    return { kind: 'set-done' };
+  },
+
+  uncomplete(unitId, setId) {
+    const u = this.state.units.find(u => u.id === unitId);
+    const s = u.sets.find(s => s.id === setId);
+    s.done = false;
+  },
+
+  deleteSet(unitId, setId) {
+    const u = this.state.units.find(u => u.id === unitId);
+    u.sets = u.sets.filter(s => s.id !== setId);
+    if (u.sets.length === 0) {
+      this.state.units = this.state.units.filter(x => x.id !== unitId);
+    }
+  },
+
+  deleteUnit(unitId) {
+    this.state.units = this.state.units.filter(u => u.id !== unitId);
+  },
+
+  addSet(unitId) {
+    const u = this.state.units.find(u => u.id === unitId);
+    const last = u.sets[u.sets.length - 1];
+    u.sets.push({ id: crypto.randomUUID(), kg: last?.kg ?? 0, reps: last?.reps ?? 0, done: false, warmup: false });
+  },
+
+  toggleWarmup(unitId, setId) {
+    const s = this.state.units.find(u => u.id === unitId).sets.find(s => s.id === setId);
+    s.warmup = !s.warmup;
+  },
+
+  stats() {
+    const all = this.state.units.flatMap(u => u.sets);
+    const done = all.filter(s => s.done && !s.warmup);
+    const remainUnits = this.state.units.filter(u => !this.unitDone(u)).length;
+    return {
+      doneSets: done.length,
+      remainUnits,
+      volume: done.reduce((a, s) => a + s.kg * s.reps, 0),
+    };
+  },
+};
+
+// ================= 页面壳（一次性，勿移植） =================
+Cockpit.init();
+const $ = id => document.getElementById(id);
+let recSecs = 0;
+setInterval(() => {
+  recSecs++;
+  $('recTime').textContent = `${String(Math.floor(recSecs/60)).padStart(2,'0')}:${String(recSecs%60).padStart(2,'0')}`;
+}, 1000);
+
+let restTimer = null;
+
+function showToast(text) {
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function render() {
+  const st = Cockpit.state;
+  const cur = Cockpit.currentSet();
+  const cards = $('cards');
+  cards.innerHTML = '';
+
+  st.units.forEach(u => {
+    const doneCount = u.sets.filter(s => s.done).length;
+    const allDone = Cockpit.unitDone(u);
+    const card = document.createElement('div');
+    card.className = 'ex-card' + (allDone ? ' done' : '') + (u.collapsed ? ' collapsed' : '');
+
+    // 卡片头（大块折叠区 + 44pt 动作菜单按钮）
+    const head = document.createElement('div');
+    head.className = 'ex-head';
+    head.innerHTML = `<span class="name">${u.name}</span>
+      <span class="meta">${doneCount}/${u.sets.length} 组${u.note ? ' · ✎' : ''}</span>
+      <span class="chev">▼</span>`;
+    head.addEventListener('click', () => {
+      u.collapsed = !u.collapsed;
+      render();
+    });
+    const menuBtn = document.createElement('button');
+    menuBtn.className = 'ex-menu-btn';
+    menuBtn.textContent = '⋯';
+    menuBtn.onclick = e => {
+      e.stopPropagation();
+      showToast('动作菜单：休息 / 备注 / 换动作 / 删除动作（占位）');
+    };
+    head.appendChild(menuBtn);
+    card.appendChild(head);
+
+    if (!u.collapsed) {
+      u.sets.forEach((s, i) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'set-row-wrap';
+        // 滑动底层动作条
+        const actions = document.createElement('div');
+        actions.className = 'set-row-actions';
+        actions.innerHTML = `<div class="swipe-complete">${s.done ? '取消完成' : '完成'}</div><div class="swipe-delete">删除</div>`;
+        wrap.appendChild(actions);
+
+        const row = document.createElement('div');
+        const isCurrent = cur && cur.set.id === s.id;
+        row.className = 'set-row' + (s.done ? ' done' : '') + (isCurrent ? ' current' : '');
+        row.innerHTML = `
+          <div class="badge ${s.warmup ? 'warmup' : ''}">${s.warmup ? '热' : i + 1}</div>
+          <div class="val">${s.kg}<span>kg</span></div>
+          <div class="x-sign">×</div>
+          <div class="val">${s.reps}<span>次</span></div>
+          <div class="spacer"></div>
+          <div class="check">${s.done ? '✓' : ''}</div>`;
+
+        // 序号徽章：点按切换热身/正式（44pt 触控目标）
+        const badgeEl = row.querySelector('.badge');
+        badgeEl.onclick = e => {
+          e.stopPropagation();
+          Cockpit.toggleWarmup(u.id, s.id);
+          showToast(s.warmup ? '已标为正式组' : '已标为热身组');
+          render();
+        };
+        row.querySelector('.check').onclick = e => {
+          e.stopPropagation();
+          if (s.done) { Cockpit.uncomplete(u.id, s.id); }
+          else { s.done = true; Cockpit.state.rest = { seconds: 90, total: 90, nextLabel: '' }; }
+          render();
+        };
+        // 数字格点击 → 键盘
+        row.querySelectorAll('.val').forEach(v => v.onclick = e => {
+          e.stopPropagation();
+          $('keypad').classList.add('show');
+        });
+
+        // 手势：右滑完成/取消，左滑删除（鼠标/触摸统一的 pointer 拖拽模拟）
+        {
+          let startX = 0, dx = 0, dragging = false;
+          row.addEventListener('pointerdown', e => { startX = e.clientX; dragging = true; row.style.transition = 'none'; });
+          row.addEventListener('pointermove', e => {
+            if (!dragging) return;
+            dx = Math.max(-96, Math.min(96, e.clientX - startX));
+            row.style.transform = `translateX(${dx}px)`;
+          });
+          const end = () => {
+            if (!dragging) return;
+            dragging = false;
+            row.style.transition = '';
+            row.style.transform = '';
+            if (dx > 64) {
+              s.done = !s.done;
+              showToast(s.done ? '已完成本组' : '已取消完成');
+              render();
+            } else if (dx < -64) {
+              Cockpit.deleteSet(u.id, s.id);
+              showToast('已删除该组');
+              render();
+            }
+            dx = 0;
+          };
+          row.addEventListener('pointerup', end);
+          row.addEventListener('pointercancel', end);
+        }
+
+        wrap.appendChild(row);
+        card.appendChild(wrap);
+      });
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'add-set';
+      addBtn.textContent = '＋ 加一组';
+      addBtn.onclick = () => { Cockpit.addSet(u.id); render(); };
+      card.appendChild(addBtn);
+    }
+    cards.appendChild(card);
+  });
+
+  // 底部主按钮：完成本组 / 下一个动作 / 全部完成
+  const stats = Cockpit.stats();
+  $('statSets').textContent = stats.doneSets;
+  $('statRemain').textContent = stats.remainUnits;
+  $('statVol').textContent = stats.volume >= 1000 ? (stats.volume/1000).toFixed(1) + 't' : stats.volume;
+
+  const cta = $('heroCta');
+  if (!cur) {
+    cta.disabled = true;
+    cta.className = 'hero-cta';
+    cta.innerHTML = '✓ 全部完成';
+  } else {
+    const curUnitDoneAfterThis = cur.unit.sets.filter(s => s.done).length === cur.unit.sets.length - 1;
+    const nxt = Cockpit.nextUnit(cur.unit.id);
+    cta.disabled = false;
+    if (curUnitDoneAfterThis && nxt) {
+      // 本组完成即练完该动作 → 主按钮预告「下一个动作」（点击后完成本组并引导推进）
+      cta.className = 'hero-cta next';
+      cta.innerHTML = `✓ 完成本组 <small>${cur.set.kg}kg×${cur.set.reps} · 然后去「${nxt.name}」</small>`;
+    } else {
+      cta.className = 'hero-cta';
+      cta.innerHTML = `✓ 完成本组 <small>${cur.unit.name} 第 ${cur.unit.sets.indexOf(cur.set) + 1} 组 · ${cur.set.kg}kg×${cur.set.reps}</small>`;
+    }
+  }
+}
+
+$('heroCta').onclick = () => {
+  const r = Cockpit.completeCurrent();
+  if (r.kind === 'all-done') return;
+  render();
+  openRest();
+  if (r.kind === 'unit-done' && r.next) {
+    // 不自动折叠：toast 引导 + 下一张卡保持折叠状态由用户点头展开
+    setTimeout(() => showToast(`「${r.unit.name}」完成 · 下一个：${r.next.name}`), 300);
+  }
+};
+
+// 休息浮层
+function openRest() {
+  const r = Cockpit.state.rest;
+  if (!r) return;
+  $('restNext').textContent = r.nextLabel;
+  $('restTime').textContent = r.seconds;
+  $('restOverlay').classList.add('show');
+  clearInterval(restTimer);
+  restTimer = setInterval(() => {
+    r.seconds = Math.max(0, r.seconds - 1);
+    $('restTime').textContent = r.seconds;
+    if (r.seconds === 0) closeRest();
+  }, 1000);
+}
+function closeRest() {
+  clearInterval(restTimer);
+  $('restOverlay').classList.remove('show');
+}
+$('restDone').onclick = closeRest;
+$('restMin').onclick = closeRest;
+$('restOverlay').onclick = e => { if (e.target === $('restOverlay')) closeRest(); };
+$('restMinus').onclick = () => { const r = Cockpit.state.rest; if (r) { r.seconds = Math.max(0, r.seconds - 10); $('restTime').textContent = r.seconds; } };
+$('restPlus').onclick = () => { const r = Cockpit.state.rest; if (r) { r.seconds += 10; $('restTime').textContent = r.seconds; } };
+
+// 键盘：点空白关闭
+document.addEventListener('pointerdown', e => {
+  if ($('keypad').classList.contains('show') && !e.target.closest('.keypad') && !e.target.closest('.val')) {
+    $('keypad').classList.remove('show');
+  }
+});
+document.querySelectorAll('.keypad button').forEach(b => b.onclick = () => showToast('输入（占位）'));
+
+render();
+</script>
+</body>
+</html>
