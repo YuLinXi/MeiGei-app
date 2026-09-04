@@ -3856,10 +3856,11 @@ private struct ExerciseBlock: View {
         .paperShadow(.sm, cornerRadius: Theme.Radius.lg)
     }
 
-    // 卡头：展开态 = 名称 + ⋯ + 收起 ^；折叠态 = 名称 + 摘要 + 展开 ⌄。
-    // 整行点击均可折叠/展开；⋯ 与 chevron 为独立 Button（命中区 36pt），手势优先于整行 tap，不会误触。
+    // 卡头：左侧折叠箭头 + 动作名；右侧摘要（折叠时）+ 结构图标 + ⋯ 更多操作。
+    // 整行点击均可折叠/展开；⋯ 与 chevron 为独立 Button，手势优先于整行 tap，不会误触。
     private var head: some View {
         HStack(spacing: Theme.Spacing.sm) {
+            collapseButton
             Text(exercise.displayExerciseName)
                 .font(Theme.Font.l2)
                 .foregroundStyle(isAllDone ? Theme.Color.muted : Theme.Color.fg)
@@ -3884,21 +3885,7 @@ private struct ExerciseBlock: View {
                 .accessibilityLabel("选择备选动作，共 \(alternativeCount) 个")
             }
             Spacer()
-            if isExpanded {
-                if isDropSetUnit {
-                    WorkoutStructureIcon(kind: .dropSet)
-                }
-                if !readOnly { moreButton }
-                Button(action: onToggleExpand) {
-                    Image(systemName: "chevron.up")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.muted)
-                        .frame(width: 36, height: 36)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("收起动作")
-            } else {
+            if !isExpanded {
                 if noteText != nil {
                     Image(systemName: "note.text")
                         .font(.system(size: 13, weight: .semibold))
@@ -3906,18 +3893,31 @@ private struct ExerciseBlock: View {
                         .accessibilityHidden(true)
                 }
                 Text(summaryText).font(Theme.Font.l4).foregroundStyle(Theme.Color.muted).lineLimit(1)
-                if isDropSetUnit {
-                    WorkoutStructureIcon(kind: .dropSet)
-                }
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
+            }
+            if isDropSetUnit {
+                WorkoutStructureIcon(kind: .dropSet)
+            }
+            if !readOnly {
+                moreButton
             }
         }
         .padding(.horizontal, 15)
         .frame(minHeight: isExpanded ? 48 : 50)
         .contentShape(Rectangle())
         .onTapGesture { onToggleExpand() }
+    }
+
+    private var collapseButton: some View {
+        Button(action: onToggleExpand) {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+                .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                .frame(width: 22, height: 36)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isExpanded ? "收起动作" : "展开动作")
     }
 
     @ViewBuilder
@@ -3963,7 +3963,6 @@ private struct ExerciseBlock: View {
             Image(systemName: "ellipsis")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(isMenuOpen ? Theme.Color.accent : Theme.Color.muted)
-                // 命中区加大到 36pt，与相邻的收起 chevron 保持明确边界，减少误触。
                 .frame(width: 36, height: 36)
                 .contentShape(Rectangle())
         }
@@ -4108,25 +4107,14 @@ private struct SupersetBlock: View {
 
     private var head: some View {
         HStack(spacing: Theme.Spacing.sm) {
+            collapseButton
             Text(titleText)
                 .font(Theme.Font.l2)
                 .foregroundStyle(isAllDone ? Theme.Color.muted : Theme.Color.fg)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer()
-            if isExpanded {
-                WorkoutStructureIcon(kind: .superset)
-                if !readOnly { moreButton }
-                Button(action: onToggleExpand) {
-                    Image(systemName: "chevron.up")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.muted)
-                        .frame(width: 36, height: 36)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("收起超级组")
-            } else {
+            if !isExpanded {
                 if noteText != nil {
                     Image(systemName: "note.text")
                         .font(.system(size: 13, weight: .semibold))
@@ -4137,10 +4125,10 @@ private struct SupersetBlock: View {
                     .font(Theme.Font.l4)
                     .foregroundStyle(Theme.Color.muted)
                     .lineLimit(1)
-                WorkoutStructureIcon(kind: .superset)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
+            }
+            WorkoutStructureIcon(kind: .superset)
+            if !readOnly {
+                moreButton
             }
         }
         .padding(.horizontal, 15)
@@ -4148,6 +4136,19 @@ private struct SupersetBlock: View {
         .contentShape(Rectangle())
         // 整行点击均可折叠/展开；⋯ 与 chevron 为独立 Button，手势优先于整行 tap，不会误触。
         .onTapGesture { onToggleExpand() }
+    }
+
+    private var collapseButton: some View {
+        Button(action: onToggleExpand) {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.muted)
+                .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                .frame(width: 22, height: 36)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isExpanded ? "收起超级组" : "展开超级组")
     }
 
     @ViewBuilder
@@ -4171,7 +4172,6 @@ private struct SupersetBlock: View {
             Image(systemName: "ellipsis")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(isMenuOpen ? Theme.Color.accent : Theme.Color.muted)
-                // 命中区加大到 36pt，与相邻的收起 chevron 保持明确边界，减少误触。
                 .frame(width: 36, height: 36)
                 .contentShape(Rectangle())
         }
