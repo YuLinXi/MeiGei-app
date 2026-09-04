@@ -39,6 +39,9 @@ struct ProfileView: View {
     @State private var healthAuthorized = false
     @State private var notificationsEnabled: Bool?
     @State private var caloriePreferences = WorkoutCaloriePreferences.current()
+    @State private var showBadgeWall = ProcessInfo.processInfo.arguments.contains("-open-badge-wall")
+
+    @Query(sort: \BadgeGrant.unlockedAt, order: .reverse) private var badgeGrants: [BadgeGrant]
 
     private var profile: UserProfile? { profiles.first(where: { $0.serverUserId == session.currentUserId }) }
 
@@ -57,6 +60,7 @@ struct ProfileView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                         header
+                        badgeOverviewCard
                         personalInfoGroup
                         syncGroup
                         trainingPrefsGroup
@@ -73,6 +77,14 @@ struct ProfileView: View {
         .rootTabTopScrim()
         // 我的页不展示顶部标题，隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(isPresented: $showBadgeWall) {
+            BadgeWallView()
+        }
+        .onOpenURL { url in
+            if url.scheme == "dontlift" && url.host == "badge-wall" {
+                showBadgeWall = true
+            }
+        }
         .task {
             WorkoutPerformanceMonitor.event("profile.appear")
             healthAuthorized = healthKit.isAuthorized
@@ -164,6 +176,79 @@ struct ProfileView: View {
     /// 副标：只展示总训练次数。
     private var headerSubtitle: String {
         "总训练次数 \(totalWorkouts) 次"
+    }
+
+    // MARK: - 成就徽章概览卡片
+
+    private var badgeOverviewCard: some View {
+        Button {
+            showBadgeWall = true
+        } label: {
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                HStack(alignment: .center) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "medal.fill")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(Theme.Color.accent)
+                        Text("成就徽章")
+                            .font(Theme.Font.body(size: 15, weight: .bold))
+                            .foregroundStyle(Theme.Color.fg)
+                    }
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Text("已解锁 \(badgeGrants.count) / \(BadgeDefinition.all.count)")
+                            .font(Theme.Font.mono(size: 13, weight: .medium))
+                            .foregroundStyle(Theme.Color.fg2)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.Color.muted)
+                    }
+                }
+
+                if badgeGrants.isEmpty {
+                    HStack(spacing: 10) {
+                        ForEach(0..<5, id: \.self) { _ in
+                            Circle()
+                                .fill(Theme.Color.surface2.opacity(0.6))
+                                .frame(width: 34, height: 34)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Theme.Color.border, lineWidth: 1)
+                                )
+                        }
+                        Text("完成训练点亮专属勋章")
+                            .font(Theme.Font.body(size: 12))
+                            .foregroundStyle(Theme.Color.muted)
+                            .padding(.leading, 4)
+                        Spacer()
+                    }
+                    .padding(.top, 2)
+                } else {
+                    HStack(spacing: 10) {
+                        ForEach(badgeGrants.prefix(5), id: \.badgeCode) { grant in
+                            if let def = grant.definition {
+                                BadgeIconView(definition: def, isUnlocked: true, size: .mini)
+                            }
+                        }
+                        if badgeGrants.count < 5 {
+                            ForEach(0..<(5 - badgeGrants.count), id: \.self) { _ in
+                                Circle()
+                                    .fill(Theme.Color.surface2.opacity(0.6))
+                                    .frame(width: 34, height: 34)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Theme.Color.border, lineWidth: 1)
+                                    )
+                            }
+                        }
+                        Spacer()
+                    }
+                    .padding(.top, 2)
+                }
+            }
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - 个人资料分组（称呼可编辑 + 性别，均为资料、改即 PATCH 后端）
@@ -611,9 +696,18 @@ struct ProfileView: View {
     /// 生成演示数据并立即触发历史投影重建，首页与复盘页即刻可见。
     private func seedDemoData() {
         do {
+            if caloriePreferences.bodyWeightKg == nil {
+                WorkoutCaloriePreferences.setBodyWeightKg(75.0)
+                caloriePreferences = WorkoutCaloriePreferences.current()
+            }
             let result = try WorkoutDemoSeedData.seed(in: modelContext)
             historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
-            seedResult = "已生成 \(result.workouts) 次训练、\(result.plans) 个计划。回到首页即可查看肌群负荷与历史。"
+
+            UserDefaults.standard.removeObject(forKey: BadgeEngine.backfillCompletedKey)
+            UserDefaults.standard.removeObject(forKey: BadgeEngine.careerReviewShownKey)
+            let backfilledGrants = BadgeEngine.runBackfillIfNeeded(in: modelContext, force: true)
+
+            seedResult = "已生成 \(result.workouts) 次训练、\(result.plans) 个计划，并解锁/回溯了 \(backfilledGrants.count) 枚成就勋章。"
         } catch {
             seedResult = "生成失败：\(error.localizedDescription)"
         }
@@ -780,7 +874,7 @@ private enum ProfileSheet: Identifiable {
     }
 }
 
-private struct CalorieBodyWeightSheet: View {
+struct CalorieBodyWeightSheet: View {
     @Environment(\.dismiss) private var dismiss
     @FocusState private var weightFocused: Bool
 

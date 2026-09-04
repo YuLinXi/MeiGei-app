@@ -76,11 +76,7 @@ final class DontLiftUITests: XCTestCase {
         let firstHandle = app.buttons["Reorder 上斜杠铃卧推"]
         if firstHandle.waitForExistence(timeout: 2) {
             let thirdHandle = app.buttons["Reorder 坐姿哑铃推肩"]
-            let dropPoint = thirdHandle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1.6))
-            firstHandle.press(forDuration: 1.0,
-                              thenDragTo: dropPoint,
-                              withVelocity: .slow,
-                              thenHoldForDuration: 0.5)
+            firstHandle.press(forDuration: 1.0, thenDragTo: thirdHandle)
             Thread.sleep(forTimeInterval: 1.0)
             // 拖动后断言「坐姿哑铃推肩」上移到「上斜杠铃卧推」之上。
             let firstTitle = app.staticTexts["上斜杠铃卧推"].firstMatch

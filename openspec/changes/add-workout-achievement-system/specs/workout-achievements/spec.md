@@ -1,0 +1,100 @@
+## Purpose
+
+本能力为「别练了」提供严肃硬核的力量训练成就系统，通过 24 枚具有独立图腾与专属命名的进阶勋章、纯函数评估引擎、存量历史回溯与高光庆祝交互，量化并致敬用户的每一次力量突破与长期纪律。
+
+## ADDED Requirements
+
+### Requirement: 24 枚硬核独立成就勋章矩阵
+
+系统 SHALL 提供 24 枚一次性解锁的独立成就勋章（无段位折叠，每个层级均为独立实体），分为四大板块：
+1. **力量与三大项俱乐部（9 枚）**：
+   - `strength_bw_bench_1_0`（破阵）：杠铃卧推单组最高重量 $\ge 1.0\times$ 体重；
+   - `strength_bw_squat_1_5`（撼地）：杠铃深蹲单组最高重量 $\ge 1.5\times$ 体重；
+   - `strength_bw_deadlift_2_0`（拔山）：杠铃硬拉单组最高重量 $\ge 2.0\times$ 体重；
+   - `strength_bw_bench_1_5`（铁穹）：杠铃卧推单组最高重量 $\ge 1.5\times$ 体重；
+   - `strength_bw_squat_2_0`（双倍重力）：杠铃深蹲单组最高重量 $\ge 2.0\times$ 体重；
+   - `strength_bw_deadlift_2_5`（泰坦之握）：杠铃硬拉单组最高重量 $\ge 2.5\times$ 体重；
+   - `strength_big3_total_300`（300 俱乐部）：三大项历史 PR 总和 $\ge 300\text{ kg}$；
+   - `strength_big3_total_400`（400 俱乐部）：三大项历史 PR 总和 $\ge 400\text{ kg}$；
+   - `strength_big3_total_500`（500 俱乐部）：三大项历史 PR 总和 $\ge 500\text{ kg}$。
+2. **累计总吨位（5 枚）**：
+   - `tonnage_10t`（初辟）：历史累计训练量 $\ge 10,000\text{ kg}$；
+   - `tonnage_50t`（战车）：历史累计训练量 $\ge 50,000\text{ kg}$；
+   - `tonnage_100t`（巨阙）：历史累计训练量 $\ge 100,000\text{ kg}$；
+   - `tonnage_500t`（磐石）：历史累计训练量 $\ge 500,000\text{ kg}$；
+   - `tonnage_1000t`（千吨引力）：历史累计训练量 $\ge 1,000,000\text{ kg}$。
+3. **纪律与生涯历程（5 枚）**：
+   - `career_first_workout`（破晓）：完成生涯第 1 次有效训练；
+   - `career_10_workouts`（习惯之始）：完成生涯第 10 次训练；
+   - `career_50_workouts`（渐入佳境）：完成生涯第 50 次训练；
+   - `career_100_workouts`（百炼成钢）：完成生涯第 100 次训练；
+   - `career_300_workouts`（千锤之躯）：完成生涯第 300 次训练。
+4. **单次战役极限（5 枚）**：
+   - `feat_volume_10t`（单场万吨）：单次训练量 $\ge 10,000\text{ kg}$；
+   - `feat_volume_20t`（力竭深渊）：单次训练量 $\ge 20,000\text{ kg}$；
+   - `feat_triple_pr`（势如破竹）：单次训练中打破 $\ge 3$ 个动作的历史 PR；
+   - `feat_dense_sets`（铁血容量）：单次训练完成正式组 $\ge 25$ 组；
+   - `feat_perfect_plan`（严丝合缝）：100% 严格执行预定计划项（组数与动作全达成）。
+
+#### Scenario: 独立解锁不折叠
+- **WHEN** 用户深蹲达到 2.0x 体重
+- **THEN** 用户同时拥有「撼地（1.5x BW）」和「双倍重力（2.0x BW）」两枚独立勋章
+- **AND** 徽章馆中两枚勋章并列点亮呈现，不合并为一个升级徽章。
+
+### Requirement: 三大项动作的绝对精准绑定口径
+
+系统评估三大项成绩时，MUST 且仅能通过动作的标准内置代码（Builtin Code）进行归集：
+- 深蹲（S）：必须为 `BB_SQUAT`（杠铃深蹲）；
+- 卧推（B）：必须为 `BB_BENCH_PRESS`（杠铃卧推）；
+- 硬拉（D）：必须为 `DEADLIFT`（标准传统硬拉）或 `SUMO_DEADLIFT`（相扑硬拉），并遵循国际力量举（IPF）规则取两者最高值作为有效成绩。
+任何史密斯机、哑铃、挂片器械或单腿变式动作 MUST NOT 计入三大项总和。
+
+#### Scenario: 史密斯动作不计入三大项
+- **WHEN** 用户使用「史密斯机卧推（SMITH_BENCH_PRESS）」推起 120kg
+- **THEN** 该成绩不计入卧推三大项总和，亦不触发「破阵（卧推 1.0x BW）」勋章。
+
+### Requirement: 存根模型与增量判定流水线
+
+系统 SHALL 在 SwiftData 中引入轻量实体 `BadgeGrant`，包含字段：
+- `badgeCode: String`：勋章唯一标识；
+- `unlockedAt: Date`：达成解锁时间；
+- `workoutId: UUID?`：达成该勋章的具体训练 ID（生涯首发或历史某次训练）；
+- `snapshotMetric: Double`：达成时的关键指标快照（如当时的重量或累计吨位）。
+
+`BadgeEngine` SHALL 在训练结束（`finishWorkout()`）确认且 `workout.isFinished = true` 时执行增量评估：
+1. 取出当前已获得的全部 `BadgeGrant` 的 `badgeCode` 集合；
+2. 仅对未解锁的徽章进行快速 O(1) 规则匹配；
+3. 若命中新勋章，持久化写入 `BadgeGrant` 并返回新解锁列表用于界面庆祝。
+
+#### Scenario: 训练完成触发新勋章
+- **WHEN** 用户完成训练且累计吨位突破 100,000kg
+- **THEN** 系统判定命中 `tonnage_100t`
+- **AND** 创建 `BadgeGrant(badgeCode: "tonnage_100t", workoutId: workout.localId)` 写入数据库
+- **AND** 唤起训练结算高光庆祝弹窗。
+
+### Requirement: 存量历史回溯与生涯回顾弹窗（Career Review）
+
+系统 SHALL 在老用户初次更新后提供平滑无痛的历史数据回溯：
+1. App 启动装配期检查 UserDefaults `hasCompletedBadgeBackfill`；
+2. 若未执行，在后台 Task 中异步以时间正序遍历用户全部已完成训练，模拟解锁过程并补齐 `BadgeGrant` 存根；
+3. 回溯完成后置位 `hasCompletedBadgeBackfill = true`；
+4. 当用户进入主界面且不存在活跃训练浮层时，唤起一次性「生涯成就回顾」汇总弹窗。
+
+#### Scenario: 老用户首启展示生涯回顾
+- **WHEN** 拥有 80 次历史训练的老用户升级新版并进入 App
+- **THEN** 后台自动完成回溯计算并写入已有勋章存根
+- **AND** 主界面弹出「生涯成就回顾」卡片，汇总展示历史总吨位、三大项成绩及已点亮的勋章
+- **AND** 用户点击「全部收入我的徽章馆」后关闭弹窗，该弹窗永不再弹。
+
+### Requirement: 个人中心徽章馆展示（Badge Wall）
+
+系统 SHALL 提供全量 24 枚勋章的二级展览页：
+- **排布规格**：3 列卡片网格，按四大板块清晰分节；
+- **已解锁态**：金属高光浮雕质感，显示解锁日期；点击展开详情弹窗，提供「查看当日训练」快捷跳转；
+- **未解锁态**：30% 透明度暗钛质感，清晰展示达成条件与实时进度条（例如：`当前 68,400 / 100,000 kg (68%)`）；
+- **体重缺失引导**：未录入体重时，体重倍数类勋章展示「完善个人体重以开启」提示并引导至体重录入弹窗。
+
+#### Scenario: 点击已解锁徽章反查训练
+- **WHEN** 用户在徽章馆中点击已解锁的「破阵（卧推 1.0x BW）」
+- **THEN** 弹窗展示该勋章详情、解锁日期及当时的卧推重量快照
+- **AND** 用户点击「查看当日训练」可直接打开该次训练的详情页（WorkoutDetailView）。

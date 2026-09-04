@@ -835,6 +835,7 @@ struct WorkoutLoggingView: View {
     @Environment(WorkoutLiveActivityController.self) private var workoutLiveActivity
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(PRCelebrationCenter.self) private var prCelebration
+    @Environment(BadgeCelebrationCenter.self) private var badgeCelebration
     @Environment(PlanWritebackCenter.self) private var planWriteback
     @Environment(GlobalMessageCenter.self) private var globalMessage
     @Environment(WorkoutHistoryStore.self) private var historyStore
@@ -2905,12 +2906,57 @@ struct WorkoutLoggingView: View {
             // 只读详情页，若挂本页 sheet 会随本页销毁而一闪即逝（详见 PRCelebrationCenter）。
             prCelebration.present(prs, summary: prSummary)
         }
+        evaluateBadges()
         historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
         let draft = TeamShareDraft(workout: workout)
         Task { @MainActor in
             await autoShareCompletedWorkout(draft)
         }
         recordTeamPlanCompletionIfNeeded()
+    }
+
+    private func evaluateBadges() {
+        let grantDescriptor = FetchDescriptor<BadgeGrant>()
+        let existingGrants = (try? modelContext.fetch(grantDescriptor)) ?? []
+        let currentGrants = Set(existingGrants.map(\.badgeCode))
+
+        let workoutDescriptor = FetchDescriptor<Workout>(
+            predicate: #Predicate { $0.deletedAt == nil }
+        )
+        let rawWorkouts = (try? modelContext.fetch(workoutDescriptor)) ?? []
+        let allFinished = rawWorkouts.filter { $0.endedAt != nil }
+
+        let currentWeight = WorkoutCaloriePreferences.current().bodyWeightKg
+
+        var plan: WorkoutPlan? = nil
+        if let planId = workout.planId {
+            var planDescriptor = FetchDescriptor<WorkoutPlan>(predicate: #Predicate { $0.localId == planId && $0.deletedAt == nil })
+            planDescriptor.fetchLimit = 1
+            plan = (try? modelContext.fetch(planDescriptor))?.first
+        }
+
+        let candidates = BadgeEngine.evaluateIncremental(
+            workout: workout,
+            allFinishedWorkouts: allFinished,
+            currentGrants: currentGrants,
+            currentWeight: currentWeight,
+            plan: plan
+        )
+
+        guard !candidates.isEmpty else { return }
+
+        for candidate in candidates {
+            let grant = BadgeGrant(
+                badgeCode: candidate.badgeCode,
+                unlockedAt: candidate.unlockedAt,
+                workoutId: candidate.workoutId,
+                snapshotMetric: candidate.snapshotMetric
+            )
+            modelContext.insert(grant)
+        }
+        try? modelContext.save()
+
+        badgeCelebration.presentIncremental(candidates, workoutSummary: prSummary)
     }
 
     private func autoShareCompletedWorkout(_ draft: TeamShareDraft) async {

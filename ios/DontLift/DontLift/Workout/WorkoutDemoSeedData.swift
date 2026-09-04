@@ -24,20 +24,20 @@ enum WorkoutDemoSeedData {
     }
 
     // 全部取自内置动作库已确认存在的条目。
-    private static let benchPress = Lift(code: "HAMMER_BENCH_PRESS", name: "悍马机卧推", muscle: "胸",
-                                         baseWeight: 60, weeklyStep: 2.5, sets: 4, reps: 8)
+    private static let benchPress = Lift(code: "BB_BENCH_PRESS", name: "杠铃卧推", muscle: "胸",
+                                         baseWeight: 75, weeklyStep: 2.5, sets: 4, reps: 8)
     private static let fly = Lift(code: "FLAT_DB_FLY", name: "平躺哑铃飞鸟", muscle: "胸",
                                   baseWeight: 12.5, weeklyStep: 1.25, sets: 3, reps: 10)
     private static let pulldown = Lift(code: "NEUTRAL_GRIP_PULLDOWN", name: "对握高位下拉", muscle: "背",
                                        baseWeight: 55, weeklyStep: 2.5, sets: 4, reps: 8)
     private static let row = Lift(code: "BB_SEAL_ROW", name: "海豹杠铃划船", muscle: "背",
                                   baseWeight: 50, weeklyStep: 2.5, sets: 4, reps: 8)
-    private static let squat = Lift(code: "TRAP_BAR_SQUAT", name: "六角杠深蹲", muscle: "腿",
-                                    baseWeight: 70, weeklyStep: 2.5, sets: 4, reps: 6)
+    private static let squat = Lift(code: "BB_SQUAT", name: "杠铃深蹲", muscle: "腿",
+                                    baseWeight: 100, weeklyStep: 5, sets: 4, reps: 6)
     private static let legPress = Lift(code: "LYING_LEG_PRESS", name: "连动式仰卧腿举", muscle: "腿",
                                        baseWeight: 100, weeklyStep: 5, sets: 3, reps: 10)
-    private static let rdl = Lift(code: "MACHINE_ROMANIAN_DL", name: "挂片式罗马尼亚硬拉", muscle: "腿",
-                                  baseWeight: 50, weeklyStep: 2.5, sets: 3, reps: 10)
+    private static let rdl = Lift(code: "DEADLIFT", name: "硬拉", muscle: "背",
+                                  baseWeight: 130, weeklyStep: 5, sets: 3, reps: 5)
     private static let ohp = Lift(code: "DB_OVERHEAD_PRESS", name: "哑铃推肩", muscle: "肩",
                                   baseWeight: 20, weeklyStep: 1.25, sets: 4, reps: 8)
     private static let curl = Lift(code: "BB_EZ_BAR_CURL", name: "EZ杆二头弯举", muscle: "手臂",

@@ -15,13 +15,21 @@ struct MainTabView: View {
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(WorkoutPresentationCenter.self) private var workoutPresentation
     @Environment(WorkoutLiveActivityController.self) private var workoutLiveActivity
+    @Environment(BadgeCelebrationCenter.self) private var badgeCelebration
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// 全局进行中会话（LIVE 悬浮胶囊来源）：未删除且未结束 = isActive。
     @State private var activeSession: Workout?
     @State private var activeRootSheet: RootSheet?
     @State private var presentedRootSheet: RootSheet?
-    @State private var selectedTab: MainTab = .workout
+    @State private var selectedTab: MainTab = {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-tab-profile") || ProcessInfo.processInfo.arguments.contains("-open-badge-wall") {
+            return .profile
+        }
+        #endif
+        return .workout
+    }()
 
     private enum MainTab: Hashable {
         case workout
@@ -34,6 +42,8 @@ struct MainTabView: View {
     private enum RootSheet: String, Identifiable {
         case planWriteback
         case prCelebration
+        case badgeCelebration
+        case careerBadgeReview
         case teamShare
 
         var id: String { rawValue }
@@ -121,6 +131,15 @@ struct MainTabView: View {
         .onAppear {
             refreshActiveSession()
             #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-test-career-review") {
+                checkCareerReviewOnLaunch(force: true)
+            } else {
+                checkCareerReviewOnLaunch()
+            }
+            #else
+            checkCareerReviewOnLaunch()
+            #endif
+            #if DEBUG
             // UI 测试钩子：直达「训练进行中」浮层。直接查库而不读 @State，避免同 runloop 时序抖动。
             if UITestHooks.isLiveWorkoutUITest,
                let workout = WorkoutSession.activeSession(in: modelContext) {
@@ -182,15 +201,58 @@ struct MainTabView: View {
                 if let records = prCelebration.records {
                     PRCelebrationSheet(records: records, summary: prCelebration.summary)
                 }
+            case .badgeCelebration:
+                if let candidates = badgeCelebration.incrementalCandidates {
+                    WorkoutBadgeCelebrationSheet(
+                        candidates: candidates,
+                        summary: badgeCelebration.workoutSummary
+                    ) {
+                        badgeCelebration.dismissIncremental()
+                    }
+                }
+            case .careerBadgeReview:
+                if let grants = badgeCelebration.careerReviewGrants {
+                    CareerBadgeReviewSheet(
+                        grants: grants,
+                        totalTonnage: badgeCelebration.careerReviewTotalTonnage,
+                        workoutCount: badgeCelebration.careerReviewWorkoutCount,
+                        big3: badgeCelebration.careerReviewBig3
+                    ) {
+                        badgeCelebration.dismissCareerReview()
+                    }
+                }
             case .teamShare:
                 if let draft = teamShare.draft {
                     TeamShareSheet(draft: draft)
                 }
             }
         }
-        .onAppear { presentNextRootSheetIfNeeded() }
+        .onAppear {
+            #if DEBUG
+            if UITestHooks.isTestBadgeCelebration {
+                let mockCandidates = [
+                    BadgeGrantCandidate(
+                        badgeCode: "strength_bw_bench_1_0",
+                        unlockedAt: .now,
+                        workoutId: UUID(),
+                        snapshotMetric: 1.07
+                    ),
+                    BadgeGrantCandidate(
+                        badgeCode: "tonnage_100t",
+                        unlockedAt: .now,
+                        workoutId: UUID(),
+                        snapshotMetric: 100_000
+                    )
+                ]
+                badgeCelebration.presentIncremental(mockCandidates, workoutSummary: "胸背超级组爆发训练 · 达成 2 项荣誉突破")
+            }
+            #endif
+            presentNextRootSheetIfNeeded()
+        }
         .onChange(of: planWriteback.receipt != nil) { _, _ in presentNextRootSheetIfNeeded() }
         .onChange(of: prCelebration.records != nil) { _, _ in presentNextRootSheetIfNeeded() }
+        .onChange(of: badgeCelebration.incrementalCandidates != nil) { _, _ in presentNextRootSheetIfNeeded() }
+        .onChange(of: badgeCelebration.careerReviewGrants != nil) { _, _ in presentNextRootSheetIfNeeded() }
         .onChange(of: teamShare.draft != nil) { _, _ in presentNextRootSheetIfNeeded() }
         .onOpenURL { handleDeepLink($0) }
         .task(id: session.currentUserId) {
@@ -216,6 +278,10 @@ struct MainTabView: View {
             next = .planWriteback
         } else if prCelebration.records != nil {
             next = .prCelebration
+        } else if badgeCelebration.incrementalCandidates != nil {
+            next = .badgeCelebration
+        } else if badgeCelebration.careerReviewGrants != nil && activeSession == nil {
+            next = .careerBadgeReview
         } else if teamShare.draft != nil {
             next = .teamShare
         } else {
@@ -233,11 +299,51 @@ struct MainTabView: View {
                 planWriteback.receipt = nil
             case .prCelebration:
                 prCelebration.records = nil
+            case .badgeCelebration:
+                badgeCelebration.dismissIncremental()
+            case .careerBadgeReview:
+                badgeCelebration.dismissCareerReview()
             case .teamShare:
                 teamShare.draft = nil
             }
         }
         presentedRootSheet = nil
+        presentNextRootSheetIfNeeded()
+    }
+
+    private func checkCareerReviewOnLaunch(force: Bool = false) {
+        guard activeSession == nil else { return }
+        if !force {
+            guard !UserDefaults.standard.bool(forKey: BadgeEngine.careerReviewShownKey) else { return }
+        }
+
+        // 若尚未执行存量回溯，立即在本地执行一次
+        BadgeEngine.runBackfillIfNeeded(in: modelContext, force: force)
+
+        let grantDescriptor = FetchDescriptor<BadgeGrant>(sortBy: [SortDescriptor(\.unlockedAt, order: .forward)])
+        guard let grants = try? modelContext.fetch(grantDescriptor), !grants.isEmpty else {
+            if !force {
+                UserDefaults.standard.set(true, forKey: BadgeEngine.careerReviewShownKey)
+            }
+            return
+        }
+
+        let workoutDescriptor = FetchDescriptor<Workout>(
+            predicate: #Predicate { $0.deletedAt == nil }
+        )
+        let rawWorkouts = (try? modelContext.fetch(workoutDescriptor)) ?? []
+        let allWorkouts = rawWorkouts.filter { $0.endedAt != nil }
+
+        let totalTonnage = BadgeEngine.cumulativeTonnage(in: allWorkouts)
+        let count = BadgeEngine.completedWorkoutCount(in: allWorkouts)
+        let big3 = BadgeEngine.big3PRs(in: allWorkouts)
+
+        badgeCelebration.presentCareerReview(
+            grants: grants,
+            totalTonnage: totalTonnage,
+            workoutCount: count,
+            big3: big3
+        )
         presentNextRootSheetIfNeeded()
     }
 
@@ -249,12 +355,17 @@ struct MainTabView: View {
     }
 
     private func handleDeepLink(_ url: URL) {
-        guard url.scheme == "dontlift",
-              url.host == "workout" else { return }
-        selectedTab = .workout
-        refreshActiveSession()
-        if url.pathComponents.contains("live"), let activeSession {
-            workoutPresentation.present(activeSession)
+        guard url.scheme == "dontlift" else { return }
+        if url.host == "workout" {
+            selectedTab = .workout
+            refreshActiveSession()
+            if url.pathComponents.contains("live"), let activeSession {
+                workoutPresentation.present(activeSession)
+            }
+        } else if url.host == "profile" || url.host == "badge-wall" {
+            selectedTab = .profile
+        } else if url.host == "career-review" {
+            checkCareerReviewOnLaunch(force: true)
         }
     }
 
