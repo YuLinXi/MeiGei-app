@@ -891,8 +891,10 @@ struct WorkoutLoggingView: View {
     @State private var fabAnchor: CGPoint?
     /// FAB 拖动中的实时位移（手势驱动，松手自动归零）；用 @GestureState 保证跟手不延迟。
     @GestureState private var fabDrag: CGSize = .zero
-    /// 显式动作排序面板。
-    @State private var showingOrderEditor = false
+    /// 就地排序模式：true 时动作列表切换为可拖拽的紧凑行列表，右上按钮变为「完成」。
+    @State private var reordering = false
+    /// 排序模式中的 unitId 草稿顺序；点「完成」时一次性写回模型。
+    @State private var reorderDraft: [UUID] = []
     /// 当前正在编辑备注的动作或超级组；nil 表示备注编辑 sheet 关闭。
     @State private var noteEditingTarget: WorkoutNoteTarget?
     /// 动作备注编辑草稿；仅点击「完成」或「清空备注」时写回模型。
@@ -1155,26 +1157,30 @@ struct WorkoutLoggingView: View {
             Theme.Color.bg.ignoresSafeArea()
             ScrollViewReader { proxy in
                 GeometryReader { viewport in
+                    if reordering {
+                        // 排序模式：不用外层 ScrollView（嵌套 List 的拖拽手势会被外层滚动抢走）。
+                        // 顶部信息区原位渲染但被蒙层封锁；排序面板（共用组件）为白色满幅浮层、自身滚动。
+                        VStack(spacing: 0) {
+                            topSection
+                                .padding(.horizontal, Theme.Spacing.lg)
+                                .reorderMasked(true,
+                                               horizontalBleed: Theme.Spacing.lg,
+                                               topBleed: Theme.Spacing.sm)
+                            InPlaceReorderPanel(title: "训练动作",
+                                                items: reorderItems,
+                                                onMove: { source, destination in
+                                                    reorderDraft.move(fromOffsets: source, toOffset: destination)
+                                                    Theme.Haptics.selection()
+                                                },
+                                                onDone: commitReorder)
+                        }
+                        .frame(width: viewport.size.width, alignment: .top)
+                        .padding(.top, Theme.Spacing.sm)
+                        .transition(.opacity)
+                    } else {
                     ScrollView {
                         VStack(spacing: Theme.Spacing.md) {
-                            LiveHeaderView(startedAt: workout.startedAt,
-                                           timerStartedAt: workout.timerStartedAt,
-                                           endedAt: workout.endedAt,
-                                           onStart: { startTimerIfNeeded() },
-                                           onFinish: presentFinishConfirmation)
-                            triadStats
-                            if workout.isActive, let note = workout.note, !note.isEmpty {
-                                workoutNoteStrip(note)
-                            }
-                            if workout.isFinished {
-                                WorkoutPosterShareButton {
-                                    prepareForPresentation()
-                                    showingPosterPreview = true
-                                }
-                            }
-                            if shouldOfferSaveAsPlan {
-                                saveAsPlanCard
-                            }
+                            topSection
                             exerciseSectionHeader
                             exerciseList
                             Color.clear.frame(height: canShowWorkoutAddBar ? 12 : 80)
@@ -1231,11 +1237,14 @@ struct WorkoutLoggingView: View {
                     }
                     // preference 读取置于 safeAreaInset 之后：否则读不到键盘(外层 inset 内容)发出的行位置。
                     .onPreferenceChange(SetRowFramesKey.self) { setRowFrames = $0 }
+                    .transition(.opacity)
+                    }
                 }
             }
             // 浮动 FAB（rest 进行中且未展开即显示）：可在页面内自由拖动；键盘升起时被顶到键盘上方，
             // 不侵占键盘激活区。本屏无 Tab Bar，默认贴右下角。休息计时卡片已上提到全局 overlay。
-            if restTimer.isRunning && !restTimer.isExpanded {
+            // 排序模式下隐藏：排序区之外不允许任何操作。
+            if restTimer.isRunning && !restTimer.isExpanded && !reordering {
                 GeometryReader { geo in
                     ZStack { restFAB }
                         .frame(width: Self.fabRadius * 2, height: Self.fabRadius * 2)
@@ -1276,10 +1285,11 @@ struct WorkoutLoggingView: View {
         // 键盘升降统一用近临界阻尼弹簧：面板下滑 + inset 收起 + 上方内容回流 + FAB 共用一条曲线，贴近 iOS 原生键盘的平滑。
         .animation(.spring(response: 0.45, dampingFraction: 0.92), value: focused == nil)
         // 子页统一导航栏：全局训练浮层使用专用收起按钮，普通历史页保留返回语义。
+        // 排序模式下隐藏两侧按钮：不点「完成」不允许任何导航/菜单操作。
         .paperToolbar(title: workout.isActive ? "训练进行中" : (workout.title ?? "训练")) {
-            toolbarLeading
+            if !reordering { toolbarLeading }
         } trailing: {
-            if workout.isActive {
+            if workout.isActive && !reordering {
                 CircleIconMenu(systemName: "ellipsis",
                                items: loggingMenuItems,
                                accessibilityLabel: "训练更多操作")
@@ -1290,7 +1300,8 @@ struct WorkoutLoggingView: View {
             if let target = activeActionMenuTarget, let anchor {
                 GeometryReader { proxy in
                     let pt = proxy[anchor]
-                    let menuWidth: CGFloat = 280
+                    // 宽度由休息选项行决定：4×36 预设 + 自定义胶囊 + 间距 + 两侧 padding 14 ≈ 260。
+                    let menuWidth: CGFloat = 260
                     ZStack(alignment: .topLeading) {
                         Color.black.opacity(0.001)
                             .ignoresSafeArea()
@@ -1373,11 +1384,6 @@ struct WorkoutLoggingView: View {
         .sheet(isPresented: $creatingSuperset) {
             SupersetCreationSheet(historyPrefill: supersetHistoryPrefill) { result in addSuperset(result) }
         }
-        .sheet(isPresented: $showingOrderEditor) {
-            ExerciseOrderEditorSheet(title: "调整动作顺序",
-                                     items: workoutOrderItems,
-                                     onCommit: applyWorkoutExerciseOrder)
-        }
         .sheet(isPresented: $showingPosterPreview) {
             WorkoutPosterPreviewSheet(workout: workout, personalRecords: posterPersonalRecords)
         }
@@ -1423,6 +1429,10 @@ struct WorkoutLoggingView: View {
             consumeRestCompletionIfNeeded()
             historyStore.ensureLoaded(reason: .manual)
             workoutLiveActivity.syncWorkout(workout)
+            #if DEBUG
+            // UI 测试钩子：直达排序模式，供截图验证蒙层覆盖。
+            if UITestHooks.isAutoReorderUITest { beginReorder() }
+            #endif
         }
         .onDisappear {
             NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
@@ -1644,13 +1654,18 @@ struct WorkoutLoggingView: View {
                         .textCase(.uppercase)
                         .foregroundStyle(Theme.Color.muted)
                     Spacer(minLength: 8)
-                    Button {
-                        prepareForPresentation()
-                        showingOrderEditor = true
-                    } label: {
+                    // 胶囊大命中区（32pt 高），点击进入就地拖拽排序模式（面板由 InPlaceReorderPanel 承载）。
+                    Button(action: beginReorder) {
                         Label("排序", systemImage: "arrow.up.arrow.down")
                             .font(Theme.Font.body(size: 12, weight: .bold))
                             .foregroundStyle(Theme.Color.accent)
+                            .padding(.horizontal, 12)
+                            .frame(height: 32)
+                            .background(Theme.Color.accentSoft, in: Capsule())
+                            .overlay(
+                                Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1)
+                            )
+                            .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("调整训练动作顺序")
@@ -1658,6 +1673,31 @@ struct WorkoutLoggingView: View {
                 .padding(.horizontal, 2)
             }
         }
+    }
+
+    /// 进入就地排序模式：收起键盘/菜单/休息卡片，快照当前 unit 顺序为草稿。
+    private func beginReorder() {
+        prepareForPresentation()
+        restTimer.isExpanded = false
+        reorderDraft = workout.trainingUnits.map(\.unitId)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            reordering = true
+        }
+        Theme.Haptics.impact(.light)
+    }
+
+    /// 退出排序模式并把草稿顺序一次性写回模型（无变化时 apply 内部直接返回）。
+    private func commitReorder() {
+        applyWorkoutExerciseOrder(reorderDraft)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            reordering = false
+        }
+    }
+
+    /// 排序模式行数据：按草稿顺序映射展示项。
+    private var reorderItems: [ExerciseOrderItem] {
+        let byId = Dictionary(uniqueKeysWithValues: workoutOrderItems.map { ($0.id, $0) })
+        return reorderDraft.compactMap { byId[$0] }
     }
 
     private func orderTitle(for unit: WorkoutUnit) -> String {
@@ -1729,8 +1769,34 @@ struct WorkoutLoggingView: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// 顶部信息区（计时卡 / 三栏统计 / 备注 / 海报 / 存为计划）：排序模式下原位渲染但被蒙层封锁。
+    private var topSection: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            LiveHeaderView(startedAt: workout.startedAt,
+                           timerStartedAt: workout.timerStartedAt,
+                           endedAt: workout.endedAt,
+                           onStart: { startTimerIfNeeded() },
+                           onFinish: presentFinishConfirmation)
+            triadStats
+            if workout.isActive, let note = workout.note, !note.isEmpty {
+                workoutNoteStrip(note)
+            }
+            if workout.isFinished {
+                WorkoutPosterShareButton {
+                    prepareForPresentation()
+                    showingPosterPreview = true
+                }
+            }
+            if shouldOfferSaveAsPlan {
+                saveAsPlanCard
+            }
+        }
+    }
+
+    // 就地排序面板与蒙层已收敛为共用组件 InPlaceReorderPanel / View.reorderMasked（InPlaceReorderPanel.swift）。
+
     private var canShowWorkoutAddBar: Bool {
-        canEdit && focused == nil && restEditingTarget == nil
+        canEdit && !reordering && focused == nil && restEditingTarget == nil
     }
 
     private var workoutAddBottomBar: some View {
@@ -1902,8 +1968,8 @@ struct WorkoutLoggingView: View {
 
     // MARK: 动作 ⋯ 组间休息菜单（顶层浮层，放大版）
 
-    /// 组间休息分段可选值（跟随全局 / 关 / 60 / 90 / 120），更长时间走自定义输入。
-    private static let restOptions: [Int?] = [nil, 0, 60, 90, 120]
+    /// 组间休息分段可选值（跟随全局 / 60 / 90 / 120），更长时间走自定义输入。
+    private static let restOptions: [Int?] = [nil, 60, 90, 120]
 
     @ViewBuilder
     private var restDurationKeypadOverlay: some View {
@@ -1963,11 +2029,13 @@ struct WorkoutLoggingView: View {
                 HStack {
                     Text(restMenuTitle(for: target)).font(Theme.Font.l2).foregroundStyle(Theme.Color.fg)
                     Spacer()
+                    // 当前生效值贴右对齐（如「全局 · 90s」）。
                     Text(configured == nil ? "全局 · \(current)s" : (current == 0 ? "关" : "\(current)s"))
                         .font(Theme.Font.mono(size: 15, weight: .bold))
                         .foregroundStyle(Theme.Color.accent)
                 }
-                HStack(spacing: 5) {
+                // 预设秒数 + 自定义同一行排布。
+                HStack(spacing: 4) {
                     ForEach(Self.restOptions.indices, id: \.self) { index in
                         let opt = Self.restOptions[index]
                         let on = configured == opt
@@ -1977,7 +2045,7 @@ struct WorkoutLoggingView: View {
                             Text(opt.map { $0 == 0 ? "关" : "\($0)" } ?? "全局")
                                 .font(Theme.Font.mono(size: 14, weight: .bold))
                                 .foregroundStyle(on ? .white : Theme.Color.fg2)
-                                .frame(width: 40)
+                                .frame(width: 36)
                                 .frame(height: 44)
                                 .background(on ? Theme.Color.accent : Theme.Color.bg,
                                             in: RoundedRectangle(cornerRadius: 9, style: .continuous))
@@ -1992,26 +2060,18 @@ struct WorkoutLoggingView: View {
                     Button {
                         beginRestDurationEditing(for: restTarget, current: current, isCustom: isCustom)
                     } label: {
-                        VStack(spacing: 2) {
-                            HStack(spacing: 3) {
-                                Image(systemName: "pencil")
-                                    .font(.system(size: 8, weight: .bold))
-                                Text("自定义")
-                                    .font(Theme.Font.body(size: 10.5, weight: .bold))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                            }
-                            if !customValueText.isEmpty {
-                                Text(customValueText)
-                                    .font(customValueText == "输入秒数"
-                                          ? Theme.Font.body(size: 10, weight: .semibold)
-                                          : Theme.Font.mono(size: 13, weight: .bold))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.72)
-                            }
+                        HStack(spacing: 4) {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 10, weight: .bold))
+                            Text(customValueText.isEmpty ? "自定义" : customValueText)
+                                .font(customValueText.isEmpty || customValueText == "输入秒数"
+                                      ? Theme.Font.body(size: 12, weight: .bold)
+                                      : Theme.Font.mono(size: 13, weight: .bold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
                         }
                         .foregroundStyle(customHighlighted ? Theme.Color.fg : Theme.Color.muted)
-                        .frame(width: 68)
+                        .padding(.horizontal, 10)
                         .frame(height: 44)
                         .background(customHighlighted ? Theme.Color.accentSoft : Theme.Color.bg,
                                     in: RoundedRectangle(cornerRadius: 9, style: .continuous))
@@ -2026,10 +2086,8 @@ struct WorkoutLoggingView: View {
                     .accessibilityValue(customAccessibilityValue)
                     .accessibilityHint("双击编辑自定义秒数")
                 }
-                Text(restDescription(for: target, configured: configured, resolved: current))
-                    .font(Theme.Font.l4).foregroundStyle(Theme.Color.muted)
             }
-            .padding(16)
+            .padding(14)
             Rectangle().fill(Theme.Color.border).frame(height: 1)
             if case .exercise(let exercise) = target,
                let unit = switchableUnit(for: exercise),
@@ -2046,7 +2104,7 @@ struct WorkoutLoggingView: View {
                         Spacer()
                     }
                     .foregroundStyle(canSwitchExercise(exercise) ? Theme.Color.fg : Theme.Color.muted)
-                    .padding(.horizontal, 16).padding(.vertical, 14)
+                    .padding(.horizontal, 14).padding(.vertical, 14)
                 }
                 .buttonStyle(.plain)
                 .disabled(!canSwitchExercise(exercise))
@@ -2063,7 +2121,7 @@ struct WorkoutLoggingView: View {
                     Spacer()
                 }
                 .foregroundStyle(Theme.Color.fg)
-                .padding(.horizontal, 16).padding(.vertical, 14)
+                .padding(.horizontal, 14).padding(.vertical, 14)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(noteExists ? "编辑备注" : "添加备注")
@@ -2078,7 +2136,7 @@ struct WorkoutLoggingView: View {
                     Spacer()
                 }
                 .foregroundStyle(Theme.Color.accent)
-                .padding(.horizontal, 16).padding(.vertical, 14)
+                .padding(.horizontal, 14).padding(.vertical, 14)
             }.buttonStyle(.plain)
         }
         .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
@@ -2142,24 +2200,6 @@ struct WorkoutLoggingView: View {
             return workout.trainingUnits.first(where: { $0.singleExerciseId == ex.localId })?.restAfterSetSeconds
         case .superset(let unit, _, _):
             return unit.superset?.restAfterRoundSeconds
-        }
-    }
-
-    private func restDescription(for target: WorkoutActionMenuTarget,
-                                 configured: Int?,
-                                 resolved: Int) -> String {
-        let inheritance = switch target {
-        case .exercise: "已完成的上一组休息优先沿用其最终目标"
-        case .superset: "已完成的上一轮休息优先沿用其最终目标"
-        }
-        if configured == nil {
-            return "跟随全局设置，当前 \(resolved) 秒；\(inheritance)"
-        }
-        switch target {
-        case .exercise:
-            return resolved == 0 ? "该动作完成后不自动开始休息" : "该动作每组完成后默认休息 \(resolved) 秒；\(inheritance)"
-        case .superset:
-            return resolved == 0 ? "该超级组完成后不自动开始休息" : "该超级组每轮完成后默认休息 \(resolved) 秒；\(inheritance)"
         }
     }
 
@@ -3817,6 +3857,7 @@ private struct ExerciseBlock: View {
     }
 
     // 卡头：展开态 = 名称 + ⋯ + 收起 ^；折叠态 = 名称 + 摘要 + 展开 ⌄。
+    // 整行点击均可折叠/展开；⋯ 与 chevron 为独立 Button（命中区 36pt），手势优先于整行 tap，不会误触。
     private var head: some View {
         HStack(spacing: Theme.Spacing.sm) {
             Text(exercise.displayExerciseName)
@@ -3848,9 +3889,15 @@ private struct ExerciseBlock: View {
                     WorkoutStructureIcon(kind: .dropSet)
                 }
                 if !readOnly { moreButton }
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
+                Button(action: onToggleExpand) {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.muted)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("收起动作")
             } else {
                 if noteText != nil {
                     Image(systemName: "note.text")
@@ -3916,7 +3963,9 @@ private struct ExerciseBlock: View {
             Image(systemName: "ellipsis")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(isMenuOpen ? Theme.Color.accent : Theme.Color.muted)
-                .frame(width: 28, height: 28)
+                // 命中区加大到 36pt，与相邻的收起 chevron 保持明确边界，减少误触。
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         // 发布 ⋯ 底部锚点，供父视图顶层菜单定位。
@@ -4068,9 +4117,15 @@ private struct SupersetBlock: View {
             if isExpanded {
                 WorkoutStructureIcon(kind: .superset)
                 if !readOnly { moreButton }
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
+                Button(action: onToggleExpand) {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.muted)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("收起超级组")
             } else {
                 if noteText != nil {
                     Image(systemName: "note.text")
@@ -4091,6 +4146,7 @@ private struct SupersetBlock: View {
         .padding(.horizontal, 15)
         .frame(minHeight: isExpanded ? 48 : 50)
         .contentShape(Rectangle())
+        // 整行点击均可折叠/展开；⋯ 与 chevron 为独立 Button，手势优先于整行 tap，不会误触。
         .onTapGesture { onToggleExpand() }
     }
 
@@ -4115,7 +4171,9 @@ private struct SupersetBlock: View {
             Image(systemName: "ellipsis")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(isMenuOpen ? Theme.Color.accent : Theme.Color.muted)
-                .frame(width: 28, height: 28)
+                // 命中区加大到 36pt，与相邻的收起 chevron 保持明确边界，减少误触。
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .anchorPreference(key: ExerciseMenuAnchorKey.self, value: .bottomTrailing) {

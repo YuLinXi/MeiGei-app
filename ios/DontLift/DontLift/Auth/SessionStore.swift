@@ -40,6 +40,10 @@ final class SessionStore {
         let key = Self.tokenKey
         let tokenSnapshot = self.token
         Task { [weak self] in
+            #if DEBUG
+            // UI 测试模式由 uitestInjectFakeSession 独占安装 hooks，跳过避免竞态覆盖。
+            if UITestHooks.isLiveWorkoutUITest { return }
+            #endif
             await self?.installAPIHooks(tokenKey: key, tokenSnapshot: tokenSnapshot)
         }
     }
@@ -261,3 +265,23 @@ final class SessionStore {
         }
     }
 }
+
+#if DEBUG
+extension SessionStore {
+    /// UI 测试（-uitest-live-workout）：无签名模拟器 build 写 Keychain 会 errSecMissingEntitlement(-34018)，
+    /// 故直接注入内存登录态 + 本地画像（含称呼），并置位补全门控跳过 GET /me 路由请求。
+    /// token provider 返回常量假 token（不读 Keychain）；401 handler 置空——测试期间任何请求失败都不登出。
+    func uitestInjectFakeSession() {
+        let userId = UUID()
+        let token = "uitest-fake-token"
+        self.token = token
+        self.currentUserId = userId
+        upsertProfile(userId: userId, appleSub: "uitest", email: nil, displayName: "测试用户")
+        needsProfileCompletion = false
+        Task {
+            await APIClient.shared.setTokenProvider { token }
+            await APIClient.shared.setUnauthorizedHandler { }
+        }
+    }
+}
+#endif

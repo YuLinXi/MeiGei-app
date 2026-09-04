@@ -31,6 +31,12 @@ private struct PlanOrderTarget: Identifiable {
     let groupId: UUID?
 }
 
+/// 计划列表就地排序目标：分组排序 或 某分组内的计划排序。
+private enum PlanListReorderTarget {
+    case groups
+    case plans(PlanOrderTarget)
+}
+
 private struct PlanEditorRoute: Identifiable, Hashable {
     let id = UUID()
     let groupId: UUID?
@@ -99,8 +105,10 @@ struct PlanListView: View {
     @State private var creatingPlanRoute: PlanEditorRoute?
     @State private var groupEditor: PlanGroupEditorTarget?
     @State private var deletingGroup: WorkoutPlanGroup?
-    @State private var showingGroupOrderEditor = false
-    @State private var planOrderTarget: PlanOrderTarget?
+    /// 就地排序目标（nil = 非排序模式）：分组排序或某分组内的计划排序。
+    @State private var reorderTarget: PlanListReorderTarget?
+    /// 排序模式中的 id 草稿顺序；点「完成」时一次性写回模型。
+    @State private var reorderDraft: [UUID] = []
     @State private var expandedSectionId: String?
     /// 计划详情导航：用绑定式 navigationDestination(item:) 而非 NavigationLink(value:)。
     /// 本工程是「全局唯一 NavigationStack 包 TabView」，类型注册式 navigationDestination(for:)
@@ -150,6 +158,57 @@ struct PlanListView: View {
         }
     }
 
+    /// 排序模式行数据：按草稿顺序映射展示项。
+    private var reorderItems: [ExerciseOrderItem] {
+        let source: [ExerciseOrderItem]
+        switch reorderTarget {
+        case .groups: source = groupOrderItems
+        case .plans(let target): source = planOrderItems(for: target.groupId)
+        case nil: return []
+        }
+        let byId = Dictionary(uniqueKeysWithValues: source.map { ($0.id, $0) })
+        return reorderDraft.compactMap { byId[$0] }
+    }
+
+    /// 排序面板标题：分组排序为「分组」，计划排序为目标分组名。
+    private var reorderPanelTitle: String {
+        switch reorderTarget {
+        case .groups: return "分组"
+        case .plans(let target): return target.title
+        case nil: return ""
+        }
+    }
+
+    /// 进入就地排序模式：收起展开的分组，快照当前顺序为草稿。
+    private func beginReorder(_ target: PlanListReorderTarget) {
+        expandedSectionId = nil
+        switch target {
+        case .groups:
+            reorderDraft = orderedGroups.map(\.localId)
+        case .plans(let planTarget):
+            reorderDraft = plans(in: planTarget.groupId).map(\.localId)
+        }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            reorderTarget = target
+        }
+        Theme.Haptics.impact(.light)
+    }
+
+    /// 退出排序模式并把草稿顺序一次性写回模型（无变化时 apply 内部直接返回）。
+    private func commitReorder() {
+        switch reorderTarget {
+        case .groups:
+            applyGroupOrder(reorderDraft)
+        case .plans(let target):
+            applyPlanOrder(reorderDraft, groupId: target.groupId)
+        case nil:
+            break
+        }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            reorderTarget = nil
+        }
+    }
+
     private func usage(for plan: WorkoutPlan) -> PlanUsageSummary {
         historyStore.planUsage[plan.localId] ?? .empty
     }
@@ -157,6 +216,26 @@ struct PlanListView: View {
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
+            if reorderTarget != nil {
+                // 排序模式：不用外层 ScrollView（嵌套 List 的拖拽手势会被外层滚动抢走）。
+                // 顶部计划总览原位渲染但被蒙层封锁；排序面板为白色满幅浮层、自身滚动。
+                VStack(spacing: 0) {
+                    planOverview
+                        .padding(.horizontal, Theme.Spacing.lg)
+                        .padding(.top, Theme.Spacing.md)
+                        .reorderMasked(true,
+                                       horizontalBleed: Theme.Spacing.lg,
+                                       topBleed: Theme.Spacing.md)
+                    InPlaceReorderPanel(title: reorderPanelTitle,
+                                        items: reorderItems,
+                                        onMove: { source, destination in
+                                            reorderDraft.move(fromOffsets: source, toOffset: destination)
+                                            Theme.Haptics.selection()
+                                        },
+                                        onDone: commitReorder)
+                }
+                .transition(.opacity)
+            } else {
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
@@ -183,9 +262,12 @@ struct PlanListView: View {
                     .animation(sectionToggleAnimation, value: expandedSectionId)
                 }
             }
+            .transition(.opacity)
+            }
         }
+        // 排序模式下隐藏浮动添加菜单：排序区之外不允许任何操作。
         .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
-            floatingAddMenu
+            if reorderTarget == nil { floatingAddMenu }
         }
         .rootTabTopScrim()
         .toolbar(.hidden, for: .navigationBar)
@@ -209,16 +291,6 @@ struct PlanListView: View {
                     renameGroup(group, name: name)
                 }
             }
-        }
-        .sheet(isPresented: $showingGroupOrderEditor) {
-            ExerciseOrderEditorSheet(title: "调整分组顺序",
-                                     items: groupOrderItems,
-                                     onCommit: applyGroupOrder)
-        }
-        .sheet(item: $planOrderTarget) { target in
-            ExerciseOrderEditorSheet(title: "调整\(target.title)顺序",
-                                     items: planOrderItems(for: target.groupId),
-                                     onCommit: { applyPlanOrder($0, groupId: target.groupId) })
         }
         .paperConfirmDialog(
             isPresented: Binding(
@@ -271,7 +343,7 @@ struct PlanListView: View {
         ]
         if orderedGroups.count > 1 {
             items.append(PaperMenuItem(title: "调整分组顺序", systemImage: "arrow.up.arrow.down") {
-                showingGroupOrderEditor = true
+                beginReorder(.groups)
             })
         }
         return items
@@ -398,7 +470,7 @@ struct PlanListView: View {
         ]
         if section.plans.count > 1 {
             items.append(PaperMenuItem(title: "调整计划顺序", systemImage: "arrow.up.arrow.down") {
-                planOrderTarget = PlanOrderTarget(id: section.id, title: section.title, groupId: section.groupId)
+                beginReorder(.plans(PlanOrderTarget(id: section.id, title: section.title, groupId: section.groupId)))
             })
         }
         if let group = section.group {
@@ -627,8 +699,10 @@ struct PlanDetailView: View {
     @State private var pendingDeleteItem: PlanItem?
     /// 计划整体备注编辑 sheet 显隐（点按详情头部备注直接进入编辑）。
     @State private var editingPlanNote = false
-    /// 显式动作排序面板。
-    @State private var showingOrderEditor = false
+    /// 就地排序模式：true 时动作列表切换为共用排序面板（InPlaceReorderPanel），其余区域压暗封锁。
+    @State private var reordering = false
+    /// 排序模式中的 itemId 草稿顺序；点「完成」时一次性写回模型。
+    @State private var reorderDraft: [UUID] = []
     /// 单一活跃会话守卫：冲突态 + 待新建闭包。
     @State private var conflict: Workout?
     @State private var pendingBuild: (() -> Workout)?
@@ -659,9 +733,55 @@ struct PlanDetailView: View {
         }
     }
 
+    /// 排序模式行数据：按草稿顺序映射展示项。
+    private var reorderItems: [ExerciseOrderItem] {
+        let byId = Dictionary(uniqueKeysWithValues: planOrderItems.map { ($0.id, $0) })
+        return reorderDraft.compactMap { byId[$0] }
+    }
+
+    /// 进入就地排序模式：收起展开详情，快照当前 itemId 顺序为草稿。
+    private func beginReorder() {
+        expandedItemId = nil
+        reorderDraft = orderedItems.map(\.itemId)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            reordering = true
+        }
+        Theme.Haptics.impact(.light)
+    }
+
+    /// 退出排序模式并把草稿顺序一次性写回模型（无变化时 apply 内部直接返回）。
+    private func commitReorder() {
+        applyPlanItemOrder(reorderDraft)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            reordering = false
+        }
+    }
+
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
+            if reordering {
+                // 排序模式：原生 List 整体替换（面板内嵌 List 不能被外层滚动容器包裹，否则拖拽手势被抢）。
+                // 顶部信息区原位渲染但被蒙层封锁；排序面板为白色满幅浮层、自身滚动。
+                VStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 11) {
+                        header
+                        statRow
+                        modeInfoCard
+                    }
+                    .padding(.horizontal, 17)
+                    .padding(.top, 4)
+                    .reorderMasked(true, horizontalBleed: 17, topBleed: 4)
+                    InPlaceReorderPanel(title: "训练动作",
+                                        items: reorderItems,
+                                        onMove: { source, destination in
+                                            reorderDraft.move(fromOffsets: source, toOffset: destination)
+                                            Theme.Haptics.selection()
+                                        },
+                                        onDone: commitReorder)
+                }
+                .transition(.opacity)
+            } else {
             List {
                 // 标题区作为单个原生 List 行，内部继续沿用原有 11pt 纸感版式。
                 VStack(alignment: .leading, spacing: 11) {
@@ -707,15 +827,21 @@ struct PlanDetailView: View {
             .scrollContentBackground(.hidden)
             .contentMargins(.vertical, 0, for: .scrollContent)
             .environment(\.defaultMinListRowHeight, 1)
+            .transition(.opacity)
+            }
         }
         // 对齐原型 .footer：scroll 与 footer 为兄弟（内容不穿底栏），底栏实底 + 顶部分隔线。
-        .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+        // 排序模式下隐藏底栏：排序区之外不允许任何操作。
+        .safeAreaInset(edge: .bottom, spacing: 0) { if !reordering { bottomBar } }
         .onAppear { WorkoutPerformanceMonitor.event("plan.detail.appear") }
         // 子页统一导航栏：圆形返回 + ⋯ 菜单（标题留空，计划名在内容区大字呈现）。
-        .paperToolbar(onBack: { dismiss() }) {
-            CircleIconMenu(systemName: "ellipsis",
-                           items: detailMenuItems,
-                           accessibilityLabel: "计划更多操作")
+        // 排序模式下返回键无效、⋯ 菜单隐藏：不点「完成」不允许任何操作。
+        .paperToolbar(onBack: { if !reordering { dismiss() } }) {
+            if !reordering {
+                CircleIconMenu(systemName: "ellipsis",
+                               items: detailMenuItems,
+                               accessibilityLabel: "计划更多操作")
+            }
         }
         .paperConfirmDialog(
             isPresented: $confirmingDelete,
@@ -801,11 +927,6 @@ struct PlanDetailView: View {
         }
         .sheet(isPresented: $showingMode) {
             PlanModeSheet(plan: plan)
-        }
-        .sheet(isPresented: $showingOrderEditor) {
-            ExerciseOrderEditorSheet(title: "调整动作顺序",
-                                     items: planOrderItems,
-                                     onCommit: applyPlanItemOrder)
         }
         // 训练冲突二次确认：统一为纸感弹窗。无独立取消按钮，点蒙层即取消；
         // 「丢弃并开始新训练」为主（红填充）、「继续训练」为次（描边）。
@@ -929,12 +1050,16 @@ struct PlanDetailView: View {
                 .foregroundStyle(Theme.Color.muted)
             Spacer(minLength: 8)
             if orderedItems.count > 1 {
-                Button {
-                    showingOrderEditor = true
-                } label: {
+                // 胶囊大命中区（32pt 高），点击进入就地拖拽排序模式（与训练进行中一致）。
+                Button(action: beginReorder) {
                     Label("排序", systemImage: "arrow.up.arrow.down")
                         .font(Theme.Font.body(size: 12, weight: .bold))
                         .foregroundStyle(Theme.Color.accent)
+                        .padding(.horizontal, 12)
+                        .frame(height: 32)
+                        .background(Theme.Color.accentSoft, in: Capsule())
+                        .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1))
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("调整动作顺序")

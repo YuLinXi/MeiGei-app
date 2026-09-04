@@ -120,6 +120,13 @@ struct MainTabView: View {
         .tint(Theme.Color.accent)
         .onAppear {
             refreshActiveSession()
+            #if DEBUG
+            // UI 测试钩子：直达「训练进行中」浮层。直接查库而不读 @State，避免同 runloop 时序抖动。
+            if UITestHooks.isLiveWorkoutUITest,
+               let workout = WorkoutSession.activeSession(in: modelContext) {
+                workoutPresentation.present(workout)
+            }
+            #endif
             if PushManager.shared.pendingOpenedTeamId != nil {
                 selectedTab = .team
             }
@@ -187,6 +194,10 @@ struct MainTabView: View {
         .onChange(of: teamShare.draft != nil) { _, _ in presentNextRootSheetIfNeeded() }
         .onOpenURL { handleDeepLink($0) }
         .task(id: session.currentUserId) {
+            #if DEBUG
+            // UI 测试场景跳过同步/分享重试（假 token 打后端会 401 触发全局登出）。
+            if UITestHooks.isLiveWorkoutUITest { return }
+            #endif
             if let userId = session.currentUserId {
                 let hasPendingShare = !teamService.pendingShareWorkoutIds(userId: userId).isEmpty
                 let hasPendingPlanEvent = teamService.hasPendingPlanShareEvents(userId: userId)

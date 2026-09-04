@@ -22,10 +22,17 @@ struct DontLiftApp: App {
 
     init() {
         let container = AppModelContainer.make()
+        #if DEBUG
+        // UI 测试钩子：播种进行中训练；假登录态在 SessionStore 创建后注入（内存态，绕开无签名 build 的 Keychain 限制）。
+        UITestHooks.seedLiveWorkoutIfNeeded(container: container)
+        #endif
         self.modelContainer = container
         // 同名动作历史合并（一次性本地迁移，幂等）：把旧手填记录挂到同名内置动作 code，避免历史断裂。
         ExerciseHistoryMerge.runIfNeeded(in: container.mainContext)
         let session = SessionStore(modelContext: container.mainContext)
+        #if DEBUG
+        if UITestHooks.isLiveWorkoutUITest { session.uitestInjectFakeSession() }
+        #endif
         let historyStore = WorkoutHistoryStore(modelContext: container.mainContext)
         let workoutLiveActivity = WorkoutLiveActivityController()
         _session = State(initialValue: session)
@@ -60,6 +67,10 @@ struct DontLiftApp: App {
                 .environment(workoutPresentation)
                 .preferredColorScheme(.light)
                 .task(id: session.isLoggedIn) {
+                    #if DEBUG
+                    // UI 测试场景跳过 HealthKit 授权弹窗，避免阻塞自动化。
+                    if UITestHooks.isLiveWorkoutUITest { return }
+                    #endif
                     if session.isLoggedIn { await healthKit.requestAuthorization() }
                 }
         }
