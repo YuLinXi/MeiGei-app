@@ -18,6 +18,7 @@ struct CheckinSummary: Codable, Hashable, Identifiable {
     struct ExerciseSummary: Codable, Hashable, Identifiable {
         var name: String
         var sets: [SetSummary]
+        var builtinExerciseCode: String? = nil
         var id: String { name }
     }
 
@@ -60,7 +61,7 @@ extension CheckinSummary {
             totalSets += statSets.count
             for s in statSets {
                 volume += s.statEntries.reduce(0.0) { acc, entry in
-                    acc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+                    acc + entry.volumeKg
                 }
             }
             return ExerciseSummary(
@@ -72,7 +73,7 @@ extension CheckinSummary {
                                       setTypeRaw: $0.setTypeRaw,
                                       isWarmup: $0.isWarmupEffective,
                                       segments: $0.segments)
-                })
+                }, builtinExerciseCode: ex.builtinExerciseCode)
         }
         self.init(
             title: workout.title,

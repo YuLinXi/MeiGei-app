@@ -250,7 +250,7 @@ struct WorkoutSupersetMember: Codable, Identifiable, Hashable {
         exercises.flatMap(\.sets).reduce(0.0) { acc, set in
             guard set.countsForStats else { return acc }
             return acc + set.statEntries.reduce(0.0) { entryAcc, entry in
-                entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+                entryAcc + entry.volumeKg
             }
         }
     }
@@ -470,6 +470,11 @@ struct WorkoutSetStatEntry: Equatable, Hashable {
     var segmentId: UUID?
     var weightKg: Double?
     var reps: Int?
+    var isAssistedWeight: Bool = false
+
+    var volumeKg: Double {
+        ExerciseWeightSemantics.volume(weight: weightKg, reps: reps, assisted: isAssistedWeight)
+    }
 }
 
 /// 一个动作下的单组记录（聚合子节点，不单独同步）。新增组可由调用方按当前训练上下文预填重量/次数；
@@ -561,14 +566,17 @@ nonisolated final class WorkoutSet {
         guard countsForStats else { return [] }
         if isDropSet {
             return effectiveSegments.map {
-                WorkoutSetStatEntry(setId: localId, segmentId: $0.segmentId, weightKg: $0.weightKg, reps: $0.reps)
+                WorkoutSetStatEntry(setId: localId, segmentId: $0.segmentId, weightKg: $0.weightKg, reps: $0.reps, isAssistedWeight: exercise?.isAssistedWeight == true)
             }
         }
-        return [WorkoutSetStatEntry(setId: localId, segmentId: nil, weightKg: weightKg, reps: reps)]
+        return [WorkoutSetStatEntry(setId: localId, segmentId: nil, weightKg: weightKg, reps: reps, isAssistedWeight: exercise?.isAssistedWeight == true)]
     }
 
     var topStatEntry: WorkoutSetStatEntry? {
-        statEntries.max { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
+        let entries = statEntries
+        return exercise?.isAssistedWeight == true
+            ? entries.filter { $0.weightKg != nil }.min { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
+            : entries.max { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
     }
 
     var summaryWeightReps: (weightKg: Double?, reps: Int?) {
@@ -596,7 +604,10 @@ nonisolated final class WorkoutSet {
     func syncDropSummaryFromSegments() {
         guard isDropSet else { return }
         let valid = effectiveSegments
-        if let top = valid.max(by: { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }) {
+        let top = exercise?.isAssistedWeight == true
+            ? valid.filter { $0.weightKg != nil }.min(by: { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) })
+            : valid.max(by: { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) })
+        if let top {
             weightKg = top.weightKg
             reps = top.reps
         } else {

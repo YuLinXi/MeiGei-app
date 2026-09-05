@@ -2,6 +2,15 @@
 
 定义 DontLift 训练核心三屏（训练首页 / 训练进行中 / 动作详情）与 Live Activity 的行为规约。训练记录、休息计时、动作库的基础行为以现有实现为准；本 spec 聚焦视觉强度升级后的可观察行为与边界条件（empty state、placeholder、PR 元素配色独占）。
 ## Requirements
+
+### Requirement: 固定辅助动作的重量特例
+
+本规格中的最大重量、重量乘次数和顶组规则 SHALL 对固定辅助动作采用 `assisted-exercise-weight` 能力的特例：`ASSISTED_PULL_UP` 保存的重量是辅助公斤，不计负重吨位；组数、次数及热量照常统计。最低辅助摘要不等于 PR；PR 必须改善此前成绩且不被其他历史成绩覆盖。普通动作沿用原规则。
+
+#### Scenario: 辅助记录不作为普通负重
+- **WHEN** 已完成辅助引体向上 20 kg × 8 次
+- **THEN** 展示辅助重量，不增加 160 kg 负重吨位，仍保留完成组与 8 次重复
+
 ### Requirement: 训练首页周聚合视图
 
 iOS 训练首页 SHALL 在顶部展示「本周训练量」hero（按本地时区周一 00:00 为周起点），并以两宫格展示本周「总组数 / 总次数」。聚合数据 MUST 按需即时计算自本地 `Workout` 集合，不入库。App MUST NOT 展示或计算「平均时长」统计。当本周训练数为 0 时，hero MUST NOT 显示「0.0 t」字面量，而 SHALL 展示鼓励性 Empty State 文案与「开始第 1 次训练」CTA。

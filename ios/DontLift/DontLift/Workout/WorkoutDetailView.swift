@@ -47,7 +47,7 @@ struct WorkoutDetailView: View {
         var out: [String: Double] = [:]
         let prKeys = Set(personalRecords.map(\.exerciseKey))
         for ex in sortedExercises where prKeys.contains(ex.historyKey) {
-            if let m = ex.sets.flatMap(\.statEntries).compactMap(\.weightKg).max() { out[ex.historyKey] = m }
+            if let record = personalRecords.first(where: { $0.exerciseKey == ex.historyKey }) { out[ex.historyKey] = record.weightKg }
         }
         return out
     }
@@ -292,7 +292,7 @@ struct WorkoutDetailView: View {
                             .foregroundStyle(Theme.Color.fg)
                         Spacer(minLength: Theme.Spacing.sm)
                         HStack(alignment: .firstTextBaseline, spacing: 1) {
-                            Text(formatKg(pr.weightKg))
+                            Text((ExerciseWeightSemantics.isAssisted(pr.exerciseKey) ? "辅助 " : "") + formatKg(pr.weightKg))
                                 .font(Theme.Font.number(size: 13, weight: .bold))
                                 .foregroundStyle(Theme.Color.accent)
                             Text("kg")
@@ -509,7 +509,7 @@ private struct ExerciseLogCard: View {
         let vol = (statSets.isEmpty ? sortedSets : statSets).reduce(0.0) { acc, s in
             guard s.countsForStats else { return acc }
             return acc + s.statEntries.reduce(0.0) { entryAcc, entry in
-                entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+                entryAcc + entry.volumeKg
             }
         }
         let volText = vol >= 1000 ? String(format: "%.1fk", vol / 1000) : String(format: "%.0f", vol)
@@ -708,7 +708,7 @@ private struct LogSetRow: View {
             VStack(alignment: .leading, spacing: 5) {
                 ForEach(set.effectiveSegments) { segment in
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text(segment.weightKg.map(formatKg) ?? "—")
+                        Text((set.exercise?.isAssistedWeight == true ? "辅助 " : "") + (segment.weightKg.map(formatKg) ?? "—"))
                             .font(Theme.Font.number(size: 13, weight: .bold))
                             .foregroundStyle(valueColor)
                         Text("kg")
@@ -730,7 +730,7 @@ private struct LogSetRow: View {
             }
         } else {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(set.weightKg.map(formatKg) ?? "—")
+                Text((set.exercise?.isAssistedWeight == true ? "辅助 " : "") + (set.weightKg.map(formatKg) ?? "—"))
                     .font(Theme.Font.number(size: 15, weight: .bold))
                     .foregroundStyle(valueColor)
                 Text("kg")
@@ -791,13 +791,13 @@ private struct LogSetRow: View {
         let rest = actualRestText.map { "，休息用时 \($0)" } ?? ""
         if set.isDropSet {
             let values = set.effectiveSegments.enumerated().map { idx, segment in
-                let w = segment.weightKg.map { "\(formatKg($0)) 公斤" } ?? "未记录重量"
+                let w = segment.weightKg.map { "\(set.exercise?.isAssistedWeight == true ? "辅助 " : "")\(formatKg($0)) 公斤" } ?? "未记录重量"
                 let r = segment.reps.map { "\($0) 次" } ?? "未记录次数"
                 return "第 \(idx + 1) 段，\(w)，\(r)"
             }.joined(separator: "，")
             return "第 \(badgeText) 组，递减组，\(values)" + rest + (isPR ? "，新纪录" : "")
         }
-        let w = set.weightKg.map { "\(formatKg($0)) 公斤" } ?? "未记录重量"
+        let w = set.weightKg.map { "\(set.exercise?.isAssistedWeight == true ? "辅助 " : "")\(formatKg($0)) 公斤" } ?? "未记录重量"
         let r = set.reps.map { "\($0) 次" } ?? "未记录次数"
         let name = set.isWarmupEffective ? "热身组" : "第 \(badgeText) 组"
         return "\(name)，\(w)，\(r)" + rest + (isPR ? "，新纪录" : "")

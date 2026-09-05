@@ -39,9 +39,8 @@ enum WorkoutWeeklyStats {
                 for s in ex.sets where s.countsForStats {
                     stats.setCount += 1
                     for entry in s.statEntries {
-                        let kg = entry.weightKg ?? 0
                         let reps = entry.reps ?? 0
-                        stats.volumeKg += kg * Double(reps)
+                        stats.volumeKg += entry.volumeKg
                         stats.repCount += reps
                     }
                 }

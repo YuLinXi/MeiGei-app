@@ -75,7 +75,7 @@ enum MuscleLoadAggregator {
                 setsByCategory[bucket, default: 0] += sets.count
                 for set in sets {
                     for entry in set.statEntries {
-                        volumeByCategory[bucket, default: 0] += (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+                        volumeByCategory[bucket, default: 0] += entry.volumeKg
                     }
                 }
             }
@@ -186,7 +186,7 @@ enum MuscleLoadAggregator {
                 var volume = 0.0
                 for set in sets {
                     for entry in set.statEntries {
-                        volume += (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+                        volume += entry.volumeKg
                     }
                 }
                 let key = exercise.historyKey

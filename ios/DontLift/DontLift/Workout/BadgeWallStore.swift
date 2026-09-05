@@ -82,8 +82,12 @@ final class BadgeWallStore {
                 guard self.revision == generation else { throw CancellationError() }
                 if existing == nil {
                     self.isBackfilling = true
-                    await BadgeEngine.runBackfillIfNeeded(in: context, workoutSnapshots: workouts)
+                    let scope = self.userId!.uuidString
+                    await BadgeEngine.runBackfillIfNeeded(in: context, workoutSnapshots: workouts, ruleScope: scope)
                     if self.sessionGeneration == session { self.isBackfilling = false }
+                    guard UserDefaults.standard.bool(forKey: "badge.assistedWeightRules.v1.\(scope)") else {
+                        throw CancellationError()
+                    }
                 }
                 try Task.checkCancellation()
                 let grants = try context.fetch(FetchDescriptor<BadgeGrant>()).map(BadgeEngine.grantSnapshot)

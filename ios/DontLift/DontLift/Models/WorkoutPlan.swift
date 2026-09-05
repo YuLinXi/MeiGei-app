@@ -500,7 +500,7 @@ extension PlanItem {
                                                            count: groupCount,
                                                            existing: dropSetPrescriptions)
             suggestedSets = groupCount
-            let summary = Self.summaryWeightReps(from: finalPrescription.segments)
+            let summary = Self.summaryWeightReps(from: finalPrescription.segments, assisted: ExerciseWeightSemantics.isAssisted(builtinExerciseCode))
             suggestedWeightKg = summary.weightKg
             suggestedReps = summary.reps
             return
@@ -512,7 +512,7 @@ extension PlanItem {
         setPrescriptions = finalPrescriptions
         let formal = finalPrescriptions.filter { !$0.isWarmupEffective }
         suggestedSets = formal.count
-        let summary = Self.summaryWeightReps(from: formal)
+        let summary = Self.summaryWeightReps(from: formal, assisted: ExerciseWeightSemantics.isAssisted(builtinExerciseCode))
         suggestedWeightKg = summary.weightKg
         suggestedReps = summary.reps
     }
@@ -575,7 +575,7 @@ extension PlanItem {
         return prescription.isWarmup == nil ? nil : false
     }
 
-    private static func summaryWeightReps(from prescriptions: [PlanSetPrescription]) -> (weightKg: Double?, reps: Int?) {
+    private static func summaryWeightReps(from prescriptions: [PlanSetPrescription], assisted: Bool = false) -> (weightKg: Double?, reps: Int?) {
         let entries = prescriptions.flatMap { prescription -> [(weightKg: Double?, reps: Int?)] in
             if prescription.setType == .drop {
                 return prescription.segments
@@ -584,7 +584,7 @@ extension PlanItem {
             }
             return [(prescription.weightKg, prescription.reps)]
         }
-        return summaryWeightReps(from: entries)
+        return summaryWeightReps(from: entries, assisted: assisted)
     }
 
     private static func dropPrescriptionClones(from template: PlanSetPrescription,
@@ -614,14 +614,17 @@ extension PlanItem {
         }
     }
 
-    private static func summaryWeightReps(from segments: [WorkoutSetSegment]) -> (weightKg: Double?, reps: Int?) {
+    private static func summaryWeightReps(from segments: [WorkoutSetSegment], assisted: Bool = false) -> (weightKg: Double?, reps: Int?) {
         summaryWeightReps(from: segments
             .sorted { $0.segmentIndex < $1.segmentIndex }
-            .map { ($0.weightKg, $0.reps) })
+            .map { ($0.weightKg, $0.reps) }, assisted: assisted)
     }
 
-    private static func summaryWeightReps(from entries: [(weightKg: Double?, reps: Int?)]) -> (weightKg: Double?, reps: Int?) {
+    private static func summaryWeightReps(from entries: [(weightKg: Double?, reps: Int?)], assisted: Bool = false) -> (weightKg: Double?, reps: Int?) {
         let effective = entries.filter { $0.weightKg != nil || $0.reps != nil }
+        if assisted, let top = effective.filter({ $0.weightKg != nil }).min(by: { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }) {
+            return (top.weightKg, top.reps)
+        }
         if let top = effective.filter({ $0.weightKg != nil }).max(by: { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }) {
             return (top.weightKg, top.reps)
         }

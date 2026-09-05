@@ -392,7 +392,7 @@ struct WorkoutListView: View {
         let durationMin: Int? = w.durationSec.map { Int($0 / 60) }
         let pr = w.pr
         let durText = durationMin.map { "，\($0) 分钟" } ?? ""
-        let prText = pr.map { "，\($0.name) PR \(formatKg($0.weightKg)) 公斤" } ?? ""
+        let prText = pr.map { "，\($0.name) \($0.isAssistedWeight ? "辅助突破" : "PR") \(formatKg($0.weightKg)) 公斤" } ?? ""
         let a11yLabel = "\(w.title)，\(w.exerciseCount) 个动作，\(w.setCount) 组\(durText)\(prText)"
         return HStack(spacing: Theme.Spacing.md) {
             dateBlock(w.startedAt)
@@ -408,7 +408,7 @@ struct WorkoutListView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 if let pr {
-                    Text("▲ \(pr.name) PR \(formatKg(pr.weightKg))kg")
+                    Text("\(pr.isAssistedWeight ? "▼" : "▲") \(pr.name) \(pr.isAssistedWeight ? "辅助" : "PR") \(formatKg(pr.weightKg))kg")
                         .font(Theme.Font.body(size: 11, weight: .medium))
                         .foregroundStyle(Theme.Color.accent)
                         .lineLimit(1)
@@ -1144,7 +1144,7 @@ struct WorkoutLoggingView: View {
         return RestActivityAttributes.NextSet(
             exerciseName: candidate.exerciseName,
             setIndex: candidate.setIndex,
-            weightText: candidate.weightKg.map { "\(formatKg($0)) kg" },
+            weightText: candidate.weightKg.map { "\(exercise(containing: candidate.setId)?.isAssistedWeight == true ? "辅助 " : "")\(formatKg($0)) kg" },
             repsText: candidate.reps.map { "\($0) 次" }
         )
     }
@@ -2896,7 +2896,9 @@ struct WorkoutLoggingView: View {
     private func recomputeDerived() {
         let prs = WorkoutPerformanceMonitor.measure("finish.pr.detect") {
             if historyStore.lastRefreshFinishedAt != nil {
-                detectPersonalRecords(in: workout, priorBestByKey: historyStore.bestWeightByExerciseKey)
+                workout.exercises.contains(where: \.isAssistedWeight)
+                    ? detectPersonalRecordsFromFallbackHistory()
+                    : detectPersonalRecords(in: workout, priorBestByKey: historyStore.bestWeightByExerciseKey)
             } else {
                 detectPersonalRecordsFromFallbackHistory()
             }
@@ -3891,6 +3893,14 @@ private struct ExerciseBlock: View {
                     }
                 }
                 .padding(.top, 4).padding(.bottom, 8)
+                if exercise.isAssistedWeight {
+                    Text(ExerciseWeightSemantics.assistanceHint)
+                        .font(Theme.Font.body(size: 11))
+                        .foregroundStyle(Theme.Color.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 15)
+                        .padding(.bottom, 10)
+                }
                 if !readOnly { addSetButton }
             }
         }
@@ -4140,6 +4150,13 @@ private struct SupersetBlock: View {
                 }
                 .padding(.top, 6)
                 .padding(.bottom, 8)
+                if first.isAssistedWeight || second.isAssistedWeight {
+                    Text("\(first.isAssistedWeight ? first.displayExerciseName : second.displayExerciseName)：\(ExerciseWeightSemantics.assistanceHint)")
+                        .font(Theme.Font.body(size: 11))
+                        .foregroundStyle(Theme.Color.muted)
+                        .padding(.horizontal, 15)
+                        .padding(.bottom, 10)
+                }
                 if !readOnly { roundActions }
             }
         }
@@ -4314,7 +4331,7 @@ private struct SupersetBlock: View {
                                    completedFill: completedFill,
                                    readOnly: readOnly,
                                    accessibilityName: "\(exerciseName(for: set))第 \(set.setIndex + 1) 组",
-                                   label: field == .weight ? "重量" : "次数",
+                                   label: field == .weight ? (set.exercise?.isAssistedWeight == true ? "辅助重量" : "重量") : "次数",
                                    value: field == .weight ? set.weightKg.map { "\(formatKg($0)) 公斤" } : set.reps.map { "\($0) 次" })
             .onTapGesture { if !readOnly { onFocus(cell) } }
     }
@@ -4527,7 +4544,7 @@ private struct SetRow: View {
             badge
             valueCell(text: weightDisplay, placeholder: "kg", unit: "kg",
                       inputMode: inputMode(for: .weight, text: weightDisplay),
-                      label: "重量", value: set.weightKg.map { "\(formatKg($0)) 公斤" })
+                      label: set.exercise?.isAssistedWeight == true ? "辅助重量" : "重量", value: set.weightKg.map { "\(formatKg($0)) 公斤" })
                 .onTapGesture { if !readOnly { onFocus(.weight(set.localId)) } }
             Text("×").font(Theme.Font.mono(size: 11)).foregroundStyle(Theme.Color.muted).frame(width: 12)
             valueCell(text: repsDisplay, placeholder: "次", unit: "次",

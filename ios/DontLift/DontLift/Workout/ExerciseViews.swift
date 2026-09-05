@@ -1477,7 +1477,7 @@ struct ExerciseDetailView: View {
             HStack(spacing: Theme.Spacing.md) {
                 dataCell("上次", lastAgoText(last))
                 dataCell("最近一组", lastSetText(last))
-                dataCell("PR", pr.map { "\(formatKg($0.weightKg))kg" } ?? "—", accent: true)
+                dataCell(exercise.isAssistedWeight ? "最低辅助" : "PR", pr.map { "\(formatKg($0.weightKg))kg" } ?? "—", accent: true)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

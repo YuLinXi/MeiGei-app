@@ -142,7 +142,7 @@ struct WorkoutPosterData: Equatable {
         let statSets = exercises.flatMap(\.sets).filter(\.countsForStats)
         let totalVolume = statSets.reduce(0.0) { acc, set in
             acc + set.statEntries.reduce(0.0) { entryAcc, entry in
-                entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+                entryAcc + entry.volumeKg
             }
         }
         let statSetCount = statSets.count
@@ -164,7 +164,7 @@ struct WorkoutPosterData: Equatable {
         self.prLines = personalRecords.prefix(3).map {
             PRLine(id: $0.exerciseKey,
                    name: $0.exerciseName,
-                   weightText: "\(formatKg($0.weightKg))kg")
+                   weightText: "\(ExerciseWeightSemantics.isAssisted($0.exerciseKey) ? "辅助 " : "")\(formatKg($0.weightKg))kg")
         }
         self.context = WorkoutPosterContext(
             workoutId: workout.localId,
@@ -253,9 +253,9 @@ struct WorkoutPosterData: Equatable {
         let count = sets.count
         if let weighted = topWeightedSet(in: sets) {
             if let reps = weighted.reps {
-                return "\(formatKg(weighted.weightKg))kg × \(reps)次 · 共\(count)组"
+                return "\(sets.first?.exercise?.isAssistedWeight == true ? "辅助 " : "")\(formatKg(weighted.weightKg))kg × \(reps)次 · 共\(count)组"
             }
-            return "\(formatKg(weighted.weightKg))kg · 共\(count)组"
+            return "\(sets.first?.exercise?.isAssistedWeight == true ? "辅助 " : "")\(formatKg(weighted.weightKg))kg · 共\(count)组"
         }
         if let reps = sets.flatMap(\.statEntries).compactMap(\.reps).max() {
             return "\(reps)次 · 共\(count)组"
@@ -268,7 +268,7 @@ struct WorkoutPosterData: Equatable {
         for set in sets {
             guard let entry = set.topStatEntry, let weight = entry.weightKg else { continue }
             if let current = best {
-                if weight > current.weightKg {
+                if ExerciseWeightSemantics.isBetter(weight, than: current.weightKg, assisted: set.exercise?.isAssistedWeight == true) {
                     best = (weight, entry.reps)
                 }
             } else {

@@ -136,7 +136,8 @@ class TeamPlanServiceTest {
         SharePlan req = new SharePlan(planId, "递减计划", null, """
                 [{
                   "itemId":"%s",
-                  "exerciseName":"卧推",
+                  "exerciseName":"辅助引体向上",
+                  "builtinExerciseCode":"ASSISTED_PULL_UP",
                   "orderIndex":0,
                   "suggestedSets":1,
                   "suggestedReps":8,
@@ -161,6 +162,7 @@ class TeamPlanServiceTest {
         verify(versionMapper).insert(versionCaptor.capture());
         JsonNode item = objectMapper.readTree(versionCaptor.getValue().getItems()).get(0);
         JsonNode prescription = item.get("setPrescriptions").get(0);
+        assertThat(item.get("builtinExerciseCode").asText()).isEqualTo("ASSISTED_PULL_UP");
         assertThat(item.has("suggestedWeightKg")).isFalse();
         assertThat(item.get("restAfterSetSeconds").asInt()).isZero();
         assertThat(prescription.has("weightKg")).isFalse();

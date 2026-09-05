@@ -37,6 +37,7 @@ struct PlanSupersetMemberDisplay: Equatable, Identifiable {
     let equipmentType: String?
     let weightKg: Double?
     let reps: Int?
+    var assisted: Bool = false
 }
 
 /// 计划详情专用的纯展示派生；不持久化、不标脏，也不改变开始训练规则。
@@ -82,7 +83,7 @@ enum PlanItemDisplay {
     static func templateBaselineSummary(for item: PlanItem, comparedTo sets: [WorkoutSet]) -> String? {
         let plannedSets = PlanPrefill.plannedSets(for: item)
         guard !hasSameArrangement(plannedSets, sets) else { return nil }
-        return baselineSummary(groups: groups(from: plannedSets), equipmentType: item.resolvedEquipmentType)
+        return baselineSummary(groups: groups(from: plannedSets), equipmentType: item.resolvedEquipmentType, assisted: ExerciseWeightSemantics.isAssisted(item.builtinExerciseCode))
     }
 
     static func groups(from sets: [WorkoutSet]) -> [PlanItemGroupDisplay] {
@@ -131,19 +132,20 @@ enum PlanItemDisplay {
                                       name: $0.displayExerciseName,
                                       equipmentType: $0.resolvedEquipmentType,
                                       weightKg: $0.suggestedWeightKg,
-                                      reps: $0.suggestedReps)
+                                      reps: $0.suggestedReps,
+                                      assisted: ExerciseWeightSemantics.isAssisted($0.builtinExerciseCode))
         }
     }
 
-    static func groupValueText(_ value: PlanItemGroupValue?, equipmentType: String?) -> String {
+    static func groupValueText(_ value: PlanItemGroupValue?, equipmentType: String?, assisted: Bool = false) -> String {
         guard let value else { return "未设置" }
-        return valueText(weightKg: value.weightKg, reps: value.reps, equipmentType: equipmentType)
+        return valueText(weightKg: value.weightKg, reps: value.reps, equipmentType: equipmentType, assisted: assisted)
     }
 
-    static func valueText(weightKg: Double?, reps: Int?, equipmentType: String?) -> String {
+    static func valueText(weightKg: Double?, reps: Int?, equipmentType: String?, assisted: Bool = false) -> String {
         let weightText: String
         if let weightKg {
-            weightText = "\(formatKg(weightKg)) kg"
+            weightText = "\(assisted ? "辅助 " : "")\(formatKg(weightKg)) kg"
         } else if equipmentType == EquipmentType.bodyweight.rawValue {
             weightText = "自重"
         } else {
@@ -152,7 +154,7 @@ enum PlanItemDisplay {
         return "\(weightText) × \(reps.map(String.init) ?? "未设置") 次"
     }
 
-    private static func baselineSummary(groups: [PlanItemGroupDisplay], equipmentType: String?) -> String {
+    private static func baselineSummary(groups: [PlanItemGroupDisplay], equipmentType: String?, assisted: Bool = false) -> String {
         guard !groups.isEmpty else { return "未设置组次" }
 
         let warmupCount = groups.filter { $0.kind == .warmup }.count
@@ -179,6 +181,6 @@ enum PlanItemDisplay {
         guard values.allSatisfy({ $0.weightKg == first.weightKg && $0.reps == first.reps }) else {
             return "\(countText) · 各组设置不同"
         }
-        return "\(countText) · \(groupValueText(first, equipmentType: equipmentType))"
+        return "\(countText) · \(groupValueText(first, equipmentType: equipmentType, assisted: assisted))"
     }
 }

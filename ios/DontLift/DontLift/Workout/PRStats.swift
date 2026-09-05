@@ -20,7 +20,8 @@ enum PRStats {
                 let key = ex.historyKey
                 for entry in ex.sets.flatMap(\.statEntries) {
                     guard let wt = entry.weightKg, let r = entry.reps, r > 0 else { continue }
-                    if let cur = map[key] { if wt > cur { map[key] = wt } } else { map[key] = wt }
+                    if ex.isAssistedWeight && (!wt.isFinite || wt < 0) { continue }
+                    if let cur = map[key] { if ExerciseWeightSemantics.isBetter(wt, than: cur, assisted: ex.isAssistedWeight) { map[key] = wt } } else { map[key] = wt }
                 }
             }
         }
@@ -38,9 +39,10 @@ enum PRStats {
             for ex in w.exercises where ex.historyKey == exerciseKey {
                 for entry in ex.sets.flatMap(\.statEntries) {
                     guard let wt = entry.weightKg, let r = entry.reps, r > 0 else { continue }
+                    if ex.isAssistedWeight && (!wt.isFinite || wt < 0) { continue }
                     allWeightsByDay.append((wt, w.startedAt))
                     if let cur = best {
-                        if wt > cur.w || (wt == cur.w && w.startedAt > cur.d) {
+                        if ExerciseWeightSemantics.isBetter(wt, than: cur.w, assisted: ex.isAssistedWeight) || (wt == cur.w && (ex.isAssistedWeight && r > cur.r || ((!ex.isAssistedWeight || r == cur.r) && w.startedAt > cur.d))) {
                             best = (wt, r, w.startedAt)
                         }
                     } else {
@@ -52,10 +54,10 @@ enum PRStats {
 
         guard let b = best else { return nil }
         let cal = Calendar.current
-        let prevBest = allWeightsByDay
+        let previous = allWeightsByDay
             .filter { !cal.isDate($0.day, inSameDayAs: b.d) }
             .map(\.weight)
-            .max()
+        let prevBest = ExerciseWeightSemantics.isAssisted(exerciseKey) ? previous.min() : previous.max()
         return PRSummary(exerciseKey: exerciseKey, weightKg: b.w, reps: b.r, date: b.d, previousBestKg: prevBest)
     }
 }

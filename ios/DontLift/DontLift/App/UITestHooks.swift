@@ -30,6 +30,16 @@ enum UITestHooks {
     static func seedLiveWorkoutIfNeeded(container: ModelContainer) {
         guard isLiveWorkoutUITest else { return }
         let context = container.mainContext
+        if ProcessInfo.processInfo.arguments.contains("-uitest-assisted-weight") {
+            // 仅专用 UI 测试参数生效，不改动用户训练；复用已有测试会话时只替换测试动作。
+            if let active = WorkoutSession.activeSession(in: context), active.title == "UI 测试训练",
+               let exercise = active.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }).first {
+                exercise.builtinExerciseCode = "ASSISTED_PULL_UP"
+                exercise.exerciseName = "辅助引体向上"
+                try? context.save()
+                return
+            }
+        }
         guard WorkoutSession.activeSession(in: context) == nil else { return }
         let exercises = ["杠铃卧推", "杠铃划船", "哑铃肩推"].enumerated().map { index, name in
             WorkoutExercise(exerciseName: name,
@@ -40,6 +50,10 @@ enum UITestHooks {
                               startedAt: .now,
                               timerStartedAt: .now,
                               exercises: exercises)
+        if ProcessInfo.processInfo.arguments.contains("-uitest-assisted-weight"), let exercise = exercises.first {
+            exercise.builtinExerciseCode = "ASSISTED_PULL_UP"
+            exercise.exerciseName = "辅助引体向上"
+        }
         context.insert(workout)
         try? context.save()
     }

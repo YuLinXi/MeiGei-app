@@ -1190,7 +1190,7 @@ struct PlanDetailView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(groups) { group in
-                        trainingGroupRow(group, equipmentType: item.resolvedEquipmentType)
+                        trainingGroupRow(group, equipmentType: item.resolvedEquipmentType, assisted: ExerciseWeightSemantics.isAssisted(item.builtinExerciseCode))
                         if group.id != groups.last?.id { detailDivider }
                     }
                 }
@@ -1245,7 +1245,7 @@ struct PlanDetailView: View {
                     label: "动作 \(index + 1) · \(member.name)",
                     value: PlanItemDisplay.valueText(weightKg: member.weightKg,
                                                      reps: member.reps,
-                                                     equipmentType: member.equipmentType)
+                                                     equipmentType: member.equipmentType, assisted: member.assisted)
                 )
                 if member.id != members.last?.id { detailDivider }
             }
@@ -1311,7 +1311,7 @@ struct PlanDetailView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func trainingGroupRow(_ group: PlanItemGroupDisplay, equipmentType: String?) -> some View {
+    private func trainingGroupRow(_ group: PlanItemGroupDisplay, equipmentType: String?, assisted: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             if group.kind == .drop {
                 Text(group.title)
@@ -1319,11 +1319,11 @@ struct PlanDetailView: View {
                     .foregroundStyle(Theme.Color.fg2)
                 ForEach(group.values) { value in
                     detailKeyValue(label: "第 \(value.position + 1) 段",
-                                   value: PlanItemDisplay.groupValueText(value, equipmentType: equipmentType))
+                                   value: PlanItemDisplay.groupValueText(value, equipmentType: equipmentType, assisted: assisted))
                 }
             } else {
                 detailKeyValue(label: group.title,
-                               value: PlanItemDisplay.groupValueText(group.values.first, equipmentType: equipmentType))
+                               value: PlanItemDisplay.groupValueText(group.values.first, equipmentType: equipmentType, assisted: assisted))
             }
         }
         .padding(.vertical, 8)

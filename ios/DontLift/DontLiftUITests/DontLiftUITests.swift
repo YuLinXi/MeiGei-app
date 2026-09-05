@@ -10,6 +10,22 @@ import XCTest
 final class DontLiftUITests: XCTestCase {
 
     @MainActor
+    func testAssistedWeightHintInWorkout() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uitest-live-workout", "-uitest-assisted-weight"]
+        app.launch()
+        let title = app.staticTexts["辅助引体向上"].firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 15))
+        let hint = app.staticTexts["此动作记录辅助重量，辅助越小，难度越大。"]
+        if !hint.exists { title.tap() }
+        XCTAssertTrue(hint.waitForExistence(timeout: 5))
+        XCTAssertTrue(hint.isHittable)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
+    @MainActor
     func testBadgeWallRepeatedEntryAndLazyScrolling() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-dev-auto-login", "-dev-seed-demo", "-tab-profile", "-dismiss-career-review"]

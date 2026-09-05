@@ -334,7 +334,7 @@ struct TeamCheckinDetailSheet: View {
                     } else {
                         VStack(spacing: 6) {
                             ForEach(Array(exercise.sets.enumerated()), id: \.offset) { index, set in
-                                checkinSetRow(set, index: index)
+                                checkinSetRow(set, index: index, assisted: ExerciseWeightSemantics.isAssisted(exercise.builtinExerciseCode))
                             }
                         }
                     }
@@ -373,7 +373,7 @@ struct TeamCheckinDetailSheet: View {
                                 .font(Theme.Font.body(size: 13, weight: .semibold))
                                 .foregroundStyle(Theme.Color.fg2)
                             ForEach(Array(exercise.sets.enumerated()), id: \.offset) { index, set in
-                                checkinSetRow(set, index: index)
+                                checkinSetRow(set, index: index, assisted: ExerciseWeightSemantics.isAssisted(exercise.builtinExerciseCode))
                             }
                         }
                     }
@@ -385,7 +385,7 @@ struct TeamCheckinDetailSheet: View {
     }
 
     @ViewBuilder
-    private func checkinSetRow(_ set: CheckinSummary.SetSummary, index: Int) -> some View {
+    private func checkinSetRow(_ set: CheckinSummary.SetSummary, index: Int, assisted: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("#\(index + 1)")
@@ -395,7 +395,7 @@ struct TeamCheckinDetailSheet: View {
                 if set.setType == .drop {
                     WorkoutStructureIcon(kind: .dropSet)
                 } else {
-                    setValueLine(weightKg: set.weightKg, reps: set.reps)
+                    setValueLine(weightKg: set.weightKg, reps: set.reps, assisted: assisted)
                 }
                 Spacer(minLength: 0)
             }
@@ -406,7 +406,7 @@ struct TeamCheckinDetailSheet: View {
                             .font(Theme.Font.mono(size: 10, weight: .semibold))
                             .foregroundStyle(Theme.Color.muted)
                             .frame(width: 34, alignment: .leading)
-                        setValueLine(weightKg: segment.weightKg, reps: segment.reps)
+                        setValueLine(weightKg: segment.weightKg, reps: segment.reps, assisted: assisted)
                         Spacer(minLength: 0)
                     }
                     .padding(.leading, 34)
@@ -419,9 +419,9 @@ struct TeamCheckinDetailSheet: View {
         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
     }
 
-    private func setValueLine(weightKg: Double?, reps: Int?) -> some View {
+    private func setValueLine(weightKg: Double?, reps: Int?, assisted: Bool) -> some View {
         HStack(spacing: 6) {
-            Text(weightKg.map { formatKg($0) + " kg" } ?? "— kg")
+            Text((assisted ? "辅助 " : "") + (weightKg.map { formatKg($0) + " kg" } ?? "— kg"))
                 .font(Theme.Font.mono(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.Color.fg)
             Text("×")

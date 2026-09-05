@@ -50,14 +50,24 @@ func detectPersonalRecords(in workout: Workout, history: [Workout]) -> [Personal
             bestByKey[ex.historyKey] = max(bestByKey[ex.historyKey] ?? m, m)
         }
     }
-    return detectPersonalRecords(in: workout, priorBestByKey: bestByKey)
+    let prior = history.filter { $0.localId != workout.localId && $0.isFinished && $0.startedAt < workout.startedAt }
+        .flatMap(\.exercises).filter(\.isAssistedWeight).flatMap(\.assistancePerformances)
+    return detectPersonalRecords(in: workout, priorBestByKey: bestByKey, priorAssistance: prior)
 }
 
 /// 使用预先构建的历史最大重量索引识别新 PR，避免结束训练时重新扫描全历史。
-func detectPersonalRecords(in workout: Workout, priorBestByKey: [String: Double]) -> [PersonalRecord] {
+func detectPersonalRecords(in workout: Workout, priorBestByKey: [String: Double], priorAssistance: [ExerciseWeightSemantics.Performance] = []) -> [PersonalRecord] {
     var seen = Set<String>()
     var prs: [PersonalRecord] = []
     for ex in workout.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }) {
+        if ex.isAssistedWeight {
+            guard !seen.contains(ex.historyKey),
+                  let best = ex.assistancePerformances.filter({ ExerciseWeightSemantics.isAssistanceBreakthrough($0, prior: priorAssistance) }).min(by: { $0.weight < $1.weight }) else { continue }
+            prs.append(PersonalRecord(exerciseKey: ex.historyKey, exerciseName: ex.displayExerciseName,
+                                      weightKg: best.weight, previousBestKg: priorAssistance.filter { $0.weight > best.weight && $0.reps <= best.reps }.map(\.weight).min()))
+            seen.insert(ex.historyKey)
+            continue
+        }
         guard let sessionMax = ex.sets.flatMap(\.statEntries).compactMap(\.weightKg).max() else { continue }
         let key = ex.historyKey
         guard !seen.contains(key) else { continue }
@@ -185,7 +195,7 @@ struct PRCelebrationSheet: View {
                     .foregroundStyle(Theme.Color.fg)
                 if let prev = pr.previousBestKg {
                     // 刷新型：灰字「旧纪录 N kg」。
-                    Text("旧纪录 \(formatKg(prev)) kg")
+                    Text("\(ExerciseWeightSemantics.isAssisted(pr.exerciseKey) ? "此前辅助" : "旧纪录") \(formatKg(prev)) kg")
                         .font(Theme.Font.body(size: 12))
                         .foregroundStyle(Theme.Color.muted)
                 } else {
@@ -199,11 +209,11 @@ struct PRCelebrationSheet: View {
             }
             Spacer(minLength: 0)
             HStack(alignment: .center, spacing: 3) {
-                Image(systemName: "arrowtriangle.up.fill")
+                Image(systemName: ExerciseWeightSemantics.isAssisted(pr.exerciseKey) ? "arrowtriangle.down.fill" : "arrowtriangle.up.fill")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(Theme.Color.accent)
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text(formatKg(pr.weightKg))
+                    Text((ExerciseWeightSemantics.isAssisted(pr.exerciseKey) ? "辅助 " : "") + formatKg(pr.weightKg))
                         .numStyle(size: 30, weight: .bold)
                         .foregroundStyle(Theme.Color.accent)
                     Text("kg")

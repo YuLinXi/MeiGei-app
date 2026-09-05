@@ -13,6 +13,7 @@ enum WorkoutHistoryRefreshReason: String {
 struct PRBadge: Equatable, Hashable {
     var name: String
     var weightKg: Double
+    var isAssistedWeight: Bool = false
 }
 
 struct SetSnapshot: Codable, Equatable, Hashable {
@@ -534,6 +535,7 @@ final class WorkoutHistoryStore {
         var prByWorkoutId: [UUID: PRBadge] = [:]
         var recordsByWorkoutId: [UUID: [PersonalRecord]] = [:]
         var bestByKey: [String: Double] = [:]
+        var assistanceHistory: [(date: Date, value: ExerciseWeightSemantics.Performance)] = []
         var exerciseBest: [String: (weight: Double, reps: Int, date: Date)] = [:]
         var allWeightsByKey: [String: [(weight: Double, date: Date)]] = [:]
         var historyPointsByKey: [String: [ExerciseHistoryPoint]] = [:]
@@ -548,7 +550,14 @@ final class WorkoutHistoryStore {
                 let sortedSets = ex.sets.sorted { $0.setIndex < $1.setIndex }
                 let counted = sortedSets.filter(\.countsForStats)
                 let statEntries = counted.flatMap(\.statEntries)
-                if let maxWeight = statEntries.compactMap(\.weightKg).max(), !seenKeys.contains(key) {
+                if ex.isAssistedWeight {
+                    let prior = assistanceHistory.filter { $0.date < w.startedAt }.map(\.value)
+                    if let best = ex.assistancePerformances.filter({ ExerciseWeightSemantics.isAssistanceBreakthrough($0, prior: prior) }).min(by: { $0.weight < $1.weight }), seenKeys.insert(key).inserted {
+                        records.append(PersonalRecord(exerciseKey: key, exerciseName: ex.displayExerciseName, weightKg: best.weight,
+                                                      previousBestKg: prior.filter { $0.weight > best.weight && $0.reps <= best.reps }.map(\.weight).min()))
+                    }
+                }
+                if !ex.isAssistedWeight, let maxWeight = statEntries.compactMap(\.weightKg).max(), !seenKeys.contains(key) {
                     let prior = bestByKey[key]
                     if prior == nil || maxWeight > prior! {
                         records.append(PersonalRecord(
@@ -563,9 +572,10 @@ final class WorkoutHistoryStore {
 
                 for entry in statEntries {
                     guard let weight = entry.weightKg, let reps = entry.reps, reps > 0 else { continue }
+                    if ex.isAssistedWeight && (!weight.isFinite || weight < 0) { continue }
                     allWeightsByKey[key, default: []].append((weight, w.startedAt))
                     if let cur = exerciseBest[key] {
-                        if weight > cur.weight || (weight == cur.weight && w.startedAt > cur.date) {
+                        if ExerciseWeightSemantics.isBetter(weight, than: cur.weight, assisted: ex.isAssistedWeight) || (weight == cur.weight && (ex.isAssistedWeight && reps > cur.reps || ((!ex.isAssistedWeight || reps == cur.reps) && w.startedAt > cur.date))) {
                             exerciseBest[key] = (weight, reps, w.startedAt)
                         }
                     } else {
@@ -573,10 +583,12 @@ final class WorkoutHistoryStore {
                     }
                 }
 
-                if let maxWeight = statEntries.compactMap(\.weightKg).max() {
-                    bestByKey[key] = max(bestByKey[key] ?? maxWeight, maxWeight)
+                let weights = statEntries.compactMap(\.weightKg)
+                if let maxWeight = ex.isAssistedWeight ? weights.filter({ $0.isFinite && $0 >= 0 }).min() : weights.max() {
+                    let previous = bestByKey[key] ?? maxWeight
+                    bestByKey[key] = ex.isAssistedWeight ? min(previous, maxWeight) : max(previous, maxWeight)
                     var point = perWorkoutPoint[key] ?? (nil, nil, nil)
-                    point.maxWeight = max(point.maxWeight ?? maxWeight, maxWeight)
+                    point.maxWeight = ex.isAssistedWeight ? min(point.maxWeight ?? maxWeight, maxWeight) : max(point.maxWeight ?? maxWeight, maxWeight)
                     perWorkoutPoint[key] = point
                 } else if perWorkoutPoint[key] == nil {
                     perWorkoutPoint[key] = (nil, nil, nil)
@@ -594,8 +606,9 @@ final class WorkoutHistoryStore {
                 }
             }
 
+            assistanceHistory += w.exercises.filter(\.isAssistedWeight).flatMap(\.assistancePerformances).map { (w.startedAt, $0) }
             if let first = records.first {
-                prByWorkoutId[w.localId] = PRBadge(name: first.exerciseName, weightKg: first.weightKg)
+                prByWorkoutId[w.localId] = PRBadge(name: first.exerciseName, weightKg: first.weightKg, isAssistedWeight: ExerciseWeightSemantics.isAssisted(first.exerciseKey))
             }
             if !records.isEmpty {
                 recordsByWorkoutId[w.localId] = records
@@ -613,10 +626,10 @@ final class WorkoutHistoryStore {
         let cal = Calendar.current
         var exercisePRs: [String: PRSummary] = [:]
         for (key, best) in exerciseBest {
-            let prevBest = (allWeightsByKey[key] ?? [])
+            let previous = (allWeightsByKey[key] ?? [])
                 .filter { !cal.isDate($0.date, inSameDayAs: best.date) }
                 .map(\.weight)
-                .max()
+            let prevBest = ExerciseWeightSemantics.isAssisted(key) ? previous.min() : previous.max()
             exercisePRs[key] = PRSummary(
                 exerciseKey: key,
                 weightKg: best.weight,
@@ -643,7 +656,7 @@ final class WorkoutHistoryStore {
             let volume = w.exercises.flatMap(\.sets).reduce(0.0) { acc, set in
                 guard set.countsForStats else { return acc }
                 return acc + set.statEntries.reduce(0.0) { entryAcc, entry in
-                    entryAcc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+                    entryAcc + entry.volumeKg
                 }
             }
             return WorkoutRowSummary(
@@ -768,7 +781,7 @@ final class WorkoutHistoryStore {
                 for set in exercise.sets where set.countsForStats {
                     summary.setCount += 1
                     summary.volumeKg += set.statEntries.reduce(0.0) { acc, entry in
-                        acc + (entry.weightKg ?? 0) * Double(entry.reps ?? 0)
+                        acc + entry.volumeKg
                     }
                 }
             }

@@ -468,6 +468,7 @@ struct PlanPrescriptionPreview {
 
     let sets: [WorkoutSet]
     let source: Source
+    var assisted: Bool = false
 
     var badgeText: String { source.badgeText }
     var detailText: String { source.detailText }
@@ -483,9 +484,9 @@ struct PlanPrescriptionPreview {
 
         switch (values.weightKg, values.reps) {
         case let (.some(weight), .some(reps)):
-            return "\(countText) · \(formatKg(weight)) kg × \(reps)\(dropText)"
+            return "\(countText) · \(assisted ? "辅助 " : "")\(formatKg(weight)) kg × \(reps)\(dropText)"
         case let (.some(weight), .none):
-            return "\(countText) · \(formatKg(weight)) kg\(dropText)"
+            return "\(countText) · \(assisted ? "辅助 " : "")\(formatKg(weight)) kg\(dropText)"
         case let (.none, .some(reps)):
             return "\(countText) × \(reps)\(dropText)"
         case (.none, .none):
@@ -505,6 +506,7 @@ struct PlanPrescriptionPreview {
     private var representativeSet: WorkoutSet? {
         let weighted = mainSets.filter { $0.summaryWeightReps.weightKg != nil }
         if !weighted.isEmpty {
+            if assisted { return weighted.min { ($0.summaryWeightReps.weightKg ?? 0) < ($1.summaryWeightReps.weightKg ?? 0) } }
             return weighted.max { ($0.summaryWeightReps.weightKg ?? 0) < ($1.summaryWeightReps.weightKg ?? 0) }
         }
         return mainSets.first { $0.summaryWeightReps.reps != nil } ?? mainSets.first
@@ -521,7 +523,7 @@ struct PlanPrescriptionPreview {
     static func make(for item: PlanItem, mode: WorkoutPlanMode, history: [Workout], planId: UUID? = nil) -> PlanPrescriptionPreview {
         let sets = PlanPrefill.sets(for: item, mode: mode, history: history)
         if mode == .strict {
-            return PlanPrescriptionPreview(sets: sets, source: .strict)
+            return PlanPrescriptionPreview(sets: sets, source: .strict, assisted: ExerciseWeightSemantics.isAssisted(item.builtinExerciseCode))
         }
 
         let source: Source
@@ -534,13 +536,13 @@ struct PlanPrescriptionPreview {
         } else {
             source = .defaultValue
         }
-        return PlanPrescriptionPreview(sets: sets, source: source)
+        return PlanPrescriptionPreview(sets: sets, source: source, assisted: ExerciseWeightSemantics.isAssisted(item.builtinExerciseCode))
     }
 
     static func make(for item: PlanItem, mode: WorkoutPlanMode, lookup: PlanHistoryLookup, planId: UUID? = nil) -> PlanPrescriptionPreview {
         let sets = PlanPrefill.sets(for: item, mode: mode, lookup: lookup)
         if mode == .strict {
-            return PlanPrescriptionPreview(sets: sets, source: .strict)
+            return PlanPrescriptionPreview(sets: sets, source: .strict, assisted: ExerciseWeightSemantics.isAssisted(item.builtinExerciseCode))
         }
 
         let source: Source
@@ -553,7 +555,7 @@ struct PlanPrescriptionPreview {
         } else {
             source = .defaultValue
         }
-        return PlanPrescriptionPreview(sets: sets, source: source)
+        return PlanPrescriptionPreview(sets: sets, source: source, assisted: ExerciseWeightSemantics.isAssisted(item.builtinExerciseCode))
     }
 
     /// 最近一次同计划训练里没完成该动作时，展示「保留」心智。
@@ -606,7 +608,7 @@ enum PlanWriteback {
             let memberText = i.orderedSupersetMembers.map { member in
                 var parts: [String] = [member.displayExerciseName]
                 if let reps = member.suggestedReps { parts.append("\(reps) 次") }
-                if let weight = member.suggestedWeightKg { parts.append("\(formatKg(weight)) kg") }
+                if let weight = member.suggestedWeightKg { parts.append("\(ExerciseWeightSemantics.isAssisted(member.builtinExerciseCode) ? "辅助 " : "")\(formatKg(weight)) kg") }
                 return parts.joined(separator: " · ")
             }.joined(separator: " / ")
             return "超级组 · \(i.supersetRounds) 组 · \(memberText) · \(restSummary(i.supersetRestAfterRoundSeconds))"
@@ -615,14 +617,14 @@ enum PlanWriteback {
             var parts: [String] = ["递减组"]
             if let s = i.suggestedSets { parts.append("\(s) 组") }
             if let r = i.suggestedReps { parts.append("\(r) 次") }
-            if let w = i.suggestedWeightKg { parts.append("\(formatKg(w)) kg") }
+            if let w = i.suggestedWeightKg { parts.append("\(ExerciseWeightSemantics.isAssisted(i.builtinExerciseCode) ? "辅助 " : "")\(formatKg(w)) kg") }
             parts.append(restSummary(i.restAfterSetSeconds))
             return parts.joined(separator: " · ")
         }
         var parts: [String] = []
         if let s = i.suggestedSets { parts.append("\(s) 组") }
         if let r = i.suggestedReps { parts.append("\(r) 次") }
-        if let w = i.suggestedWeightKg { parts.append("\(formatKg(w)) kg") }
+        if let w = i.suggestedWeightKg { parts.append("\(ExerciseWeightSemantics.isAssisted(i.builtinExerciseCode) ? "辅助 " : "")\(formatKg(w)) kg") }
         if i.orderedSetPrescriptions.contains(where: { $0.setType == .drop }) { parts.append("含递减组") }
         let base = parts.isEmpty ? "未设建议" : parts.joined(separator: " × ")
         return "\(base) · \(restSummary(i.restAfterSetSeconds))"
@@ -833,7 +835,10 @@ enum PlanWriteback {
     }
 
     private static func topStatEntry(in sets: [WorkoutSet]) -> WorkoutSetStatEntry? {
-        sets.flatMap(\.statEntries).max { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
+        let entries = sets.flatMap(\.statEntries)
+        return sets.first?.exercise?.isAssistedWeight == true
+            ? entries.filter { $0.weightKg != nil }.min { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
+            : entries.max { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
     }
 
     private static func mergedRegularPrescriptions(observed: [WorkoutSet],
