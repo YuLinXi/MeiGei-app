@@ -173,6 +173,25 @@ class WorkoutSyncServiceTest {
         assertThat(captor.getValue().getVersion()).isEqualTo(2);
     }
 
+    @Test
+    void push_preservesBodyWeightSnapshotWhenReplacingAggregate() {
+        WorkoutSyncService service = new WorkoutSyncService(workoutMapper, exerciseMapper, setMapper, checkinService);
+        UUID userId = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.now();
+        Workout server = workout(now.minusMinutes(10));
+        server.setVersion(2);
+        Workout incoming = workout(now);
+        incoming.setId(server.getId());
+        incoming.setBodyWeightKgAtCompletion(72.5);
+        when(workoutMapper.findByIdIncludingDeleted(incoming.getId())).thenReturn(server);
+
+        service.push(userId, List.of(new WorkoutTree(incoming, List.of())));
+
+        ArgumentCaptor<Workout> captor = ArgumentCaptor.forClass(Workout.class);
+        verify(workoutMapper).updateById(captor.capture());
+        assertThat(captor.getValue().getBodyWeightKgAtCompletion()).isEqualTo(72.5);
+    }
+
     private Workout workout(OffsetDateTime updatedAt) {
         Workout workout = new Workout();
         workout.setId(UUID.randomUUID());

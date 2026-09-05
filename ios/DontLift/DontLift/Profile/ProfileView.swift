@@ -10,6 +10,7 @@ struct ProfileView: View {
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(RestTimerController.self) private var restTimer
     @Environment(WorkoutHistoryStore.self) private var historyStore
+    @Environment(BadgeWallStore.self) private var badgeWallStore
     @Environment(\.modelContext) private var modelContext
 
     @Query private var profiles: [UserProfile]
@@ -41,7 +42,9 @@ struct ProfileView: View {
     @State private var caloriePreferences = WorkoutCaloriePreferences.current()
     @State private var showBadgeWall = ProcessInfo.processInfo.arguments.contains("-open-badge-wall")
 
-    @Query(sort: \BadgeGrant.unlockedAt, order: .reverse) private var badgeGrants: [BadgeGrant]
+    private var badgeGrants: [BadgeGrantCandidate] {
+        badgeWallStore.progress.compactMap(\.grant).sorted { $0.unlockedAt > $1.unlockedAt }
+    }
 
     private var profile: UserProfile? { profiles.first(where: { $0.serverUserId == session.currentUserId }) }
 
@@ -86,7 +89,6 @@ struct ProfileView: View {
             }
         }
         .onAppear {
-            BadgeEngine.runBackfillIfNeeded(in: modelContext)
             #if DEBUG
             if UITestHooks.testBadgeDetailId != nil {
                 showBadgeWall = true
@@ -98,7 +100,6 @@ struct ProfileView: View {
             healthAuthorized = healthKit.isAuthorized
             caloriePreferences = .current()
             await refreshNotificationStatus()
-            BadgeEngine.runBackfillIfNeeded(in: modelContext)
         }
         .sheet(item: $profileSheet) { sheet in
             profileSheetView(sheet)
@@ -235,7 +236,7 @@ struct ProfileView: View {
                 } else {
                     HStack(spacing: 10) {
                         ForEach(badgeGrants.prefix(5), id: \.badgeCode) { grant in
-                            if let def = grant.definition {
+                            if let def = BadgeDefinition.lookup(grant.badgeCode) {
                                 BadgeIconView(definition: def, isUnlocked: true, size: .mini)
                             }
                         }
@@ -714,9 +715,10 @@ struct ProfileView: View {
 
             UserDefaults.standard.removeObject(forKey: BadgeEngine.backfillCompletedKey)
             UserDefaults.standard.removeObject(forKey: BadgeEngine.careerReviewShownKey)
-            let backfilledGrants = BadgeEngine.runBackfillIfNeeded(in: modelContext, force: true)
-
-            seedResult = "已生成 \(result.workouts) 次训练、\(result.plans) 个计划，并解锁/回溯了 \(backfilledGrants.count) 枚成就勋章。"
+            Task { @MainActor in
+                let backfilledGrants = await BadgeEngine.runBackfillIfNeeded(in: modelContext, force: true)
+                seedResult = "已生成 \(result.workouts) 次训练、\(result.plans) 个计划，并解锁/回溯了 \(backfilledGrants.count) 枚成就勋章。"
+            }
         } catch {
             seedResult = "生成失败：\(error.localizedDescription)"
         }

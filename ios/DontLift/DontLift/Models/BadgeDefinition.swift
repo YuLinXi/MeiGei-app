@@ -1,7 +1,7 @@
 import Foundation
 
 /// 成就勋章大类
-enum BadgeCategory: String, CaseIterable, Identifiable {
+nonisolated enum BadgeCategory: String, CaseIterable, Identifiable, Sendable {
     case strength   // 力量与三大项俱乐部
     case tonnage    // 累计总吨位
     case career     // 纪律与生涯历程
@@ -18,15 +18,6 @@ enum BadgeCategory: String, CaseIterable, Identifiable {
         }
     }
 
-    var subtitle: String {
-        switch self {
-        case .strength: return "体重倍数突破与三大项绝对力量俱乐部"
-        case .tonnage:  return "日积月累托起的重工工程量化"
-        case .career:   return "千锤百炼、日复一日的自律刻度"
-        case .feats:    return "单场极限爆发与严格执行的巅峰战役"
-        }
-    }
-
     /// 勋章几何外形语义（圆型精密盘、八边形砝码、六角战术章、菱形锋芒章）
     var shapeStyleName: String {
         switch self {
@@ -39,7 +30,7 @@ enum BadgeCategory: String, CaseIterable, Identifiable {
 }
 
 /// 24 枚独立成就勋章静态元数据
-struct BadgeDefinition: Identifiable, Equatable, Hashable {
+nonisolated struct BadgeDefinition: Identifiable, Equatable, Hashable, Sendable {
     let code: String
     let name: String
     let category: BadgeCategory
@@ -59,7 +50,7 @@ struct BadgeDefinition: Identifiable, Equatable, Hashable {
             code: "strength_bw_bench_1_0",
             name: "破阵",
             category: .strength,
-            requirementDescription: "杠铃卧推单组最高重量 ≥ 1.0x 体重",
+            requirementDescription: "杠铃卧推单组最高重量 ≥ 1.0 倍体重",
             targetValue: 1.0,
             unit: "x BW",
             iconSystemName: "figure.strengthtraining.traditional",
@@ -69,7 +60,7 @@ struct BadgeDefinition: Identifiable, Equatable, Hashable {
             code: "strength_bw_squat_1_5",
             name: "撼地",
             category: .strength,
-            requirementDescription: "杠铃深蹲单组最高重量 ≥ 1.5x 体重",
+            requirementDescription: "杠铃深蹲单组最高重量 ≥ 1.5 倍体重",
             targetValue: 1.5,
             unit: "x BW",
             iconSystemName: "figure.cross.training",
@@ -79,7 +70,7 @@ struct BadgeDefinition: Identifiable, Equatable, Hashable {
             code: "strength_bw_deadlift_2_0",
             name: "拔山",
             category: .strength,
-            requirementDescription: "杠铃硬拉单组最高重量 ≥ 2.0x 体重",
+            requirementDescription: "杠铃硬拉单组最高重量 ≥ 2.0 倍体重",
             targetValue: 2.0,
             unit: "x BW",
             iconSystemName: "figure.core.training",
@@ -89,7 +80,7 @@ struct BadgeDefinition: Identifiable, Equatable, Hashable {
             code: "strength_bw_bench_1_5",
             name: "铁穹",
             category: .strength,
-            requirementDescription: "杠铃卧推单组最高重量 ≥ 1.5x 体重",
+            requirementDescription: "杠铃卧推单组最高重量 ≥ 1.5 倍体重",
             targetValue: 1.5,
             unit: "x BW",
             iconSystemName: "shield.checkered",
@@ -99,7 +90,7 @@ struct BadgeDefinition: Identifiable, Equatable, Hashable {
             code: "strength_bw_squat_2_0",
             name: "双倍重力",
             category: .strength,
-            requirementDescription: "杠铃深蹲单组最高重量 ≥ 2.0x 体重",
+            requirementDescription: "杠铃深蹲单组最高重量 ≥ 2.0 倍体重",
             targetValue: 2.0,
             unit: "x BW",
             iconSystemName: "scalemass.fill",
@@ -109,7 +100,7 @@ struct BadgeDefinition: Identifiable, Equatable, Hashable {
             code: "strength_bw_deadlift_2_5",
             name: "泰坦之握",
             category: .strength,
-            requirementDescription: "杠铃硬拉单组最高重量 ≥ 2.5x 体重",
+            requirementDescription: "杠铃硬拉单组最高重量 ≥ 2.5 倍体重",
             targetValue: 2.5,
             unit: "x BW",
             iconSystemName: "lock.shield.fill",

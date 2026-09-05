@@ -54,7 +54,7 @@
     - 深蹲：`BB_SQUAT`
     - 卧推：`BB_BENCH_PRESS`
     - 硬拉：`max(DEADLIFT, SUMO_DEADLIFT)`（遵循国际力量举 IPF 规则）
-  - **自重倍数计算源**：读取 `WorkoutCaloriePreferences.currentWeight`（用户在资料中保存的当前体重）。若用户未录入体重，倍数类勋章不可达成并在未解锁卡片中展示引导文案。
+  - **自重倍数计算源**：训练完成时把 `WorkoutCaloriePreferences.currentWeight` 保存到 `Workout.bodyWeightKgAtCompletion`，判定和历史回溯只使用该次训练的体重快照。旧训练没有快照时不补授倍数类勋章；徽章馆仍用当前体重展示未解锁进度。
 - **替代方案对比**：
   - *按动作名称模糊匹配（包含“深蹲”）*：不可取。容易误将哑铃深蹲、哈克深蹲、高脚杯深蹲等非标准杠铃动作计入，破坏严肃健身严肃性。
 
@@ -68,9 +68,9 @@
 |  [场景 A: 老用户存量回溯]                  [场景 B: 日常单次训练结算]    |
 |  触发: App 装配期 / UserDefaults 未置位    触发: finishWorkout() 确认     |
 |                                                                          |
-|  1. Task.detached 后台异步拉取全部已完成   1. 提取本次训练数据            |
-|     Workouts (时间正序排序)                2. 取出当前未解锁的 BadgeCodes |
-|  2. 模拟历史时间线依次判定                 3. 纯函数匹配增量指标          |
+|  1. 后台 ModelActor 读取训练值快照        1. 提取本次训练数据            |
+|  2. Task.detached 按时间正序线性扫描       2. 取出当前未解锁的 BadgeCodes |
+|     并模拟历史时间线依次判定                3. 纯函数匹配增量指标          |
 |  3. 批量写入 BadgeGrant 存根               4. 若命中:                     |
 |  4. 置位 hasCompletedBadgeBackfill = true     - 插入 BadgeGrant          |
 |  5. 切换回 MainActor 唤起「生涯回顾」弹窗     - 唤起「训练结算庆祝」弹窗 |
@@ -92,6 +92,14 @@
 
 ## Risks / Trade-offs
 
+### 徽章馆会话缓存与按需绘制
+
+- App 持有 `BadgeWallStore`，个人页和徽章馆共享展示值快照；页面进入不启动历史扫描，取消固定 350ms 等待和整页加载提示。
+- 登录后后台 `ModelActor` 使用独立 `ModelContext` 读取训练关系；动作身份去重后复用动作库解析，后台线性汇总进度，主线程只发布结果和写入授予记录。
+- 监听主上下文保存事件中的训练、动作、组、计划和授予标识。新增、同数量编辑、删除以及同步落盘均触发失效；体重变更只重算缓存中的进度，不重新读历史、不改变历史体重快照规则。
+- 更新期间保留已展示内容；冷启动先展示静态徽章和已保存授予，未知进度不显示为 0%。读取失败保留旧快照并允许下次进入重试。并发失效合并补算，账号切换清空缓存并阻止旧任务发布。
+- 统一 `LazyVGrid + Section` 使用稳定徽章 code，分组排序在快照发布时完成，屏幕外卡片按需创建。保留 SwiftUI 实时绘制，不新增位图资源或磁盘缓存。
+
 - **[Risk] 用户更替新设备或重装 App 导致本地 SwiftData 存根丢失**
   → **Mitigation**: 提供自愈兜底机制。当 `SyncEngine` 拉取历史 `Workout` 完成后，检查若 `BadgeGrant` 表为空但存在历史完成训练，自动后台补跑一次静默 Backfill，勋章瞬间恢复。
 - **[Risk] 用户修改或删除了产生徽章的历史训练**
@@ -101,6 +109,7 @@
 
 ## Migration Plan
 
-1. **SwiftData 模型升级**：在 `AppModelContainer.make()` 的 schema 中追加 `BadgeGrant.self`（全新独立实体，无需复杂轻量级迁移映射）。
-2. **渐进式回溯**：新版启动时自动检测并初始化 `hasCompletedBadgeBackfill`。
-3. **回滚策略**：纯本地新增实体，无后端破坏性改动。若回滚仅需移除客户端代码与容器注册。
+1. **SwiftData 模型升级**：在 `AppModelContainer.make()` 的 schema 中追加 `BadgeGrant.self`，并给 `Workout` 增加可选的 `bodyWeightKgAtCompletion` 字段。
+2. **后端兼容迁移**：为 workout 表增加可空的 `body_weight_kg_at_completion` 列；旧客户端不上传该字段时保持为空，新旧数据均可继续同步。
+3. **渐进式回溯**：新版启动时自动检测并初始化 `hasCompletedBadgeBackfill`。
+4. **回滚策略**：服务端新增列为可空字段，可保留不用；客户端回滚时忽略该字段与本地 `BadgeGrant` 实体。

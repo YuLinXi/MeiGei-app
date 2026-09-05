@@ -9,6 +9,42 @@ import XCTest
 
 final class DontLiftUITests: XCTestCase {
 
+    @MainActor
+    func testBadgeWallRepeatedEntryAndLazyScrolling() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-dev-auto-login", "-dev-seed-demo", "-tab-profile", "-dismiss-career-review"]
+        app.launch()
+        let entry = app.buttons.containing(.staticText, identifier: "成就徽章").firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 20))
+        entry.tap()
+        let summary = app.staticTexts["badge.wall.summary"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 10))
+        let ready = NSPredicate(format: "value BEGINSWITH %@", "ready:")
+        expectation(for: ready, evaluatedWith: summary)
+        waitForExpectations(timeout: 20)
+        let counts = summary.value as? String
+        XCTAssertFalse(app.staticTexts["正在加载徽章"].exists)
+        for _ in 0..<10 {
+            app.navigationBars.buttons.firstMatch.tap()
+            XCTAssertTrue(entry.waitForExistence(timeout: 5))
+            entry.tap()
+            XCTAssertTrue(summary.waitForExistence(timeout: 5))
+            XCTAssertEqual(summary.value as? String, counts)
+        }
+        let options = XCTMeasureOptions()
+        options.iterationCount = 1
+        measure(metrics: [XCTOSSignpostMetric.scrollDecelerationMetric], options: options) {
+            for _ in 0..<4 { app.swipeUp() }
+            XCTAssertTrue(app.staticTexts["单次战役极限"].exists)
+            for _ in 0..<4 { app.swipeDown() }
+        }
+        XCTAssertTrue(summary.isHittable)
+        XCTAssertEqual(summary.value as? String, counts)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
 

@@ -1,6 +1,6 @@
 import Foundation
 
-extension Workout {
+@MainActor extension Workout {
     func canOfferSaveAsPlanTemplate(alreadySaved: Bool) -> Bool {
         isFinished
         && planId == nil

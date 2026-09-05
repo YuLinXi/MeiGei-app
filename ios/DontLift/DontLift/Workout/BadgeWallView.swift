@@ -3,29 +3,25 @@ import SwiftData
 
 /// 严肃力量成就徽章馆二级全屏页
 struct BadgeWallView: View {
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \BadgeGrant.unlockedAt, order: .reverse) private var allGrants: [BadgeGrant]
-    @Query(sort: \Workout.startedAt, order: .forward) private var rawWorkouts: [Workout]
-
-    private var allWorkouts: [Workout] {
-        rawWorkouts.filter { $0.deletedAt == nil && $0.endedAt != nil }
-    }
+    @Environment(BadgeWallStore.self) private var badgeWallStore
 
     @State private var selectedBadge: BadgeProgress?
     @State private var openedWorkout: Workout?
     @State private var showingWeightSheet: Bool = false
     @State private var caloriePreferences = WorkoutCaloriePreferences.current()
 
-    private var progressList: [BadgeProgress] {
-        BadgeEngine.calculateProgress(
-            allFinishedWorkouts: allWorkouts,
-            grants: allGrants,
-            currentWeight: caloriePreferences.bodyWeightKg
-        )
-    }
+    private static let chineseDateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy年M月d日 HH:mm"
+        return formatter
+    }()
 
     private var unlockedCount: Int {
-        progressList.filter(\.isUnlocked).count
+        badgeWallStore.progress.filter(\.isUnlocked).count
     }
 
     private var totalCount: Int {
@@ -39,8 +35,10 @@ struct BadgeWallView: View {
                 summaryHeaderCard
 
                 // 2. 按四大板块分节呈现
-                ForEach(BadgeCategory.allCases) { category in
-                    categorySection(category: category)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
+                    ForEach(BadgeCategory.allCases) { category in
+                        categorySection(category: category)
+                    }
                 }
 
                 Color.clear.frame(height: 32)
@@ -49,14 +47,13 @@ struct BadgeWallView: View {
             .padding(.top, 16)
         }
         .background(Theme.Color.bg.ignoresSafeArea())
-        .navigationTitle("成就勋章馆")
-        .navigationBarTitleDisplayMode(.inline)
+        .paperToolbar(title: "成就勋章馆", onBack: { dismiss() })
         .toolbar(.visible, for: .navigationBar)
         .navigationDestination(item: $openedWorkout) { workout in
             WorkoutDetailView(workout: workout)
         }
         .sheet(item: $selectedBadge) { progress in
-            badgeDetailSheet(progress: progress)
+            badgeDetailSheet(progress: badgeWallStore.progress.first { $0.id == progress.id } ?? progress)
         }
         .sheet(isPresented: $showingWeightSheet) {
             CalorieBodyWeightSheet(
@@ -65,20 +62,16 @@ struct BadgeWallView: View {
                 onSave: { kg, _ in
                     WorkoutCaloriePreferences.setBodyWeightKg(kg)
                     caloriePreferences = WorkoutCaloriePreferences.current()
-                    BadgeEngine.runBackfillIfNeeded(in: modelContext, force: true)
                 }
             )
         }
-        .onAppear {
-            caloriePreferences = WorkoutCaloriePreferences.current()
-            BadgeEngine.runBackfillIfNeeded(in: modelContext)
-        }
+        .onAppear { caloriePreferences = WorkoutCaloriePreferences.current() }
         .task {
-            BadgeEngine.runBackfillIfNeeded(in: modelContext)
+            badgeWallStore.ensureLoaded()
             #if DEBUG
             if let targetId = UITestHooks.testBadgeDetailId {
-                try? await Task.sleep(for: .milliseconds(350))
-                if let match = progressList.first(where: { $0.definition.id == targetId }) {
+                await badgeWallStore.waitUntilLoaded()
+                if let match = badgeWallStore.progress.first(where: { $0.definition.id == targetId }) {
                     selectedBadge = match
                 }
             }
@@ -92,12 +85,11 @@ struct BadgeWallView: View {
         VStack(spacing: 12) {
             HStack(alignment: .lastTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("TOTAL BADGES UNLOCKED")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.2)
-                        .foregroundStyle(Color(hex: "E04328"))
-
-                    Text("已点亮荣誉刻度")
+                    Text("已解锁徽章")
+                        .accessibilityIdentifier("badge.wall.summary")
+                        #if DEBUG
+                        .accessibilityValue("\(badgeWallStore.isReady ? "ready" : "loading"):\(badgeWallStore.historyReadCount):\(badgeWallStore.completedRefreshCount)")
+                        #endif
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(Color.primary)
                 }
@@ -139,9 +131,6 @@ struct BadgeWallView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Color.secondary)
                 Spacer()
-                Text("24 枚独立不折叠")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.secondary)
             }
         }
         .padding(16)
@@ -158,18 +147,19 @@ struct BadgeWallView: View {
     // MARK: - 分类 Section 与 3 列网格
 
     private func categorySection(category: BadgeCategory) -> some View {
-        let categoryItems = progressList.filter { $0.definition.category == category }
+        let categoryItems = badgeWallStore.sections[category] ?? []
         let categoryUnlocked = categoryItems.filter(\.isUnlocked).count
 
-        return VStack(alignment: .leading, spacing: 12) {
+        return Section {
+            ForEach(categoryItems, id: \.definition.code) { item in
+                badgeGridCell(item: item)
+            }
+        } header: {
             HStack(alignment: .lastTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(category.displayName)
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(Color.primary)
-                    Text(category.subtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.secondary)
                 }
                 Spacer()
                 Text("\(categoryUnlocked) / \(categoryItems.count)")
@@ -177,18 +167,7 @@ struct BadgeWallView: View {
                     .foregroundStyle(Color(hex: "E04328"))
             }
 
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: 12),
-                    GridItem(.flexible(), spacing: 12),
-                    GridItem(.flexible(), spacing: 12)
-                ],
-                spacing: 12
-            ) {
-                ForEach(categoryItems, id: \.definition.code) { item in
-                    badgeGridCell(item: item)
-                }
-            }
+            .padding(.top, 12)
         }
     }
 
@@ -200,9 +179,9 @@ struct BadgeWallView: View {
                 BadgeIconView(
                     definition: item.definition,
                     isUnlocked: item.isUnlocked,
-                    size: .regular
+                    size: .regular,
+                    progress: badgeWallStore.isReady ? item.progressRatio : nil
                 )
-                .padding(.top, 4)
 
                 VStack(spacing: 2) {
                     Text(item.definition.name)
@@ -210,55 +189,10 @@ struct BadgeWallView: View {
                         .foregroundStyle(item.isUnlocked ? Color.primary : Color.secondary)
                         .lineLimit(1)
 
-                    if item.isUnlocked {
-                        if let grant = item.grant {
-                            Text(grant.unlockedAt.formatted(date: .numeric, time: .omitted))
-                                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                                .foregroundStyle(Color(hex: "E04328"))
-                                .lineLimit(1)
-                        } else {
-                            Text("已达成")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Color(hex: "E04328"))
-                        }
-                    } else {
-                        if item.progressRatio > 0 {
-                            Text("\(Int(item.progressRatio * 100))%")
-                                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                                .foregroundStyle(Color.secondary)
-                        } else if item.progressText.contains("完善体重") {
-                            Text("待完善体重")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Color.secondary.opacity(0.8))
-                        } else {
-                            Text("未解锁")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Color.secondary.opacity(0.7))
-                        }
-                    }
-                }
-
-                // 进度微条
-                if !item.isUnlocked {
-                    Capsule()
-                        .fill(Color.primary.opacity(0.06))
-                        .frame(height: 3)
-                        .overlay(
-                            GeometryReader { g in
-                                Capsule()
-                                    .fill(Color(hex: "E04328").opacity(0.6))
-                                    .frame(width: g.size.width * CGFloat(item.progressRatio), height: 3)
-                            },
-                            alignment: .leading
-                        )
-                        .padding(.horizontal, 10)
-                        .padding(.bottom, 6)
-                } else {
-                    Color.clear.frame(height: 3).padding(.bottom, 6)
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .frame(height: 104)
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(item.isUnlocked ? Theme.Color.surface : Theme.Color.surface.opacity(0.5))
@@ -315,11 +249,11 @@ struct BadgeWallView: View {
                                     .font(.system(size: 13))
                                     .foregroundStyle(Color.secondary)
                                 Spacer()
-                                Text(grant.unlockedAt.formatted(date: .abbreviated, time: .shortened))
+                                Text(Self.chineseDateTimeFormatter.string(from: grant.unlockedAt))
                                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
                                     .foregroundStyle(Color.primary)
                             }
-                            if grant.snapshotMetric > 0 {
+                            if grant.snapshotMetric > 0, progress.definition.unit != "次" {
                                 HStack {
                                     Text("达成记录")
                                         .font(.system(size: 13))
@@ -331,6 +265,8 @@ struct BadgeWallView: View {
                                 }
                             }
                         }
+                    } else if !badgeWallStore.isReady {
+                        Text("进度更新中").foregroundStyle(.secondary)
                     } else {
                         HStack {
                             Text("当前进度")
@@ -342,8 +278,9 @@ struct BadgeWallView: View {
                                 .foregroundStyle(Color(hex: "E04328"))
                         }
 
-                        ProgressView(value: progress.progressRatio)
-                            .tint(Color(hex: "E04328"))
+                        Text("完成度 \(Int((progress.progressRatio * 100).rounded()))%")
+                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Color(hex: "E04328"))
                     }
                 }
                 .padding(16)
@@ -363,7 +300,8 @@ struct BadgeWallView: View {
                 // 操作按钮
                 if progress.isUnlocked, let grant = progress.grant, let workoutId = grant.workoutId {
                     Button {
-                        if let found = allWorkouts.first(where: { $0.localId == workoutId }) {
+                        let descriptor = FetchDescriptor<Workout>(predicate: #Predicate { $0.localId == workoutId && $0.deletedAt == nil })
+                        if let found = try? modelContext.fetch(descriptor).first {
                             selectedBadge = nil
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                                 openedWorkout = found
@@ -442,13 +380,14 @@ struct BadgeWallView: View {
             }
             return String(format: "%.1f kg", value)
         } else if unit.contains("BW") {
-            return String(format: "%.2f x BW", value)
+            return String(format: "%.2f 倍体重", value)
         } else if value.truncatingRemainder(dividingBy: 1) == 0 {
             return "\(Int(value)) \(unit)"
         } else {
             return String(format: "%.1f \(unit)", value)
         }
     }
+
 }
 
 extension BadgeProgress: Identifiable {

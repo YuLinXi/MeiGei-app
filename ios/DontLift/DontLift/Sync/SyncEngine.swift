@@ -86,7 +86,6 @@ final class SyncEngine {
         NotificationCenter.default.post(name: .dontliftSyncCompleted, object: nil)
         if workoutsSynced && saved {
             NotificationCenter.default.post(name: .dontliftWorkoutSyncSucceeded, object: nil)
-            BadgeEngine.runBackfillIfNeeded(in: modelContext)
         }
     }
 
@@ -471,7 +470,8 @@ final class SyncEngine {
                            sourceShareVersionId: m.sourceShareVersionId,
                            sourcePlanNameSnapshot: m.sourcePlanNameSnapshot,
                            title: m.title,
-                           startedAt: m.startedAt, endedAt: m.endedAt, note: m.note,
+                           startedAt: m.startedAt, endedAt: m.endedAt,
+                           bodyWeightKgAtCompletion: m.bodyWeightKgAtCompletion, note: m.note,
                            units: m.unitsJSON,
                            createdAt: nil, updatedAt: m.updatedAt, deletedAt: m.deletedAt, version: m.version)
         return WorkoutTreeDTO(workout: w, exercises: nodes)
@@ -485,7 +485,9 @@ final class SyncEngine {
         m.sourcePlanNameSnapshot = w.sourcePlanNameSnapshot
         m.title = w.title
         if let s = w.startedAt { m.startedAt = s }
-        m.endedAt = w.endedAt; m.note = w.note
+        m.endedAt = w.endedAt
+        m.bodyWeightKgAtCompletion = w.bodyWeightKgAtCompletion
+        m.note = w.note
         m.unitsJSON = w.units
         m.updatedAt = w.updatedAt; m.deletedAt = w.deletedAt
         m.version = w.version ?? m.version

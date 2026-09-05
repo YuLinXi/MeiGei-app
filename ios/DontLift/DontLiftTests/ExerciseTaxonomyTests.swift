@@ -293,7 +293,7 @@ struct ExerciseTaxonomyTests {
         #expect(machineRow.displayExerciseName == "单臂器械划船")
     }
 
-    @Test func historyKeysUseCanonicalAliasCode() {
+    @Test @MainActor func historyKeysUseCanonicalAliasCode() {
         let legacyWorkoutExercise = WorkoutExercise(
             builtinExerciseCode: "CABLE_FLY",
             exerciseName: "绳索夹胸",

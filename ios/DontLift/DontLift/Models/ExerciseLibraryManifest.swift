@@ -164,7 +164,7 @@ enum ExerciseLibrary {
     }
 }
 
-extension WorkoutExercise {
+@MainActor extension WorkoutExercise {
     var resolvedBuiltinExercise: BuiltinExercise? {
         ExerciseLibrary.resolve(code: builtinExerciseCode, name: exerciseName)
     }

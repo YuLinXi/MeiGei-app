@@ -3,7 +3,7 @@ import SwiftData
 import Testing
 @testable import DontLift
 
-struct BadgeEngineTests {
+@MainActor struct BadgeEngineTests {
 
     // MARK: - 辅助测试构建器
 
@@ -107,6 +107,7 @@ struct BadgeEngineTests {
         #expect(unweightedBwCodes.isEmpty)
 
         // 录入 70kg 体重：应达成全部 6 枚体重倍数徽章
+        w.bodyWeightKgAtCompletion = 70
         let weightedResults = BadgeEngine.evaluateIncremental(
             workout: w,
             allFinishedWorkouts: [w],
@@ -120,6 +121,51 @@ struct BadgeEngineTests {
         #expect(bwCodes.contains("strength_bw_squat_2_0"))
         #expect(bwCodes.contains("strength_bw_deadlift_2_0"))
         #expect(bwCodes.contains("strength_bw_deadlift_2_5"))
+    }
+
+    @Test func bodyweightBadgeUsesTheTriggeringWorkoutInsteadOfAnOlderPR() {
+        let oldBench = Self.makeWorkout(
+            exercises: [Self.makeExercise(code: "BB_BENCH_PRESS", name: "杠铃卧推", weight: 100)],
+            startedAt: Date(timeIntervalSince1970: 1_000),
+            endedAt: Date(timeIntervalSince1970: 2_000)
+        )
+        let unrelatedWorkout = Self.makeWorkout(
+            exercises: [Self.makeExercise(code: "CABLE_ROW", name: "坐姿划船", weight: 50)],
+            startedAt: Date(timeIntervalSince1970: 3_000),
+            endedAt: Date(timeIntervalSince1970: 4_000)
+        )
+
+        let results = BadgeEngine.evaluateIncremental(
+            workout: unrelatedWorkout,
+            allFinishedWorkouts: [oldBench, unrelatedWorkout],
+            currentGrants: [],
+            currentWeight: 70
+        )
+
+        #expect(results.allSatisfy { !$0.badgeCode.starts(with: "strength_bw_") })
+    }
+
+    @Test @MainActor func historyBackfillUsesEachWorkoutBodyweightSnapshot() {
+        let oldBench = Self.makeWorkout(
+            exercises: [Self.makeExercise(code: "BB_BENCH_PRESS", name: "杠铃卧推", weight: 100)],
+            startedAt: Date(timeIntervalSince1970: 1_000),
+            endedAt: Date(timeIntervalSince1970: 2_000)
+        )
+        oldBench.bodyWeightKgAtCompletion = 110
+        let laterUnrelatedWorkout = Self.makeWorkout(
+            exercises: [Self.makeExercise(code: "CABLE_ROW", name: "坐姿划船", weight: 50)],
+            startedAt: Date(timeIntervalSince1970: 3_000),
+            endedAt: Date(timeIntervalSince1970: 4_000)
+        )
+        laterUnrelatedWorkout.bodyWeightKgAtCompletion = 70
+
+        let results = BadgeEngine.simulateHistoryTimeline(
+            sortedFinishedWorkouts: [oldBench, laterUnrelatedWorkout],
+            existingGrants: [],
+            currentWeight: 70
+        )
+
+        #expect(results.allSatisfy { !$0.badgeCode.starts(with: "strength_bw_") })
     }
 
     // MARK: - 3. 三大项俱乐部总和判定
@@ -259,9 +305,31 @@ struct BadgeEngineTests {
         #expect(planCodes.contains("feat_perfect_plan"))
     }
 
+    @Test func missingPlanCannotUnlockPerfectExecution() {
+        let planId = UUID()
+        let exercise = Self.makeExercise(
+            code: "BB_BENCH_PRESS",
+            name: "杠铃卧推",
+            weight: 80,
+            setsCount: 3,
+            planItemId: UUID()
+        )
+        let workout = Self.makeWorkout(exercises: [exercise], planId: planId)
+
+        let results = BadgeEngine.evaluateIncremental(
+            workout: workout,
+            allFinishedWorkouts: [workout],
+            currentGrants: [],
+            currentWeight: nil,
+            plan: nil
+        )
+
+        #expect(!results.contains { $0.badgeCode == "feat_perfect_plan" })
+    }
+
     // MARK: - 6. 存量回溯与幂等性验证
 
-    @Test @MainActor func backfillPipelineAndIdempotency() throws {
+    @Test @MainActor func backfillPipelineAndIdempotency() async throws {
         let container = AppModelContainer.make(inMemory: true)
         let context = container.mainContext
         let testDefaults = UserDefaults(suiteName: "BadgeEngineTests.\(UUID().uuidString)")!
@@ -282,7 +350,7 @@ struct BadgeEngineTests {
         try context.save()
 
         // 首次执行 Backfill
-        let createdFirst = BadgeEngine.runBackfillIfNeeded(in: context, defaults: testDefaults)
+        let createdFirst = await BadgeEngine.runBackfillIfNeeded(in: context, defaults: testDefaults)
         #expect(!createdFirst.isEmpty)
         #expect(testDefaults.bool(forKey: BadgeEngine.backfillCompletedKey) == true)
 
@@ -295,8 +363,20 @@ struct BadgeEngineTests {
         #expect(firstWorkoutGrant?.workoutId == w1.localId)
 
         // 二次执行 Backfill：幂等保护，不再生成任何新徽章
-        let createdSecond = BadgeEngine.runBackfillIfNeeded(in: context, defaults: testDefaults)
+        let createdSecond = await BadgeEngine.runBackfillIfNeeded(in: context, defaults: testDefaults)
         #expect(createdSecond.isEmpty)
+
+        // 同步编辑既有训练不会改变记录数量，但应使缓存失效并补齐新资格。
+        let existingCodes = Set(savedGrants.map(\.badgeCode))
+        #expect(!existingCodes.contains("tonnage_50t"))
+        w2.exercises[0].sets.append(contentsOf: (10..<50).map { index in
+            WorkoutSet(setIndex: index, weightKg: 120, reps: 10, completed: true)
+        })
+        w2.updatedAt = Date(timeIntervalSince1970: 20_000)
+        try context.save()
+
+        let createdAfterEdit = await BadgeEngine.runBackfillIfNeeded(in: context, defaults: testDefaults)
+        #expect(createdAfterEdit.contains { $0.badgeCode == "tonnage_50t" })
     }
 
     // MARK: - 7. 徽章进度展示计算

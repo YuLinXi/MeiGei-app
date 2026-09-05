@@ -1,9 +1,37 @@
 import Foundation
+import SwiftUI
 import SwiftData
 import Testing
 @testable import DontLift
 
 struct BadgeModelTests {
+
+    @Test @MainActor func diagonalFillRetainsVisibleUnfilledAreaForEveryShape() {
+        let rect = CGRect(x: 0, y: 0, width: 64, height: 64)
+        let shapes: [(BadgeShapeKind, Path)] = [
+            (.circle, Circle().path(in: rect)), (.octagon, OctagonShape().path(in: rect)),
+            (.hexagon, HexagonShape().path(in: rect)), (.diamond, DiamondShape().path(in: rect))
+        ]
+        for (kind, shape) in shapes {
+            let capped = BadgeDiagonalFill(progress: 0.94, kind: kind).path(in: rect)
+            #expect(capped == BadgeDiagonalFill(progress: 0.9999, kind: kind).path(in: rect))
+            #expect(capped == BadgeDiagonalFill(progress: 1, kind: kind).path(in: rect))
+            var total = 0
+            var unfilled = 0
+            for y in 0..<128 {
+                for x in 0..<128 {
+                    let point = CGPoint(x: (Double(x) + 0.5) / 2, y: (Double(y) + 0.5) / 2)
+                    if shape.contains(point) {
+                        total += 1
+                        if !capped.contains(point) { unfilled += 1 }
+                    }
+                }
+            }
+            let ratio = Double(unfilled) / Double(total)
+            #expect(ratio >= 0.055 && ratio <= 0.075)
+            #expect(BadgeDiagonalFill(progress: 0, kind: kind).path(in: rect).isEmpty)
+        }
+    }
 
     @Test func badgeDefinitionHasExactly24UniqueBadgesAcrossFourCategories() {
         let all = BadgeDefinition.all

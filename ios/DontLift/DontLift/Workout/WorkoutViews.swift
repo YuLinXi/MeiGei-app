@@ -2829,6 +2829,7 @@ struct WorkoutLoggingView: View {
         restTimer.stop()   // 结束训练即停止进行中的休息计时全套，避免倒计时/灵动岛残留。
         let endedAt = Date.now
         workout.endedAt = endedAt
+        workout.bodyWeightKgAtCompletion = WorkoutCaloriePreferences.current().bodyWeightKg
         cleanupIncompleteSets()   // 落值方案：清理未打勾预填残组（design.md D6）
         touch()
         // 时长以计时起点为基准（排除开始前空闲）；旧数据无 timerStartedAt 时回退 startedAt。

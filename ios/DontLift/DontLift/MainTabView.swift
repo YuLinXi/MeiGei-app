@@ -16,6 +16,7 @@ struct MainTabView: View {
     @Environment(WorkoutPresentationCenter.self) private var workoutPresentation
     @Environment(WorkoutLiveActivityController.self) private var workoutLiveActivity
     @Environment(BadgeCelebrationCenter.self) private var badgeCelebration
+    @Environment(BadgeWallStore.self) private var badgeWallStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// 全局进行中会话（LIVE 悬浮胶囊来源）：未删除且未结束 = isActive。
@@ -140,7 +141,7 @@ struct MainTabView: View {
         }
         .onChange(of: activeSession == nil) { _, isIdle in
             if isIdle {
-                checkCareerReviewOnLaunch()
+                Task { await checkCareerReviewOnLaunch() }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .dontliftSyncCompleted)) { _ in
@@ -242,12 +243,11 @@ struct MainTabView: View {
     private func handleOnAppear() {
         refreshActiveSession()
         // 存量荣誉勋章自愈与静默回溯（独立运行，不被活跃训练拦截）
-        BadgeEngine.runBackfillIfNeeded(in: modelContext)
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-test-career-review") {
-            checkCareerReviewOnLaunch(force: true)
+            Task { await checkCareerReviewOnLaunch(force: true) }
         } else {
-            checkCareerReviewOnLaunch()
+            Task { await checkCareerReviewOnLaunch() }
         }
         if UITestHooks.isTestBadgeCelebration {
             let mockCandidates = [
@@ -272,7 +272,7 @@ struct MainTabView: View {
             workoutPresentation.present(workout)
         }
         #else
-        checkCareerReviewOnLaunch()
+        Task { await checkCareerReviewOnLaunch() }
         #endif
         if PushManager.shared.pendingOpenedTeamId != nil {
             selectedTab = .team
@@ -341,14 +341,17 @@ struct MainTabView: View {
         presentNextRootSheetIfNeeded()
     }
 
-    private func checkCareerReviewOnLaunch(force: Bool = false) {
+    private func checkCareerReviewOnLaunch(force: Bool = false) async {
         guard activeSession == nil else { return }
         if !force {
             guard !UserDefaults.standard.bool(forKey: BadgeEngine.careerReviewShownKey) else { return }
         }
 
         // 若尚未执行存量回溯，立即在本地执行一次
-        BadgeEngine.runBackfillIfNeeded(in: modelContext, force: force)
+        badgeWallStore.configure(context: modelContext, userId: session.currentUserId)
+        if force { badgeWallStore.invalidate() }
+        await badgeWallStore.waitUntilLoaded()
+        guard badgeWallStore.isReady else { return }
 
         let grantDescriptor = FetchDescriptor<BadgeGrant>(sortBy: [SortDescriptor(\.unlockedAt, order: .forward)])
         guard let grants = try? modelContext.fetch(grantDescriptor), !grants.isEmpty else {
@@ -395,7 +398,7 @@ struct MainTabView: View {
         } else if url.host == "profile" || url.host == "badge-wall" {
             selectedTab = .profile
         } else if url.host == "career-review" {
-            checkCareerReviewOnLaunch(force: true)
+            Task { await checkCareerReviewOnLaunch(force: true) }
         }
     }
 

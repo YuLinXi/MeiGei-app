@@ -3,14 +3,15 @@ import SwiftData
 
 /// 训练记录聚合根（对应后端 workout）。
 /// 子节点 exercise/set 无独立同步信封，随聚合整体上传、服务端按 workoutId 全量替换（design.md D5）。
+/// 持久化字段由各自 ModelContext 的执行器访问；业务操作仍在 MainActor 上执行。
 @Model
-final class Workout: Syncable {
-    @Attribute(.unique) var localId: UUID
-    var serverId: UUID?
-    var updatedAt: Date
-    var deletedAt: Date?
-    var version: Int
-    var syncStatusRaw: String
+nonisolated final class Workout: Syncable {
+    @Attribute(.unique) nonisolated var localId: UUID
+    nonisolated var serverId: UUID?
+    nonisolated var updatedAt: Date
+    nonisolated var deletedAt: Date?
+    nonisolated var version: Int
+    nonisolated var syncStatusRaw: String
 
     /// 来源计划模板（可空：徒手临时训练）。
     var planId: UUID?
@@ -24,6 +25,8 @@ final class Workout: Syncable {
     /// 非 nil = 计时已启动（完成第一组或手动「开始训练」），REC 与训练时长均以此为基准。
     var timerStartedAt: Date?
     var endedAt: Date?
+    /// 训练结束时记录的体重，用于按当时有效体重判定自重倍数成就。
+    var bodyWeightKgAtCompletion: Double?
     var note: String?
     /// 一级训练单元索引 JSON。nil/空数组表示旧数据：按 `exercises.orderIndex` 派生为单动作单元。
     var unitsJSON: String?
@@ -31,7 +34,7 @@ final class Workout: Syncable {
     @Relationship(deleteRule: .cascade, inverse: \WorkoutExercise.workout)
     var exercises: [WorkoutExercise]
 
-    init(
+    @MainActor init(
         localId: UUID = UUID(),
         planId: UUID? = nil,
         sourceShareId: UUID? = nil,
@@ -41,6 +44,7 @@ final class Workout: Syncable {
         startedAt: Date = .now,
         timerStartedAt: Date? = nil,
         endedAt: Date? = nil,
+        bodyWeightKgAtCompletion: Double? = nil,
         note: String? = nil,
         unitsJSON: String? = nil,
         exercises: [WorkoutExercise] = [],
@@ -60,6 +64,7 @@ final class Workout: Syncable {
         self.startedAt = startedAt
         self.timerStartedAt = timerStartedAt
         self.endedAt = endedAt
+        self.bodyWeightKgAtCompletion = bodyWeightKgAtCompletion
         self.note = note
         self.unitsJSON = unitsJSON
         self.exercises = exercises
@@ -152,7 +157,7 @@ struct WorkoutSupersetMember: Codable, Identifiable, Hashable {
 
 // MARK: - 会话生命周期派生状态（不新增持久化字段，见 workout-session-lifecycle）
 
-extension Workout {
+@MainActor extension Workout {
     /// 进行中会话：未删除且未结束。全局至多一个（由 `WorkoutSession.beginSession` 守卫保证）。
     var isActive: Bool { deletedAt == nil && endedAt == nil }
     /// 已完成会话：未删除且已结束。
@@ -396,7 +401,7 @@ extension Workout {
 
 /// 训练中的一个动作条目（聚合子节点，不单独同步）。
 @Model
-final class WorkoutExercise {
+nonisolated final class WorkoutExercise {
     @Attribute(.unique) var localId: UUID
     var builtinExerciseCode: String?
     var customExerciseId: UUID?
@@ -444,7 +449,7 @@ enum WorkoutSetType: String, Codable, CaseIterable {
 }
 
 /// 递减组内的单段重量/次数。segment 不是独立同步实体，随父级 `WorkoutSet` 一起保存。
-struct WorkoutSetSegment: Codable, Hashable, Identifiable {
+nonisolated struct WorkoutSetSegment: Codable, Hashable, Identifiable, Sendable {
     var segmentId: UUID
     var segmentIndex: Int
     var weightKg: Double?
@@ -470,7 +475,7 @@ struct WorkoutSetStatEntry: Equatable, Hashable {
 /// 一个动作下的单组记录（聚合子节点，不单独同步）。新增组可由调用方按当前训练上下文预填重量/次数；
 /// 未完成组不计入训练量/PR。
 @Model
-final class WorkoutSet {
+nonisolated final class WorkoutSet {
     @Attribute(.unique) var localId: UUID
     var setIndex: Int
     var weightKg: Double?
@@ -482,7 +487,7 @@ final class WorkoutSet {
     /// 该组休息完成后的真实秒数；nil 表示尚未产生休息回填。
     var actualRestSeconds: Int?
     /// 组类型 raw（默认 "working"）。SwiftData 轻量迁移：存储属性声明带默认值，旧本地记录读出即 working。
-    var setTypeRaw: String = WorkoutSetType.working.rawValue
+    var setTypeRaw: String = "working"
     /// 热身标记。新语义中热身独立于结构类型；旧 `setTypeRaw == "warmup"` 由 helper 兼容识别。
     var isWarmup: Bool = false
     /// 递减组分段。普通组/热身组保持空数组；SwiftData 轻量迁移时旧记录读出即空。
@@ -490,7 +495,7 @@ final class WorkoutSet {
 
     var exercise: WorkoutExercise?
 
-    init(
+    @MainActor init(
         localId: UUID = UUID(),
         setIndex: Int,
         weightKg: Double? = nil,
@@ -519,7 +524,7 @@ final class WorkoutSet {
 }
 
 // 计算属性放 extension：避免 @Model 宏对类体内带 get/set 的计算属性注入访问器导致解析错。
-extension WorkoutSet {
+@MainActor extension WorkoutSet {
     /// 组类型枚举视图：get 未知值兜底 `.working`（跨版本安全），set 写回 raw。
     var setType: WorkoutSetType {
         get {
@@ -644,7 +649,7 @@ extension WorkoutSet {
     }
 }
 
-extension WorkoutExercise {
+@MainActor extension WorkoutExercise {
     /// 展示用排序：热身组吸顶（warmup 段在前），段内按稳定原序 setIndex 升序。
     var displaySortedSets: [WorkoutSet] {
         sets.sorted {

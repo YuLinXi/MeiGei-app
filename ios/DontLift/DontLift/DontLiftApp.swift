@@ -20,6 +20,7 @@ struct DontLiftApp: App {
     @State private var syncProgress = SyncProgressCenter()
     @State private var workoutPresentation = WorkoutPresentationCenter()
     @State private var badgeCelebration = BadgeCelebrationCenter()
+    @State private var badgeWallStore = BadgeWallStore()
 
     init() {
         let container = AppModelContainer.make()
@@ -74,11 +75,21 @@ struct DontLiftApp: App {
                 .environment(syncProgress)
                 .environment(workoutPresentation)
                 .environment(badgeCelebration)
+                .environment(badgeWallStore)
                 .preferredColorScheme(.light)
+                .onChange(of: session.currentUserId, initial: true) { _, userId in
+                    badgeWallStore.configure(context: modelContainer.mainContext, userId: userId)
+                }
+                .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { notification in
+                    badgeWallStore.saved(notification)
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .badgeBodyWeightChanged)) { _ in
+                    badgeWallStore.invalidate(historyChanged: false)
+                }
                 .task(id: session.isLoggedIn) {
                     #if DEBUG
                     // UI 测试场景跳过 HealthKit 授权弹窗，避免阻塞自动化。
-                    if UITestHooks.isLiveWorkoutUITest { return }
+                    if UITestHooks.isLiveWorkoutUITest || UITestHooks.isAutoLogin { return }
                     #endif
                     if session.isLoggedIn { await healthKit.requestAuthorization() }
                 }

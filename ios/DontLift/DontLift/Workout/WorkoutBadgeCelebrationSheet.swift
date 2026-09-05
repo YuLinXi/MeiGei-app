@@ -67,9 +67,8 @@ struct WorkoutBadgeCelebrationSheet: View {
                 .padding(.top, 12)
 
             VStack(spacing: 6) {
-                Text("NEW BADGE UNLOCKED")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(1.5)
+                Text("新徽章已解锁")
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Color(hex: "E04328"))
 
                 Text(definition.name)
@@ -90,7 +89,7 @@ struct WorkoutBadgeCelebrationSheet: View {
                     .foregroundStyle(Color.primary)
                     .multilineTextAlignment(.center)
 
-                if candidate.snapshotMetric > 0 {
+                if candidate.snapshotMetric > 0, definition.unit != "次" {
                     Text("达成记录: \(formatSnapshot(candidate.snapshotMetric, unit: definition.unit))")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color(hex: "E04328"))
@@ -114,9 +113,8 @@ struct WorkoutBadgeCelebrationSheet: View {
     private func multiBadgeView(items: [(candidate: BadgeGrantCandidate, definition: BadgeDefinition)]) -> some View {
         VStack(spacing: 14) {
             VStack(spacing: 4) {
-                Text("NEW ACHIEVEMENTS UNLOCKED")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(1.5)
+                Text("新徽章已解锁")
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Color(hex: "E04328"))
                     .padding(.top, 8)
 
@@ -173,7 +171,7 @@ struct WorkoutBadgeCelebrationSheet: View {
             }
             return String(format: "%.1f kg", value)
         } else if unit.contains("BW") {
-            return String(format: "%.2f x BW", value)
+            return String(format: "%.2f 倍体重", value)
         } else if value.truncatingRemainder(dividingBy: 1) == 0 {
             return "\(Int(value)) \(unit)"
         } else {

@@ -51,7 +51,10 @@ enum UITestHooks {
         _ = try? WorkoutDemoSeedData.seed(in: context)
         UserDefaults.standard.removeObject(forKey: BadgeEngine.backfillCompletedKey)
         UserDefaults.standard.removeObject(forKey: BadgeEngine.careerReviewShownKey)
-        BadgeEngine.runBackfillIfNeeded(in: context, force: true)
+        configureLaunchEnvironment()
+        Task { @MainActor in
+            await BadgeEngine.runBackfillIfNeeded(in: context, force: true)
+        }
     }
 
     /// 在 App 启动装配期调用：清除进行中训练会话（用于测试主页/生涯回顾等正常展示）。

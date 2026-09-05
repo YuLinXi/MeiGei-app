@@ -158,6 +158,7 @@ struct WorkoutDTO: Codable {
     var title: String?
     var startedAt: Date?
     var endedAt: Date?
+    var bodyWeightKgAtCompletion: Double?
     var note: String?
     /// 一级训练单元 JSON 字符串；旧后端/旧数据缺失时本地按动作列表派生。
     var units: String?

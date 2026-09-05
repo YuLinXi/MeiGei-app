@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// 勋章几何外形枚举
-enum BadgeShapeKind {
+nonisolated enum BadgeShapeKind: Hashable, Sendable {
     case circle
     case octagon
     case hexagon
@@ -113,6 +113,7 @@ struct BadgeIconView: View {
     let definition: BadgeDefinition
     var isUnlocked: Bool = true
     var size: BadgeIconSize = .regular
+    var progress: Double? = nil
 
     private var shapeKind: BadgeShapeKind {
         BadgeShapeKind.from(category: definition.category)
@@ -120,45 +121,66 @@ struct BadgeIconView: View {
 
     var body: some View {
         ZStack {
+            artwork(isLit: isUnlocked)
+            if !isUnlocked, let progress, progress > 0 {
+                artwork(isLit: true)
+                    .mask(BadgeDiagonalFill(progress: progress, kind: shapeKind))
+            }
+        }
+        .frame(width: size.dimension, height: size.dimension)
+        .shadow(
+            color: isUnlocked ? Color.black.opacity(0.35) : Color.black.opacity(0.15),
+            radius: size == .regular ? 2 : (isUnlocked ? 5 : 2),
+            x: 0,
+            y: size == .regular ? 1 : 2
+        )
+        .overlay(alignment: .bottomTrailing) {
+            // 当前进度满足门槛不等于历史授予，仍未解锁时保留状态差异。
+            if !isUnlocked, let progress, progress >= 1 {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .padding(4)
+                    .background(Theme.Color.surface, in: Circle())
+            }
+        }
+    }
+
+    private func artwork(isLit: Bool) -> some View {
+        ZStack {
             switch shapeKind {
             case .circle:
-                renderShapeContent(shape: Circle())
+                renderShapeContent(shape: Circle(), isLit: isLit)
             case .octagon:
-                renderShapeContent(shape: OctagonShape())
+                renderShapeContent(shape: OctagonShape(), isLit: isLit)
             case .hexagon:
-                renderShapeContent(shape: HexagonShape())
+                renderShapeContent(shape: HexagonShape(), isLit: isLit)
             case .diamond:
-                renderShapeContent(shape: DiamondShape())
+                renderShapeContent(shape: DiamondShape(), isLit: isLit)
             }
 
             // 中心符号
             Image(systemName: definition.iconSystemName)
                 .font(.system(size: size.symbolSize, weight: .bold))
                 .foregroundColor(
-                    isUnlocked ? Color(hex: "F45138") : Color(hex: "5A5D66")
+                    isLit ? Color(hex: "F45138") : Color(hex: "5A5D66")
                 )
                 .shadow(
-                    color: isUnlocked ? Color(hex: "E04328").opacity(0.6) : .clear,
-                    radius: isUnlocked ? 6 : 0,
+                    color: isLit && size != .regular ? Color(hex: "E04328").opacity(0.6) : .clear,
+                    radius: isLit && size != .regular ? 6 : 0,
                     x: 0,
                     y: 1
                 )
         }
         .frame(width: size.dimension, height: size.dimension)
-        .shadow(
-            color: isUnlocked ? Color.black.opacity(0.35) : Color.black.opacity(0.15),
-            radius: isUnlocked ? 5 : 2,
-            x: 0,
-            y: 2
-        )
     }
 
     @ViewBuilder
-    private func renderShapeContent<S: Shape>(shape: S) -> some View {
+    private func renderShapeContent<S: Shape>(shape: S, isLit: Bool) -> some View {
         // 背景底板与金属拉丝渐变
         shape
             .fill(
-                isUnlocked
+                isLit
                     ? LinearGradient(
                         colors: [Color(hex: "2A2C32"), Color(hex: "17181C")],
                         startPoint: .topLeading,
@@ -172,7 +194,7 @@ struct BadgeIconView: View {
             )
 
         // 内圈光晕 / 蚀刻金属质感边框
-        if isUnlocked {
+        if isLit {
             shape
                 .stroke(
                     LinearGradient(
@@ -188,13 +210,67 @@ struct BadgeIconView: View {
                 )
 
             // 核心图腾居中微光
-            Circle()
-                .fill(Color(hex: "E04328").opacity(0.18))
-                .frame(width: size.dimension * 0.55, height: size.dimension * 0.55)
-                .blur(radius: size.dimension * 0.12)
+            if size != .regular {
+                Circle()
+                    .fill(Color(hex: "E04328").opacity(0.18))
+                    .frame(width: size.dimension * 0.55, height: size.dimension * 0.55)
+                    .blur(radius: size.dimension * 0.12)
+            }
         } else {
             shape
                 .stroke(Color(hex: "34373E").opacity(0.5), lineWidth: size.borderWidth)
         }
+    }
+}
+
+/// 以右上—左下斜线为边界，从左上角向右下角揭开彩色图层。
+struct BadgeDiagonalFill: Shape {
+    var progress: Double
+    var kind: BadgeShapeKind = .circle
+
+    // 只初始化一次：按实际图形面积计算斜切线位置，避免外接方框的缺口落在图形之外。
+    // 缓存 4 组百分位，不在滚动绘制时重复采样。
+    private static let offsets: [BadgeShapeKind: [CGFloat]] = {
+        let rect = CGRect(x: 0, y: 0, width: 1, height: 1)
+        let paths: [(BadgeShapeKind, Path)] = [
+            (.circle, Circle().path(in: rect)), (.octagon, OctagonShape().path(in: rect)),
+            (.hexagon, HexagonShape().path(in: rect)), (.diamond, DiamondShape().path(in: rect))
+        ]
+        return Dictionary(uniqueKeysWithValues: paths.map { kind, path in
+            var distances: [CGFloat] = []
+            for y in 0..<96 {
+                for x in 0..<96 {
+                    let point = CGPoint(x: (Double(x) + 0.5) / 96, y: (Double(y) + 0.5) / 96)
+                    if path.contains(point) { distances.append(point.x + point.y) }
+                }
+            }
+            distances.sort()
+            return (kind, (0...94).map { percentile in
+                distances[max(0, Int(Double(distances.count) * Double(percentile) / 100) - 1)]
+            })
+        })
+    }()
+
+    func path(in rect: CGRect) -> Path {
+        let fraction = progress.isFinite ? min(0.94, max(0, progress)) : 0
+        guard fraction > 0 else { return Path() }
+        let values = Self.offsets[kind]!
+        let percent = fraction * 100
+        let lower = Int(percent)
+        let upper = min(94, lower + 1)
+        let offset = values[lower] + (values[upper] - values[lower]) * CGFloat(percent - Double(lower))
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        if offset <= 1 {
+            path.addLine(to: CGPoint(x: rect.minX + rect.width * offset, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + rect.height * offset))
+        } else {
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * (offset - 1)))
+            path.addLine(to: CGPoint(x: rect.minX + rect.width * (offset - 1), y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        }
+        path.closeSubpath()
+        return path
     }
 }

@@ -35,6 +35,9 @@ public class Workout extends BaseEntity implements UserOwned {
 
     private OffsetDateTime endedAt;
 
+    /** 训练结束时的体重快照，用于客户端按历史时点判定自重倍数成就。 */
+    private Double bodyWeightKgAtCompletion;
+
     private String note;
 
     /** 一级训练单元 jsonb 字符串；空数组表示旧数据按 workout_exercise 顺序派生单动作。 */

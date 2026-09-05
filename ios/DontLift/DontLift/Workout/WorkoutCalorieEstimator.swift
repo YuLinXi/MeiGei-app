@@ -57,6 +57,12 @@ struct WorkoutCaloriePreferences: Equatable {
     }
 
     static func setBodyWeightKg(_ value: Double?, defaults: UserDefaults = .standard) {
+        let previous = current(defaults: defaults).bodyWeightKg
+        defer {
+            if previous != current(defaults: defaults).bodyWeightKg {
+                NotificationCenter.default.post(name: .badgeBodyWeightChanged, object: nil)
+            }
+        }
         guard let normalized = normalizedBodyWeight(value) else {
             defaults.removeObject(forKey: bodyWeightKgKey)
             return

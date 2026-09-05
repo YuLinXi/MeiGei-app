@@ -1,8 +1,9 @@
 import Foundation
 import SwiftData
+import CryptoKit
 
 /// 候选解锁成就（未持久化内存模型）
-struct BadgeGrantCandidate: Equatable, Hashable {
+struct BadgeGrantCandidate: Equatable, Hashable, Sendable {
     let badgeCode: String
     let unlockedAt: Date
     let workoutId: UUID?
@@ -10,14 +11,97 @@ struct BadgeGrantCandidate: Equatable, Hashable {
 }
 
 /// 徽章当前达成进度（供徽章馆与个人中心展示）
-struct BadgeProgress: Equatable {
+struct BadgeProgress: Equatable, Sendable {
     let definition: BadgeDefinition
     let isUnlocked: Bool
     let currentMetric: Double
     let targetMetric: Double
-    let grant: BadgeGrant?
+    let grant: BadgeGrantCandidate?
     let progressRatio: Double
     let progressText: String
+}
+
+struct BadgeSegmentSnapshot: Sendable {
+    let weightKg: Double?
+    let reps: Int?
+}
+
+struct BadgeSetSnapshot: Sendable {
+    let weightKg: Double?
+    let reps: Int?
+    let completed: Bool
+    let isWarmup: Bool
+    let segments: [BadgeSegmentSnapshot]
+    var isDropSet: Bool = false
+}
+
+struct BadgeExerciseSnapshot: Sendable {
+    let historyKey: String
+    let liftCode: String?
+    let planItemId: UUID?
+    let sets: [BadgeSetSnapshot]
+
+    nonisolated var completedSetCount: Int { sets.filter { $0.completed && !$0.isWarmup }.count }
+
+    nonisolated var maxWorkingWeight: Double? {
+        sets.flatMap { set -> [Double] in
+            guard set.completed && !set.isWarmup else { return [] }
+            if set.isDropSet {
+                return set.segments.compactMap { segment in
+                    guard (segment.reps ?? 0) > 0, let weight = segment.weightKg, weight > 0 else { return nil }
+                    return weight
+                }
+            }
+            guard (set.reps ?? 0) > 0, let weight = set.weightKg, weight > 0 else { return [] }
+            return [weight]
+        }.max()
+    }
+
+    nonisolated var volumeKg: Double {
+        sets.reduce(0) { total, set in
+            guard set.completed && !set.isWarmup else { return total }
+            if set.isDropSet {
+                return total + set.segments.reduce(0) { $0 + ($1.weightKg ?? 0) * Double($1.reps ?? 0) }
+            }
+            return total + (set.weightKg ?? 0) * Double(set.reps ?? 0)
+        }
+    }
+}
+
+struct BadgeWorkoutSnapshot: Sendable {
+    let id: UUID
+    let planId: UUID?
+    let startedAt: Date
+    let endedAt: Date
+    let updatedAt: Date
+    let bodyWeightKgAtCompletion: Double?
+    let exercises: [BadgeExerciseSnapshot]
+
+    nonisolated var volumeKg: Double { exercises.reduce(0) { $0 + $1.volumeKg } }
+    nonisolated var completedSetCount: Int { exercises.reduce(0) { $0 + $1.completedSetCount } }
+    nonisolated var allSetsCompleted: Bool {
+        !exercises.isEmpty && exercises.allSatisfy { !$0.sets.isEmpty && $0.sets.allSatisfy(\.completed) }
+    }
+}
+
+private struct BadgePlanSnapshot: Sendable {
+    let id: UUID
+    let requirements: [BadgePlanRequirement]
+
+    nonisolated var requiredSetsByItemId: [UUID: Int] {
+        Dictionary(uniqueKeysWithValues: requirements.map { ($0.itemId, $0.requiredSetCount) })
+    }
+}
+
+private struct BadgePlanRequirement: Sendable {
+    let itemId: UUID
+    let requiredSetCount: Int
+}
+
+private struct BadgeBackfillInput: Sendable {
+    let workouts: [BadgeWorkoutSnapshot]
+    let plans: [BadgePlanSnapshot]
+    let existingGrantCodes: [String]
 }
 
 /// 国际力量举（IPF）标准三大项枚举
@@ -59,8 +143,7 @@ enum Big3Lift: String, CaseIterable {
 enum BadgeEngine {
     /// UserDefaults 标记：存量历史训练回溯是否已完成
     static let backfillCompletedKey = "hasCompletedBadgeBackfill"
-    static let backfillLastWorkoutCountKey = "hasCompletedBadgeBackfill_workoutCount"
-    static let backfillLastGrantCountKey = "hasCompletedBadgeBackfill_grantCount"
+    static let backfillFingerprintKey = "hasCompletedBadgeBackfill_fingerprint_v2"
     /// UserDefaults 标记：生涯成就回顾弹窗是否已对用户展示过
     static let careerReviewShownKey = "hasShownCareerBadgeReview"
 
@@ -169,10 +252,7 @@ enum BadgeEngine {
         }
         guard allSetsCompleted else { return false }
 
-        guard let plan, !plan.items.isEmpty else {
-            // 若计划对象因删除等原因不可查，则基于本次训练动作均有组完成判定
-            return workout.completedStatEntryCount > 0
-        }
+        guard let plan, !plan.items.isEmpty else { return false }
 
         // 严格对比计划项：计划内的每一项动作与组数均需全达成
         for item in plan.items {
@@ -200,6 +280,63 @@ enum BadgeEngine {
         return true
     }
 
+    private static func snapshot(_ workout: Workout) -> BadgeWorkoutSnapshot? {
+        guard workout.deletedAt == nil, let endedAt = workout.endedAt else { return nil }
+        return BadgeWorkoutSnapshot(
+            id: workout.localId,
+            planId: workout.planId,
+            startedAt: workout.startedAt,
+            endedAt: endedAt,
+            updatedAt: workout.updatedAt,
+            bodyWeightKgAtCompletion: workout.bodyWeightKgAtCompletion,
+            exercises: workout.exercises.sorted { $0.orderIndex < $1.orderIndex }.map { exercise in
+                let liftCode: String?
+                switch Big3Lift.identify(exercise: exercise) {
+                case .bench: liftCode = Big3Lift.bench.rawValue
+                case .squat: liftCode = Big3Lift.squat.rawValue
+                case .deadlift: liftCode = Big3Lift.deadlift.rawValue
+                case nil: liftCode = nil
+                }
+                return BadgeExerciseSnapshot(
+                    historyKey: exercise.historyKey,
+                    liftCode: liftCode,
+                    planItemId: exercise.planItemId,
+                    sets: exercise.sets.sorted { $0.setIndex < $1.setIndex }.map {
+                        BadgeSetSnapshot(
+                            weightKg: $0.weightKg,
+                            reps: $0.reps,
+                            completed: $0.completed,
+                            isWarmup: $0.isWarmupEffective,
+                            segments: ($0.isDropSet ? $0.sortedSegments : []).map {
+                                BadgeSegmentSnapshot(weightKg: $0.weightKg, reps: $0.reps)
+                            },
+                            isDropSet: $0.isDropSet
+                        )
+                    }
+                )
+            }
+        )
+    }
+
+    private static func snapshot(_ plan: WorkoutPlan) -> BadgePlanSnapshot {
+        var requirements: [UUID: Int] = [:]
+        for item in plan.items {
+            if item.isSuperset {
+                for member in item.orderedSupersetMembers {
+                    requirements[member.memberId] = item.supersetRounds
+                }
+            } else {
+                requirements[item.itemId] = item.suggestedSets ?? item.setPrescriptions?.count ?? 1
+            }
+        }
+        return BadgePlanSnapshot(
+            id: plan.localId,
+            requirements: requirements
+                .map { BadgePlanRequirement(itemId: $0.key, requiredSetCount: $0.value) }
+                .sorted { $0.itemId.uuidString < $1.itemId.uuidString }
+        )
+    }
+
     // MARK: - 纯函数式徽章评估（增量单次训练结算）
 
     /// 评估单次训练结算触发的新徽章
@@ -207,14 +344,14 @@ enum BadgeEngine {
     ///   - workout: 刚刚完成的训练（已置位 `endedAt != nil`）
     ///   - allFinishedWorkouts: 包含本次在内的全部历史有效完成训练
     ///   - currentGrants: 当前已获得的徽章 code 集合
-    ///   - currentWeight: 用户当前体重（若未录入则传入 nil）
+    ///   - currentWeight: 保留的调用参数；自重倍数判定只使用训练完成时保存的体重快照
     ///   - plan: 本次训练对应的计划对象（可选）
     /// - Returns: 本次新达成的徽章候选列表
     static func evaluateIncremental(
         workout: Workout,
         allFinishedWorkouts: [Workout],
         currentGrants: Set<String>,
-        currentWeight: Double?,
+        currentWeight _: Double?,
         plan: WorkoutPlan? = nil
     ) -> [BadgeGrantCandidate] {
         var newCandidates: [BadgeGrantCandidate] = []
@@ -232,19 +369,20 @@ enum BadgeEngine {
         }
 
         // 1. 力量与三大项俱乐部（9 枚）
-        let prs = big3PRs(in: allFinishedWorkouts)
-        if let bw = currentWeight, bw > 0 {
-            if let bench = prs.bench {
+        // 自重倍数必须绑定触发该徽章的训练；历史 PR 不能在之后借用新的当前体重补授。
+        let workoutPRs = big3PRs(in: [workout])
+        if let bw = workout.bodyWeightKgAtCompletion, bw > 0 {
+            if let bench = workoutPRs.bench {
                 let multiplier = (bench / bw * 100).rounded() / 100
                 if bench >= 1.0 * bw { recordIfUnlocked(code: "strength_bw_bench_1_0", metric: multiplier) }
                 if bench >= 1.5 * bw { recordIfUnlocked(code: "strength_bw_bench_1_5", metric: multiplier) }
             }
-            if let squat = prs.squat {
+            if let squat = workoutPRs.squat {
                 let multiplier = (squat / bw * 100).rounded() / 100
                 if squat >= 1.5 * bw { recordIfUnlocked(code: "strength_bw_squat_1_5", metric: multiplier) }
                 if squat >= 2.0 * bw { recordIfUnlocked(code: "strength_bw_squat_2_0", metric: multiplier) }
             }
-            if let deadlift = prs.deadlift {
+            if let deadlift = workoutPRs.deadlift {
                 let multiplier = (deadlift / bw * 100).rounded() / 100
                 if deadlift >= 2.0 * bw { recordIfUnlocked(code: "strength_bw_deadlift_2_0", metric: multiplier) }
                 if deadlift >= 2.5 * bw { recordIfUnlocked(code: "strength_bw_deadlift_2_5", metric: multiplier) }
@@ -301,33 +439,164 @@ enum BadgeEngine {
     ///   - currentWeight: 用户体重
     ///   - plans: 关联计划字典
     /// - Returns: 需要补写入数据库的全部新徽章存根候选
+    @MainActor
     static func simulateHistoryTimeline(
         sortedFinishedWorkouts: [Workout],
         existingGrants: [BadgeGrant],
         currentWeight: Double?,
         plans: [UUID: WorkoutPlan] = [:]
     ) -> [BadgeGrantCandidate] {
-        var runningGrants = Set(existingGrants.map(\.badgeCode))
-        var accumulatedCandidates: [BadgeGrantCandidate] = []
-        var runningHistory: [Workout] = []
+        let workouts = sortedFinishedWorkouts.compactMap(snapshot)
+        let planSnapshots = Dictionary(uniqueKeysWithValues: plans.values.map { ($0.localId, snapshot($0)) })
+        return simulateHistoryTimeline(
+            workouts: workouts,
+            existingGrantCodes: Set(existingGrants.map(\.badgeCode)),
+            plans: planSnapshots
+        )
+    }
 
-        for workout in sortedFinishedWorkouts {
-            runningHistory.append(workout)
-            let plan = workout.planId.flatMap { plans[$0] }
-            let newlyUnlocked = evaluateIncremental(
-                workout: workout,
-                allFinishedWorkouts: runningHistory,
-                currentGrants: runningGrants,
-                currentWeight: currentWeight,
-                plan: plan
-            )
-            for candidate in newlyUnlocked {
-                runningGrants.insert(candidate.badgeCode)
-                accumulatedCandidates.append(candidate)
-            }
+    nonisolated private static func simulateHistoryTimeline(
+        workouts: [BadgeWorkoutSnapshot],
+        existingGrantCodes: Set<String>,
+        plans: [UUID: BadgePlanSnapshot]
+    ) -> [BadgeGrantCandidate] {
+        var grants = existingGrantCodes
+        var candidates: [BadgeGrantCandidate] = []
+        var workoutCount = 0
+        var totalTonnage = 0.0
+        var big3Best: [String: Double] = [:]
+        var bestByHistoryKey: [String: Double] = [:]
+
+        func append(_ code: String, metric: Double, workout: BadgeWorkoutSnapshot) {
+            guard grants.insert(code).inserted else { return }
+            candidates.append(BadgeGrantCandidate(
+                badgeCode: code,
+                unlockedAt: workout.endedAt,
+                workoutId: workout.id,
+                snapshotMetric: metric
+            ))
         }
 
-        return accumulatedCandidates
+        for workout in workouts.sorted(by: { $0.startedAt < $1.startedAt }) {
+            var brokenPRCount = 0
+            var brokenPRKeys = Set<String>()
+            var currentBestByHistoryKey: [String: Double] = [:]
+            for exercise in workout.exercises {
+                guard let weight = exercise.maxWorkingWeight else { continue }
+                currentBestByHistoryKey[exercise.historyKey] = max(currentBestByHistoryKey[exercise.historyKey] ?? weight, weight)
+                if let previous = bestByHistoryKey[exercise.historyKey],
+                   weight > previous,
+                   brokenPRKeys.insert(exercise.historyKey).inserted {
+                    brokenPRCount += 1
+                }
+                if let lift = exercise.liftCode {
+                    big3Best[lift] = max(big3Best[lift] ?? weight, weight)
+                }
+            }
+
+            if let bodyWeight = workout.bodyWeightKgAtCompletion, bodyWeight > 0 {
+                let workoutBestByLift = Dictionary(grouping: workout.exercises.compactMap { exercise -> (String, Double)? in
+                    guard let lift = exercise.liftCode, let weight = exercise.maxWorkingWeight else { return nil }
+                    return (lift, weight)
+                }, by: \.0).mapValues { $0.map(\.1).max() ?? 0 }
+                if let bench = workoutBestByLift[Big3Lift.bench.rawValue] {
+                    let multiplier = (bench / bodyWeight * 100).rounded() / 100
+                    if bench >= bodyWeight { append("strength_bw_bench_1_0", metric: multiplier, workout: workout) }
+                    if bench >= 1.5 * bodyWeight { append("strength_bw_bench_1_5", metric: multiplier, workout: workout) }
+                }
+                if let squat = workoutBestByLift[Big3Lift.squat.rawValue] {
+                    let multiplier = (squat / bodyWeight * 100).rounded() / 100
+                    if squat >= 1.5 * bodyWeight { append("strength_bw_squat_1_5", metric: multiplier, workout: workout) }
+                    if squat >= 2 * bodyWeight { append("strength_bw_squat_2_0", metric: multiplier, workout: workout) }
+                }
+                if let deadlift = workoutBestByLift[Big3Lift.deadlift.rawValue] {
+                    let multiplier = (deadlift / bodyWeight * 100).rounded() / 100
+                    if deadlift >= 2 * bodyWeight { append("strength_bw_deadlift_2_0", metric: multiplier, workout: workout) }
+                    if deadlift >= 2.5 * bodyWeight { append("strength_bw_deadlift_2_5", metric: multiplier, workout: workout) }
+                }
+            }
+
+            if let bench = big3Best[Big3Lift.bench.rawValue],
+               let squat = big3Best[Big3Lift.squat.rawValue],
+               let deadlift = big3Best[Big3Lift.deadlift.rawValue] {
+                let total = bench + squat + deadlift
+                if total >= 300 { append("strength_big3_total_300", metric: total, workout: workout) }
+                if total >= 400 { append("strength_big3_total_400", metric: total, workout: workout) }
+                if total >= 500 { append("strength_big3_total_500", metric: total, workout: workout) }
+            }
+
+            workoutCount += 1
+            totalTonnage += workout.volumeKg
+            if totalTonnage >= 10_000 { append("tonnage_10t", metric: totalTonnage, workout: workout) }
+            if totalTonnage >= 50_000 { append("tonnage_50t", metric: totalTonnage, workout: workout) }
+            if totalTonnage >= 100_000 { append("tonnage_100t", metric: totalTonnage, workout: workout) }
+            if totalTonnage >= 500_000 { append("tonnage_500t", metric: totalTonnage, workout: workout) }
+            if totalTonnage >= 1_000_000 { append("tonnage_1000t", metric: totalTonnage, workout: workout) }
+
+            if workoutCount >= 1 { append("career_first_workout", metric: Double(workoutCount), workout: workout) }
+            if workoutCount >= 10 { append("career_10_workouts", metric: Double(workoutCount), workout: workout) }
+            if workoutCount >= 50 { append("career_50_workouts", metric: Double(workoutCount), workout: workout) }
+            if workoutCount >= 100 { append("career_100_workouts", metric: Double(workoutCount), workout: workout) }
+            if workoutCount >= 300 { append("career_300_workouts", metric: Double(workoutCount), workout: workout) }
+
+            if workout.volumeKg >= 10_000 { append("feat_volume_10t", metric: workout.volumeKg, workout: workout) }
+            if workout.volumeKg >= 20_000 { append("feat_volume_20t", metric: workout.volumeKg, workout: workout) }
+            if workout.completedSetCount >= 25 { append("feat_dense_sets", metric: Double(workout.completedSetCount), workout: workout) }
+            if brokenPRCount >= 3 { append("feat_triple_pr", metric: Double(brokenPRCount), workout: workout) }
+            if let planId = workout.planId,
+               let plan = plans[planId],
+               !plan.requiredSetsByItemId.isEmpty,
+               workout.allSetsCompleted,
+               plan.requiredSetsByItemId.allSatisfy({ itemId, requiredCount in
+                   workout.exercises.first(where: { $0.planItemId == itemId })?.sets.filter(\.completed).count ?? 0 >= requiredCount
+               }) {
+                append("feat_perfect_plan", metric: 100, workout: workout)
+            }
+
+            for (key, weight) in currentBestByHistoryKey {
+                bestByHistoryKey[key] = max(bestByHistoryKey[key] ?? weight, weight)
+            }
+        }
+        return candidates
+    }
+
+    nonisolated private static func fingerprint(_ input: BadgeBackfillInput) -> String? {
+        var parts = input.existingGrantCodes.sorted()
+        for workout in input.workouts.sorted(by: { $0.id.uuidString < $1.id.uuidString }) {
+            parts.append(contentsOf: [
+                workout.id.uuidString,
+                workout.planId?.uuidString ?? "",
+                String(workout.startedAt.timeIntervalSince1970),
+                String(workout.endedAt.timeIntervalSince1970),
+                String(workout.updatedAt.timeIntervalSince1970),
+                workout.bodyWeightKgAtCompletion.map { String($0) } ?? ""
+            ])
+            for exercise in workout.exercises {
+                parts.append(contentsOf: [exercise.historyKey, exercise.liftCode ?? "", exercise.planItemId?.uuidString ?? ""])
+                for set in exercise.sets {
+                    parts.append(contentsOf: [
+                        set.weightKg.map { String($0) } ?? "",
+                        set.reps.map { String($0) } ?? "",
+                        String(set.completed),
+                        String(set.isWarmup),
+                        String(set.isDropSet)
+                    ])
+                    for segment in set.segments {
+                        parts.append(segment.weightKg.map { String($0) } ?? "")
+                        parts.append(segment.reps.map { String($0) } ?? "")
+                    }
+                }
+            }
+        }
+        for plan in input.plans.sorted(by: { $0.id.uuidString < $1.id.uuidString }) {
+            parts.append(plan.id.uuidString)
+            for requirement in plan.requirements {
+                parts.append(requirement.itemId.uuidString)
+                parts.append(String(requirement.requiredSetCount))
+            }
+        }
+        let data = Data(parts.joined(separator: "|").utf8)
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     /// 执行存量老用户历史数据回溯流水线（幂等保障）
@@ -335,14 +604,15 @@ enum BadgeEngine {
     ///   - context: SwiftData ModelContext
     ///   - defaults: UserDefaults 存储
     ///   - force: 是否强制重新运行扫描（如 DEBUG 播种后）
-    /// - Returns: 本次新插入的 BadgeGrant 列表
+    /// - Returns: 本次新插入的徽章候选列表
     @discardableResult
     @MainActor
     static func runBackfillIfNeeded(
         in context: ModelContext,
         defaults: UserDefaults = .standard,
-        force: Bool = false
-    ) -> [BadgeGrant] {
+        force: Bool = false,
+        workoutSnapshots suppliedSnapshots: [BadgeWorkoutSnapshot]? = nil
+    ) async -> [BadgeGrantCandidate] {
         let grantDescriptor = FetchDescriptor<BadgeGrant>()
         let existingGrants = (try? context.fetch(grantDescriptor)) ?? []
         // 若全部 24 枚勋章均已解锁，无需再扫描
@@ -351,43 +621,50 @@ enum BadgeEngine {
             return []
         }
 
-        let workoutDescriptor = FetchDescriptor<Workout>(
-            predicate: #Predicate { $0.deletedAt == nil },
-            sortBy: [SortDescriptor(\.startedAt, order: .forward)]
-        )
-        guard let rawWorkouts = try? context.fetch(workoutDescriptor) else {
-            return []
+        let workoutSnapshots: [BadgeWorkoutSnapshot]
+        if let suppliedSnapshots { workoutSnapshots = suppliedSnapshots } else {
+            let container = context.container
+            guard let loaded = try? await Task.detached(priority: .utility, operation: {
+                try await BadgeHistoryReader(modelContainer: container).readWorkouts()
+            }).value else { return [] }
+            workoutSnapshots = loaded
         }
-        let allWorkouts = rawWorkouts.filter { $0.endedAt != nil }
-        if allWorkouts.isEmpty {
+        guard !Task.isCancelled else { return [] }
+        if workoutSnapshots.isEmpty {
             defaults.set(true, forKey: backfillCompletedKey)
             defaults.set(true, forKey: careerReviewShownKey)
             return []
         }
 
-        // 智能缓存短路：非强制模式下，若已执行过回溯、已有授予存根、且历史训练数与存根数均无变化，直接跳过
-        let lastWorkoutCount = defaults.integer(forKey: backfillLastWorkoutCountKey)
-        let lastGrantCount = defaults.integer(forKey: backfillLastGrantCountKey)
-        let hasCompletedBefore = defaults.bool(forKey: backfillCompletedKey)
-        if !force && hasCompletedBefore && !existingGrants.isEmpty && allWorkouts.count == lastWorkoutCount && existingGrants.count == lastGrantCount {
+        let planDescriptor = FetchDescriptor<WorkoutPlan>(predicate: #Predicate { $0.deletedAt == nil })
+        let allPlans = (try? context.fetch(planDescriptor)) ?? []
+        let planSnapshots = allPlans.map(snapshot)
+        let input = BadgeBackfillInput(
+            workouts: workoutSnapshots,
+            plans: planSnapshots,
+            existingGrantCodes: existingGrants.map(\.badgeCode).sorted()
+        )
+        let inputFingerprint = await Task.detached(priority: .utility) {
+            fingerprint(input)
+        }.value
+        if !force,
+           defaults.bool(forKey: backfillCompletedKey),
+           inputFingerprint == defaults.string(forKey: backfillFingerprintKey) {
             return []
         }
 
-        let planDescriptor = FetchDescriptor<WorkoutPlan>(predicate: #Predicate { $0.deletedAt == nil })
-        let allPlans = (try? context.fetch(planDescriptor)) ?? []
-        let planMap = Dictionary(uniqueKeysWithValues: allPlans.map { ($0.localId, $0) })
+        let planMap = Dictionary(uniqueKeysWithValues: planSnapshots.map { ($0.id, $0) })
+        let existingCodes = Set(existingGrants.map(\.badgeCode))
+        let candidates = await Task.detached(priority: .utility) {
+            simulateHistoryTimeline(workouts: workoutSnapshots, existingGrantCodes: existingCodes, plans: planMap)
+        }.value
 
-        let currentWeight = WorkoutCaloriePreferences.current(defaults: defaults).bodyWeightKg
-
-        let candidates = simulateHistoryTimeline(
-            sortedFinishedWorkouts: allWorkouts,
-            existingGrants: existingGrants,
-            currentWeight: currentWeight,
-            plans: planMap
-        )
-
+        let latestGrants = (try? context.fetch(grantDescriptor)) ?? []
+        guard !Task.isCancelled else { return [] }
+        let latestCodes = Set(latestGrants.map(\.badgeCode))
+        let newCandidates = candidates.filter { !latestCodes.contains($0.badgeCode) }
         var createdGrants: [BadgeGrant] = []
-        for candidate in candidates {
+        for candidate in newCandidates {
             let grant = BadgeGrant(
                 badgeCode: candidate.badgeCode,
                 unlockedAt: candidate.unlockedAt,
@@ -405,11 +682,19 @@ enum BadgeEngine {
             #endif
         }
 
-        defaults.set(allWorkouts.count, forKey: backfillLastWorkoutCountKey)
-        defaults.set(existingGrants.count + createdGrants.count, forKey: backfillLastGrantCountKey)
+        let finalInput = BadgeBackfillInput(
+            workouts: workoutSnapshots,
+            plans: planSnapshots,
+            existingGrantCodes: (existingGrants.map(\.badgeCode) + createdGrants.map(\.badgeCode)).sorted()
+        )
+        if let finalFingerprint = await Task.detached(priority: .utility, operation: {
+            fingerprint(finalInput)
+        }).value {
+            defaults.set(finalFingerprint, forKey: backfillFingerprintKey)
+        }
         defaults.set(true, forKey: backfillCompletedKey)
 
-        return createdGrants
+        return newCandidates
     }
 
     // MARK: - 徽章进度与详情计算（UI 呈现）
@@ -420,15 +705,36 @@ enum BadgeEngine {
         grants: [BadgeGrant],
         currentWeight: Double?
     ) -> [BadgeProgress] {
-        let grantMap = Dictionary(uniqueKeysWithValues: grants.map { ($0.badgeCode, $0) })
-        let big3 = big3PRs(in: allFinishedWorkouts)
-        let totalTonnage = cumulativeTonnage(in: allFinishedWorkouts)
-        let totalWorkouts = completedWorkoutCount(in: allFinishedWorkouts)
-        let totalBig3 = big3Total(in: allFinishedWorkouts)
+        calculateProgress(workouts: allFinishedWorkouts.compactMap { snapshot($0) }, grants: grants.map { grantSnapshot($0) }, currentWeight: currentWeight)
+    }
 
-        // 单次战役单项极限极值
-        let maxSingleVolume = allFinishedWorkouts.map(\.completedStatVolumeKg).max() ?? 0
-        let maxSingleSets = allFinishedWorkouts.map(\.completedStatEntryCount).max() ?? 0
+    static func grantSnapshot(_ grant: BadgeGrant) -> BadgeGrantCandidate {
+        BadgeGrantCandidate(badgeCode: grant.badgeCode, unlockedAt: grant.unlockedAt,
+                            workoutId: grant.workoutId, snapshotMetric: grant.snapshotMetric)
+    }
+
+    nonisolated static func calculateProgress(
+        workouts: [BadgeWorkoutSnapshot], grants: [BadgeGrantCandidate], currentWeight: Double?
+    ) -> [BadgeProgress] {
+        let grantMap = Dictionary(grants.map { ($0.badgeCode, $0) }, uniquingKeysWith: { first, _ in first })
+        var best: [String: Double] = [:]
+        var totalTonnage = 0.0
+        var maxSingleVolume = 0.0
+        var maxSingleSets = 0
+        for workout in workouts {
+            let volume = workout.volumeKg
+            totalTonnage += volume
+            maxSingleVolume = max(maxSingleVolume, volume)
+            maxSingleSets = max(maxSingleSets, workout.completedSetCount)
+            for exercise in workout.exercises {
+                if let code = exercise.liftCode, let weight = exercise.maxWorkingWeight {
+                    best[code] = max(best[code] ?? weight, weight)
+                }
+            }
+        }
+        let big3 = (bench: best["bench"], squat: best["squat"], deadlift: best["deadlift"])
+        let totalBig3: Double? = best.count == 3 ? best.values.reduce(0, +) : nil
+        let totalWorkouts = workouts.count
 
         return BadgeDefinition.all.map { definition in
             let grant = grantMap[definition.code]
@@ -447,7 +753,7 @@ enum BadgeEngine {
                     let ratio = best / bw
                     progressRatio = min(1.0, max(0.0, ratio / definition.targetValue))
                     let targetKg = definition.targetValue * bw
-                    progressText = "\(formatKg(best)) / \(formatKg(targetKg)) kg (\(String(format: "%.1f", ratio)) / \(String(format: "%.1f", definition.targetValue))x)"
+                    progressText = "\(formatKg(best)) / \(formatKg(targetKg)) kg（\(String(format: "%.1f", ratio)) / \(String(format: "%.1f", definition.targetValue)) 倍体重）"
                 } else {
                     progressRatio = 0
                     progressText = "完善体重以开启"
@@ -460,7 +766,7 @@ enum BadgeEngine {
                     let ratio = best / bw
                     progressRatio = min(1.0, max(0.0, ratio / definition.targetValue))
                     let targetKg = definition.targetValue * bw
-                    progressText = "\(formatKg(best)) / \(formatKg(targetKg)) kg (\(String(format: "%.1f", ratio)) / \(String(format: "%.1f", definition.targetValue))x)"
+                    progressText = "\(formatKg(best)) / \(formatKg(targetKg)) kg（\(String(format: "%.1f", ratio)) / \(String(format: "%.1f", definition.targetValue)) 倍体重）"
                 } else {
                     progressRatio = 0
                     progressText = "完善体重以开启"
@@ -473,7 +779,7 @@ enum BadgeEngine {
                     let ratio = best / bw
                     progressRatio = min(1.0, max(0.0, ratio / definition.targetValue))
                     let targetKg = definition.targetValue * bw
-                    progressText = "\(formatKg(best)) / \(formatKg(targetKg)) kg (\(String(format: "%.1f", ratio)) / \(String(format: "%.1f", definition.targetValue))x)"
+                    progressText = "\(formatKg(best)) / \(formatKg(targetKg)) kg（\(String(format: "%.1f", ratio)) / \(String(format: "%.1f", definition.targetValue)) 倍体重）"
                 } else {
                     progressRatio = 0
                     progressText = "完善体重以开启"
@@ -538,7 +844,7 @@ enum BadgeEngine {
         }
     }
 
-    private static func formatKg(_ value: Double) -> String {
+    nonisolated private static func formatKg(_ value: Double) -> String {
         if value >= 1_000_000 {
             let m = value / 1_000_000
             return String(format: "%.1fM", m)
