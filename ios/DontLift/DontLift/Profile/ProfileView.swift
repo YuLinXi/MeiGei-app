@@ -85,11 +85,20 @@ struct ProfileView: View {
                 showBadgeWall = true
             }
         }
+        .onAppear {
+            BadgeEngine.runBackfillIfNeeded(in: modelContext)
+            #if DEBUG
+            if UITestHooks.testBadgeDetailId != nil {
+                showBadgeWall = true
+            }
+            #endif
+        }
         .task {
             WorkoutPerformanceMonitor.event("profile.appear")
             healthAuthorized = healthKit.isAuthorized
             caloriePreferences = .current()
             await refreshNotificationStatus()
+            BadgeEngine.runBackfillIfNeeded(in: modelContext)
         }
         .sheet(item: $profileSheet) { sheet in
             profileSheetView(sheet)

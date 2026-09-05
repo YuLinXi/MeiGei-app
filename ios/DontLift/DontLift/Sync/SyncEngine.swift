@@ -86,6 +86,7 @@ final class SyncEngine {
         NotificationCenter.default.post(name: .dontliftSyncCompleted, object: nil)
         if workoutsSynced && saved {
             NotificationCenter.default.post(name: .dontliftWorkoutSyncSucceeded, object: nil)
+            BadgeEngine.runBackfillIfNeeded(in: modelContext)
         }
     }
 

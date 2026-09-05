@@ -65,13 +65,16 @@ struct BadgeWallView: View {
                 onSave: { kg, _ in
                     WorkoutCaloriePreferences.setBodyWeightKg(kg)
                     caloriePreferences = WorkoutCaloriePreferences.current()
+                    BadgeEngine.runBackfillIfNeeded(in: modelContext, force: true)
                 }
             )
         }
         .onAppear {
             caloriePreferences = WorkoutCaloriePreferences.current()
+            BadgeEngine.runBackfillIfNeeded(in: modelContext)
         }
         .task {
+            BadgeEngine.runBackfillIfNeeded(in: modelContext)
             #if DEBUG
             if let targetId = UITestHooks.testBadgeDetailId {
                 try? await Task.sleep(for: .milliseconds(350))

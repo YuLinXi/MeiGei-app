@@ -94,6 +94,7 @@ final class SessionStore {
         try? modelContext.delete(model: Workout.self)
         try? modelContext.delete(model: WorkoutExercise.self)
         try? modelContext.delete(model: WorkoutSet.self)
+        try? modelContext.delete(model: BadgeGrant.self)
         try? modelContext.save()
         SyncDomain.resetAllWatermarks()
         if let userId {

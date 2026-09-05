@@ -104,51 +104,30 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        // 全局唯一 NavigationStack 包 TabView：push 页渲染在 TabView（含 Tab Bar）之上，
-        // 所有二级/三级页天然全屏、标准右滑入转场，Tab Bar 被盖住而非做消失动画。
-        NavigationStack {
-            TabView(selection: $selectedTab) {
-                WorkoutListView()
-                    .tabItem { Label("训练", image: "tabTrain") }
-                    .tag(MainTab.workout)
-                PlanListView()
-                    .tabItem { Label("计划", image: "tabPlan") }
-                    .tag(MainTab.plan)
-                ExerciseLibraryView()
-                    .tabItem { Label("动作", image: "tabExercise") }
-                    .tag(MainTab.exercise)
-                TeamListView()
-                    .tabItem { Label("Team", image: "tabTeam") }
-                    .tag(MainTab.team)
-                ProfileView()
-                    .tabItem { Label("我的", image: "tabProfile") }
-                    .tag(MainTab.profile)
+        mainView
+            .sheet(item: $activeRootSheet, onDismiss: clearPresentedRootSheetAndContinue) { sheet in
+                rootSheetContent(for: sheet)
             }
-            .toolbarBackground(Theme.Color.bg, for: .navigationBar)
-            .toolbarColorScheme(.light, for: .navigationBar)
+            .onChange(of: planWriteback.receipt != nil) { _, _ in presentNextRootSheetIfNeeded() }
+            .onChange(of: prCelebration.records != nil) { _, _ in presentNextRootSheetIfNeeded() }
+            .onChange(of: badgeCelebration.incrementalCandidates != nil) { _, _ in presentNextRootSheetIfNeeded() }
+            .onChange(of: badgeCelebration.careerReviewGrants != nil) { _, _ in presentNextRootSheetIfNeeded() }
+            .onChange(of: teamShare.draft != nil) { _, _ in presentNextRootSheetIfNeeded() }
+            .onOpenURL { handleDeepLink($0) }
+            .task(id: session.currentUserId) {
+                await handleSessionUserTask()
+            }
+    }
+
+    private var mainView: some View {
+        NavigationStack {
+            tabContent
+                .toolbarBackground(Theme.Color.bg, for: .navigationBar)
+                .toolbarColorScheme(.light, for: .navigationBar)
         }
         .tint(Theme.Color.accent)
         .onAppear {
-            refreshActiveSession()
-            #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-test-career-review") {
-                checkCareerReviewOnLaunch(force: true)
-            } else {
-                checkCareerReviewOnLaunch()
-            }
-            #else
-            checkCareerReviewOnLaunch()
-            #endif
-            #if DEBUG
-            // UI 测试钩子：直达「训练进行中」浮层。直接查库而不读 @State，避免同 runloop 时序抖动。
-            if UITestHooks.isLiveWorkoutUITest,
-               let workout = WorkoutSession.activeSession(in: modelContext) {
-                workoutPresentation.present(workout)
-            }
-            #endif
-            if PushManager.shared.pendingOpenedTeamId != nil {
-                selectedTab = .team
-            }
+            handleOnAppear()
         }
         .onChange(of: selectedTab) { _, tab in
             if tab == .workout {
@@ -158,6 +137,11 @@ struct MainTabView: View {
         }
         .onChange(of: historyStore.lastRefreshFinishedAt) { _, _ in
             refreshActiveSession()
+        }
+        .onChange(of: activeSession == nil) { _, isIdle in
+            if isIdle {
+                checkCareerReviewOnLaunch()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .dontliftSyncCompleted)) { _ in
             refreshActiveSession()
@@ -179,96 +163,142 @@ struct MainTabView: View {
         // 休息计时浮层：挂在全局 NavigationStack 之上的 overlay，层级高于 push 页与 Tab Bar；
         // 卡片与背景遮罩同步淡入淡出，收起后回到训练页 FAB。
         .overlay {
-            if restTimer.isExpanded {
-                RestTimerSheet(controller: restTimer) {
-                    withAnimation(restAnim) { restTimer.isExpanded = false }
-                }
-                .transition(.opacity)
-            }
+            restTimerOverlay
         }
         .onChange(of: restTimer.isRunning) { _, running in
             // 倒计时归零（或外部结束）时自动渐隐收回弹窗。
             if !running { withAnimation(restAnim) { restTimer.isExpanded = false } }
         }
-        // 根层弹窗队列：回写回执有撤销入口，优先展示；关闭后再展示 PR 庆祝与手动 Team 分享入口。
-        .sheet(item: $activeRootSheet, onDismiss: clearPresentedRootSheetAndContinue) { sheet in
-            switch sheet {
-            case .planWriteback:
-                if let receipt = planWriteback.receipt {
-                    PlanWritebackSheet(receipt: receipt)
-                }
-            case .prCelebration:
-                if let records = prCelebration.records {
-                    PRCelebrationSheet(records: records, summary: prCelebration.summary)
-                }
-            case .badgeCelebration:
-                if let candidates = badgeCelebration.incrementalCandidates {
-                    WorkoutBadgeCelebrationSheet(
-                        candidates: candidates,
-                        summary: badgeCelebration.workoutSummary
-                    ) {
-                        badgeCelebration.dismissIncremental()
-                    }
-                }
-            case .careerBadgeReview:
-                if let grants = badgeCelebration.careerReviewGrants {
-                    CareerBadgeReviewSheet(
-                        grants: grants,
-                        totalTonnage: badgeCelebration.careerReviewTotalTonnage,
-                        workoutCount: badgeCelebration.careerReviewWorkoutCount,
-                        big3: badgeCelebration.careerReviewBig3
-                    ) {
-                        badgeCelebration.dismissCareerReview()
-                    }
-                }
-            case .teamShare:
-                if let draft = teamShare.draft {
-                    TeamShareSheet(draft: draft)
+    }
+
+    private var tabContent: some View {
+        TabView(selection: $selectedTab) {
+            WorkoutListView()
+                .tabItem { Label("训练", image: "tabTrain") }
+                .tag(MainTab.workout)
+            PlanListView()
+                .tabItem { Label("计划", image: "tabPlan") }
+                .tag(MainTab.plan)
+            ExerciseLibraryView()
+                .tabItem { Label("动作", image: "tabExercise") }
+                .tag(MainTab.exercise)
+            TeamListView()
+                .tabItem { Label("Team", image: "tabTeam") }
+                .tag(MainTab.team)
+            ProfileView()
+                .tabItem { Label("我的", image: "tabProfile") }
+                .tag(MainTab.profile)
+        }
+    }
+
+    @ViewBuilder
+    private var restTimerOverlay: some View {
+        if restTimer.isExpanded {
+            RestTimerSheet(controller: restTimer) {
+                withAnimation(restAnim) { restTimer.isExpanded = false }
+            }
+            .transition(.opacity)
+        }
+    }
+
+    @ViewBuilder
+    private func rootSheetContent(for sheet: RootSheet) -> some View {
+        switch sheet {
+        case .planWriteback:
+            if let receipt = planWriteback.receipt {
+                PlanWritebackSheet(receipt: receipt)
+            }
+        case .prCelebration:
+            if let records = prCelebration.records {
+                PRCelebrationSheet(records: records, summary: prCelebration.summary)
+            }
+        case .badgeCelebration:
+            if let candidates = badgeCelebration.incrementalCandidates {
+                WorkoutBadgeCelebrationSheet(
+                    candidates: candidates,
+                    summary: badgeCelebration.workoutSummary
+                ) {
+                    badgeCelebration.dismissIncremental()
                 }
             }
-        }
-        .onAppear {
-            #if DEBUG
-            if UITestHooks.isTestBadgeCelebration {
-                let mockCandidates = [
-                    BadgeGrantCandidate(
-                        badgeCode: "strength_bw_bench_1_0",
-                        unlockedAt: .now,
-                        workoutId: UUID(),
-                        snapshotMetric: 1.07
-                    ),
-                    BadgeGrantCandidate(
-                        badgeCode: "tonnage_100t",
-                        unlockedAt: .now,
-                        workoutId: UUID(),
-                        snapshotMetric: 100_000
-                    )
-                ]
-                badgeCelebration.presentIncremental(mockCandidates, workoutSummary: "胸背超级组爆发训练 · 达成 2 项荣誉突破")
-            }
-            #endif
-            presentNextRootSheetIfNeeded()
-        }
-        .onChange(of: planWriteback.receipt != nil) { _, _ in presentNextRootSheetIfNeeded() }
-        .onChange(of: prCelebration.records != nil) { _, _ in presentNextRootSheetIfNeeded() }
-        .onChange(of: badgeCelebration.incrementalCandidates != nil) { _, _ in presentNextRootSheetIfNeeded() }
-        .onChange(of: badgeCelebration.careerReviewGrants != nil) { _, _ in presentNextRootSheetIfNeeded() }
-        .onChange(of: teamShare.draft != nil) { _, _ in presentNextRootSheetIfNeeded() }
-        .onOpenURL { handleDeepLink($0) }
-        .task(id: session.currentUserId) {
-            #if DEBUG
-            // UI 测试场景跳过同步/分享重试（假 token 打后端会 401 触发全局登出）。
-            if UITestHooks.isLiveWorkoutUITest { return }
-            #endif
-            if let userId = session.currentUserId {
-                let hasPendingShare = !teamService.pendingShareWorkoutIds(userId: userId).isEmpty
-                let hasPendingPlanEvent = teamService.hasPendingPlanShareEvents(userId: userId)
-                if hasPendingShare || hasPendingPlanEvent {
-                    await syncEngine.syncAll()
+        case .careerBadgeReview:
+            if let grants = badgeCelebration.careerReviewGrants {
+                CareerBadgeReviewSheet(
+                    grants: grants,
+                    totalTonnage: badgeCelebration.careerReviewTotalTonnage,
+                    workoutCount: badgeCelebration.careerReviewWorkoutCount,
+                    big3: badgeCelebration.careerReviewBig3
+                ) {
+                    badgeCelebration.dismissCareerReview()
                 }
             }
-            await retryReadyPendingShares()
+        case .teamShare:
+            if let draft = teamShare.draft {
+                TeamShareSheet(draft: draft)
+            }
         }
+    }
+
+    private func handleOnAppear() {
+        refreshActiveSession()
+        // 存量荣誉勋章自愈与静默回溯（独立运行，不被活跃训练拦截）
+        BadgeEngine.runBackfillIfNeeded(in: modelContext)
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-test-career-review") {
+            checkCareerReviewOnLaunch(force: true)
+        } else {
+            checkCareerReviewOnLaunch()
+        }
+        if UITestHooks.isTestBadgeCelebration {
+            let mockCandidates = [
+                BadgeGrantCandidate(
+                    badgeCode: "strength_bw_bench_1_0",
+                    unlockedAt: .now,
+                    workoutId: UUID(),
+                    snapshotMetric: 1.07
+                ),
+                BadgeGrantCandidate(
+                    badgeCode: "tonnage_100t",
+                    unlockedAt: .now,
+                    workoutId: UUID(),
+                    snapshotMetric: 100_000
+                )
+            ]
+            badgeCelebration.presentIncremental(mockCandidates, workoutSummary: "胸背超级组爆发训练 · 达成 2 项荣誉突破")
+        }
+        // UI 测试钩子：直达「训练进行中」浮层。直接查库而不读 @State，避免同 runloop 时序抖动。
+        if UITestHooks.isLiveWorkoutUITest,
+           let workout = WorkoutSession.activeSession(in: modelContext) {
+            workoutPresentation.present(workout)
+        }
+        #else
+        checkCareerReviewOnLaunch()
+        #endif
+        if PushManager.shared.pendingOpenedTeamId != nil {
+            selectedTab = .team
+        }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-tab-profile") {
+            selectedTab = .profile
+        }
+        #endif
+        presentNextRootSheetIfNeeded()
+    }
+
+    private func handleSessionUserTask() async {
+        #if DEBUG
+        // UI 测试场景跳过同步/分享重试（假 token 打后端会 401 触发全局登出）。
+        if UITestHooks.isLiveWorkoutUITest { return }
+        #endif
+        if let userId = session.currentUserId {
+            let pendingIds = teamService.pendingShareWorkoutIds(userId: userId)
+            let hasPendingShare = !pendingIds.isEmpty
+            let hasPendingPlanEvent = teamService.hasPendingPlanShareEvents(userId: userId)
+            if hasPendingShare || hasPendingPlanEvent {
+                await syncEngine.syncAll()
+            }
+        }
+        await retryReadyPendingShares()
     }
 
     private func presentNextRootSheetIfNeeded() {

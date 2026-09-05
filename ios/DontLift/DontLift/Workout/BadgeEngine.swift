@@ -59,6 +59,8 @@ enum Big3Lift: String, CaseIterable {
 enum BadgeEngine {
     /// UserDefaults 标记：存量历史训练回溯是否已完成
     static let backfillCompletedKey = "hasCompletedBadgeBackfill"
+    static let backfillLastWorkoutCountKey = "hasCompletedBadgeBackfill_workoutCount"
+    static let backfillLastGrantCountKey = "hasCompletedBadgeBackfill_grantCount"
     /// UserDefaults 标记：生涯成就回顾弹窗是否已对用户展示过
     static let careerReviewShownKey = "hasShownCareerBadgeReview"
 
@@ -341,7 +343,11 @@ enum BadgeEngine {
         defaults: UserDefaults = .standard,
         force: Bool = false
     ) -> [BadgeGrant] {
-        if !force && defaults.bool(forKey: backfillCompletedKey) {
+        let grantDescriptor = FetchDescriptor<BadgeGrant>()
+        let existingGrants = (try? context.fetch(grantDescriptor)) ?? []
+        // 若全部 24 枚勋章均已解锁，无需再扫描
+        if existingGrants.count >= BadgeDefinition.all.count {
+            defaults.set(true, forKey: backfillCompletedKey)
             return []
         }
 
@@ -353,9 +359,19 @@ enum BadgeEngine {
             return []
         }
         let allWorkouts = rawWorkouts.filter { $0.endedAt != nil }
+        if allWorkouts.isEmpty {
+            defaults.set(true, forKey: backfillCompletedKey)
+            defaults.set(true, forKey: careerReviewShownKey)
+            return []
+        }
 
-        let grantDescriptor = FetchDescriptor<BadgeGrant>()
-        let existingGrants = (try? context.fetch(grantDescriptor)) ?? []
+        // 智能缓存短路：非强制模式下，若已执行过回溯、已有授予存根、且历史训练数与存根数均无变化，直接跳过
+        let lastWorkoutCount = defaults.integer(forKey: backfillLastWorkoutCountKey)
+        let lastGrantCount = defaults.integer(forKey: backfillLastGrantCountKey)
+        let hasCompletedBefore = defaults.bool(forKey: backfillCompletedKey)
+        if !force && hasCompletedBefore && !existingGrants.isEmpty && allWorkouts.count == lastWorkoutCount && existingGrants.count == lastGrantCount {
+            return []
+        }
 
         let planDescriptor = FetchDescriptor<WorkoutPlan>(predicate: #Predicate { $0.deletedAt == nil })
         let allPlans = (try? context.fetch(planDescriptor)) ?? []
@@ -389,11 +405,9 @@ enum BadgeEngine {
             #endif
         }
 
+        defaults.set(allWorkouts.count, forKey: backfillLastWorkoutCountKey)
+        defaults.set(existingGrants.count + createdGrants.count, forKey: backfillLastGrantCountKey)
         defaults.set(true, forKey: backfillCompletedKey)
-        // 若老用户没有任何历史完成训练，直接静默置位已看过生涯回顾，避免对新用户弹出空回顾
-        if allWorkouts.isEmpty {
-            defaults.set(true, forKey: careerReviewShownKey)
-        }
 
         return createdGrants
     }
