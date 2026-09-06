@@ -25,35 +25,35 @@ enum UITestHooks {
         ProcessInfo.processInfo.arguments.contains(seedDemoArg)
     }
 
-    /// 在 App 启动装配期调用：播种进行中训练。幂等：已存在进行中会话则跳过（重启场景）。
+    /// 在 App 启动装配期调用：播种进行中训练。确保每次启动具有确定性的干净动作列表。
     @MainActor
     static func seedLiveWorkoutIfNeeded(container: ModelContainer) {
         guard isLiveWorkoutUITest else { return }
         let context = container.mainContext
-        if ProcessInfo.processInfo.arguments.contains("-uitest-assisted-weight") {
-            // 仅专用 UI 测试参数生效，不改动用户训练；复用已有测试会话时只替换测试动作。
-            if let active = WorkoutSession.activeSession(in: context), active.title == "UI 测试训练",
-               let exercise = active.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }).first {
-                exercise.builtinExerciseCode = "ASSISTED_PULL_UP"
-                exercise.exerciseName = "辅助引体向上"
-                try? context.save()
-                return
+        let isAssisted = ProcessInfo.processInfo.arguments.contains("-uitest-assisted-weight")
+        let allWorkouts = (try? context.fetch(FetchDescriptor<Workout>())) ?? []
+        for workout in allWorkouts {
+            if workout.title == "UI 测试训练" {
+                context.delete(workout)
+            } else if workout.endedAt == nil && workout.deletedAt == nil {
+                workout.endedAt = .now
             }
         }
-        guard WorkoutSession.activeSession(in: context) == nil else { return }
-        let exercises = ["杠铃卧推", "杠铃划船", "哑铃肩推"].enumerated().map { index, name in
+        try? context.save()
+
+        let exercises = ["上斜杠铃卧推", "杠铃划船", "哑铃肩推"].enumerated().map { index, name in
             WorkoutExercise(exerciseName: name,
                             orderIndex: index,
                             sets: (0..<3).map { WorkoutSet(setIndex: $0, weightKg: 60, reps: 10) })
+        }
+        if isAssisted, let first = exercises.first {
+            first.builtinExerciseCode = "ASSISTED_PULL_UP"
+            first.exerciseName = "辅助引体向上"
         }
         let workout = Workout(title: "UI 测试训练",
                               startedAt: .now,
                               timerStartedAt: .now,
                               exercises: exercises)
-        if ProcessInfo.processInfo.arguments.contains("-uitest-assisted-weight"), let exercise = exercises.first {
-            exercise.builtinExerciseCode = "ASSISTED_PULL_UP"
-            exercise.exerciseName = "辅助引体向上"
-        }
         context.insert(workout)
         try? context.save()
     }
@@ -66,9 +66,6 @@ enum UITestHooks {
         UserDefaults.standard.removeObject(forKey: BadgeEngine.backfillCompletedKey)
         UserDefaults.standard.removeObject(forKey: BadgeEngine.careerReviewShownKey)
         configureLaunchEnvironment()
-        Task { @MainActor in
-            await BadgeEngine.runBackfillIfNeeded(in: context, force: true)
-        }
     }
 
     /// 在 App 启动装配期调用：清除进行中训练会话（用于测试主页/生涯回顾等正常展示）。

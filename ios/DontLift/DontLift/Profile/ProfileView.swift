@@ -259,6 +259,7 @@ struct ProfileView: View {
             .cardStyle()
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("profile.badge.entry")
     }
 
     // MARK: - 个人资料分组（称呼可编辑 + 性别，均为资料、改即 PATCH 后端）

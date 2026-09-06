@@ -44,7 +44,7 @@ struct RootView: View {
             .task {
                 #if DEBUG
                 // UI 测试场景：跳过推送授权与同步（假 token 打后端会 401 触发全局登出）。
-                if UITestHooks.isLiveWorkoutUITest {
+                if UITestHooks.isLiveWorkoutUITest || UITestHooks.isAutoLogin {
                     restTimer.handleAppBecameActive()
                     RestTimerController.clearDeliveredRestNotification()
                     historyStore.ensureLoaded(reason: .login)
@@ -82,6 +82,9 @@ struct RootView: View {
     }
 
     private func scheduleForegroundSyncIfNeeded() {
+        #if DEBUG
+        if UITestHooks.isLiveWorkoutUITest || UITestHooks.isAutoLogin { return }
+        #endif
         guard let backgroundedAt = lastBackgroundedAt else { return }
         lastBackgroundedAt = nil
         cancelForegroundSyncTask()

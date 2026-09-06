@@ -288,7 +288,7 @@ struct MainTabView: View {
     private func handleSessionUserTask() async {
         #if DEBUG
         // UI 测试场景跳过同步/分享重试（假 token 打后端会 401 触发全局登出）。
-        if UITestHooks.isLiveWorkoutUITest { return }
+        if UITestHooks.isLiveWorkoutUITest || UITestHooks.isAutoLogin { return }
         #endif
         if let userId = session.currentUserId {
             let pendingIds = teamService.pendingShareWorkoutIds(userId: userId)

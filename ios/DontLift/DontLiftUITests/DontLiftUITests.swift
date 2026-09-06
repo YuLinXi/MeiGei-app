@@ -30,7 +30,7 @@ final class DontLiftUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-dev-auto-login", "-dev-seed-demo", "-tab-profile", "-dismiss-career-review"]
         app.launch()
-        let entry = app.buttons.containing(.staticText, identifier: "成就徽章").firstMatch
+        let entry = app.buttons["profile.badge.entry"]
         XCTAssertTrue(entry.waitForExistence(timeout: 20))
         entry.tap()
         let summary = app.staticTexts["badge.wall.summary"]
@@ -120,8 +120,8 @@ final class DontLiftUITests: XCTestCase {
 
         // 排序行存在（3 个动作；第三个种子名「哑铃肩推」经内置库归并显示为「坐姿哑铃推肩」）。
         XCTAssertTrue(app.staticTexts["上斜杠铃卧推"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["杠铃划船"].exists)
-        XCTAssertTrue(app.staticTexts["坐姿哑铃推肩"].exists)
+        XCTAssertTrue(app.staticTexts["杠铃划船"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["坐姿哑铃推肩"].waitForExistence(timeout: 3))
 
         // 真实拖拽：把第一行拖到列表末尾（系统 EditMode 手柄，label 形如 "Reorder 上斜杠铃卧推"）。
         // 落点须越过末行底缘才会插到最后；慢速拖拽避免被当成滚动吞掉。
