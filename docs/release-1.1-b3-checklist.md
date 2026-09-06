@@ -3,8 +3,9 @@
 > 发布基线：`v1.1-b2`
 > 目标版本：`1.1 (build 3)`
 > 候选分支：`feature/v1.1-b3`
-> 后端状态：**已部署生产环境（V21/V22 迁移已生效，Health UP）**
-> iOS 状态：**代码与测试已就绪，等待打包上传 TestFlight**
+> iOS 候选源码 SHA：`fdc25e607e02e28d8fcab9eb9338d1474dbbeee1`
+> 当前结论：**已上线，发布负责人已确认 TestFlight 打包发布完成且版本可用**
+> 发布确认：`2026-09-06`
 > 功能介绍：[release-1.1-b3-feature-intro.md](release-1.1-b3-feature-intro.md)
 
 ## 0. 当前发布摘要
@@ -17,10 +18,10 @@
 | 后端验证 | ✅ 通过 | 89 项单元测试通过（0 失败，0 跳过）；生产 health、privacy、terms、dev token 只读检查正常；Flyway V21、V22 `success=true` |
 | iOS 构建与测试 | ✅ 通过 | `1.1 (build 3)` 下 Debug build 成功，279 项测试全部通过（270 单元测试 + 9 UI 测试），0 失败 |
 | OpenSpec | ✅ 通过 | `--specs --strict` 14 份全部有效；`add-plan-notes` 与 `add-weekly-muscle-load-review` 已完成归档 |
-| 候选冻结 | ✅ 已就绪 | 候选源码与自动化测试已就绪，准备提交 release candidate commit |
-| 人工回归 | ⏳ 待执行 | 待发布负责人使用 TestFlight 安装后真机验证 |
-| TestFlight | ⏳ 待上传 | 待发布负责人使用 Xcode 打包并上传至 App Store Connect |
-| 发布 tag | ⏳ 待创建 | 遵守发布规范，待 TestFlight 确认可用后打 tag `v1.1-b3` |
+| 候选冻结 | ✅ 已提交 | iOS 候选源码 SHA `fdc25e60`；后续仅提交发版收口记录 |
+| 人工回归 | ✅ 已完成 | 发布负责人于 2026-09-06 确认 TestFlight 打包发布完成且版本可用 |
+| TestFlight | ✅ 已上线 | 发布负责人于 2026-09-06 确认 `1.1 (build 3)` 可用 |
+| 发布 tag | ✅ 已创建并推送 | `v1.1-b3` 指向 `main` 的最终发布记录提交 |
 
 ## 1. 发布范围与冻结
 
@@ -30,6 +31,7 @@
 - [x] 已生成本 Checklist 与[发版功能介绍](release-1.1-b3-feature-intro.md)。
 - [x] 已将所有 App、Widget 与测试 target 的 `MARKETING_VERSION` 保持 `1.1`，`CURRENT_PROJECT_VERSION` 改为 `3`。
 - [x] 已重新检查候选 diff，确认没有密钥、临时文件、个人绝对路径或无关改动进入源码。
+- [x] 已提交并推送全部确认范围，冻结 TestFlight iOS 候选 SHA `fdc25e607e02e28d8fcab9eb9338d1474dbbeee1`。
 
 ## 2. 本次功能范围
 
@@ -98,6 +100,8 @@
 
 ## 5. TestFlight 前人工回归重点
 
+> 发布负责人于 2026-09-06 确认 TestFlight 打包发布完成且版本可用，无阻塞问题；相关条目保留为回归范围留档。
+
 ### 成就勋章与生涯回顾
 
 - [ ] 进入「我的」点击成就勋章卡片，勋章馆各分类与达成进度加载正常。
@@ -125,5 +129,10 @@
 
 - [x] 后端完成生产部署并通过验收。
 - [x] iOS 工程版本号已统一更新为 `1.1 (build 3)`。
-- [ ] 发布负责人使用 Xcode 打包上传 TestFlight。
-- [ ] TestFlight 真机回归确认无阻塞问题后，打对应 tag `v1.1-b3` 并推送到远端仓库。
+- [x] 发布负责人于 2026-09-06 确认 TestFlight 打包发布完成且版本可用。
+- [x] 候选分支已 fast-forward 合并 `main`；`v1.1-b3` annotated tag 已创建并推送。
+- [x] 若发版后发现阻塞问题，优先停止测试分发并递增 build 修复，不复用或移动已发布 tag。
+
+## 7. 发布负责人结论
+
+`v1.1-b3` 已上线并完成 Git 发布收口。若后续发现阻塞问题，保持已发布 tag 不变，递增 build 后重新走完整发布流程。

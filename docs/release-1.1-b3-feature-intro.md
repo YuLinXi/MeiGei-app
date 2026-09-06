@@ -3,8 +3,8 @@
 > 发布基线：`v1.1-b2`
 > 目标版本：`MARKETING_VERSION = 1.1`，`CURRENT_PROJECT_VERSION = 3`
 > 候选分支：`feature/v1.1-b3`
-> 后端状态：**已部署生产环境**（Flyway V21、V22 迁移成功，Health 200 UP）
-> iOS 状态：**代码与测试已就绪，等待打包上传 TestFlight**
+> iOS 候选源码 SHA：`fdc25e607e02e28d8fcab9eb9338d1474dbbeee1`
+> 文档状态：**已上线，发布负责人于 2026-09-06 确认 TestFlight 打包发布完成且版本可用**
 > 关联清单：[release-1.1-b3-checklist.md](release-1.1-b3-checklist.md)
 
 ## 版本与状态
@@ -17,8 +17,8 @@
 | 后端验证 | 89 项单元测试全部通过（0 失败，0 跳过）；生产 health、privacy、terms、dev token 验证正常 |
 | iOS 验证 | iPhone 17 Pro 模拟器 Debug build 成功，279 项自动化测试通过（270 项单元测试 + 9 项 UI 测试），0 失败 |
 | OpenSpec 验证 | `openspec validate --specs --strict` 严格校验通过，14 份规格全部有效 |
-| TestFlight | 待发布负责人使用 Xcode 打包并上传至 App Store Connect / TestFlight |
-| 发布结论 | 后端已安全上线，iOS 候选源码及全部自动化验证完成，待 TestFlight 验证后打 tag `v1.1-b3` |
+| TestFlight | 发布负责人于 2026-09-06 确认 `1.1 (build 3)` 已完成打包发布且版本可用 |
+| 发布结论 | iOS 候选源码已完成发布验证，已合并 `main` 并创建 `v1.1-b3` tag |
 
 ## 一句话摘要
 
@@ -112,13 +112,15 @@
 6. **未升级客户端兼容**：
    - 使用 `v1.1-b2` 客户端连接已升级的生产后端，确认基础训练记录上传与团队功能均正常运作。
 
+发布负责人已于 2026-09-06 确认 TestFlight 打包发布完成且版本可用；本次发布 tag：`v1.1-b3` 已创建。
+
 ## 发布收口
 
 - [x] 后端完成代码与迁移部署（V21、V22 已生效，Health 正常）。
 - [x] iOS 工程版本号已统一更新为 `MARKETING_VERSION = 1.1`, `CURRENT_PROJECT_VERSION = 3`。
 - [x] 本地全量自动化测试（后端 89 项、iOS 279 项）全部通过。
-- [ ] iOS 待发布负责人使用 Xcode 打包并上传 TestFlight。
-- [ ] TestFlight 真机回归通过后，建议打对应 tag `v1.1-b3`。
+- [x] 发布负责人于 2026-09-06 确认 TestFlight 打包发布完成且版本可用。
+- [x] 候选分支已 fast-forward 合并 `main`；`v1.1-b3` annotated tag 已创建并推送。
 
 ## TestFlight 用户文案（可直接复制）
 
