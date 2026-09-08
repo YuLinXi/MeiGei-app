@@ -15,33 +15,13 @@ struct ExerciseOrderItem: Identifiable, Equatable {
     }
 }
 
-/// 排序模式蒙层：压暗并吞掉落在其上的一切手势（tap/drag/scroll 起点），下方内容不可操作。
-/// 直接作为内容区块的 overlay 使用，随内容布局始终贴合目标区域。
-/// `horizontalBleed`/`topBleed` 为出血量：区块自带水平/顶部内边距时传入同值，让蒙层视觉满幅。
-extension View {
-    func reorderMasked(_ active: Bool,
-                       horizontalBleed: CGFloat = 0,
-                       topBleed: CGFloat = 0) -> some View {
-        overlay {
-            if active {
-                Color.black.opacity(0.35)
-                    .contentShape(Rectangle())
-                    .onTapGesture { }
-                    .accessibilityHidden(true)
-                    .padding(.horizontal, -horizontalBleed)
-                    .padding(.top, -topBleed)
-                    .transition(.opacity)
-            }
-        }
-    }
-}
-
-/// 通用就地排序面板：白底满幅浮层（延伸到屏幕底缘），标题 + 实心「完成」胶囊 + 可拖拽行列表。
-/// 训练进行中 / 计划详情 / 计划列表三处排序模式共用，保证交互与视觉完全一致。
+/// 通用排序弹窗：以系统 `.sheet` 呈现（与「编辑动作」等弹层统一），原生支持下滑关闭；
+/// 白底满幅内容，标题 + 实心「完成」胶囊 + 可拖拽行列表。
+/// 训练进行中 / 计划详情 / 计划列表三处排序共用，保证交互与视觉完全一致。
 ///
 /// 使用约定：
-/// - 宿主在排序模式下用「顶部内容区（reorderMasked 压暗）+ 本面板」替换原列表布局，
-///   不要用外层 ScrollView 包裹本面板（嵌套 List 的拖拽手势会被外层滚动抢走）。
+/// - 宿主用 `.sheet(isPresented:onDismiss:)` 呈现；排序期间页面被系统 scrim 封锁，无需自绘蒙层。
+/// - 「完成」与下滑关闭统一走 sheet 的 `onDismiss` 提交草稿顺序（宿主把 onDone 设为关闭 sheet）。
 /// - 行的水平留白收在行内容内部：拖拽快照只渲染行内容，行内自带留白才能让浮起行
 ///   与白底面板保持与静止态一致的间距。
 struct InPlaceReorderPanel: View {
@@ -96,10 +76,15 @@ struct InPlaceReorderPanel: View {
         }
         .padding(.top, Theme.Spacing.md)
         .frame(maxHeight: .infinity, alignment: .top)
-        // 白底浮层：满幅并延伸到屏幕底缘，遮住下方米色页面背景。
+        // 白底满幅：与 sheet 的 presentationBackground 同色，内容延伸到屏幕底缘。
         .background {
             Theme.Color.surface.ignoresSafeArea(edges: .bottom)
         }
+        // 统一 sheet 呈现：默认 60% 高度、可上拉全屏，下滑关闭交给系统（门把手可见），与「编辑动作」等弹层一致。
+        .presentationDetents([.fraction(0.6), .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.Color.surface)
+        .presentationCornerRadius(26)
     }
 
     private func reorderRow(_ item: ExerciseOrderItem) -> some View {

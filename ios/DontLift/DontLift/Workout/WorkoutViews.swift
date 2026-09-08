@@ -1158,27 +1158,6 @@ struct WorkoutLoggingView: View {
             Theme.Color.bg.ignoresSafeArea()
             ScrollViewReader { proxy in
                 GeometryReader { viewport in
-                    if reordering {
-                        // 排序模式：不用外层 ScrollView（嵌套 List 的拖拽手势会被外层滚动抢走）。
-                        // 顶部信息区原位渲染但被蒙层封锁；排序面板（共用组件）为白色满幅浮层、自身滚动。
-                        VStack(spacing: 0) {
-                            topSection
-                                .padding(.horizontal, Theme.Spacing.lg)
-                                .reorderMasked(true,
-                                               horizontalBleed: Theme.Spacing.lg,
-                                               topBleed: Theme.Spacing.sm)
-                            InPlaceReorderPanel(title: "训练动作",
-                                                items: reorderItems,
-                                                onMove: { source, destination in
-                                                    reorderDraft.move(fromOffsets: source, toOffset: destination)
-                                                    Theme.Haptics.selection()
-                                                },
-                                                onDone: commitReorder)
-                        }
-                        .frame(width: viewport.size.width, alignment: .top)
-                        .padding(.top, Theme.Spacing.sm)
-                        .transition(.opacity)
-                    } else {
                     ScrollView {
                         VStack(spacing: Theme.Spacing.md) {
                             topSection
@@ -1239,7 +1218,6 @@ struct WorkoutLoggingView: View {
                     // preference 读取置于 safeAreaInset 之后：否则读不到键盘(外层 inset 内容)发出的行位置。
                     .onPreferenceChange(SetRowFramesKey.self) { setRowFrames = $0 }
                     .transition(.opacity)
-                    }
                 }
             }
             // 浮动 FAB（rest 进行中且未展开即显示）：可在页面内自由拖动；键盘升起时被顶到键盘上方，
@@ -1384,6 +1362,17 @@ struct WorkoutLoggingView: View {
         }
         .sheet(isPresented: $creatingSuperset) {
             SupersetCreationSheet(historyPrefill: supersetHistoryPrefill) { result in addSuperset(result) }
+        }
+        // 排序统一为系统 sheet 弹窗（与「编辑动作」等弹层一致）：原生下滑关闭。
+        // 下滑与点「完成」等价——onDismiss 统一提交草稿顺序并退出排序模式。
+        .sheet(isPresented: $reordering, onDismiss: commitReorder) {
+            InPlaceReorderPanel(title: "训练动作排序",
+                                items: reorderItems,
+                                onMove: { source, destination in
+                                    reorderDraft.move(fromOffsets: source, toOffset: destination)
+                                    Theme.Haptics.selection()
+                                },
+                                onDone: { reordering = false })
         }
         .sheet(isPresented: $showingPosterPreview) {
             WorkoutPosterPreviewSheet(workout: workout, personalRecords: posterPersonalRecords)
@@ -1655,7 +1644,7 @@ struct WorkoutLoggingView: View {
                         .textCase(.uppercase)
                         .foregroundStyle(Theme.Color.muted)
                     Spacer(minLength: 8)
-                    // 胶囊大命中区（32pt 高），点击进入就地拖拽排序模式（面板由 InPlaceReorderPanel 承载）。
+                    // 胶囊大命中区（32pt 高），点击弹出统一排序弹窗（InPlaceReorderPanel，系统 sheet）。
                     Button(action: beginReorder) {
                         Label("排序", systemImage: "arrow.up.arrow.down")
                             .font(Theme.Font.body(size: 12, weight: .bold))
@@ -1676,23 +1665,19 @@ struct WorkoutLoggingView: View {
         }
     }
 
-    /// 进入就地排序模式：收起键盘/菜单/休息卡片，快照当前 unit 顺序为草稿。
+    /// 进入排序：收起键盘/菜单/休息卡片，快照当前 unit 顺序为草稿，弹出排序 sheet。
     private func beginReorder() {
         prepareForPresentation()
         restTimer.isExpanded = false
         reorderDraft = workout.trainingUnits.map(\.unitId)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-            reordering = true
-        }
+        reordering = true
         Theme.Haptics.impact(.light)
     }
 
-    /// 退出排序模式并把草稿顺序一次性写回模型（无变化时 apply 内部直接返回）。
+    /// 排序 sheet 关闭（下滑或「完成」）后统一提交：把草稿顺序一次性写回模型（无变化时 apply 内部直接返回）。
     private func commitReorder() {
         applyWorkoutExerciseOrder(reorderDraft)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-            reordering = false
-        }
+        reordering = false
     }
 
     /// 排序模式行数据：按草稿顺序映射展示项。
@@ -1794,7 +1779,7 @@ struct WorkoutLoggingView: View {
         }
     }
 
-    // 就地排序面板与蒙层已收敛为共用组件 InPlaceReorderPanel / View.reorderMasked（InPlaceReorderPanel.swift）。
+    // 排序弹窗已收敛为共用组件 InPlaceReorderPanel（InPlaceReorderPanel.swift），以系统 sheet 呈现。
 
     private var canShowWorkoutAddBar: Bool {
         canEdit && !reordering && focused == nil && restEditingTarget == nil
