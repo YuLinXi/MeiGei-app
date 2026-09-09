@@ -247,6 +247,8 @@ struct WorkoutListView: View {
         if totalSets > 0 {
             let topEntries = board.filter { $0.workingSets > 0 }.prefix(3)
             let maxSets = max(board.map(\.workingSets).max() ?? 0, 1)
+            // 总容量与总组数同范围（含「其他」桶），与复盘页头部口径一致。
+            let totalVolume = board.reduce(0.0) { $0 + $1.volumeKg }
 
             Button {
                 showingMuscleLoadReview = true
@@ -264,12 +266,11 @@ struct WorkoutListView: View {
                             MuscleLoadRowView(
                                 name: entry.category?.rawValue ?? "其他",
                                 entry: entry,
-                                baselineSets: nil,
                                 barFraction: Double(entry.workingSets) / Double(maxSets)
                             )
                         }
                     }
-                    Text("共 \(totalSets) 组 · 全部 →")
+                    Text("共 \(totalSets) 组 · \(formatMuscleLoadVolume(totalVolume))")
                         .font(Theme.Font.body(size: 11, weight: .medium))
                         .foregroundStyle(Theme.Color.muted)
                 }
@@ -277,7 +278,7 @@ struct WorkoutListView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("本周肌群负荷，共 \(totalSets) 有效组")
+            .accessibilityLabel("本周肌群负荷，共 \(totalSets) 有效组，\(formatMuscleLoadVolume(totalVolume))")
             .accessibilityHint("点按查看肌群负荷复盘")
         }
     }
