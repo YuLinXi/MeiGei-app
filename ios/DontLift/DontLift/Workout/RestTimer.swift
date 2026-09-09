@@ -66,8 +66,6 @@ final class RestTimerController {
     private(set) var contextLabel: String?
     /// 下一组结构化信息，用于 Live Activity 展示重量/次数；仅随本次休息生命周期存在。
     private(set) var contextNextSet: RestActivityAttributes.NextSet?
-    /// 前台 ticker 写入，仅用于驱动 SwiftUI 每秒刷新。
-    private(set) var tick: Date = .now
     /// 等待训练页消费的休息完成事件；页面切换/销毁期间保留，避免实际休息回写丢失。
     private(set) var completionEvent: CompletionEvent?
 
@@ -77,6 +75,9 @@ final class RestTimerController {
     var nextHint: String?
 
     private var ticker: Timer?
+    /// 通知调度串行句柄：start/adjust/stop 先取消上一个任务，任务体内逐步检查取消，
+    /// 保证「清旧 → 排新」以最后一次操作为准；UNUserNotificationCenter 的 IPC 移到后台线程，不占主线程。
+    private var notificationTask: Task<Void, Never>?
     private let liveActivityController: WorkoutLiveActivityController?
     /// 本次休息对应的已完成组；nil 表示只展示计时，不产生训练页回写事件。
     private var activeSetId: UUID?
@@ -92,9 +93,9 @@ final class RestTimerController {
     private static let hapticsKey = "dontlift.rest.hapticsEnabled"
     private static let soundKey = "dontlift.rest.soundEnabled"
     /// 休息结束本地通知标识（PushManager 据此在前台抑制其声音，避免与前台音效双响）。
-    static let notificationId = "dontlift.rest.timer"
+    nonisolated static let notificationId = "dontlift.rest.timer"
     /// 系统通知使用与 App 内一致的双响提示音，避免两套声音体验不一致。
-    static let notificationSoundName = "rest_complete.caf"
+    nonisolated static let notificationSoundName = "rest_complete.caf"
     /// 前台展示休息结束横幅后，延迟清掉通知中心残留；锁屏/后台场景等用户回到 App 再清理。
     private static let deliveredNotificationCleanupDelay: TimeInterval = 6
 
@@ -159,14 +160,14 @@ final class RestTimerController {
     /// 结束训练 / 放弃训练时收束休息：清状态、撤销待发通知、结束训练会话 Live Activity。
     func stop() {
         clear()
-        Self.clearRestNotifications(removePending: true, removeDelivered: true)
+        clearScheduledRestNotifications()
         liveActivityController?.endWorkout()
     }
 
     /// 手动提前完成休息：产生实际休息回写事件，但不播放结束音，避免与用户主动操作重复反馈。
     func completeEarly(now: Date = .now) {
         completeCurrentRest(now: now, playFeedback: false)
-        Self.clearRestNotifications(removePending: true, removeDelivered: true)
+        clearScheduledRestNotifications()
     }
 
     /// 训练页在开始下一段休息前消费上一段休息，保留“提前进入下一组”的实际休息秒数。
@@ -186,7 +187,6 @@ final class RestTimerController {
 
     /// App 回到前台时兜底收束后台到点的休息。后台通知已负责提示音，这里不再补播。
     func handleAppBecameActive(now: Date = .now) {
-        tick = now
         guard let endDate else {
             backgroundedDuringCurrentRest = false
             return
@@ -201,7 +201,6 @@ final class RestTimerController {
 
     /// 前台本地通知到达时兜底收束休息；通知自身不发声，声音仍由 App 内播放器负责。
     func handleForegroundRestNotification(now: Date = .now) {
-        tick = now
         guard let endDate, endDate.timeIntervalSince(now) <= 0 else { return }
         completeCurrentRest(now: now, playFeedback: true)
     }
@@ -250,7 +249,6 @@ final class RestTimerController {
     }
 
     private func onTick() {
-        tick = .now
         // 前台到点：收起计时条，播一声提醒音（无视静音键）+ 按开关震动。
         // 同刻本地通知由 PushManager 在前台抑制其声音，避免双响。
         if let endDate, endDate.timeIntervalSinceNow <= 0 {
@@ -334,25 +332,44 @@ final class RestTimerController {
     }
 
     private func scheduleNotification(after seconds: TimeInterval) {
-        let center = UNUserNotificationCenter.current()
-        Self.clearRestNotifications(removePending: true, removeDelivered: true)
-        guard seconds > 0 else { return }
-        let content = UNMutableNotificationContent()
-        content.title = "休息结束"
-        content.body = contextLabel.map { "继续：\($0)" } ?? "开始下一组"
-        // 后台/锁屏到点的提醒音由系统通知播放；前台音效由 AVAudioPlayer 播放同一份 caf。
-        // 注意：通知声音仍服从静音键，静音下无声——突破静音需 Critical Alerts 特权（健身场景大概率被拒），不做。
-        if soundEnabled {
-            content.sound = UNNotificationSound(named: UNNotificationSoundName(Self.notificationSoundName))
+        notificationTask?.cancel()
+        let label = contextLabel
+        let soundOn = soundEnabled
+        // UNUserNotificationCenter 的 remove/add 是跨进程 IPC，移出主线程；
+        // 逐步检查取消：已起飞的 IPC 无法撤回，窗口最坏一次调用，下一次调度会纠正最终状态。
+        notificationTask = Task.detached {
+            guard !Task.isCancelled else { return }
+            Self.clearRestNotifications(removePending: true, removeDelivered: true)
+            guard seconds > 0, !Task.isCancelled else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "休息结束"
+            content.body = label.map { "继续：\($0)" } ?? "开始下一组"
+            // 后台/锁屏到点的提醒音由系统通知播放；前台音效由 AVAudioPlayer 播放同一份 caf。
+            // 注意：通知声音仍服从静音键，静音下无声——突破静音需 Critical Alerts 特权（健身场景大概率被拒），不做。
+            if soundOn {
+                content.sound = UNNotificationSound(named: UNNotificationSoundName(Self.notificationSoundName))
+            }
+            // Time Sensitive 会让系统展示“即时通知”标签；该标签不能单独改文案或隐藏。
+            // 休息提醒选择保留更高投递优先级，如需去掉标签只能降级为普通通知。
+            content.interruptionLevel = .timeSensitive
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
+            guard !Task.isCancelled else { return }
+            try? await UNUserNotificationCenter.current()
+                .add(UNNotificationRequest(identifier: Self.notificationId, content: content, trigger: trigger))
         }
-        // Time Sensitive 会让系统展示“即时通知”标签；该标签不能单独改文案或隐藏。
-        // 休息提醒选择保留更高投递优先级，如需去掉标签只能降级为普通通知。
-        content.interruptionLevel = .timeSensitive
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
-        center.add(UNNotificationRequest(identifier: Self.notificationId, content: content, trigger: trigger))
     }
 
-    private static func clearRestNotifications(removePending: Bool, removeDelivered: Bool) {
+    /// 撤销待发/已投递的休息通知（与 scheduleNotification 共用串行句柄，后台线程执行）。
+    private func clearScheduledRestNotifications() {
+        notificationTask?.cancel()
+        notificationTask = Task.detached {
+            guard !Task.isCancelled else { return }
+            Self.clearRestNotifications(removePending: true, removeDelivered: true)
+        }
+    }
+
+    /// 纯 UNUserNotificationCenter 调用，无 MainActor 依赖，供后台调度任务直接执行。
+    private nonisolated static func clearRestNotifications(removePending: Bool, removeDelivered: Bool) {
         let center = UNUserNotificationCenter.current()
         if removePending {
             center.removePendingNotificationRequests(withIdentifiers: [notificationId])

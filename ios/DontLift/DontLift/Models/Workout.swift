@@ -31,6 +31,11 @@ nonisolated final class Workout: Syncable {
     /// 一级训练单元索引 JSON。nil/空数组表示旧数据：按 `exercises.orderIndex` 派生为单动作单元。
     var unitsJSON: String?
 
+    /// `storedUnits` 解码缓存（仅内存）：以 unitsJSON 值比对失效，
+    /// 避免一次视图求值/多次策略计算内重复 JSONDecoder 全量解码。
+    @Transient private var cachedUnitsJSON: String?
+    @Transient private var cachedUnits: [WorkoutUnit]?
+
     @Relationship(deleteRule: .cascade, inverse: \WorkoutExercise.workout)
     var exercises: [WorkoutExercise]
 
@@ -164,7 +169,14 @@ struct WorkoutSupersetMember: Codable, Identifiable, Hashable {
     var isFinished: Bool { deletedAt == nil && endedAt != nil }
 
     var storedUnits: [WorkoutUnit] {
-        get { Self.decodeUnits(unitsJSON) }
+        get {
+            // 解码结果按 unitsJSON 值比对缓存：外部直接改 unitsJSON（不走 setter）也天然失效。
+            if let cachedUnits, cachedUnitsJSON == unitsJSON { return cachedUnits }
+            let decoded = Self.decodeUnits(unitsJSON)
+            cachedUnitsJSON = unitsJSON
+            cachedUnits = decoded
+            return decoded
+        }
         set { unitsJSON = Self.encodeUnits(newValue) }
     }
 
@@ -253,6 +265,39 @@ struct WorkoutSupersetMember: Codable, Identifiable, Hashable {
                 entryAcc + entry.volumeKg
             }
         }
+    }
+
+    /// 训练进行页统计快照：四个指标一趟遍历算出（原四个计算属性各自全扫 sets，
+    /// 视图每次重估都重复执行；快照化后只在 touch() 节奏下重算）。
+    struct StatsSnapshot: Equatable {
+        /// 已完成且计入统计的组数（completed && 非热身，递减组按组计）。
+        var completedSets = 0
+        /// 未勾选完成的组数（含热身组，结束训练强确认文案据此）。
+        var remainingSets = 0
+        /// 仍有未完成组的动作数。
+        var remainingExercises = 0
+        /// 累计训练量 kg·rep（口径同 completedStatVolumeKg）。
+        var volumeKg = 0.0
+    }
+
+    /// 单次遍历全部动作/组计算统计快照。
+    func makeStatsSnapshot() -> StatsSnapshot {
+        var snapshot = StatsSnapshot()
+        for exercise in exercises {
+            var hasIncomplete = false
+            for set in exercise.sets {
+                if !set.completed {
+                    hasIncomplete = true
+                    snapshot.remainingSets += 1
+                }
+                if set.countsForStats {
+                    snapshot.completedSets += 1
+                    snapshot.volumeKg += set.statEntries.reduce(0.0) { $0 + $1.volumeKg }
+                }
+            }
+            if hasIncomplete { snapshot.remainingExercises += 1 }
+        }
+        return snapshot
     }
 
     func exercise(id: UUID) -> WorkoutExercise? {

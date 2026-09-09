@@ -78,18 +78,19 @@ enum ExerciseLibraryManifest {
 }
 
 enum ExerciseLibrary {
-    private static var byCode: [String: BuiltinExercise] {
+    /// 静态常量（一次性惰性初始化、线程安全）：原先的计算属性每次访问都重建全量字典，
+    /// 在训练页每动作块每次渲染都会触发，是高频热点。
+    private static let byCode: [String: BuiltinExercise] =
         Dictionary(uniqueKeysWithValues: BuiltinExercise.starter.map { ($0.code, $0) })
-    }
 
-    private static var aliasNamesByTargetCode: [String: Set<String>] {
+    private static let aliasNamesByTargetCode: [String: Set<String>] = {
         var result: [String: Set<String>] = [:]
         for alias in ExerciseLibraryManifest.aliases {
             result[alias.targetCode, default: []].formUnion(alias.legacyNames)
             result[alias.targetCode, default: []].formUnion(alias.legacyCodes)
         }
         return result
-    }
+    }()
 
     static func resolve(code: String?, name: String?) -> BuiltinExercise? {
         let trimmedCode = code?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
