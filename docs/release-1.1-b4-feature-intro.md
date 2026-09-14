@@ -5,7 +5,7 @@
 > 当前工程实际版本：App、Widget、测试 target 均为 `1.1 (build 4)`
 > 候选分支：`feature/v1.1-b4`
 > 候选提交：`0705e4fddff1a7b75bc7c26c1d71783035eb1ae5`
-> 文档状态：**候选已提交；人工验证已通过；待用户 Archive、上传 TestFlight**
+> 文档状态：**候选已提交并推送；人工验证已通过；待用户 Archive、上传 TestFlight**
 > 关联清单：[release-1.1-b4-checklist.md](release-1.1-b4-checklist.md)
 > 用户公告：[release-1.1-b4-user-announcement.md](release-1.1-b4-user-announcement.md)
 
