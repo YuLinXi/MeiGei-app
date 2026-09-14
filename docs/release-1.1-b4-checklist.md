@@ -6,7 +6,7 @@
 > 候选分支：`feature/v1.1-b4`
 > 当前候选提交：`0705e4fddff1a7b75bc7c26c1d71783035eb1ae5`
 > 当前工作树：候选已提交并推送，工作树干净
-> 当前结论：**自动化、人工回归和 TestFlight 验证已通过，待合并 main 并创建 tag**
+> 当前结论：**自动化、人工回归和 TestFlight 验证已通过，main 已本地合并，待推送并创建 tag**
 > 功能介绍：[release-1.1-b4-feature-intro.md](release-1.1-b4-feature-intro.md)
 > 用户公告：[release-1.1-b4-user-announcement.md](release-1.1-b4-user-announcement.md)
 
@@ -26,7 +26,7 @@
 | iOS 自动化测试 | ✅ 通过 | xcresult 汇总 274/274 通过；UI target 9/9 通过，0 失败、0 跳过 |
 | 人工 UI 回归 | ✅ 用户确认通过 | 用户已确认 build 4 相关人工路径全部验证通过；本轮未提供设备/iOS 版本明细，文档不虚构测试环境 |
 | TestFlight 上传 | ✅ 用户确认通过 | 用户已确认 build 4 已上传、状态为 `VALID` 且可安装 |
-| `main` 合并与 tag | ⏳ 待执行 | 用户已确认门禁通过，待本次执行合并 `main` 和创建 `v1.1-b4` |
+| `main` 合并与 tag | ⚠️ main 已本地合并 | 合并提交为 `1b9a2c1c947f591427a7ed779fbd530d2fd8091a`，待推送 `main` 并创建 `v1.1-b4` |
 
 ## 1. 发布范围与候选冻结
 
@@ -117,9 +117,9 @@
 - [ ] 后端部署：本候选无需部署；若范围发生变化，重新执行部署判断。
 - [x] iOS 上传：用户确认已完成，build 4 为 `VALID` 且可安装。
 - [x] TestFlight 可安装：用户确认已完成最终验证。
-- [ ] 候选分支合并 `main`：当前未执行。
-- [ ] 创建并推送 annotated tag `v1.1-b4`：待本次合并 `main` 后执行。
-- [x] 已回填当前候选提交、人工验证、TestFlight 和推送状态；合并 SHA、tag 和完成时间待本次收口后回填。
+- [x] 候选分支已合并 `main`：合并提交为 `1b9a2c1c947f591427a7ed779fbd530d2fd8091a`，合并后工作树内容与候选分支一致。
+- [ ] 创建并推送 annotated tag `v1.1-b4`：待 `main` 推送后执行。
+- [x] 已回填当前候选提交、人工验证、TestFlight 和推送状态及本地合并 SHA；tag 和完成时间待本次收口后回填。
 
 ## 8. 回滚与异常处理
 

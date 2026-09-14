@@ -5,7 +5,7 @@
 > 当前工程实际版本：App、Widget、测试 target 均为 `1.1 (build 4)`
 > 候选分支：`feature/v1.1-b4`
 > 候选提交：`0705e4fddff1a7b75bc7c26c1d71783035eb1ae5`
-> 文档状态：**候选已提交并推送；TestFlight 已可安装；待合并 main、创建 tag**
+> 文档状态：**候选已提交并推送；main 已本地合并；TestFlight 已可安装；待推送 main、创建 tag**
 > 关联清单：[release-1.1-b4-checklist.md](release-1.1-b4-checklist.md)
 > 用户公告：[release-1.1-b4-user-announcement.md](release-1.1-b4-user-announcement.md)
 
@@ -99,4 +99,4 @@ TestFlight 已可安装，请重点反馈肌群容量排版、周复盘对比和
 - [x] 将所有 target 的 build 从 3 递增为 4，并重新执行必要的 build/test；8 组 configuration 已统一，build/test 均通过。
 - [x] 用户确认完成 Simulator/真机人工回归和 TestFlight 安装验证；设备/iOS 详细信息待补充时不作虚构记录。
 - [x] 用户确认已完成 Archive、上传 TestFlight，状态为 `VALID` 且可安装。
-- [ ] 用户已确认收口授权；待实际合并 `main`、创建并推送 `v1.1-b4` annotated tag。
+- [x] 用户已确认收口授权，main 已本地合并；待推送合并结果并创建 `v1.1-b4` annotated tag。
