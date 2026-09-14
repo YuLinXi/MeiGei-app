@@ -105,9 +105,11 @@ struct PlanListView: View {
     @State private var creatingPlanRoute: PlanEditorRoute?
     @State private var groupEditor: PlanGroupEditorTarget?
     @State private var deletingGroup: WorkoutPlanGroup?
-    /// 就地排序目标（nil = 非排序模式）：分组排序或某分组内的计划排序。
+    /// 排序目标（nil = 未在排序）：分组排序或某分组内的计划排序；sheet 关闭提交后才清空。
     @State private var reorderTarget: PlanListReorderTarget?
-    /// 排序模式中的 id 草稿顺序；点「完成」时一次性写回模型。
+    /// 排序 sheet 显隐。
+    @State private var reorderPresented = false
+    /// 排序中的 id 草稿顺序；关闭 sheet（下滑或「完成」）时一次性写回模型。
     @State private var reorderDraft: [UUID] = []
     @State private var expandedSectionId: String?
     /// 计划详情导航：用绑定式 navigationDestination(item:) 而非 NavigationLink(value:)。
@@ -179,7 +181,7 @@ struct PlanListView: View {
         }
     }
 
-    /// 进入就地排序模式：收起展开的分组，快照当前顺序为草稿。
+    /// 进入排序：收起展开的分组，快照当前顺序为草稿，弹出排序 sheet。
     private func beginReorder(_ target: PlanListReorderTarget) {
         expandedSectionId = nil
         switch target {
@@ -188,13 +190,12 @@ struct PlanListView: View {
         case .plans(let planTarget):
             reorderDraft = plans(in: planTarget.groupId).map(\.localId)
         }
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-            reorderTarget = target
-        }
+        reorderTarget = target
+        reorderPresented = true
         Theme.Haptics.impact(.light)
     }
 
-    /// 退出排序模式并把草稿顺序一次性写回模型（无变化时 apply 内部直接返回）。
+    /// 排序 sheet 关闭（下滑或「完成」）后统一提交：把草稿顺序一次性写回模型（无变化时 apply 内部直接返回）。
     private func commitReorder() {
         switch reorderTarget {
         case .groups:
@@ -204,9 +205,7 @@ struct PlanListView: View {
         case nil:
             break
         }
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-            reorderTarget = nil
-        }
+        reorderTarget = nil
     }
 
     private func usage(for plan: WorkoutPlan) -> PlanUsageSummary {
@@ -216,26 +215,6 @@ struct PlanListView: View {
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
-            if reorderTarget != nil {
-                // 排序模式：不用外层 ScrollView（嵌套 List 的拖拽手势会被外层滚动抢走）。
-                // 顶部计划总览原位渲染但被蒙层封锁；排序面板为白色满幅浮层、自身滚动。
-                VStack(spacing: 0) {
-                    planOverview
-                        .padding(.horizontal, Theme.Spacing.lg)
-                        .padding(.top, Theme.Spacing.md)
-                        .reorderMasked(true,
-                                       horizontalBleed: Theme.Spacing.lg,
-                                       topBleed: Theme.Spacing.md)
-                    InPlaceReorderPanel(title: reorderPanelTitle,
-                                        items: reorderItems,
-                                        onMove: { source, destination in
-                                            reorderDraft.move(fromOffsets: source, toOffset: destination)
-                                            Theme.Haptics.selection()
-                                        },
-                                        onDone: commitReorder)
-                }
-                .transition(.opacity)
-            } else {
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
@@ -263,11 +242,10 @@ struct PlanListView: View {
                 }
             }
             .transition(.opacity)
-            }
         }
-        // 排序模式下隐藏浮动添加菜单：排序区之外不允许任何操作。
+        // 排序 sheet 弹出期间隐藏浮动添加菜单。
         .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
-            if reorderTarget == nil { floatingAddMenu }
+            if !reorderPresented { floatingAddMenu }
         }
         .rootTabTopScrim()
         .toolbar(.hidden, for: .navigationBar)
@@ -291,6 +269,17 @@ struct PlanListView: View {
                     renameGroup(group, name: name)
                 }
             }
+        }
+        // 排序统一为系统 sheet 弹窗（与「编辑动作」等弹层一致）：原生下滑关闭。
+        // 下滑与点「完成」等价——onDismiss 统一提交草稿顺序并退出排序。
+        .sheet(isPresented: $reorderPresented, onDismiss: commitReorder) {
+            InPlaceReorderPanel(title: reorderPanelTitle,
+                                items: reorderItems,
+                                onMove: { source, destination in
+                                    reorderDraft.move(fromOffsets: source, toOffset: destination)
+                                    Theme.Haptics.selection()
+                                },
+                                onDone: { reorderPresented = false })
         }
         .paperConfirmDialog(
             isPresented: Binding(
@@ -699,7 +688,7 @@ struct PlanDetailView: View {
     @State private var pendingDeleteItem: PlanItem?
     /// 计划整体备注编辑 sheet 显隐（点按详情头部备注直接进入编辑）。
     @State private var editingPlanNote = false
-    /// 就地排序模式：true 时动作列表切换为共用排序面板（InPlaceReorderPanel），其余区域压暗封锁。
+    /// 排序 sheet 显隐：true 时以系统 sheet 弹出共用排序弹窗（InPlaceReorderPanel）。
     @State private var reordering = false
     /// 排序模式中的 itemId 草稿顺序；点「完成」时一次性写回模型。
     @State private var reorderDraft: [UUID] = []
@@ -739,49 +728,23 @@ struct PlanDetailView: View {
         return reorderDraft.compactMap { byId[$0] }
     }
 
-    /// 进入就地排序模式：收起展开详情，快照当前 itemId 顺序为草稿。
+    /// 进入排序：收起展开详情，快照当前 itemId 顺序为草稿，弹出排序 sheet。
     private func beginReorder() {
         expandedItemId = nil
         reorderDraft = orderedItems.map(\.itemId)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-            reordering = true
-        }
+        reordering = true
         Theme.Haptics.impact(.light)
     }
 
-    /// 退出排序模式并把草稿顺序一次性写回模型（无变化时 apply 内部直接返回）。
+    /// 排序 sheet 关闭（下滑或「完成」）后统一提交：把草稿顺序一次性写回模型（无变化时 apply 内部直接返回）。
     private func commitReorder() {
         applyPlanItemOrder(reorderDraft)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-            reordering = false
-        }
+        reordering = false
     }
 
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
-            if reordering {
-                // 排序模式：原生 List 整体替换（面板内嵌 List 不能被外层滚动容器包裹，否则拖拽手势被抢）。
-                // 顶部信息区原位渲染但被蒙层封锁；排序面板为白色满幅浮层、自身滚动。
-                VStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 11) {
-                        header
-                        statRow
-                        modeInfoCard
-                    }
-                    .padding(.horizontal, 17)
-                    .padding(.top, 4)
-                    .reorderMasked(true, horizontalBleed: 17, topBleed: 4)
-                    InPlaceReorderPanel(title: "训练动作",
-                                        items: reorderItems,
-                                        onMove: { source, destination in
-                                            reorderDraft.move(fromOffsets: source, toOffset: destination)
-                                            Theme.Haptics.selection()
-                                        },
-                                        onDone: commitReorder)
-                }
-                .transition(.opacity)
-            } else {
             List {
                 // 标题区作为单个原生 List 行，内部继续沿用原有 11pt 纸感版式。
                 VStack(alignment: .leading, spacing: 11) {
@@ -828,7 +791,6 @@ struct PlanDetailView: View {
             .contentMargins(.vertical, 0, for: .scrollContent)
             .environment(\.defaultMinListRowHeight, 1)
             .transition(.opacity)
-            }
         }
         // 对齐原型 .footer：scroll 与 footer 为兄弟（内容不穿底栏），底栏实底 + 顶部分隔线。
         // 排序模式下隐藏底栏：排序区之外不允许任何操作。
@@ -907,6 +869,17 @@ struct PlanDetailView: View {
         }
         .sheet(isPresented: $editing) {
             PlanRenameSheet(plan: plan)
+        }
+        // 排序统一为系统 sheet 弹窗（与「编辑动作」等弹层一致）：原生下滑关闭。
+        // 下滑与点「完成」等价——onDismiss 统一提交草稿顺序并退出排序。
+        .sheet(isPresented: $reordering, onDismiss: commitReorder) {
+            InPlaceReorderPanel(title: "训练动作排序",
+                                items: reorderItems,
+                                onMove: { source, destination in
+                                    reorderDraft.move(fromOffsets: source, toOffset: destination)
+                                    Theme.Haptics.selection()
+                                },
+                                onDone: { reordering = false })
         }
         .sheet(isPresented: $editingPlanNote) {
             PlanNoteEditorSheet(title: "计划备注",

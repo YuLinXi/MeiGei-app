@@ -247,6 +247,8 @@ struct WorkoutListView: View {
         if totalSets > 0 {
             let topEntries = board.filter { $0.workingSets > 0 }.prefix(3)
             let maxSets = max(board.map(\.workingSets).max() ?? 0, 1)
+            // 总容量与总组数同范围（含「其他」桶），与复盘页头部口径一致。
+            let totalVolume = board.reduce(0.0) { $0 + $1.volumeKg }
 
             Button {
                 showingMuscleLoadReview = true
@@ -264,12 +266,11 @@ struct WorkoutListView: View {
                             MuscleLoadRowView(
                                 name: entry.category?.rawValue ?? "其他",
                                 entry: entry,
-                                baselineSets: nil,
                                 barFraction: Double(entry.workingSets) / Double(maxSets)
                             )
                         }
                     }
-                    Text("共 \(totalSets) 组 · 全部 →")
+                    Text("共 \(totalSets) 组 · \(formatMuscleLoadVolume(totalVolume))")
                         .font(Theme.Font.body(size: 11, weight: .medium))
                         .foregroundStyle(Theme.Color.muted)
                 }
@@ -277,7 +278,7 @@ struct WorkoutListView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("本周肌群负荷，共 \(totalSets) 有效组")
+            .accessibilityLabel("本周肌群负荷，共 \(totalSets) 有效组，\(formatMuscleLoadVolume(totalVolume))")
             .accessibilityHint("点按查看肌群负荷复盘")
         }
     }
@@ -840,6 +841,7 @@ struct WorkoutLoggingView: View {
     @Environment(GlobalMessageCenter.self) private var globalMessage
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var workout: Workout
     let onMinimize: (() -> Void)?
@@ -876,16 +878,16 @@ struct WorkoutLoggingView: View {
     @State private var buffer: String = ""
     /// 「打字即覆盖」标志：聚焦已有值后首个数字键清空重填。
     @State private var pendingReplace: Bool = false
-    /// 各组行在屏幕(.global)坐标的 frame，用于判断聚焦组是否已在可视区内（避免无谓滚动）。
-    @State private var setRowFrames: [UUID: CGRect] = [:]
+    /// 键盘/滚动布局测量态（行框/视口/键盘顶边）：逐帧变化的测量值收进独立 @Observable，
+    /// 避免每次 preference 更新触发整页 body 重估；只有读取它的视图才订阅。
+    @State private var keyboardLayout = WorkoutKeyboardLayout()
+    /// setId → 组/动作 的 O(1) 查找缓存：击键路径每键多次查询（原为 flatMap/contains 全量线性扫描）。
+    /// 引用盒承载以绕过 View 值语义；任何模型变更经 touch() 置空失效，下次查询惰性重建。
+    @State private var setLookup = WorkoutSetLookupCache()
     /// 当前打开「更多操作」菜单的组 localId（nil = 无）。顶层浮层据 anchor 定位、外部点击关闭。
     @State private var menuSetId: UUID?
     /// 待二次确认删除的动作或超级组（nil = 无确认弹窗）。
     @State private var confirmDeleteTarget: WorkoutDeleteTarget?
-    /// ScrollView 视口在 .global 坐标的 frame（顶边 = 可视区上界）。
-    @State private var scrollViewport: CGRect = .zero
-    /// 自研键盘顶边的 .global Y（0 = 键盘未显示/未测得）；作为可视区下界。
-    @State private var keypadTopY: CGFloat = 0
     /// 动作级组间休息菜单的实际尺寸，用于自定义键盘弹出时向上避让。
     @State private var restMenuSize: CGSize = .zero
     /// 休息悬浮按钮（FAB）拖动后的锚点（FAB 容器本地坐标，nil = 默认右下角）。
@@ -896,6 +898,11 @@ struct WorkoutLoggingView: View {
     @State private var reordering = false
     /// 排序模式中的 unitId 草稿顺序；点「完成」时一次性写回模型。
     @State private var reorderDraft: [UUID] = []
+    /// 落盘防抖任务：高频修改（勾选/击键）在 300ms 窗口内合并为一次 save + Live Activity 快照。
+    @State private var persistDebounceTask: Task<Void, Never>?
+    /// 根视图统计快照（完成组/剩余动作/剩余组/训练量）：只在 touch()/onAppear 重算，
+    /// body 只读快照——避免键盘 preference 等无关状态变化也触发逐 set 全扫。
+    @State private var statsSnapshot = Workout.StatsSnapshot()
     /// 当前正在编辑备注的动作或超级组；nil 表示备注编辑 sheet 关闭。
     @State private var noteEditingTarget: WorkoutNoteTarget?
     /// 动作备注编辑草稿；仅点击「完成」或「清空备注」时写回模型。
@@ -1055,22 +1062,21 @@ struct WorkoutLoggingView: View {
         pendingExerciseOptionSwitch = nil
         accordion = .expanded(unit.unitId)
         touch()
-        workoutLiveActivity.syncWorkout(workout)
         Theme.Haptics.notification(.success)
     }
 
     private var completedSetCount: Int {
-        workout.completedStatEntryCount
+        statsSnapshot.completedSets
     }
 
     private var remainingExerciseCount: Int {
         // 仍有未完成 set 的动作数。
-        workout.exercises.filter { ex in ex.sets.contains { !$0.completed } }.count
+        statsSnapshot.remainingExercises
     }
 
     /// 未勾选完成的组数（结束训练强确认据此变文案）。
     private var remainingSetCount: Int {
-        workout.exercises.flatMap(\.sets).filter { !$0.completed }.count
+        statsSnapshot.remainingSets
     }
 
     private var shouldOfferSaveAsPlan: Bool {
@@ -1090,7 +1096,7 @@ struct WorkoutLoggingView: View {
     }
 
     private var currentVolume: Double {
-        workout.completedStatVolumeKg
+        statsSnapshot.volumeKg
     }
 
     private var workoutOrderItems: [ExerciseOrderItem] {
@@ -1132,21 +1138,18 @@ struct WorkoutLoggingView: View {
         return parts.joined(separator: " · ")
     }
 
-    /// 下一组提示（对齐原型文案「下一组 · **动作名** 第 N 组」，动作名用 markdown 加粗）。
-    private func nextHint(after setId: UUID?) -> String? {
-        guard let candidate = nextSetCandidate(after: setId) else { return nil }
-        return "下一组 · **\(candidate.exerciseName)** 第 \(candidate.setIndex) 组"
-    }
-
-    /// 下一组结构化摘要：供 Live Activity / 灵动岛展示动作、第几组、重量和次数。
-    private func nextSetSummary(after setId: UUID?) -> RestActivityAttributes.NextSet? {
-        guard let candidate = nextSetCandidate(after: setId) else { return nil }
-        return RestActivityAttributes.NextSet(
+    /// 下一组展示信息（hint 文案 + Live Activity 摘要）：candidate 只算一次（nextSet 是全场 sets 扫描+排序），
+    /// 供休息条文案与 Live Activity/灵动岛两处复用。
+    private func nextSetPresentation(after setId: UUID?) -> (hint: String?, summary: RestActivityAttributes.NextSet?) {
+        guard let candidate = nextSetCandidate(after: setId) else { return (nil, nil) }
+        let hint = "下一组 · **\(candidate.exerciseName)** 第 \(candidate.setIndex) 组"
+        let summary = RestActivityAttributes.NextSet(
             exerciseName: candidate.exerciseName,
             setIndex: candidate.setIndex,
             weightText: candidate.weightKg.map { "\(exercise(containing: candidate.setId)?.isAssistedWeight == true ? "辅助 " : "")\(formatKg($0)) kg" },
             repsText: candidate.reps.map { "\($0) 次" }
         )
+        return (hint, summary)
     }
 
     private func nextSetCandidate(after setId: UUID?) -> WorkoutRestPolicy.NextSetCandidate? {
@@ -1158,27 +1161,6 @@ struct WorkoutLoggingView: View {
             Theme.Color.bg.ignoresSafeArea()
             ScrollViewReader { proxy in
                 GeometryReader { viewport in
-                    if reordering {
-                        // 排序模式：不用外层 ScrollView（嵌套 List 的拖拽手势会被外层滚动抢走）。
-                        // 顶部信息区原位渲染但被蒙层封锁；排序面板（共用组件）为白色满幅浮层、自身滚动。
-                        VStack(spacing: 0) {
-                            topSection
-                                .padding(.horizontal, Theme.Spacing.lg)
-                                .reorderMasked(true,
-                                               horizontalBleed: Theme.Spacing.lg,
-                                               topBleed: Theme.Spacing.sm)
-                            InPlaceReorderPanel(title: "训练动作",
-                                                items: reorderItems,
-                                                onMove: { source, destination in
-                                                    reorderDraft.move(fromOffsets: source, toOffset: destination)
-                                                    Theme.Haptics.selection()
-                                                },
-                                                onDone: commitReorder)
-                        }
-                        .frame(width: viewport.size.width, alignment: .top)
-                        .padding(.top, Theme.Spacing.sm)
-                        .transition(.opacity)
-                    } else {
                     ScrollView {
                         VStack(spacing: Theme.Spacing.md) {
                             topSection
@@ -1202,8 +1184,8 @@ struct WorkoutLoggingView: View {
                         if focused != nil {
                             GeometryReader { g in
                                 Color.clear
-                                    .onChange(of: g.frame(in: .global)) { _, f in scrollViewport = f }
-                                    .onAppear { scrollViewport = g.frame(in: .global) }
+                                    .onChange(of: g.frame(in: .global)) { _, f in keyboardLayout.scrollViewport = f }
+                                    .onAppear { keyboardLayout.scrollViewport = g.frame(in: .global) }
                             }
                         }
                     }
@@ -1237,9 +1219,8 @@ struct WorkoutLoggingView: View {
                         }
                     }
                     // preference 读取置于 safeAreaInset 之后：否则读不到键盘(外层 inset 内容)发出的行位置。
-                    .onPreferenceChange(SetRowFramesKey.self) { setRowFrames = $0 }
+                    .onPreferenceChange(SetRowFramesKey.self) { keyboardLayout.setRowFrames = $0 }
                     .transition(.opacity)
-                    }
                 }
             }
             // 浮动 FAB（rest 进行中且未展开即显示）：可在页面内自由拖动；键盘升起时被顶到键盘上方，
@@ -1254,7 +1235,7 @@ struct WorkoutLoggingView: View {
                         }
                         .position(fabPosition(in: geo))
                         // 键盘顶边变化时平滑被顶上去/落回（与键盘升降同一条弹簧）；拖动由手势驱动，不经此动画。
-                        .animation(.spring(response: 0.45, dampingFraction: 0.92), value: keypadTopY)
+                        .animation(.spring(response: 0.45, dampingFraction: 0.92), value: keyboardLayout.keypadTopY)
                         .gesture(
                             // 单一手势同时承担拖动与点按：实时位移跟手，松手按位移阈值区分「点按展开 / 落定」。
                             DragGesture(minimumDistance: 0, coordinateSpace: .named("fabSpace"))
@@ -1342,7 +1323,7 @@ struct WorkoutLoggingView: View {
         .overlay(alignment: .bottom) {
             restDurationKeypadOverlay
         }
-        .onPreferenceChange(KeypadTopKey.self) { keypadTopY = $0 }
+        .onPreferenceChange(KeypadTopKey.self) { keyboardLayout.keypadTopY = $0 }
         .onPreferenceChange(RestMenuSizeKey.self) { restMenuSize = $0 }
         // 组间休息已移入每个动作卡右上 ⋯ 菜单（动作级设置）；已完成训练只读，导航栏不再挂编辑入口。
         // 始终弹出二次确认；有未完成组时文案升级为强警示（finishConfirmTitle/Message）。
@@ -1384,6 +1365,17 @@ struct WorkoutLoggingView: View {
         }
         .sheet(isPresented: $creatingSuperset) {
             SupersetCreationSheet(historyPrefill: supersetHistoryPrefill) { result in addSuperset(result) }
+        }
+        // 排序统一为系统 sheet 弹窗（与「编辑动作」等弹层一致）：原生下滑关闭。
+        // 下滑与点「完成」等价——onDismiss 统一提交草稿顺序并退出排序模式。
+        .sheet(isPresented: $reordering, onDismiss: commitReorder) {
+            InPlaceReorderPanel(title: "训练动作排序",
+                                items: reorderItems,
+                                onMove: { source, destination in
+                                    reorderDraft.move(fromOffsets: source, toOffset: destination)
+                                    Theme.Haptics.selection()
+                                },
+                                onDone: { reordering = false })
         }
         .sheet(isPresented: $showingPosterPreview) {
             WorkoutPosterPreviewSheet(workout: workout, personalRecords: posterPersonalRecords)
@@ -1427,6 +1419,7 @@ struct WorkoutLoggingView: View {
             }
         }
         .onAppear {
+            refreshStatsSnapshot()
             consumeRestCompletionIfNeeded()
             historyStore.ensureLoaded(reason: .manual)
             workoutLiveActivity.syncWorkout(workout)
@@ -1436,7 +1429,12 @@ struct WorkoutLoggingView: View {
             #endif
         }
         .onDisappear {
+            flushPersist()
             NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
+        }
+        // 退后台/锁屏前强制落盘：防抖窗口内的改动不丢失。
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { flushPersist() }
         }
         .onChange(of: restTimer.completionEvent?.id) { _, _ in
             consumeRestCompletionIfNeeded()
@@ -1655,7 +1653,7 @@ struct WorkoutLoggingView: View {
                         .textCase(.uppercase)
                         .foregroundStyle(Theme.Color.muted)
                     Spacer(minLength: 8)
-                    // 胶囊大命中区（32pt 高），点击进入就地拖拽排序模式（面板由 InPlaceReorderPanel 承载）。
+                    // 胶囊大命中区（32pt 高），点击弹出统一排序弹窗（InPlaceReorderPanel，系统 sheet）。
                     Button(action: beginReorder) {
                         Label("排序", systemImage: "arrow.up.arrow.down")
                             .font(Theme.Font.body(size: 12, weight: .bold))
@@ -1676,23 +1674,19 @@ struct WorkoutLoggingView: View {
         }
     }
 
-    /// 进入就地排序模式：收起键盘/菜单/休息卡片，快照当前 unit 顺序为草稿。
+    /// 进入排序：收起键盘/菜单/休息卡片，快照当前 unit 顺序为草稿，弹出排序 sheet。
     private func beginReorder() {
         prepareForPresentation()
         restTimer.isExpanded = false
         reorderDraft = workout.trainingUnits.map(\.unitId)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-            reordering = true
-        }
+        reordering = true
         Theme.Haptics.impact(.light)
     }
 
-    /// 退出排序模式并把草稿顺序一次性写回模型（无变化时 apply 内部直接返回）。
+    /// 排序 sheet 关闭（下滑或「完成」）后统一提交：把草稿顺序一次性写回模型（无变化时 apply 内部直接返回）。
     private func commitReorder() {
         applyWorkoutExerciseOrder(reorderDraft)
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-            reordering = false
-        }
+        reordering = false
     }
 
     /// 排序模式行数据：按草稿顺序映射展示项。
@@ -1794,7 +1788,7 @@ struct WorkoutLoggingView: View {
         }
     }
 
-    // 就地排序面板与蒙层已收敛为共用组件 InPlaceReorderPanel / View.reorderMasked（InPlaceReorderPanel.swift）。
+    // 排序弹窗已收敛为共用组件 InPlaceReorderPanel（InPlaceReorderPanel.swift），以系统 sheet 呈现。
 
     private var canShowWorkoutAddBar: Bool {
         canEdit && !reordering && focused == nil && restEditingTarget == nil
@@ -1855,7 +1849,7 @@ struct WorkoutLoggingView: View {
                               readOnly: !canEdit,
                               isExpanded: activeId == unit.unitId,
                               focused: focused,
-                              editingText: buffer,
+                              editingText: liveEditingText(forAnyOf: first, second),
                               pendingReplace: pendingReplace,
                               onFocus: focus,
                               isMenuOpen: menuSupersetUnitId == unit.unitId,
@@ -1908,7 +1902,7 @@ struct WorkoutLoggingView: View {
                              isExpanded: activeId == unitId,
                              isMenuOpen: menuExerciseId == ex.localId,
                              focused: focused,
-                             editingText: buffer,
+                             editingText: liveEditingText(forAnyOf: ex),
                              pendingReplace: pendingReplace,
                              onFocus: focus,
                              onToggleExpand: {
@@ -2001,8 +1995,8 @@ struct WorkoutLoggingView: View {
         let preferredY = anchorY + gap
         var maxY = proxy.size.height - margin - menuHeight
 
-        if restEditingTarget != nil, keypadTopY > 0 {
-            let keypadTopLocalY = keypadTopY - proxy.frame(in: .global).minY
+        if restEditingTarget != nil, keyboardLayout.keypadTopY > 0 {
+            let keypadTopLocalY = keyboardLayout.keypadTopY - proxy.frame(in: .global).minY
             maxY = min(maxY, keypadTopLocalY - keyboardGap - menuHeight)
         }
 
@@ -2262,8 +2256,8 @@ struct WorkoutLoggingView: View {
         let maxX = max(minX, geo.size.width - margin - r)
         let minY = margin + r
         var maxY = geo.size.height - margin - r
-        if keypadTopY > 0 {   // 键盘升起：FAB 底边须在键盘顶上方
-            let keypadTopLocal = keypadTopY - geo.frame(in: .global).minY
+        if keyboardLayout.keypadTopY > 0 {   // 键盘升起：FAB 底边须在键盘顶上方
+            let keypadTopLocal = keyboardLayout.keypadTopY - geo.frame(in: .global).minY
             maxY = min(maxY, keypadTopLocal - margin - r)
         }
         maxY = max(minY, maxY)
@@ -2348,13 +2342,13 @@ struct WorkoutLoggingView: View {
         touch()
         if secs > 0 {
             continuedRestBaseBySet[set.localId] = nil
-            let nextSet = nextSetSummary(after: set.localId)
-            workoutLiveActivity.syncWorkout(workout)
+            // candidate 单次计算：rest label/summary 与 nextHint 复用同一结果。
+            let next = nextSetPresentation(after: set.localId)
             restTimer.start(duration: TimeInterval(secs),
-                            label: nextSet?.exerciseName ?? ex.exerciseName,
-                            nextSet: nextSet,
+                            label: next.summary?.exerciseName ?? ex.exerciseName,
+                            nextSet: next.summary,
                             setId: set.localId)
-            restTimer.nextHint = nextHint(after: set.localId)
+            restTimer.nextHint = next.hint
         }
     }
 
@@ -2377,13 +2371,13 @@ struct WorkoutLoggingView: View {
         touch()
         if secs > 0 {
             continuedRestBaseBySet[anchorSet.localId] = nil
-            let nextSet = nextSetSummary(after: anchorSet.localId)
-            workoutLiveActivity.syncWorkout(workout)
+            // candidate 单次计算：rest label/summary 与 nextHint 复用同一结果。
+            let next = nextSetPresentation(after: anchorSet.localId)
             restTimer.start(duration: TimeInterval(secs),
-                            label: nextSet?.exerciseName ?? "超级组",
-                            nextSet: nextSet,
+                            label: next.summary?.exerciseName ?? "超级组",
+                            nextSet: next.summary,
                             setId: anchorSet.localId)
-            restTimer.nextHint = nextHint(after: anchorSet.localId)
+            restTimer.nextHint = next.hint
         }
     }
 
@@ -2766,12 +2760,12 @@ struct WorkoutLoggingView: View {
         startTimerIfNeeded()
         workoutLiveActivity.syncWorkout(workout)
         continuedRestBaseBySet[set.localId] = accumulated
-        let nextSet = nextSetSummary(after: set.localId)
+        let next = nextSetPresentation(after: set.localId)
         restTimer.start(duration: Self.continuedRestDuration,
-                        label: nextSet?.exerciseName,
-                        nextSet: nextSet,
+                        label: next.summary?.exerciseName,
+                        nextSet: next.summary,
                         setId: set.localId)
-        restTimer.nextHint = nextHint(after: set.localId)
+        restTimer.nextHint = next.hint
         Theme.Haptics.impact(.light)
     }
 
@@ -2832,6 +2826,7 @@ struct WorkoutLoggingView: View {
         workout.bodyWeightKgAtCompletion = WorkoutCaloriePreferences.current().bodyWeightKg
         cleanupIncompleteSets()   // 落值方案：清理未打勾预填残组（design.md D6）
         touch()
+        flushPersist()   // 结束训练后立即全量重算/同步，必须同步落盘
         // 时长以计时起点为基准（排除开始前空闲）；旧数据无 timerStartedAt 时回退 startedAt。
         let startedAt = workout.timerStartedAt ?? workout.startedAt
         Task { await healthKit.saveStrengthWorkout(start: startedAt, end: endedAt) }
@@ -2843,6 +2838,7 @@ struct WorkoutLoggingView: View {
     private func discardWorkout() {
         Theme.Haptics.notification(.warning)
         restTimer.stop()
+        flushPersist()   // 丢弃前落盘防抖窗口内的改动（discard 自身走删除流程）
         WorkoutSession.discard(workout, in: modelContext)
         historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
         NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
@@ -3025,8 +3021,37 @@ struct WorkoutLoggingView: View {
         return detectPersonalRecords(in: workout, history: history)
     }
 
+    /// 高频修改统一入口：markDirty 同步（内存态/syncAll 读取即刻正确），
+    /// 磁盘落盘与 Live Activity 快照走 300ms 防抖合并，避免勾选/击键时主线程反复全量 save。
+    /// 崩溃不丢由 flushPersist() 保证：退后台/结束/丢弃/离开页面前强制同步落盘。
     private func touch() {
         workout.markDirty()
+        refreshStatsSnapshot()
+        setLookup.invalidate()
+        schedulePersist()
+    }
+
+    /// 重算根视图统计快照（单次全扫，替代原来四个计算属性各自全扫）。
+    private func refreshStatsSnapshot() {
+        statsSnapshot = workout.makeStatsSnapshot()
+    }
+
+    /// 防抖落盘：窗口内多次 touch 合并为一次 save + syncWorkout。
+    private func schedulePersist() {
+        persistDebounceTask?.cancel()
+        persistDebounceTask = Task { @MainActor [modelContext, workoutLiveActivity, workout] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            try? modelContext.save()
+            workoutLiveActivity.syncWorkout(workout)
+        }
+    }
+
+    /// 立即落盘：取消挂起的防抖任务并同步 save + Live Activity 快照。
+    /// 退后台 / 结束训练 / 丢弃训练 / 离开页面前必调，保证崩溃不丢数据。
+    private func flushPersist() {
+        persistDebounceTask?.cancel()
+        persistDebounceTask = nil
         try? modelContext.save()
         workoutLiveActivity.syncWorkout(workout)
     }
@@ -3052,9 +3077,10 @@ struct WorkoutLoggingView: View {
     /// 目标组是否已完整落在「视口顶 ~ 键盘顶」之间（含少量余量）。
     /// 仅当键盘已显示且测得其顶边时才判定；否则返回 false（保持原有滚动行为，首次聚焦必滚）。
     private func isRowFullyVisible(_ id: UUID) -> Bool {
-        guard keypadTopY > 0, !scrollViewport.isEmpty, let f = setRowFrames[id] else { return false }
+        guard keyboardLayout.keypadTopY > 0, !keyboardLayout.scrollViewport.isEmpty,
+              let f = keyboardLayout.setRowFrames[id] else { return false }
         let pad: CGFloat = 8   // 余量：避免贴边时判为可见
-        return f.minY >= scrollViewport.minY + pad && f.maxY <= keypadTopY - pad
+        return f.minY >= keyboardLayout.scrollViewport.minY + pad && f.maxY <= keyboardLayout.keypadTopY - pad
     }
 
     /// 某单元当前模型值的显示串（重量走 formatKg，次数走整数串）。
@@ -3073,7 +3099,7 @@ struct WorkoutLoggingView: View {
     }
 
     private func set(for id: UUID) -> WorkoutSet? {
-        workout.exercises.flatMap(\.sets).first { $0.localId == id }
+        setLookup.set(for: id, in: workout)
     }
 
     private func segment(in set: WorkoutSet, id: UUID) -> WorkoutSetSegment? {
@@ -3081,7 +3107,15 @@ struct WorkoutLoggingView: View {
     }
 
     private func exercise(containing setId: UUID) -> WorkoutExercise? {
-        workout.exercises.first { $0.sets.contains { $0.localId == setId } }
+        setLookup.exercise(containing: setId, in: workout)
+    }
+
+    /// 击键缓冲只传给含聚焦行的块；其余块收到常量 ""（输入串未变 → 块体 diff 整块跳过，
+    /// 避免一次击键重估全部动作块）。
+    private func liveEditingText(forAnyOf exercises: WorkoutExercise...) -> String {
+        guard let focused else { return "" }
+        let contains = exercises.contains { ex in ex.sets.contains { $0.localId == focused.setId } }
+        return contains ? buffer : ""
     }
 
     /// 当前动作的聚焦序列：组0.重量 → 组0.次数 → 组1.重量 → …
@@ -3141,7 +3175,7 @@ struct WorkoutLoggingView: View {
         writeBack()
     }
 
-    /// 缓冲写回模型（空串→nil），并走即时落盘（markDirty + save）。
+    /// 缓冲写回模型（空串→nil），经 touch() 标脏 + 防抖落盘（300ms 窗口合并 save）。
     private func writeBack() {
         guard let cell = focused, let s = set(for: cell.setId) else { return }
         switch cell {
@@ -3230,6 +3264,46 @@ struct WorkoutLoggingView: View {
                              segments: clonedDropSegments(from: previousDropSet))
         exercise.sets.append(set)
         return set
+    }
+}
+
+/// setId → 组/动作 的 O(1) 查找缓存（训练进行页击键路径专用）。
+/// 每次击键 currentText/applyBuffer/sequence 等会多次按 setId 反查，
+/// 原为 flatMap/contains 全量线性扫描；这里一趟建两张表后 O(1) 查询。
+/// 失效策略：任何模型变更经 touch() 调 invalidate()，下次查询惰性重建。
+/// 引用盒承载以绕过 View 值语义（@State 保持跨 body 身份；内部表变化不触发视图更新）。
+@MainActor
+private final class WorkoutSetLookupCache {
+    private var setById: [UUID: WorkoutSet]?
+    private var exerciseBySetId: [UUID: WorkoutExercise]?
+
+    func invalidate() {
+        setById = nil
+        exerciseBySetId = nil
+    }
+
+    func set(for id: UUID, in workout: Workout) -> WorkoutSet? {
+        ensureTables(in: workout)
+        return setById?[id]
+    }
+
+    func exercise(containing setId: UUID, in workout: Workout) -> WorkoutExercise? {
+        ensureTables(in: workout)
+        return exerciseBySetId?[setId]
+    }
+
+    private func ensureTables(in workout: Workout) {
+        guard setById == nil || exerciseBySetId == nil else { return }
+        var sets: [UUID: WorkoutSet] = [:]
+        var owners: [UUID: WorkoutExercise] = [:]
+        for ex in workout.exercises {
+            for set in ex.sets {
+                sets[set.localId] = set
+                owners[set.localId] = ex
+            }
+        }
+        setById = sets
+        exerciseBySetId = owners
     }
 }
 
@@ -3459,7 +3533,7 @@ private struct LiveHeaderView: View {
                         .font(Theme.Font.number(size: 15, weight: .bold))
                         .foregroundStyle(Theme.Color.fg2)
                 } else {
-                    // 进行中：墙钟实时计时（含组间休息，无暂停）。朱砂红脉冲点 + REC + 等宽计时。
+                    // 进行中：墙钟实时计时（含组间休息，无暂停）。静态朱砂红点 + REC + 等宽计时。
                     RecordingDot()
                     Text("REC")
                         .font(Theme.Font.mono(size: 11, weight: .bold))
@@ -3510,27 +3584,12 @@ private struct LiveHeaderView: View {
 }
 
 private struct RecordingDot: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-            ZStack {
-                Circle()
-                    .fill(Theme.Color.accent)
-                    .frame(width: 9, height: 9)
-                    .opacity(reduceMotion ? 1 : opacity(at: timeline.date))
-            }
-            .frame(width: 12, height: 12, alignment: .center)
-            .transaction { $0.animation = nil }
-        }
-        .accessibilityHidden(true)
-    }
-
-    private func opacity(at date: Date) -> Double {
-        let duration = 1.2
-        let phase = date.timeIntervalSinceReferenceDate
-            .truncatingRemainder(dividingBy: duration) / duration
-        return 0.35 + (cos(phase * 2 * .pi) + 1) * 0.325
+        // 静态红点：不带任何动画（repeatForever 呼吸动画曾把圆点渲染到卡片外，已移除）。
+        Circle()
+            .fill(Theme.Color.accent)
+            .frame(width: 9, height: 9)
+            .accessibilityHidden(true)
     }
 }
 
@@ -3813,15 +3872,21 @@ private struct ExerciseBlock: View {
     private var sortedSets: [WorkoutSet] {
         exercise.displaySortedSets
     }
-    /// 每组徽章文案：热身组显「热」；正式组按「仅正式组」在展示序里的相对序重新编号 1..n。
-    private func badgeText(for set: WorkoutSet) -> String {
-        if set.isWarmupEffective { return "热" }
+    /// 每组徽章文案表：热身组显「热」；正式组按「仅正式组」在展示序里的相对序重新编号 1..n。
+    /// 一次遍历生成字典，行渲染 O(1) 查表（原来逐行重扫 sortedSets，块级 O(n²)）。
+    private func badgeTexts(for sorted: [WorkoutSet]) -> [UUID: String] {
+        var result: [UUID: String] = [:]
+        result.reserveCapacity(sorted.count)
         var n = 0
-        for s in sortedSets where !s.isWarmupEffective {
-            n += 1
-            if s.localId == set.localId { return "\(n)" }
+        for s in sorted {
+            if s.isWarmupEffective {
+                result[s.localId] = "热"
+            } else {
+                n += 1
+                result[s.localId] = "\(n)"
+            }
         }
-        return "\(n)"
+        return result
     }
     /// 该组当前被聚焦的字段（nil = 未聚焦本组）。
     private func focusedField(for set: WorkoutSet) -> SetField? {
@@ -3847,7 +3912,10 @@ private struct ExerciseBlock: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        // 块级只排序一次：行渲染与计数全部复用，避免每行重排。
+        let sorted = sortedSets
+        let badgeBySetId = badgeTexts(for: sorted)
+        return VStack(spacing: 0) {
             head
             if isExpanded {
                 if let noteText {
@@ -3857,9 +3925,9 @@ private struct ExerciseBlock: View {
                 }
                 Rectangle().fill(Theme.Color.border).frame(height: 1).padding(.horizontal, 15)
                 VStack(spacing: 0) {
-                    ForEach(Array(sortedSets.enumerated()), id: \.element.localId) { index, set in
+                    ForEach(Array(sorted.enumerated()), id: \.element.localId) { index, set in
                         SetRow(set: set,
-                               badgeText: badgeText(for: set),
+                               badgeText: badgeBySetId[set.localId] ?? "",
                                readOnly: readOnly,
                                focusedCell: focused,
                                focusedField: focusedField(for: set),
@@ -3883,7 +3951,7 @@ private struct ExerciseBlock: View {
                                 }
                             }
                         }
-                        if isDropSetUnit && index < sortedSets.count - 1 {
+                        if isDropSetUnit && index < sorted.count - 1 {
                             Rectangle()
                                 .fill(Theme.Color.border)
                                 .frame(height: 1)
@@ -4371,7 +4439,7 @@ private struct SupersetBlock: View {
                 firstSet.completed = willComplete
                 secondSet.completed = willComplete
             }
-            onChange()
+            // 勾选/取消的持久化由 onCompleteRound/onUncompleteRound 内部统一 touch()，此处不再重复 onChange。
             if willComplete {
                 onCompleteRound(secondSet)
             } else {
@@ -4712,7 +4780,7 @@ private struct SetRow: View {
             withAnimation(completionAnimation) {
                 set.completed = willComplete
             }
-            onChange()
+            // 勾选/取消的持久化由 onComplete/onUncomplete 内部统一 touch()，此处不再重复 onChange。
             if willComplete {
                 onComplete()
             } else {

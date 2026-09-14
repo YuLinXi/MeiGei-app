@@ -166,34 +166,6 @@ struct MuscleLoadAggregatorTests {
         #expect(board.map(\.category) == [.back, .chest, .legs, nil])   // 同组数按中文名次序（背 U+80CC < 胸 U+80F8），其他沉底
     }
 
-    @Test func sameOffsetPreviousWeekTruncatesToElapsedTime() {
-        let calendar = Calendar.currentMondayFirst
-        let week = MuscleLoadAggregator.weekRange(for: reference, calendar: calendar)
-        // 把 reference 对齐到本周三中午，构造确定的 elapsed
-        let wednesdayNoon = calendar.date(byAdding: .day, value: 2, to: week.lowerBound)!
-            .addingTimeInterval(12 * 3600)
-
-        let baseline = MuscleLoadAggregator.sameOffsetPreviousWeekRange(
-            for: week, reference: wednesdayNoon, calendar: calendar)
-
-        let previousWeekStart = calendar.date(byAdding: .weekOfYear, value: -1, to: week.lowerBound)!
-        #expect(baseline.lowerBound == previousWeekStart)
-        #expect(baseline.upperBound == previousWeekStart
-            .addingTimeInterval(2 * 24 * 3600 + 12 * 3600))               // 上周三中午截断
-    }
-
-    @Test func completedWeekComparesAgainstFullPreviousWeek() {
-        let calendar = Calendar.currentMondayFirst
-        let previous = MuscleLoadAggregator.previousWeekRange(for: reference, calendar: calendar)
-
-        // reference 落在本周，但查看的是上一完整周时，对比基准为上上周整周
-        let baseline = MuscleLoadAggregator.sameOffsetPreviousWeekRange(
-            for: previous, reference: reference, calendar: calendar)
-
-        let expectedStart = calendar.date(byAdding: .weekOfYear, value: -1, to: previous.lowerBound)!
-        #expect(baseline == expectedStart..<previous.lowerBound)
-    }
-
     // MARK: - 趋势
 
     @Test func weeklySeriesBuildsFourWeekRisingSequence() {
@@ -226,13 +198,13 @@ struct MuscleLoadAggregatorTests {
         workouts.append(makeWorkout(at: thisWeekDay, exercises: [
             makeExercise(name: "卧推", muscle: "胸", sets: [workingSet(0), workingSet(1), workingSet(2)])
         ]))
-        // 上周一、周二（同期内）各 2 组
+        // 上周一、周二各 2 组
         for day in [0, 1] {
             workouts.append(makeWorkout(at: lastWeekStart.addingTimeInterval(TimeInterval(day) * 86400 + 3600),
                                         exercises: [makeExercise(name: "卧推", muscle: "胸",
                                                                  sets: [workingSet(0), workingSet(1)])]))
         }
-        // 上周三（同期外）1 组
+        // 上周三 1 组（整周基准同样计入）
         workouts.append(makeWorkout(at: lastWeekStart.addingTimeInterval(2 * 86400 + 3600),
                                     exercises: [makeExercise(name: "卧推", muscle: "胸", sets: [workingSet(0)])]))
 
@@ -241,8 +213,8 @@ struct MuscleLoadAggregatorTests {
 
         #expect(snapshot.weekStart == thisWeek.lowerBound)
         #expect(MuscleLoadAggregator.sets(of: .chest, in: snapshot.board) == 3)
-        // 同期基准：上周一 00:00 → 上周二 00:00 截断，只含周一的 2 组
-        #expect(MuscleLoadAggregator.sets(of: .chest, in: snapshot.baseline) == 2)
+        // 对比基准：上周整周（不按已流逝时长截断），含全部 5 组
+        #expect(MuscleLoadAggregator.sets(of: .chest, in: snapshot.baseline) == 5)
         // 上一完整周看板含全周 5 组
         #expect(MuscleLoadAggregator.sets(of: .chest, in: snapshot.previousBoard) == 5)
         #expect(snapshot.series[.chest] == [0, 0, 5, 3])

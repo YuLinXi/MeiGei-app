@@ -21,18 +21,17 @@ struct MuscleLoadContribution: Equatable, Identifiable {
 }
 
 /// 肌群负荷快照（值类型，由 `WorkoutHistoryStore` 投影构建，视图只读）。
-/// 覆盖当前周与上一完整周两套看板 + 基准 + 明细，复盘页切周无需重算。
+/// 覆盖当前周与上一完整周两套看板 + 明细；对比基准只有一组：本周对比上周整周
+/// （上周视图为纯数据回看，不再对比上上周）。
 struct MuscleLoadSnapshot: Equatable {
     /// 当前周起点（周一 00:00），用于视图判定快照是否跨周过期。
     var weekStart: Date
     /// 本周看板（八肌群 + 非零时的「其他」）。
     var board: [MuscleLoadEntry]
-    /// 本周的对比基准：上周同期截断。
+    /// 本周的对比基准：上周整周。
     var baseline: [MuscleLoadEntry]
     /// 上一完整周看板（复盘页切周）。
     var previousBoard: [MuscleLoadEntry]
-    /// 上一完整周的对比基准：上上周整周。
-    var previousBaseline: [MuscleLoadEntry]
     /// 近 4 个自然周（含本周，时间升序）每桶有效组数序列。
     var series: [ExerciseCategory?: [Int]]
     /// 本周各桶贡献明细。
@@ -42,7 +41,7 @@ struct MuscleLoadSnapshot: Equatable {
 
     static let empty = MuscleLoadSnapshot(
         weekStart: .distantPast,
-        board: [], baseline: [], previousBoard: [], previousBaseline: [],
+        board: [], baseline: [], previousBoard: [],
         series: [:], contributions: [:], previousContributions: [:]
     )
 }
@@ -113,7 +112,7 @@ enum MuscleLoadAggregator {
         entries.reduce(0) { $0 + $1.workingSets }
     }
 
-    // MARK: - 周界与同期对比
+    // MARK: - 周界
 
     /// 参考日所在自然周（周一 00:00 起）。
     static func weekRange(for reference: Date = .now,
@@ -122,27 +121,12 @@ enum MuscleLoadAggregator {
         return start..<end
     }
 
-    /// 上一完整自然周。
+    /// 上一完整自然周。本周看板的对比基准即为此区间（整周，不按已流逝时长截断）。
     static func previousWeekRange(for reference: Date = .now,
                                   calendar: Calendar = .currentMondayFirst) -> Range<Date> {
         let current = weekRange(for: reference, calendar: calendar)
         let start = calendar.date(byAdding: .weekOfYear, value: -1, to: current.lowerBound) ?? current.lowerBound
         return start..<current.lowerBound
-    }
-
-    /// 同期对比基准：若参考区间是进行中的本周（reference 落在区间内），
-    /// 取上一周「周一 00:00 起、与本周已流逝时长相同」的截断区间；完整周则取上一整周。
-    static func sameOffsetPreviousWeekRange(for week: Range<Date>,
-                                            reference: Date = .now,
-                                            calendar: Calendar = .currentMondayFirst) -> Range<Date> {
-        let previousStart = calendar.date(byAdding: .weekOfYear, value: -1, to: week.lowerBound) ?? week.lowerBound
-        let previousEnd = calendar.date(byAdding: .weekOfYear, value: -1, to: week.upperBound) ?? week.upperBound
-        guard reference >= week.lowerBound, reference < week.upperBound else {
-            return previousStart..<previousEnd
-        }
-        let elapsed = reference.timeIntervalSince(week.lowerBound)
-        let cutoff = min(previousStart + elapsed, previousEnd)
-        return previousStart..<cutoff
     }
 
     // MARK: - 近 N 周趋势
@@ -237,10 +221,6 @@ enum MuscleLoadAggregator {
                          calendar: Calendar = .currentMondayFirst) -> MuscleLoadSnapshot {
         let currentWeek = weekRange(for: reference, calendar: calendar)
         let previousWeek = previousWeekRange(for: reference, calendar: calendar)
-        let baselineRange = sameOffsetPreviousWeekRange(for: currentWeek, reference: reference, calendar: calendar)
-        let previousBaselineRange = previousWeekRange(
-            for: calendar.date(byAdding: .day, value: -1, to: currentWeek.lowerBound) ?? reference,
-            calendar: calendar)
 
         let buckets: [ExerciseCategory?] = anatomicalCategories + [nil]
         var currentByBucket: [ExerciseCategory?: [MuscleLoadContribution]] = [:]
@@ -252,12 +232,13 @@ enum MuscleLoadAggregator {
             if !previous.isEmpty { previousByBucket[bucket] = previous }
         }
 
+        // 上周整周同时充当本周的对比基准与上周视图看板，一次聚合两用。
+        let previousEntries = load(workouts: workouts, in: previousWeek)
         return MuscleLoadSnapshot(
             weekStart: currentWeek.lowerBound,
             board: sortedBoard(load(workouts: workouts, in: currentWeek)),
-            baseline: load(workouts: workouts, in: baselineRange),
-            previousBoard: sortedBoard(load(workouts: workouts, in: previousWeek)),
-            previousBaseline: load(workouts: workouts, in: previousBaselineRange),
+            baseline: previousEntries,
+            previousBoard: sortedBoard(previousEntries),
             series: weeklySeries(workouts: workouts, weeks: 4, reference: reference, calendar: calendar),
             contributions: currentByBucket,
             previousContributions: previousByBucket
@@ -267,5 +248,10 @@ enum MuscleLoadAggregator {
     /// 看板中某桶的有效组数（缺失桶按 0）。
     static func sets(of category: ExerciseCategory?, in board: [MuscleLoadEntry]) -> Int {
         board.first { $0.category == category }?.workingSets ?? 0
+    }
+
+    /// 看板中某桶的训练容量（缺失桶按 0）。
+    static func volumeKg(of category: ExerciseCategory?, in board: [MuscleLoadEntry]) -> Double {
+        board.first { $0.category == category }?.volumeKg ?? 0
     }
 }

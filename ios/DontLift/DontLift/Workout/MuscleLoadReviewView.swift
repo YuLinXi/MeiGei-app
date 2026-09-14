@@ -28,23 +28,18 @@ struct MuscleLoadSparkline: View {
     }
 }
 
-/// 单个肌群负荷行：肌群名 + 负荷条 + 组数 + 较同期变化 + 可选趋势。首页小卡与复盘页共用。
-/// 负荷条统一主色（朱砂红），「其他」桶整体弱化。
+/// 单个肌群负荷行：肌群名 + 负荷条 + 组数与容量 + 可选趋势。首页小卡与复盘页共用。
+/// 负荷条统一主色（朱砂红），「其他」桶整体弱化；组数为视觉主数字，容量弱化色紧随（「12 组 · 8.6 t」）。
+/// 行内不展示同期对比增量——对比详情在复盘页点按展开的贡献明细面板中呈现。
 struct MuscleLoadRowView: View {
     let name: String
     let entry: MuscleLoadEntry
-    /// 同期基准组数（用于变化展示）；nil 表示不展示变化。
-    let baselineSets: Int?
     /// 相对最大组数的条宽比例（0...1）。
     let barFraction: Double
     /// 近 4 周趋势序列；nil 隐藏趋势（首页小卡）。
     var series: [Int]? = nil
-    /// 次要行（「其他」桶）：弱化展示，不展示变化与主色条。
+    /// 次要行（「其他」桶）：弱化展示，不绘制主色条。
     var isSecondary = false
-
-    private var delta: Int? {
-        baselineSets.map { entry.workingSets - $0 }
-    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -63,35 +58,25 @@ struct MuscleLoadRowView: View {
             }
             .frame(height: 6)
 
-            Text("\(entry.workingSets) 组")
-                .font(Theme.Font.mono(size: 12, weight: .semibold))
-                .foregroundStyle(isSecondary ? Theme.Color.muted : Theme.Color.fg)
-                .frame(width: 44, alignment: .trailing)
-
-            if let delta {
-                deltaPill(delta)
+            HStack(spacing: 3) {
+                Text("\(entry.workingSets) 组")
+                    .font(Theme.Font.mono(size: 12, weight: .semibold))
+                    .foregroundStyle(isSecondary ? Theme.Color.muted : Theme.Color.fg)
+                Text("· \(formatMuscleLoadVolume(entry.volumeKg))")
+                    .font(Theme.Font.mono(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.Color.muted)
             }
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .frame(width: 88, alignment: .trailing)
 
             if let series {
                 MuscleLoadSparkline(values: series)
             }
         }
         .frame(height: 28)
-    }
-
-    /// 变化胶囊：增加 = 主色浅底 pill；减少 = 中性灰字；持平 = 弱灰字。
-    private func deltaPill(_ delta: Int) -> some View {
-        let text = delta > 0 ? "+\(delta)" : (delta < 0 ? "\(delta)" : "持平")
-        let positive = delta > 0
-        return Text(text)
-            .font(Theme.Font.mono(size: 10, weight: .bold))
-            .foregroundStyle(positive ? Theme.Color.accent
-                                      : (delta == 0 ? Theme.Color.muted : Theme.Color.fg2))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(positive ? Theme.Color.accentSofter : Color.clear,
-                        in: Capsule(style: .continuous))
-            .frame(width: 38, alignment: .trailing)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(name)，\(entry.workingSets) 组，\(formatMuscleLoadVolume(entry.volumeKg))")
     }
 }
 
@@ -115,8 +100,9 @@ struct MuscleLoadReviewView: View {
         viewingPreviousWeek ? snapshot.previousBoard : snapshot.board
     }
 
+    /// 本周的对比基准（上周整周）。上周视图为纯数据回看，不展示对比。
     private var baselineBoard: [MuscleLoadEntry] {
-        viewingPreviousWeek ? snapshot.previousBaseline : snapshot.baseline
+        snapshot.baseline
     }
 
     private var contributions: [ExerciseCategory?: [MuscleLoadContribution]] {
@@ -127,12 +113,40 @@ struct MuscleLoadReviewView: View {
 
     private var totalSets: Int { board.reduce(0) { $0 + $1.workingSets } }
 
-    /// 全板相对上周同期的有效组数变化（仅八肌群，不含「其他」）。
+    /// 全板总容量（含「其他」桶，与 totalSets 同范围）。
+    private var totalVolume: Double { board.reduce(0) { $0 + $1.volumeKg } }
+
+    /// 全板相对上周整周的有效组数变化（仅八肌群，不含「其他」）。
     private var totalDelta: Int {
         let baselineTotal = baselineBoard
             .filter { $0.category != nil }
             .reduce(0) { $0 + $1.workingSets }
         return board.filter { $0.category != nil }.reduce(0) { $0 + $1.workingSets } - baselineTotal
+    }
+
+    /// 全板相对上周整周的容量变化（仅八肌群，与 totalDelta 同范围）。
+    private var totalVolumeDelta: Double {
+        let baselineTotal = baselineBoard
+            .filter { $0.category != nil }
+            .reduce(0.0) { $0 + $1.volumeKg }
+        return board.filter { $0.category != nil }.reduce(0.0) { $0 + $1.volumeKg } - baselineTotal
+    }
+
+    /// 较上周整周的对比文案：组数与容量两个分量各自独立，持平（变化为 0）的分量省略，
+    /// 两个分量均持平时返回 nil（整条不展示）。容量变化绝对值 < 0.5 kg 视为持平
+    /// （低于 `formatMuscleLoadVolume` 的整数 kg 显示精度）。
+    private func comparisonText(setsDelta: Int, volumeDelta: Double) -> String? {
+        var parts: [String] = []
+        if setsDelta != 0 {
+            parts.append(setsDelta > 0 ? "多 \(setsDelta) 组" : "少 \(abs(setsDelta)) 组")
+        }
+        if abs(volumeDelta) >= 0.5 {
+            parts.append(volumeDelta > 0
+                         ? "多 \(formatMuscleLoadVolume(volumeDelta))"
+                         : "少 \(formatMuscleLoadVolume(abs(volumeDelta)))")
+        }
+        guard !parts.isEmpty else { return nil }
+        return "较上周" + parts.joined(separator: " · ")
     }
 
     var body: some View {
@@ -164,21 +178,27 @@ struct MuscleLoadReviewView: View {
                 Text("共 \(totalSets) 有效组")
                     .font(Theme.Font.body(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg2)
-                Spacer(minLength: 0)
-                weekToggle
-            }
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(totalDelta > 0 ? Theme.Color.accent
-                                        : (totalDelta < 0 ? Theme.Color.fg2 : Theme.Color.muted))
-                    .frame(width: 6, height: 6)
-                Text(totalDelta > 0
-                     ? "较\(viewingPreviousWeek ? "上上周" : "上周同期")多 \(totalDelta) 组"
-                     : (totalDelta < 0
-                        ? "较\(viewingPreviousWeek ? "上上周" : "上周同期")少 \(abs(totalDelta)) 组"
-                        : "与\(viewingPreviousWeek ? "上上周" : "上周同期")持平"))
-                    .font(Theme.Font.body(size: 12, weight: .medium))
+                Text("· \(formatMuscleLoadVolume(totalVolume))")
+                    .font(Theme.Font.body(size: 13, weight: .medium))
                     .foregroundStyle(Theme.Color.muted)
+                Spacer(minLength: 0)
+                // 总量文案变长时（如「共 210 有效组 · 120.4 t」）不许挤压切换器——
+                // 固定理想尺寸，避免「本周/上周」被截断成省略号。
+                weekToggle
+                    .fixedSize()
+            }
+            // 仅本周视图展示较上周整周的对比；组数与容量双分量，均持平时整行隐藏（含圆点）。
+            if !viewingPreviousWeek,
+               let comparison = comparisonText(setsDelta: totalDelta, volumeDelta: totalVolumeDelta) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(totalDelta > 0 || (totalDelta == 0 && totalVolumeDelta > 0)
+                              ? Theme.Color.accent : Theme.Color.fg2)
+                        .frame(width: 6, height: 6)
+                    Text(comparison)
+                        .font(Theme.Font.body(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.Color.muted)
+                }
             }
         }
     }
@@ -236,9 +256,6 @@ struct MuscleLoadReviewView: View {
                 MuscleLoadRowView(
                     name: name,
                     entry: entry,
-                    baselineSets: isSecondary
-                        ? nil
-                        : MuscleLoadAggregator.sets(of: entry.category, in: baselineBoard),
                     barFraction: Double(entry.workingSets) / Double(maxSets),
                     series: snapshot.series[entry.category],
                     isSecondary: isSecondary
@@ -246,7 +263,7 @@ struct MuscleLoadReviewView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(name)，\(entry.workingSets) 组")
+            .accessibilityLabel("\(name)，\(entry.workingSets) 组，\(formatMuscleLoadVolume(entry.volumeKg))")
             .accessibilityHint("点按\(isExpanded ? "收起" : "展开")贡献明细")
 
             if isExpanded {
@@ -257,17 +274,31 @@ struct MuscleLoadReviewView: View {
         .padding(.vertical, 8)
     }
 
-    /// 贡献明细：动作名 + 组数与训练量；左侧主色竖线标示从属肌群。无贡献时展示空态说明。
+    /// 展开面板顶部的较上周对比详情：组数与容量双分量；「其他」桶不参与对比，均持平时不展示；
+    /// 上周视图为纯数据回看，不展示对比。
+    @ViewBuilder
+    private func panelComparisonLine(for entry: MuscleLoadEntry) -> some View {
+        if !viewingPreviousWeek, let category = entry.category,
+           let text = comparisonText(setsDelta: entry.workingSets - MuscleLoadAggregator.sets(of: category, in: baselineBoard),
+                                     volumeDelta: entry.volumeKg - MuscleLoadAggregator.volumeKg(of: category, in: baselineBoard)) {
+            Text(text)
+                .font(Theme.Font.body(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg2)
+        }
+    }
+
+    /// 贡献明细：顶部为较上周对比详情（组数 + 容量），下方按有效组数降序列出各动作的组数与训练量；
+    /// 左侧主色竖线标示从属肌群。无贡献时展示空态说明。
     @ViewBuilder
     private func contributionDetail(for entry: MuscleLoadEntry) -> some View {
         let items = contributions[entry.category] ?? []
-        if items.isEmpty {
-            Text(entry.workingSets == 0 ? "本期该肌群还没有完成的正式组。" : "暂无可分解的动作明细。")
-                .font(Theme.Font.body(size: 12, weight: .medium))
-                .foregroundStyle(Theme.Color.muted)
-                .padding(.leading, 44)
-        } else {
-            VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
+            panelComparisonLine(for: entry)
+            if items.isEmpty {
+                Text(entry.workingSets == 0 ? "本期该肌群还没有完成的正式组。" : "暂无可分解的动作明细。")
+                    .font(Theme.Font.body(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.Color.muted)
+            } else {
                 ForEach(items) { item in
                     HStack(spacing: 8) {
                         RoundedRectangle(cornerRadius: 1, style: .continuous)
@@ -287,9 +318,9 @@ struct MuscleLoadReviewView: View {
                     }
                 }
             }
-            .padding(.leading, 44)
-            .padding(.top, 2)
         }
+        .padding(.leading, 44)
+        .padding(.top, 2)
     }
 
     private var emptyState: some View {
