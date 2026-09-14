@@ -6,7 +6,7 @@
 > 候选分支：`feature/v1.1-b4`
 > 当前候选提交：`0705e4fddff1a7b75bc7c26c1d71783035eb1ae5`
 > 当前工作树：候选已提交并推送，工作树干净
-> 当前结论：**自动化与人工验证已通过，待用户执行 Archive/TestFlight 上传**
+> 当前结论：**自动化、人工回归和 TestFlight 验证已通过，待合并 main 并创建 tag**
 > 功能介绍：[release-1.1-b4-feature-intro.md](release-1.1-b4-feature-intro.md)
 > 用户公告：[release-1.1-b4-user-announcement.md](release-1.1-b4-user-announcement.md)
 
@@ -25,8 +25,8 @@
 | iOS build | ✅ 通过 | iPhone 17 Pro / iOS 26.5 Simulator，Debug build 成功 |
 | iOS 自动化测试 | ✅ 通过 | xcresult 汇总 274/274 通过；UI target 9/9 通过，0 失败、0 跳过 |
 | 人工 UI 回归 | ✅ 用户确认通过 | 用户已确认 build 4 相关人工路径全部验证通过；本轮未提供设备/iOS 版本明细，文档不虚构测试环境 |
-| TestFlight 上传 | ⏳ 待执行 | 当前未 Archive、未上传，未确认 `VALID`，候选不可安装 |
-| `main` 合并与 tag | ⏳ 禁止执行 | 在版本递增、人工回归、TestFlight `VALID` 前不要合并 `main` 或创建 `v1.1-b4` |
+| TestFlight 上传 | ✅ 用户确认通过 | 用户已确认 build 4 已上传、状态为 `VALID` 且可安装 |
+| `main` 合并与 tag | ⏳ 待执行 | 用户已确认门禁通过，待本次执行合并 `main` 和创建 `v1.1-b4` |
 
 ## 1. 发布范围与候选冻结
 
@@ -90,36 +90,36 @@
 
 ## 5. TestFlight 前人工回归
 
-用户已确认以下 build 4 路径人工验证通过；Archive/TestFlight 安装后的真机复验仍需在上传后执行并补充设备、iOS 版本、结果和问题：
+用户已确认以下 build 4 路径和 TestFlight 安装验证通过；本轮未提供设备、iOS 版本、时间明细，文档不虚构测试环境：
 
-- [ ] 首页肌群负荷：有训练数据时每行显示「组数 · 容量」，摘要显示总容量，长容量文本不截断。
-- [ ] 周复盘本周页：头部显示总容量；组数/容量对比可与上周整周数据对账；持平分量不显示。
-- [ ] 周复盘上周页：显示完整上一周数据，头部和展开贡献面板均不出现对比文案。
-- [ ] 周复盘零值肌群与「其他」桶：零值行不崩版，「其他」按规格显示且不参与排序/对比。
-- [ ] 贡献明细：展开胸/背等肌群，确认肌群级组数与容量变化、动作级组数与训练量均正确。
-- [ ] 三处排序入口：训练进行中、计划详情、计划列表均能打开系统 sheet；完成、下滑关闭和重进页面后顺序正确。
-- [ ] 训练进行页快速连续勾选/编辑多组：无明显卡顿、错位、重复保存或 Live Activity 状态滞后。
-- [ ] 本版本受影响的既有主路径：冷启动、登录、同步、Team、Live Activity、休息通知、HealthKit 和 Widget。
+- [x] 首页肌群负荷：有训练数据时每行显示「组数 · 容量」，摘要显示总容量，长容量文本不截断。
+- [x] 周复盘本周页：头部显示总容量；组数/容量对比可与上周整周数据对账；持平分量不显示。
+- [x] 周复盘上周页：显示完整上一周数据，头部和展开贡献面板均不出现对比文案。
+- [x] 周复盘零值肌群与「其他」桶：零值行不崩版，「其他」按规格显示且不参与排序/对比。
+- [x] 贡献明细：展开胸/背等肌群，确认肌群级组数与容量变化、动作级组数与训练量均正确。
+- [x] 三处排序入口：训练进行中、计划详情、计划列表均能打开系统 sheet；完成、下滑关闭和重进页面后顺序正确。
+- [x] 训练进行页快速连续勾选/编辑多组：无明显卡顿、错位、重复保存或 Live Activity 状态滞后。
+- [x] 本版本受影响的既有主路径：冷启动、登录、同步、Team、Live Activity、休息通知、HealthKit 和 Widget。
 
 ## 6. 版本、Archive 与 TestFlight
 
 - [x] 将 App、Widget、单元测试、UI 测试的全部 8 组 build configuration 统一从 `CURRENT_PROJECT_VERSION = 3` 更新为 `4`；`MARKETING_VERSION` 保持 `1.1`。
 - [x] 已核对目标版本为 `1.1 (build 4)`；用户确认 build 4 未在 App Store Connect 使用过。
-- [x] 版本递增后重新运行 iOS build/test 必要门禁；后端无需重跑部署门禁，最终候选 SHA 仍待提交前冻结。
-- [ ] 用户在 Xcode 中选择 `DontLift` + `Any iOS Device (arm64)` 执行 Archive。
-- [ ] 核对 App、Widget 的签名、App Group、Push Notifications entitlement。
-- [ ] Organizer 执行 `Distribute App -> App Store Connect -> Upload`。
-- [ ] 等待 App Store Connect 状态为 `VALID` 且 TestFlight 可安装；未确认前不得写成已上传或可用。
-- [x] 用户确认当前 build 4 人工回归全部通过；TestFlight 安装后的真机复验仍待上传后执行，本轮未提供设备/iOS 版本和时间明细，文档不虚构测试环境。
+- [x] 版本递增后重新运行 iOS build/test 必要门禁；后端无需重跑部署门禁，候选范围已提交并推送。
+- [x] 用户确认已在 Xcode 中选择 `DontLift` + `Any iOS Device (arm64)` 执行 Archive。
+- [x] 用户确认已核对 App、Widget 的签名、App Group、Push Notifications entitlement。
+- [x] 用户确认已通过 Organizer 执行 `Distribute App -> App Store Connect -> Upload`。
+- [x] 用户确认 App Store Connect 状态为 `VALID` 且 TestFlight 可安装。
+- [x] 用户确认当前 build 4 人工回归和 TestFlight 安装验证全部通过；本轮未提供设备/iOS 版本和时间明细，文档不虚构测试环境。
 
-## 7. 发布收口（当前禁止执行）
+## 7. 发布收口
 
 - [ ] 后端部署：本候选无需部署；若范围发生变化，重新执行部署判断。
-- [ ] iOS 上传：当前未执行。
-- [ ] TestFlight 可安装：当前未确认。
+- [x] iOS 上传：用户确认已完成，build 4 为 `VALID` 且可安装。
+- [x] TestFlight 可安装：用户确认已完成最终验证。
 - [ ] 候选分支合并 `main`：当前未执行。
-- [ ] 创建并推送 annotated tag `v1.1-b4`：当前禁止；只有 TestFlight `VALID`、真机回归通过、用户确认后才能执行。
-- [x] 已回填当前候选提交、人工验证状态和推送状态；Archive、TestFlight、合并 SHA、tag 和完成时间待后续真实操作后回填。
+- [ ] 创建并推送 annotated tag `v1.1-b4`：待本次合并 `main` 后执行。
+- [x] 已回填当前候选提交、人工验证、TestFlight 和推送状态；合并 SHA、tag 和完成时间待本次收口后回填。
 
 ## 8. 回滚与异常处理
 

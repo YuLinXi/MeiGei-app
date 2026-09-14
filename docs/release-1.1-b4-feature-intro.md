@@ -5,7 +5,7 @@
 > 当前工程实际版本：App、Widget、测试 target 均为 `1.1 (build 4)`
 > 候选分支：`feature/v1.1-b4`
 > 候选提交：`0705e4fddff1a7b75bc7c26c1d71783035eb1ae5`
-> 文档状态：**候选已提交并推送；人工验证已通过；待用户 Archive、上传 TestFlight**
+> 文档状态：**候选已提交并推送；TestFlight 已可安装；待合并 main、创建 tag**
 > 关联清单：[release-1.1-b4-checklist.md](release-1.1-b4-checklist.md)
 > 用户公告：[release-1.1-b4-user-announcement.md](release-1.1-b4-user-announcement.md)
 
@@ -21,8 +21,8 @@
 | iOS build | build 4：iPhone 17 Pro / iOS 26.5 Simulator Debug build 成功 |
 | iOS 自动化测试 | xcresult 汇总 274/274 通过；UI target 9/9 通过，0 失败、0 跳过 |
 | OpenSpec | 14 份主 spec 严格校验通过；相关 change 已归档，归档 change ID 不作为 active delta 通过项 |
-| App Store Connect build 4 | 用户已确认未被使用 |
-| TestFlight | 尚未由本工作流执行 Archive/上传，尚未确认 `VALID`，当前不可安装 |
+| App Store Connect build 4 | 用户已确认未重复使用 |
+| TestFlight | 用户确认已上传，状态为 `VALID` 且可安装 |
 | 发布收口 | 未合并 `main`，未创建 `v1.1-b4` tag |
 
 ## 一句话摘要
@@ -72,7 +72,7 @@
 - OpenSpec：`openspec validate --specs --strict --no-interactive` 通过，14/14 主 spec 有效。
 - 生产只读：`/actuator/health` HTTP 200 且 `status=UP`；`/privacy`、`/terms` HTTP 200；`POST /auth/dev/token` HTTP 404；生产 Flyway 最新 V22 `success=true`。
 - 当前仍有既有 Swift concurrency/main-actor 编译 warning，但没有编译失败；应在后续技术债处理中单独治理，不阻塞本次候选的当前构建门禁。
-- 用户已确认 build 4 的人工 UI 回归全部通过；本轮未提供设备/iOS 版本和时间明细，因此不在文档中虚构具体测试环境。
+- 用户已确认 build 4 的人工 UI 回归和 TestFlight 安装验证全部通过；本轮未提供设备/iOS 版本和时间明细，因此不在文档中虚构具体测试环境。
 
 ## TestFlight 回归重点
 
@@ -92,11 +92,11 @@
 3. 动作排序更顺手：训练进行中、计划详情和计划列表统一使用系统排序弹窗，支持下滑关闭，完成或关闭后保存排序结果。
 4. 训练录入更流畅：优化了连续勾选、录入和休息提示时的页面刷新与保存体验。
 
-本版本尚未由本工作流上传 TestFlight。上传后请重点反馈肌群容量排版、周复盘对比和三处排序拖拽/关闭体验。
+TestFlight 已可安装，请重点反馈肌群容量排版、周复盘对比和三处排序拖拽/关闭体验。
 
 ## 发布收口
 
 - [x] 将所有 target 的 build 从 3 递增为 4，并重新执行必要的 build/test；8 组 configuration 已统一，build/test 均通过。
-- [x] 用户确认完成 Simulator/真机人工回归；设备/iOS 详细信息待补充时不作虚构记录。
-- [ ] Archive 并上传 TestFlight，等待状态变为 `VALID` 且可安装。
-- [ ] 用户确认后再合并 `main`、创建并推送 `v1.1-b4` annotated tag。
+- [x] 用户确认完成 Simulator/真机人工回归和 TestFlight 安装验证；设备/iOS 详细信息待补充时不作虚构记录。
+- [x] 用户确认已完成 Archive、上传 TestFlight，状态为 `VALID` 且可安装。
+- [ ] 用户已确认收口授权；待实际合并 `main`、创建并推送 `v1.1-b4` annotated tag。
