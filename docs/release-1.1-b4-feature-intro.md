@@ -4,8 +4,8 @@
 > 目标候选：`MARKETING_VERSION = 1.1`，`CURRENT_PROJECT_VERSION = 4`
 > 当前工程实际版本：App、Widget、测试 target 均为 `1.1 (build 4)`
 > 候选分支：`feature/v1.1-b4`
-> 候选提交：本次发版准备提交后冻结（提交前源码 HEAD 为 `f2caea76132b63f01c580054b053ab36b949749d`）
-> 文档状态：**人工验证已通过；待用户 Archive、上传 TestFlight**
+> 候选提交：`0705e4fddff1a7b75bc7c26c1d71783035eb1ae5`
+> 文档状态：**候选已提交；人工验证已通过；待用户 Archive、上传 TestFlight**
 > 关联清单：[release-1.1-b4-checklist.md](release-1.1-b4-checklist.md)
 > 用户公告：[release-1.1-b4-user-announcement.md](release-1.1-b4-user-announcement.md)
 
@@ -66,7 +66,7 @@
 
 ## 已完成验证
 
-- Git：版本递增前工作树无既有改动；本次 build 4 的工程版本修改与 3 份发版文档已完成差异核对，提交后以实际候选 SHA 为准；`git diff --check` 及基线差异检查通过。
+- Git：版本递增前工作树无既有改动；本次候选提交为 `0705e4fddff1a7b75bc7c26c1d71783035eb1ae5`，包含 build 4 工程版本修改与 3 份发版文档；`git diff --check` 及基线差异检查通过。
 - 后端：JDK 21 下 `./gradlew clean build` 通过；`./gradlew test --rerun-tasks` 通过。
 - iOS：build 4 在 iPhone 17 Pro / iOS 26.5 Simulator Debug build 通过；`xcodebuild test` 为 `TEST SUCCEEDED`，xcresult 汇总 274 项测试全部通过，UI target 9 项全部通过。
 - OpenSpec：`openspec validate --specs --strict --no-interactive` 通过，14/14 主 spec 有效。

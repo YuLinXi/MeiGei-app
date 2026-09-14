@@ -4,8 +4,8 @@
 > 发布基线：`v1.1-b3`（历史发版记录确认已完成 TestFlight 发布）
 > 目标版本：`1.1 (build 4)`
 > 候选分支：`feature/v1.1-b4`
-> 当前候选提交：本次发版准备提交后冻结（提交前 SHA 为 `f2caea76132b63f01c580054b053ab36b949749d`）
-> 当前工作树：已包含 build 4 版本递增和发版文档，待提交并推送
+> 当前候选提交：`0705e4fddff1a7b75bc7c26c1d71783035eb1ae5`
+> 当前工作树：候选已提交，待推送
 > 当前结论：**自动化与人工验证已通过，待用户执行 Archive/TestFlight 上传**
 > 功能介绍：[release-1.1-b4-feature-intro.md](release-1.1-b4-feature-intro.md)
 > 用户公告：[release-1.1-b4-user-announcement.md](release-1.1-b4-user-announcement.md)
@@ -16,7 +16,7 @@
 | --- | --- | --- |
 | 发布基线 | ✅ 已锁定 | 最近已发布 tag 为 `v1.1-b3`，本次只比较 `v1.1-b3..HEAD` 的最终差异 |
 | 候选范围 | ✅ 已锁定 | 功能候选为 3 个提交、17 个文件；本次另加入 build 4 版本修改和 3 份发版文档 |
-| 工作树 | ⚠️ 待提交 | 既有工作树无未提交改动；本次 build 4 版本修改和 3 份发版文档已核对，待本次提交并推送 |
+| 工作树 | ✅ 已提交待推送 | 既有工作树无未提交改动；本次 build 4 版本修改和 3 份发版文档已提交，待推送到候选分支 |
 | 工程版本 | ✅ 已确认 | App、Widget、测试 target 的 8 组 configuration 已统一为 `MARKETING_VERSION = 1.1`、`CURRENT_PROJECT_VERSION = 4`；用户已确认 App Store Connect 未使用 build 4 |
 | 后端部署 | ✅ 无需部署 | `v1.1-b3..HEAD` 与工作树均无 `backend/` 改动；无 API、数据库迁移或同步协议变更 |
 | 后端生产状态 | ✅ 只读检查通过 | health 200/`UP`，`/privacy` 200，`/terms` 200，生产 `/auth/dev/token` 404；Flyway 最新 V22 `success=true` |
@@ -35,7 +35,7 @@
 - [x] 已读取 `v1.1-b3..HEAD` 的提交、文件差异和相关最终实现，没有把开发过程中的中间状态写入用户说明。
 - [x] 已确认当前差异不涉及 `backend/`、API、数据库、同步协议、资源动作图或后端部署脚本。
 - [x] 已完成 `git diff --check` 与 `git diff --check v1.1-b3..HEAD`。
-- [x] 归档前冻结新的候选 SHA；本次提交并推送后以实际提交 SHA 为准，范围包含 build 4 工程修改和三份发版文档。
+- [x] 归档前冻结新的候选 SHA：`0705e4fddff1a7b75bc7c26c1d71783035eb1ae5`；范围包含 build 4 工程修改和三份发版文档。
 
 ## 2. 本次最终用户功能
 
