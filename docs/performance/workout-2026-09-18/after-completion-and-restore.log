@@ -1,0 +1,86 @@
+PROFILE workout.presentation.appear main=true duration=0.335908208 seconds
+PROFILE badge.read.values main=false duration=0.000487709 seconds
+PROFILE history.read.values main=false duration=0.00547475 seconds
+PROFILE history.project.values main=false duration=0.001593167 seconds
+[WorkoutHistoryStore] workouts=1 finished=0 active=1 pending=1 exercises=3 sets=0
+PROFILE workout.presentation.appear main=true duration=0.16143675 seconds
+PROFILE badge.read.values main=false duration=0.000395084 seconds
+PROFILE history.read.values main=false duration=0.006065625 seconds
+PROFILE history.project.values main=false duration=0.001494084 seconds
+[WorkoutHistoryStore] workouts=1 finished=0 active=1 pending=1 exercises=3 sets=0
+PROFILE workout.presentation.appear main=true duration=0.159864666 seconds
+PROFILE badge.read.values main=false duration=0.000367292 seconds
+PROFILE history.read.values main=false duration=0.004885042 seconds
+PROFILE history.project.values main=false duration=0.001459833 seconds
+[WorkoutHistoryStore] workouts=1 finished=0 active=1 pending=1 exercises=3 sets=0
+PROFILE workout.presentation.appear main=true duration=0.157487292 seconds
+PROFILE badge.read.values main=false duration=0.00036425 seconds
+PROFILE history.read.values main=false duration=0.007140583 seconds
+PROFILE history.project.values main=false duration=0.00140875 seconds
+[WorkoutHistoryStore] workouts=1 finished=0 active=1 pending=1 exercises=3 sets=0
+PROFILE workout.presentation.appear main=true duration=0.157292834 seconds
+PROFILE badge.read.values main=false duration=0.000471084 seconds
+PROFILE history.read.values main=false duration=0.006573584 seconds
+PROFILE history.project.values main=false duration=0.001761625 seconds
+[WorkoutHistoryStore] workouts=1 finished=0 active=1 pending=1 exercises=3 sets=0
+PROFILE workout.presentation.appear main=true duration=0.1629285 seconds
+PROFILE badge.read.values main=false duration=0.000356417 seconds
+PROFILE history.read.values main=false duration=0.005145 seconds
+PROFILE history.project.values main=false duration=0.002026959 seconds
+[WorkoutHistoryStore] workouts=1 finished=0 active=1 pending=1 exercises=3 sets=0
+PROFILE workout.presentation.appear main=true duration=0.157086417 seconds
+PROFILE badge.read.values main=false duration=0.000454875 seconds
+PROFILE history.read.values main=false duration=0.004476208 seconds
+PROFILE history.project.values main=false duration=0.001486958 seconds
+[WorkoutHistoryStore] workouts=1 finished=0 active=1 pending=1 exercises=3 sets=0
+PROFILE workout.presentation.appear main=true duration=0.158664375 seconds
+PROFILE badge.read.values main=false duration=0.000345334 seconds
+PROFILE history.read.values main=false duration=0.004572584 seconds
+PROFILE history.project.values main=false duration=0.001547292 seconds
+[WorkoutHistoryStore] workouts=1 finished=0 active=1 pending=1 exercises=3 sets=0
+PROFILE workout.presentation.appear main=true duration=0.160254667 seconds
+PROFILE badge.read.values main=false duration=0.000410833 seconds
+PROFILE history.read.values main=false duration=0.005145 seconds
+PROFILE history.project.values main=false duration=0.001712208 seconds
+[WorkoutHistoryStore] workouts=1 finished=0 active=1 pending=1 exercises=3 sets=0
+PROFILE workout.presentation.appear main=true duration=0.160962834 seconds
+PROFILE badge.read.values main=false duration=0.000352292 seconds
+PROFILE history.read.values main=false duration=0.004734416 seconds
+PROFILE history.project.values main=false duration=0.001521292 seconds
+[WorkoutHistoryStore] workouts=1 finished=0 active=1 pending=1 exercises=3 sets=0
+PROFILE workout.presentation.appear main=true duration=0.163594333 seconds
+PROFILE badge.read.values main=false duration=2.2739555 seconds
+PROFILE history.read.values main=false duration=2.363772042 seconds
+PROFILE history.project.values main=false duration=0.179713708 seconds
+[WorkoutHistoryStore] workouts=601 finished=600 active=1 pending=601 exercises=3603 sets=14400
+PROFILE workout.completeSet main=true duration=0.009606417 seconds
+PROFILE audio.prepare main=false duration=0.236800417 seconds
+PROFILE workout.completeSet main=true duration=0.008606042 seconds
+PROFILE workout.completeSet main=true duration=0.038517875 seconds
+PROFILE workout.completeSet main=true duration=0.024171541 seconds
+PROFILE workout.completeSet main=true duration=0.009559292 seconds
+PROFILE workout.completeSet main=true duration=0.015880542 seconds
+PROFILE workout.completeSet main=true duration=0.029150041 seconds
+PROFILE workout.completeSet main=true duration=0.009044166 seconds
+PROFILE workout.completeSet main=true duration=0.018670875 seconds
+PROFILE workout.completeSet main=true duration=0.030173083 seconds
+PROFILE workout.completeSet main=true duration=0.019575708 seconds
+PROFILE workout.completeSet main=true duration=0.019957208 seconds
+PROFILE workout.completeSet main=true duration=0.020680625 seconds
+PROFILE workout.completeSet main=true duration=0.021831875 seconds
+PROFILE workout.completeSet main=true duration=0.023519 seconds
+PROFILE workout.completeSet main=true duration=0.016979375 seconds
+PROFILE workout.completeSet main=true duration=0.020242792 seconds
+PROFILE workout.completeSet main=true duration=0.022011542 seconds
+PROFILE workout.completeSet main=true duration=0.02784875 seconds
+PROFILE workout.completeSet main=true duration=0.020133584 seconds
+PROFILE workout.completeSet main=true duration=0.029023333 seconds
+PROFILE workout.completeSet main=true duration=0.019511042 seconds
+PROFILE workout.completeSet main=true duration=0.013540125 seconds
+PROFILE workout.completeSet main=true duration=0.020755334 seconds
+PROFILE workout.completeSet main=true duration=0.01308875 seconds
+PROFILE workout.completeSet main=true duration=0.013555208 seconds
+PROFILE workout.completeSet main=true duration=0.009008417 seconds
+PROFILE workout.completeSet main=true duration=0.013122958 seconds
+PROFILE workout.completeSet main=true duration=0.007436458 seconds
+PROFILE workout.completeSet main=true duration=0.009383167 seconds

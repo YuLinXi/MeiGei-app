@@ -1,0 +1,37 @@
+PROFILE profile.stats ms=0.22370833903551102
+PROFILE badge.read.start main=false
+PROFILE history.refresh ms=3897.873583366163
+[WorkoutHistoryStore] workouts=601 finished=600 active=1 pending=601 exercises=3603 sets=14400
+PROFILE badge.map.start main=true count=600
+PROFILE badge.map.end main=true ms=1512.3518749605864
+PROFILE badge.read.end main=true ms=5881.194166606292
+[BadgeEngine] 存量回溯完成，已为老用户生成 11 枚荣誉勋章
+PROFILE profile.stats ms=0.035541714169085026
+PROFILE profile.audio ms=352.5326249655336
+PROFILE profile.complete ms=372.24858335684985
+PROFILE profile.save ms=37.49187500216067
+PROFILE profile.live ms=1.0665416484698653
+PROFILE badge.read.start main=false
+PROFILE badge.map.start main=true count=600
+PROFILE badge.map.end main=true ms=1878.39087494649
+PROFILE badge.read.end main=true ms=2498.3616250101477
+PROFILE profile.stats ms=0.03450002986937761
+PROFILE profile.stats ms=0.034374999813735485
+PROFILE profile.audio ms=0.0039583537727594376
+PROFILE profile.complete ms=22.654499975033104
+PROFILE profile.save ms=14.203541562892497
+PROFILE profile.live ms=0.7553333416581154
+PROFILE badge.read.start main=false
+PROFILE badge.map.start main=true count=600
+PROFILE badge.map.end main=true ms=3176.1335416231304
+PROFILE badge.read.end main=true ms=3723.6618333263323
+PROFILE profile.stats ms=0.03899994771927595
+PROFILE profile.stats ms=0.03291666507720947
+PROFILE profile.audio ms=0.0074999406933784485
+PROFILE profile.complete ms=4.68200002796948
+PROFILE profile.save ms=15.79262490849942
+PROFILE profile.live ms=0.6938333390280604
+PROFILE badge.read.start main=false
+PROFILE badge.map.start main=true count=600
+PROFILE badge.map.end main=true ms=1186.8260416667908
+PROFILE badge.read.end main=true ms=1672.8764582658187

@@ -10,13 +10,13 @@ enum WorkoutHistoryRefreshReason: String {
     case manual
 }
 
-struct PRBadge: Equatable, Hashable {
+nonisolated struct PRBadge: Equatable, Hashable, Sendable {
     var name: String
     var weightKg: Double
     var isAssistedWeight: Bool = false
 }
 
-struct SetSnapshot: Codable, Equatable, Hashable {
+nonisolated struct SetSnapshot: Codable, Equatable, Hashable, Sendable {
     var weightKg: Double?
     var reps: Int?
     var setTypeRaw: String = WorkoutSetType.working.rawValue
@@ -24,14 +24,14 @@ struct SetSnapshot: Codable, Equatable, Hashable {
     var segments: [WorkoutSetSegment] = []
 }
 
-struct ExerciseHistoryPoint: Equatable, Hashable {
+nonisolated struct ExerciseHistoryPoint: Equatable, Hashable, Sendable {
     var date: Date
     var maxWeightKg: Double?
     var lastSetWeightKg: Double?
     var lastSetReps: Int?
 }
 
-struct ExerciseHistorySnapshot: Equatable {
+nonisolated struct ExerciseHistorySnapshot: Equatable, Sendable {
     var exerciseKey: String
     var points: [ExerciseHistoryPoint]
     var pr: PRSummary?
@@ -44,7 +44,7 @@ struct ExerciseHistorySnapshot: Equatable {
     var last: ExerciseHistoryPoint? { points.last }
 }
 
-struct WorkoutRowSummary: Identifiable, Equatable, Hashable {
+nonisolated struct WorkoutRowSummary: Identifiable, Equatable, Hashable, Sendable {
     var id: UUID
     var title: String
     var startedAt: Date
@@ -55,7 +55,7 @@ struct WorkoutRowSummary: Identifiable, Equatable, Hashable {
     var pr: PRBadge?
 }
 
-struct HomeWorkoutSnapshot: Equatable {
+nonisolated struct HomeWorkoutSnapshot: Equatable, Sendable {
     var currentWeekStats: WeeklyStats
     var weekWorkouts: [WorkoutRowSummary]
     var weekTrainingDays: [WeekTrainingDayStatus]
@@ -68,7 +68,7 @@ struct HomeWorkoutSnapshot: Equatable {
     static let empty = HomeWorkoutSnapshot(
         currentWeekStats: .empty,
         weekWorkouts: [],
-        weekTrainingDays: WorkoutWeeklyStats.dayStatuses(workouts: [], reference: .now, calendar: .currentMondayFirst),
+        weekTrainingDays: WorkoutWeeklyStats.dayStatuses(values: [], reference: .now, calendar: .currentMondayFirst),
         todayCompletedWorkoutCount: 0,
         currentTrainingStreakDays: 0,
         recentPlanIds: [],
@@ -77,7 +77,7 @@ struct HomeWorkoutSnapshot: Equatable {
     )
 }
 
-struct WorkoutCalendarDaySummary: Identifiable, Equatable, Hashable {
+nonisolated struct WorkoutCalendarDaySummary: Identifiable, Equatable, Hashable, Sendable {
     var date: Date
     var workouts: [WorkoutRowSummary]
     var setCount: Int
@@ -88,7 +88,7 @@ struct WorkoutCalendarDaySummary: Identifiable, Equatable, Hashable {
     var workoutCount: Int { workouts.count }
 }
 
-struct WorkoutCalendarDayCell: Identifiable, Equatable, Hashable {
+nonisolated struct WorkoutCalendarDayCell: Identifiable, Equatable, Hashable, Sendable {
     var date: Date
     var isInDisplayedMonth: Bool
     var isToday: Bool
@@ -97,7 +97,7 @@ struct WorkoutCalendarDayCell: Identifiable, Equatable, Hashable {
     var id: Date { date }
 }
 
-struct WorkoutCalendarMonthSnapshot: Equatable {
+nonisolated struct WorkoutCalendarMonthSnapshot: Equatable, Sendable {
     var monthStart: Date
     var days: [WorkoutCalendarDayCell]
     var workoutCount: Int
@@ -115,7 +115,7 @@ struct WorkoutCalendarMonthSnapshot: Equatable {
     }
 }
 
-struct WorkoutCalendarMonthArchiveItem: Identifiable, Equatable, Hashable {
+nonisolated struct WorkoutCalendarMonthArchiveItem: Identifiable, Equatable, Hashable, Sendable {
     var monthStart: Date
     var trainingDayCount: Int
     var workoutCount: Int
@@ -126,31 +126,31 @@ struct WorkoutCalendarMonthArchiveItem: Identifiable, Equatable, Hashable {
     var id: Date { monthStart }
 }
 
-struct WorkoutCalendarYearArchiveGroup: Identifiable, Equatable, Hashable {
+nonisolated struct WorkoutCalendarYearArchiveGroup: Identifiable, Equatable, Hashable, Sendable {
     var year: Int
     var months: [WorkoutCalendarMonthArchiveItem]
 
     var id: Int { year }
 }
 
-struct ProfileWorkoutSnapshot: Equatable {
+nonisolated struct ProfileWorkoutSnapshot: Equatable, Sendable {
     var totalWorkouts: Int
 
     static let empty = ProfileWorkoutSnapshot(totalWorkouts: 0)
 }
 
-struct PlanUsageSummary: Equatable, Hashable {
+nonisolated struct PlanUsageSummary: Equatable, Hashable, Sendable {
     var completedCount: Int
     var lastTrainedAt: Date?
 
     static let empty = PlanUsageSummary(completedCount: 0, lastTrainedAt: nil)
 }
 
-struct LatestExercisePerformance: Equatable {
+nonisolated struct LatestExercisePerformance: Equatable, Sendable {
     var date: Date
     var sets: [SetSnapshot]
 
-    func matches(_ item: PlanItem) -> Bool {
+    @MainActor func matches(_ item: PlanItem) -> Bool {
         matches(isDropSet: item.isDropSet)
     }
 
@@ -159,25 +159,25 @@ struct LatestExercisePerformance: Equatable {
     }
 }
 
-struct PlanExerciseHistoryKey: Equatable, Hashable {
+nonisolated struct PlanExerciseHistoryKey: Equatable, Hashable, Sendable {
     var planItemId: UUID
     var historyKey: String
 }
 
-struct PlanWorkoutCompletionSnapshot: Equatable {
+nonisolated struct PlanWorkoutCompletionSnapshot: Equatable, Sendable {
     var date: Date
     var completedPlanItemIds: Set<UUID>
     var completedHistoryKeys: Set<String>
 }
 
 /// 训练中临时创建单元的历史索引键。计划预填沿用既有 planItemId 索引，避免混淆两套语义。
-struct WorkoutUnitHistoryKey: Hashable {
+nonisolated struct WorkoutUnitHistoryKey: Hashable, Sendable {
     var historyKey: String
     var kind: WorkoutUnitKind
 }
 
 /// 超级组配对忽略选择顺序；成员值仍按各自动作 key 回填。
-struct SupersetHistoryPairKey: Hashable {
+nonisolated struct SupersetHistoryPairKey: Hashable, Sendable {
     var firstHistoryKey: String
     var secondHistoryKey: String
 
@@ -192,7 +192,7 @@ struct SupersetHistoryPairKey: Hashable {
     }
 }
 
-struct SupersetHistoryPrefill: Equatable {
+nonisolated struct SupersetHistoryPrefill: Equatable, Sendable {
     var roundCount: Int
     var memberValues: [String: SetSnapshot]
 
@@ -201,7 +201,7 @@ struct SupersetHistoryPrefill: Equatable {
     }
 }
 
-struct PlanHistoryLookup: Equatable {
+nonisolated struct PlanHistoryLookup: Equatable, Sendable {
     var latestByPlanExercise: [PlanExerciseHistoryKey: LatestExercisePerformance]
     var latestByHistoryKey: [String: LatestExercisePerformance]
     var lastWorkoutByPlanId: [UUID: PlanWorkoutCompletionSnapshot]
@@ -216,7 +216,7 @@ struct PlanHistoryLookup: Equatable {
         lastWorkoutByPlanId: [:]
     )
 
-    func latestSets(for item: PlanItem) -> [SetSnapshot] {
+    @MainActor func latestSets(for item: PlanItem) -> [SetSnapshot] {
         let key = PlanExerciseHistoryKey(planItemId: item.itemId, historyKey: item.historyKey)
         if let exact = latestByPlanExercise[key], exact.matches(item) { return exact.sets }
         if let fallback = latestByHistoryKey[item.historyKey], fallback.matches(item) { return fallback.sets }
@@ -230,14 +230,14 @@ struct PlanHistoryLookup: Equatable {
         return exact.sets
     }
 
-    func latestDate(for item: PlanItem) -> Date? {
+    @MainActor func latestDate(for item: PlanItem) -> Date? {
         let key = PlanExerciseHistoryKey(planItemId: item.itemId, historyKey: item.historyKey)
         if let exact = latestByPlanExercise[key], exact.matches(item) { return exact.date }
         if let fallback = latestByHistoryKey[item.historyKey], fallback.matches(item) { return fallback.date }
         return nil
     }
 
-    func keptDate(for item: PlanItem, planId: UUID?) -> Date? {
+    @MainActor func keptDate(for item: PlanItem, planId: UUID?) -> Date? {
         guard let planId, let last = lastWorkoutByPlanId[planId] else { return nil }
         if last.completedPlanItemIds.contains(item.itemId) { return nil }
         if last.completedHistoryKeys.contains(item.historyKey) { return nil }
@@ -257,7 +257,7 @@ struct PlanHistoryLookup: Equatable {
     }
 }
 
-struct WorkoutHistorySnapshot: Equatable {
+nonisolated struct WorkoutHistorySnapshot: Equatable, Sendable {
     var home: HomeWorkoutSnapshot
     var calendarDays: [Date: WorkoutCalendarDaySummary]
     var exercisePRs: [String: PRSummary]
@@ -302,115 +302,114 @@ final class WorkoutHistoryStore {
     var muscleLoad: MuscleLoadSnapshot { snapshot.muscleLoad }
     var lastRefreshReason: WorkoutHistoryRefreshReason?
     var lastRefreshFinishedAt: Date?
-    var isRefreshing = false
-
+    enum LoadState: Equatable { case notReady, refreshing, available, failed }
+    private(set) var loadState: LoadState = .notReady
+    var isRefreshing: Bool { loadState == .refreshing }
+    var sessionRevision: Int { sessionGeneration }
+    var isCurrent: Bool { hasSnapshot && dirtyGeneration == lastBuiltGeneration }
+    var hasSnapshot: Bool { lastRefreshFinishedAt != nil }
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
-    @ObservationIgnored private var hasScheduledRefresh = false
-    @ObservationIgnored private var pendingRefreshReason: WorkoutHistoryRefreshReason?
     @ObservationIgnored private var dirtyGeneration = 1
     @ObservationIgnored private var lastBuiltGeneration = 0
+    @ObservationIgnored private var sessionGeneration = 0
+    @ObservationIgnored private let readHistory: @Sendable (ModelContainer) async throws -> [HistoryWorkout]
 
-    init(modelContext: ModelContext) {
+    init(modelContext: ModelContext,
+         readHistory: @escaping @Sendable (ModelContainer) async throws -> [HistoryWorkout] = { container in
+             try await Task.detached(priority: .userInitiated) {
+                 try WorkoutHistoryReader(modelContainer: container).read()
+             }.value
+         }) {
         self.modelContext = modelContext
+        self.readHistory = readHistory
+    }
+
+    func reset() {
+        sessionGeneration += 1
+        refreshTask?.cancel()
+        refreshTask = nil
+        dirtyGeneration += 1
+        lastBuiltGeneration = 0
+        snapshot = .empty
+        lastRefreshReason = nil
+        lastRefreshFinishedAt = nil
+        loadState = .notReady
     }
 
     func scheduleRefresh(reason: WorkoutHistoryRefreshReason, delayNanoseconds: UInt64 = 500_000_000) {
         dirtyGeneration += 1
-        guard !isRefreshing else {
-            pendingRefreshReason = reason
-            WorkoutPerformanceMonitor.event("history.refresh.coalesced")
-            return
-        }
-        enqueueRefresh(reason: reason, delayNanoseconds: delayNanoseconds)
+        ensureLoaded(reason: reason, delayNanoseconds: delayNanoseconds)
     }
 
     func ensureLoaded(reason: WorkoutHistoryRefreshReason, delayNanoseconds: UInt64 = 0) {
-        guard needsRefresh else {
-            WorkoutPerformanceMonitor.event("history.refresh.skipped")
-            return
+        guard dirtyGeneration != lastBuiltGeneration, refreshTask == nil else { return }
+        let session = sessionGeneration
+        loadState = .refreshing
+        refreshTask = Task { [weak self] in
+            if delayNanoseconds > 0 { try? await Task.sleep(nanoseconds: delayNanoseconds) }
+            guard let self, !Task.isCancelled else { return }
+            await self.performRefresh(reason: reason, session: session)
         }
-        guard !isRefreshing, !hasScheduledRefresh else {
-            WorkoutPerformanceMonitor.event("history.refresh.coalesced")
-            return
-        }
-        enqueueRefresh(reason: reason, delayNanoseconds: delayNanoseconds)
     }
 
     func refresh(reason: WorkoutHistoryRefreshReason) async {
-        dirtyGeneration += 1
-        refreshTask?.cancel()
-        hasScheduledRefresh = false
-        await performRefresh(reason: reason)
+        scheduleRefresh(reason: reason, delayNanoseconds: 0)
+        _ = await waitUntilLoaded()
     }
 
-    private var needsRefresh: Bool {
-        dirtyGeneration != lastBuiltGeneration
-    }
-
-    private func enqueueRefresh(reason: WorkoutHistoryRefreshReason, delayNanoseconds: UInt64) {
-        refreshTask?.cancel()
-        hasScheduledRefresh = true
-        refreshTask = Task { [weak self] in
-            if delayNanoseconds > 0 {
-                try? await Task.sleep(nanoseconds: delayNanoseconds)
-            }
-            guard !Task.isCancelled else { return }
-            await self?.runScheduledRefresh(reason: reason)
+    /// 等待当前有效代数；失败不会把空快照当作没有历史。
+    @discardableResult
+    func waitUntilLoaded() async -> Bool {
+        let session = sessionGeneration
+        ensureLoaded(reason: .manual)
+        while let task = refreshTask {
+            await task.value
+            guard !Task.isCancelled, session == sessionGeneration else { return false }
         }
+        return hasSnapshot && dirtyGeneration == lastBuiltGeneration
     }
 
-    private func runScheduledRefresh(reason: WorkoutHistoryRefreshReason) async {
-        hasScheduledRefresh = false
+    private func performRefresh(reason: WorkoutHistoryRefreshReason, session: Int) async {
+        while !Task.isCancelled, session == sessionGeneration {
+            let generation = dirtyGeneration
+            do {
+                let values = try await readHistory(modelContext.container)
+                try Task.checkCancellation()
+                guard session == sessionGeneration else { return }
+                let identities = await Task.detached(priority: .userInitiated) {
+                    Set(values.flatMap { $0.exercises.map(\.identity) })
+                }.value
+                let metadata = Dictionary(uniqueKeysWithValues: identities.map { ($0, HistoryExerciseMetadata.resolve($0)) })
+                let projection = await Task.detached(priority: .userInitiated) {
+                    assert(!Thread.isMainThread)
+                    return WorkoutPerformanceMonitor.measure("history.project.values") {
+                        WorkoutHistoryProjection.build(workouts: HistoryWorkout.applying(metadata, to: values))
+                    }
+                }.value
+                try Task.checkCancellation()
+                guard session == sessionGeneration else { return }
+                guard generation == dirtyGeneration else { continue }
+                snapshot = WorkoutHistorySnapshot(
+                    home: projection.home, calendarDays: projection.calendarDays,
+                    exercisePRs: projection.exercisePRs, exerciseHistories: projection.exerciseHistories,
+                    workoutRecords: projection.workoutRecords, bestWeightByExerciseKey: projection.bestWeightByExerciseKey,
+                    planLookup: projection.planLookup, planUsage: projection.planUsage,
+                    profile: projection.profile, muscleLoad: projection.muscleLoad)
+                lastBuiltGeneration = generation
+                lastRefreshReason = reason
+                lastRefreshFinishedAt = .now
+                loadState = .available
+                logDataScaleIfNeeded(projection.scale)
+                WorkoutPerformanceMonitor.event("history.refresh.completed")
+            } catch {
+                guard session == sessionGeneration else { return }
+                if generation != dirtyGeneration, !Task.isCancelled { continue }
+                loadState = .failed
+            }
+            break
+        }
+        guard session == sessionGeneration else { return }
         refreshTask = nil
-        await performRefresh(reason: reason)
-    }
-
-    private func performRefresh(reason: WorkoutHistoryRefreshReason) async {
-        guard !isRefreshing else {
-            pendingRefreshReason = reason
-            return
-        }
-        let generation = dirtyGeneration
-        var didBuild = false
-        isRefreshing = true
-
-        WorkoutPerformanceMonitor.event("history.refresh.requested")
-        do {
-            let projection = try WorkoutPerformanceMonitor.measure("history.refresh") {
-                try Self.buildProjection(modelContext: modelContext)
-            }
-            snapshot = WorkoutHistorySnapshot(
-                home: projection.home,
-                calendarDays: projection.calendarDays,
-                exercisePRs: projection.exercisePRs,
-                exerciseHistories: projection.exerciseHistories,
-                workoutRecords: projection.workoutRecords,
-                bestWeightByExerciseKey: projection.bestWeightByExerciseKey,
-                planLookup: projection.planLookup,
-                planUsage: projection.planUsage,
-                profile: projection.profile,
-                muscleLoad: projection.muscleLoad
-            )
-            lastBuiltGeneration = generation
-            lastRefreshReason = reason
-            lastRefreshFinishedAt = .now
-            logDataScaleIfNeeded(projection.scale)
-            WorkoutPerformanceMonitor.event("history.refresh.completed")
-            didBuild = true
-        } catch {
-            #if DEBUG
-            print("[WorkoutHistoryStore] refresh failed: \(error)")
-            #endif
-        }
-
-        isRefreshing = false
-        if didBuild, dirtyGeneration != lastBuiltGeneration {
-            let nextReason = pendingRefreshReason ?? reason
-            pendingRefreshReason = nil
-            enqueueRefresh(reason: nextReason, delayNanoseconds: 500_000_000)
-        } else {
-            pendingRefreshReason = nil
-        }
     }
 
     func exerciseHistory(for key: String) -> ExerciseHistorySnapshot {
@@ -490,323 +489,12 @@ final class WorkoutHistoryStore {
         }
     }
 
-    private struct Projection {
-        var home: HomeWorkoutSnapshot
-        var calendarDays: [Date: WorkoutCalendarDaySummary]
-        var exercisePRs: [String: PRSummary]
-        var exerciseHistories: [String: ExerciseHistorySnapshot]
-        var workoutRecords: [UUID: [PersonalRecord]]
-        var bestWeightByExerciseKey: [String: Double]
-        var planLookup: PlanHistoryLookup
-        var planUsage: [UUID: PlanUsageSummary]
-        var profile: ProfileWorkoutSnapshot
-        var muscleLoad: MuscleLoadSnapshot
-        var scale: DataScale
-    }
-
-    private struct DataScale {
-        var workouts: Int
-        var finished: Int
-        var active: Int
-        var pending: Int
-        var exercises: Int
-        var sets: Int
-    }
-
-    private static func buildProjection(modelContext: ModelContext) throws -> Projection {
-        var descriptor = FetchDescriptor<Workout>(
-            predicate: #Predicate { $0.deletedAt == nil },
-            sortBy: [SortDescriptor(\.startedAt, order: .reverse)]
-        )
-        descriptor.includePendingChanges = true
-        let workouts = try modelContext.fetch(descriptor)
-        let finishedDesc = workouts.filter(\.isFinished)
-        let finishedAsc = finishedDesc.reversed()
-
-        var exerciseCount = 0
-        var setCount = 0
-        var pendingCount = 0
-        for w in workouts {
-            if w.syncStatus != .synced { pendingCount += 1 }
-            exerciseCount += w.exercises.count
-            setCount += w.completedStatEntryCount
-        }
-
-        var prByWorkoutId: [UUID: PRBadge] = [:]
-        var recordsByWorkoutId: [UUID: [PersonalRecord]] = [:]
-        var bestByKey: [String: Double] = [:]
-        var assistanceHistory: [(date: Date, value: ExerciseWeightSemantics.Performance)] = []
-        var exerciseBest: [String: (weight: Double, reps: Int, date: Date)] = [:]
-        var allWeightsByKey: [String: [(weight: Double, date: Date)]] = [:]
-        var historyPointsByKey: [String: [ExerciseHistoryPoint]] = [:]
-
-        for w in finishedAsc {
-            var records: [PersonalRecord] = []
-            var seenKeys = Set<String>()
-            var perWorkoutPoint: [String: (maxWeight: Double?, lastWeight: Double?, lastReps: Int?)] = [:]
-
-            for ex in w.exercises.sorted(by: { $0.orderIndex < $1.orderIndex }) {
-                let key = ex.historyKey
-                let sortedSets = ex.sets.sorted { $0.setIndex < $1.setIndex }
-                let counted = sortedSets.filter(\.countsForStats)
-                let statEntries = counted.flatMap(\.statEntries)
-                if ex.isAssistedWeight {
-                    let prior = assistanceHistory.filter { $0.date < w.startedAt }.map(\.value)
-                    if let best = ex.assistancePerformances.filter({ ExerciseWeightSemantics.isAssistanceBreakthrough($0, prior: prior) }).min(by: { $0.weight < $1.weight }), seenKeys.insert(key).inserted {
-                        records.append(PersonalRecord(exerciseKey: key, exerciseName: ex.displayExerciseName, weightKg: best.weight,
-                                                      previousBestKg: prior.filter { $0.weight > best.weight && $0.reps <= best.reps }.map(\.weight).min()))
-                    }
-                }
-                if !ex.isAssistedWeight, let maxWeight = statEntries.compactMap(\.weightKg).max(), !seenKeys.contains(key) {
-                    let prior = bestByKey[key]
-                    if prior == nil || maxWeight > prior! {
-                        records.append(PersonalRecord(
-                            exerciseKey: key,
-                            exerciseName: ex.displayExerciseName,
-                            weightKg: maxWeight,
-                            previousBestKg: prior
-                        ))
-                        seenKeys.insert(key)
-                    }
-                }
-
-                for entry in statEntries {
-                    guard let weight = entry.weightKg, let reps = entry.reps, reps > 0 else { continue }
-                    if ex.isAssistedWeight && (!weight.isFinite || weight < 0) { continue }
-                    allWeightsByKey[key, default: []].append((weight, w.startedAt))
-                    if let cur = exerciseBest[key] {
-                        if ExerciseWeightSemantics.isBetter(weight, than: cur.weight, assisted: ex.isAssistedWeight) || (weight == cur.weight && (ex.isAssistedWeight && reps > cur.reps || ((!ex.isAssistedWeight || reps == cur.reps) && w.startedAt > cur.date))) {
-                            exerciseBest[key] = (weight, reps, w.startedAt)
-                        }
-                    } else {
-                        exerciseBest[key] = (weight, reps, w.startedAt)
-                    }
-                }
-
-                let weights = statEntries.compactMap(\.weightKg)
-                if let maxWeight = ex.isAssistedWeight ? weights.filter({ $0.isFinite && $0 >= 0 }).min() : weights.max() {
-                    let previous = bestByKey[key] ?? maxWeight
-                    bestByKey[key] = ex.isAssistedWeight ? min(previous, maxWeight) : max(previous, maxWeight)
-                    var point = perWorkoutPoint[key] ?? (nil, nil, nil)
-                    point.maxWeight = ex.isAssistedWeight ? min(point.maxWeight ?? maxWeight, maxWeight) : max(point.maxWeight ?? maxWeight, maxWeight)
-                    perWorkoutPoint[key] = point
-                } else if perWorkoutPoint[key] == nil {
-                    perWorkoutPoint[key] = (nil, nil, nil)
-                }
-
-                if let last = counted.last(where: {
-                    let summary = $0.summaryWeightReps
-                    return summary.weightKg != nil && summary.reps != nil
-                }) {
-                    let summary = last.summaryWeightReps
-                    var point = perWorkoutPoint[key] ?? (nil, nil, nil)
-                    point.lastWeight = summary.weightKg
-                    point.lastReps = summary.reps
-                    perWorkoutPoint[key] = point
-                }
-            }
-
-            assistanceHistory += w.exercises.filter(\.isAssistedWeight).flatMap(\.assistancePerformances).map { (w.startedAt, $0) }
-            if let first = records.first {
-                prByWorkoutId[w.localId] = PRBadge(name: first.exerciseName, weightKg: first.weightKg, isAssistedWeight: ExerciseWeightSemantics.isAssisted(first.exerciseKey))
-            }
-            if !records.isEmpty {
-                recordsByWorkoutId[w.localId] = records
-            }
-            for (key, point) in perWorkoutPoint {
-                historyPointsByKey[key, default: []].append(ExerciseHistoryPoint(
-                    date: w.startedAt,
-                    maxWeightKg: point.maxWeight,
-                    lastSetWeightKg: point.lastWeight,
-                    lastSetReps: point.lastReps
-                ))
-            }
-        }
-
-        let cal = Calendar.current
-        var exercisePRs: [String: PRSummary] = [:]
-        for (key, best) in exerciseBest {
-            let previous = (allWeightsByKey[key] ?? [])
-                .filter { !cal.isDate($0.date, inSameDayAs: best.date) }
-                .map(\.weight)
-            let prevBest = ExerciseWeightSemantics.isAssisted(key) ? previous.min() : previous.max()
-            exercisePRs[key] = PRSummary(
-                exerciseKey: key,
-                weightKg: best.weight,
-                reps: best.reps,
-                date: best.date,
-                previousBestKg: prevBest
-            )
-        }
-
-        var exerciseHistories: [String: ExerciseHistorySnapshot] = [:]
-        for (key, points) in historyPointsByKey {
-            exerciseHistories[key] = ExerciseHistorySnapshot(
-                exerciseKey: key,
-                points: points.sorted { $0.date < $1.date },
-                pr: exercisePRs[key]
-            )
-        }
-
-        let now = Date.now
-        let calendar = Calendar.currentMondayFirst
-        let weekBounds = WorkoutWeeklyStats.weekBounds(for: now, calendar: calendar)
-        func rowSummary(for w: Workout) -> WorkoutRowSummary {
-            let duration = w.endedAt.map { $0.timeIntervalSince(w.timerStartedAt ?? w.startedAt) }
-            let volume = w.exercises.flatMap(\.sets).reduce(0.0) { acc, set in
-                guard set.countsForStats else { return acc }
-                return acc + set.statEntries.reduce(0.0) { entryAcc, entry in
-                    entryAcc + entry.volumeKg
-                }
-            }
-            return WorkoutRowSummary(
-                id: w.localId,
-                title: w.title ?? "训练",
-                startedAt: w.startedAt,
-                durationSec: duration,
-                exerciseCount: w.exercises.count,
-                setCount: w.completedStatEntryCount,
-                volumeKg: volume,
-                pr: prByWorkoutId[w.localId]
-            )
-        }
-        let weekWorkouts = finishedDesc
-            .filter { $0.startedAt >= weekBounds.start && $0.startedAt < weekBounds.end }
-            .map(rowSummary)
-        let calendarDays = buildCalendarDays(
-            from: finishedDesc,
-            prByWorkoutId: prByWorkoutId,
-            rowSummary: rowSummary,
-            calendar: calendar
-        )
-        let today = calendar.startOfDay(for: now)
-        let todayCompletedWorkoutCount = calendarDays[today]?.workoutCount ?? 0
-        let currentTrainingStreakDays = currentTrainingStreakDays(
-            in: finishedDesc,
-            reference: now,
-            calendar: calendar
-        )
-
-        let cutoff = Date.now.addingTimeInterval(-14 * 86_400)
-        let recentPlanIdsInOrder = finishedDesc
-            .filter { $0.startedAt > cutoff }
-            .compactMap(\.planId)
-        let recentPlanIds = Set(recentPlanIdsInOrder)
-        let activePlanId = recentPlanIdsInOrder.first
-
-        let home = HomeWorkoutSnapshot(
-            currentWeekStats: WorkoutWeeklyStats.compute(
-                workouts: finishedDesc,
-                reference: now,
-                calendar: calendar
-            ),
-            weekWorkouts: Array(weekWorkouts),
-            weekTrainingDays: WorkoutWeeklyStats.dayStatuses(
-                workouts: finishedDesc,
-                reference: now,
-                calendar: calendar
-            ),
-            todayCompletedWorkoutCount: todayCompletedWorkoutCount,
-            currentTrainingStreakDays: currentTrainingStreakDays,
-            recentPlanIds: recentPlanIds,
-            activePlanId: activePlanId,
-            prByWorkoutId: prByWorkoutId
-        )
-
-        let profile = ProfileWorkoutSnapshot(totalWorkouts: finishedDesc.count)
-
-        var planUsage: [UUID: PlanUsageSummary] = [:]
-        for w in finishedDesc {
-            guard let planId = w.planId else { continue }
-            var summary = planUsage[planId] ?? .empty
-            summary.completedCount += 1
-            if summary.lastTrainedAt == nil || w.startedAt > summary.lastTrainedAt! {
-                summary.lastTrainedAt = w.startedAt
-            }
-            planUsage[planId] = summary
-        }
-
-        let planLookup = PlanHistoryLookup.build(from: finishedDesc)
-        let muscleLoad = MuscleLoadAggregator.snapshot(workouts: finishedDesc,
-                                                       reference: now,
-                                                       calendar: calendar)
-        let scale = DataScale(
-            workouts: workouts.count,
-            finished: finishedDesc.count,
-            active: workouts.filter(\.isActive).count,
-            pending: pendingCount,
-            exercises: exerciseCount,
-            sets: setCount
-        )
-
-        return Projection(
-            home: home,
-            calendarDays: calendarDays,
-            exercisePRs: exercisePRs,
-            exerciseHistories: exerciseHistories,
-            workoutRecords: recordsByWorkoutId,
-            bestWeightByExerciseKey: bestByKey,
-            planLookup: planLookup,
-            planUsage: planUsage,
-            profile: profile,
-            muscleLoad: muscleLoad,
-            scale: scale
-        )
-    }
-
     private static func monthStart(for date: Date, calendar: Calendar) -> Date? {
         let comps = calendar.dateComponents([.year, .month], from: date)
         return calendar.date(from: comps).map { calendar.startOfDay(for: $0) }
     }
 
-    private static func buildCalendarDays(
-        from workouts: [Workout],
-        prByWorkoutId: [UUID: PRBadge],
-        rowSummary: (Workout) -> WorkoutRowSummary,
-        calendar: Calendar = .currentMondayFirst
-    ) -> [Date: WorkoutCalendarDaySummary] {
-        var days: [Date: WorkoutCalendarDaySummary] = [:]
-        for workout in workouts {
-            let day = calendar.startOfDay(for: workout.startedAt)
-            var summary = days[day] ?? WorkoutCalendarDaySummary(
-                date: day,
-                workouts: [],
-                setCount: 0,
-                volumeKg: 0,
-                hasPR: false
-            )
-            summary.workouts.append(rowSummary(workout))
-            summary.hasPR = summary.hasPR || prByWorkoutId[workout.localId] != nil
-            for exercise in workout.exercises {
-                for set in exercise.sets where set.countsForStats {
-                    summary.setCount += 1
-                    summary.volumeKg += set.statEntries.reduce(0.0) { acc, entry in
-                        acc + entry.volumeKg
-                    }
-                }
-            }
-            days[day] = summary
-        }
-        return days
-    }
-
-    private static func currentTrainingStreakDays(
-        in workouts: [Workout],
-        reference: Date,
-        calendar: Calendar
-    ) -> Int {
-        let completedDays = Set(workouts.map { calendar.startOfDay(for: $0.startedAt) })
-        var cursor = calendar.startOfDay(for: reference)
-        var count = 0
-        while completedDays.contains(cursor) {
-            count += 1
-            guard let previous = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
-            cursor = previous
-        }
-        return count
-    }
-
-    private func logDataScaleIfNeeded(_ scale: DataScale) {
+    private func logDataScaleIfNeeded(_ scale: WorkoutHistoryProjection.DataScale) {
         #if DEBUG
         print("[WorkoutHistoryStore] workouts=\(scale.workouts) finished=\(scale.finished) active=\(scale.active) pending=\(scale.pending) exercises=\(scale.exercises) sets=\(scale.sets)")
         #endif
@@ -814,7 +502,11 @@ final class WorkoutHistoryStore {
 }
 
 extension PlanHistoryLookup {
-    static func build(from workouts: [Workout]) -> PlanHistoryLookup {
+    @MainActor static func build(from workouts: [Workout]) -> PlanHistoryLookup {
+        build(values: HistoryWorkout.resolved(workouts))
+    }
+
+    nonisolated static func build(values workouts: [HistoryWorkout]) -> PlanHistoryLookup {
         var latestByPlanExercise: [PlanExerciseHistoryKey: LatestExercisePerformance] = [:]
         var latestByHistoryKey: [String: LatestExercisePerformance] = [:]
         var lastWorkoutByPlanId: [UUID: PlanWorkoutCompletionSnapshot] = [:]
@@ -828,7 +520,7 @@ extension PlanHistoryLookup {
             for ex in workout.exercises {
                 let done = completedExecutionSets(from: ex)
                 guard !done.isEmpty else { continue }
-                let snapshots = done.map(PlanPrefill.snapshot(from:))
+                let snapshots = done.map(snapshot(from:))
 
                 if let planItemId = ex.planItemId {
                     completedPlanItemIds.insert(planItemId)
@@ -925,7 +617,7 @@ extension PlanHistoryLookup {
         )
     }
 
-    private static func completedRegularSets(from exercise: WorkoutExercise) -> [WorkoutSet] {
+    nonisolated private static func completedRegularSets(from exercise: HistoryExercise) -> [HistorySet] {
         let regular = exercise.sets
             .filter { $0.completed && !$0.isDropSet }
             .sorted {
@@ -937,7 +629,7 @@ extension PlanHistoryLookup {
         return regular.contains(where: { !$0.isWarmupEffective }) ? regular : []
     }
 
-    private static func snapshot(from set: WorkoutSet) -> SetSnapshot {
+    nonisolated private static func snapshot(from set: HistorySet) -> SetSnapshot {
         let summary = set.summaryWeightReps
         return SetSnapshot(
             weightKg: summary.weightKg,
@@ -948,15 +640,15 @@ extension PlanHistoryLookup {
         )
     }
 
-    private static func completedDropSets(from exercise: WorkoutExercise) -> [WorkoutSet] {
+    nonisolated private static func completedDropSets(from exercise: HistoryExercise) -> [HistorySet] {
         exercise.sets
             .filter { $0.completed && $0.isDropSet && !$0.isWarmupEffective && !$0.effectiveSegments.isEmpty }
             .sorted { $0.setIndex < $1.setIndex }
     }
 
-    private static func completedSupersetRounds(first: WorkoutExercise,
-                                                second: WorkoutExercise,
-                                                roundCount: Int) -> [(first: WorkoutSet, second: WorkoutSet)] {
+    nonisolated private static func completedSupersetRounds(first: HistoryExercise,
+                                                second: HistoryExercise,
+                                                roundCount: Int) -> [(first: HistorySet, second: HistorySet)] {
         let firstByIndex = Dictionary(uniqueKeysWithValues: first.sets.map { ($0.setIndex, $0) })
         let secondByIndex = Dictionary(uniqueKeysWithValues: second.sets.map { ($0.setIndex, $0) })
         return (0..<max(1, roundCount)).compactMap { index in
@@ -970,7 +662,7 @@ extension PlanHistoryLookup {
         }
     }
 
-    private static func completedExecutionSets(from exercise: WorkoutExercise) -> [WorkoutSet] {
+    nonisolated private static func completedExecutionSets(from exercise: HistoryExercise) -> [HistorySet] {
         let completed = exercise.sets.filter(\.completed)
         let dropSets = completed
             .filter { $0.isDropSet && !$0.isWarmupEffective }

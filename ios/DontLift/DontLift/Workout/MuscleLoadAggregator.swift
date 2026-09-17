@@ -2,7 +2,7 @@ import Foundation
 
 /// 单个桶（L1 肌群或「其他」）在一个区间内的负荷聚合。
 /// `category` 为 nil 表示「其他」桶（无法归组的动作），仅非零时展示、不参与排序与对比。
-struct MuscleLoadEntry: Equatable, Identifiable {
+nonisolated struct MuscleLoadEntry: Equatable, Identifiable , Sendable {
     var category: ExerciseCategory?
     var workingSets: Int
     var volumeKg: Double
@@ -11,7 +11,7 @@ struct MuscleLoadEntry: Equatable, Identifiable {
 }
 
 /// 某肌群在一个区间内的动作贡献明细行。
-struct MuscleLoadContribution: Equatable, Identifiable {
+nonisolated struct MuscleLoadContribution: Equatable, Identifiable , Sendable {
     var historyKey: String
     var exerciseName: String
     var workingSets: Int
@@ -23,7 +23,7 @@ struct MuscleLoadContribution: Equatable, Identifiable {
 /// 肌群负荷快照（值类型，由 `WorkoutHistoryStore` 投影构建，视图只读）。
 /// 覆盖当前周与上一完整周两套看板 + 明细；对比基准只有一组：本周对比上周整周
 /// （上周视图为纯数据回看，不再对比上上周）。
-struct MuscleLoadSnapshot: Equatable {
+nonisolated struct MuscleLoadSnapshot: Equatable , Sendable {
     /// 当前周起点（周一 00:00），用于视图判定快照是否跨周过期。
     var weekStart: Date
     /// 本周看板（八肌群 + 非零时的「其他」）。
@@ -52,15 +52,19 @@ struct MuscleLoadSnapshot: Equatable {
 /// 递减组按父组计 1 组、训练量按 segments 展开；软删训练不计入。
 /// 归组两段式：优先训练记录的动作 `primaryMuscle` 快照；缺失时回退动作库按 code/name 解析；
 /// 仍无法归组的进「其他」。非解剖类（有氧/功能性/热身拉伸）动作不计入任何桶。
-enum MuscleLoadAggregator {
+nonisolated enum MuscleLoadAggregator {
 
     /// 解剖类八个 L1 肌群的固定展示顺序之外的排序键：按有效组数降序。
-    static let anatomicalCategories: [ExerciseCategory] = ExerciseCategory.allCases.filter(\.isAnatomical)
+    static let anatomicalCategories: [ExerciseCategory] = ExerciseCategory.allCases.filter { ![ExerciseCategory.cardio, .functional, .mobility].contains($0) }
 
     // MARK: - 区间聚合
 
     /// 聚合 `[start, end)` 区间内的肌群负荷。返回八肌群（含 0 组）与「其他」（仅非零时出现）。
-    static func load(workouts: [Workout], in range: Range<Date>) -> [MuscleLoadEntry] {
+    @MainActor static func load(workouts: [Workout], in range: Range<Date>) -> [MuscleLoadEntry] {
+        load(values: HistoryWorkout.resolved(workouts), in: range)
+    }
+
+    static func load(values workouts: [HistoryWorkout], in range: Range<Date>) -> [MuscleLoadEntry] {
         var setsByCategory: [ExerciseCategory?: Int] = [:]
         var volumeByCategory: [ExerciseCategory?: Double] = [:]
 
@@ -133,7 +137,14 @@ enum MuscleLoadAggregator {
 
     /// 近 `weeks` 个自然周（含参考周，按时间升序）每个肌群的周有效组数。
     /// 返回顺序与 `sortedBoard(load(workouts:in: weekRange))` 对齐由调用方自行处理。
-    static func weeklySeries(workouts: [Workout],
+    @MainActor static func weeklySeries(workouts: [Workout],
+                             weeks: Int,
+                             reference: Date = .now,
+                             calendar: Calendar = .currentMondayFirst) -> [ExerciseCategory?: [Int]] {
+        weeklySeries(values: HistoryWorkout.resolved(workouts), weeks: weeks, reference: reference, calendar: calendar)
+    }
+
+    static func weeklySeries(values workouts: [HistoryWorkout],
                              weeks: Int,
                              reference: Date = .now,
                              calendar: Calendar = .currentMondayFirst) -> [ExerciseCategory?: [Int]] {
@@ -142,7 +153,7 @@ enum MuscleLoadAggregator {
         for offset in stride(from: -(weeks - 1), through: 0, by: 1) {
             guard let start = calendar.date(byAdding: .weekOfYear, value: offset, to: current.lowerBound) else { continue }
             let range = start..<(calendar.date(byAdding: .weekOfYear, value: 1, to: start) ?? current.upperBound)
-            for entry in load(workouts: workouts, in: range) {
+            for entry in load(values: workouts, in: range) {
                 series[entry.category, default: []].append(entry.workingSets)
             }
         }
@@ -156,7 +167,13 @@ enum MuscleLoadAggregator {
 
     // MARK: - 贡献明细
     /// 某肌群（或「其他」，category 传 nil）在区间内的动作贡献明细，按有效组数降序、再按名称稳定。
-    static func contributions(workouts: [Workout],
+    @MainActor static func contributions(workouts: [Workout],
+                              in range: Range<Date>,
+                              category: ExerciseCategory?) -> [MuscleLoadContribution] {
+        contributions(values: HistoryWorkout.resolved(workouts), in: range, category: category)
+    }
+
+    static func contributions(values workouts: [HistoryWorkout],
                               in range: Range<Date>,
                               category: ExerciseCategory?) -> [MuscleLoadContribution] {
         var byKey: [String: (name: String, sets: Int, volume: Double)] = [:]
@@ -196,27 +213,22 @@ enum MuscleLoadAggregator {
     /// 两段式归组：快照 `primaryMuscle` 优先；缺失/无法识别时回退动作库 code/name 解析。
     /// 原始分类先经 `ExerciseCategory.collapseL1` 收缩（二头/三头/前臂→手臂、小腿→腿、斜方肌→背）。
     /// 解析结果为非解剖类时返回外层 nil（不计入负荷板）；仍无法归组的返回「其他」（`.some(nil)`）。
-    static func bucket(for exercise: WorkoutExercise) -> ExerciseCategory?? {
-        if let snapshot = exercise.primaryMuscle?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !snapshot.isEmpty,
-           let category = ExerciseCategory(rawValue: ExerciseCategory.collapseL1(snapshot)) {
-            // 显式双层 Optional：外层 nil = 非解剖类不计入；内层 nil = 「其他」桶。
-            if !category.isAnatomical { return nil }
-            return .some(category)
-        }
-        if let resolved = ExerciseLibrary.resolve(code: exercise.builtinExerciseCode,
-                                                  name: exercise.exerciseName),
-           let category = ExerciseCategory(rawValue: ExerciseCategory.collapseL1(resolved.category)) {
-            if !category.isAnatomical { return nil }
-            return .some(category)
-        }
-        return .some(nil)
+    @MainActor static func bucket(for exercise: WorkoutExercise) -> ExerciseCategory?? {
+        HistoryExerciseMetadata.resolve(HistoryExercise(exercise).identity).bucket
     }
+
+    static func bucket(for exercise: HistoryExercise) -> ExerciseCategory?? { exercise.metadata!.bucket }
 
     // MARK: - 快照构建
 
     /// 由全量未删除训练一次性构建肌群负荷快照（供 history store 投影复用）。
-    static func snapshot(workouts: [Workout],
+    @MainActor static func snapshot(workouts: [Workout],
+                         reference: Date = .now,
+                         calendar: Calendar = .currentMondayFirst) -> MuscleLoadSnapshot {
+        snapshot(values: HistoryWorkout.resolved(workouts), reference: reference, calendar: calendar)
+    }
+
+    static func snapshot(values workouts: [HistoryWorkout],
                          reference: Date = .now,
                          calendar: Calendar = .currentMondayFirst) -> MuscleLoadSnapshot {
         let currentWeek = weekRange(for: reference, calendar: calendar)
@@ -226,20 +238,20 @@ enum MuscleLoadAggregator {
         var currentByBucket: [ExerciseCategory?: [MuscleLoadContribution]] = [:]
         var previousByBucket: [ExerciseCategory?: [MuscleLoadContribution]] = [:]
         for bucket in buckets {
-            let current = contributions(workouts: workouts, in: currentWeek, category: bucket)
+            let current = contributions(values: workouts, in: currentWeek, category: bucket)
             if !current.isEmpty { currentByBucket[bucket] = current }
-            let previous = contributions(workouts: workouts, in: previousWeek, category: bucket)
+            let previous = contributions(values: workouts, in: previousWeek, category: bucket)
             if !previous.isEmpty { previousByBucket[bucket] = previous }
         }
 
         // 上周整周同时充当本周的对比基准与上周视图看板，一次聚合两用。
-        let previousEntries = load(workouts: workouts, in: previousWeek)
+        let previousEntries = load(values: workouts, in: previousWeek)
         return MuscleLoadSnapshot(
             weekStart: currentWeek.lowerBound,
-            board: sortedBoard(load(workouts: workouts, in: currentWeek)),
+            board: sortedBoard(load(values: workouts, in: currentWeek)),
             baseline: previousEntries,
             previousBoard: sortedBoard(previousEntries),
-            series: weeklySeries(workouts: workouts, weeks: 4, reference: reference, calendar: calendar),
+            series: weeklySeries(values: workouts, weeks: 4, reference: reference, calendar: calendar),
             contributions: currentByBucket,
             previousContributions: previousByBucket
         )

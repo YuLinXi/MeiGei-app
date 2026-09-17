@@ -61,6 +61,37 @@ struct BadgeWallStoreTests {
         #expect(store.progress.first { $0.id == "career_first_workout" }?.isUnlocked == true)
     }
 
+    @Test func activeSavesNeverReadCompletedHistory() async throws {
+        let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+        let item = workout()
+        item.endedAt = nil
+        context.insert(item)
+        try context.save()
+        let store = BadgeWallStore()
+        store.configure(context: context, userId: UUID())
+        await store.waitUntilLoaded()
+        let reads = store.historyReadCount
+        let observer = NotificationCenter.default.addObserver(forName: ModelContext.didSave, object: context, queue: .main) { notification in
+            MainActor.assumeIsolated { store.saved(notification) }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+        for index in 0..<30 {
+            let set = item.exercises[0].sets[0]
+            set.completed.toggle()
+            set.weightKg = Double(index)
+            set.actualRestSeconds = index
+            item.markDirty()
+            try context.save()
+            await store.waitUntilLoaded()
+        }
+        #expect(store.historyReadCount == reads)
+        item.endedAt = .now
+        try context.save()
+        await store.waitUntilLoaded()
+        #expect(store.historyReadCount == reads + 1)
+    }
+
     @Test func backgroundReaderMatchesExistingRulesIncludingDropSets() async throws {
         let container = AppModelContainer.make(inMemory: true)
         let context = container.mainContext

@@ -6,7 +6,7 @@ import Foundation
 /// 训练量：每组 `weightKg * reps` 求和（缺值视为 0）。
 /// 总组数：已完成且非热身的父组数；递减组训练量/次数按有效 segments 展开。
 /// 总次数：已完成且非热身 entry 的 reps 总和。
-struct WeeklyStats: Equatable {
+nonisolated struct WeeklyStats: Equatable , Sendable {
     var volumeKg: Double
     var sessionCount: Int
     var setCount: Int
@@ -15,7 +15,7 @@ struct WeeklyStats: Equatable {
     static let empty = WeeklyStats(volumeKg: 0, sessionCount: 0, setCount: 0, repCount: 0)
 }
 
-struct WeekTrainingDayStatus: Identifiable, Equatable, Hashable {
+nonisolated struct WeekTrainingDayStatus: Identifiable, Equatable, Hashable , Sendable {
     var date: Date
     var weekdayIndex: Int
     var sessionCount: Int
@@ -25,9 +25,13 @@ struct WeekTrainingDayStatus: Identifiable, Equatable, Hashable {
     var isCompleted: Bool { sessionCount > 0 }
 }
 
-enum WorkoutWeeklyStats {
+nonisolated enum WorkoutWeeklyStats {
     /// 计算给定参考日期所在「自然周（周一起）」的训练聚合。
-    static func compute(workouts: [Workout], reference: Date = .now, calendar: Calendar = .currentMondayFirst) -> WeeklyStats {
+    @MainActor static func compute(workouts: [Workout], reference: Date = .now, calendar: Calendar = .currentMondayFirst) -> WeeklyStats {
+        compute(values: HistoryWorkout.resolved(workouts), reference: reference, calendar: calendar)
+    }
+
+    static func compute(values workouts: [HistoryWorkout], reference: Date = .now, calendar: Calendar = .currentMondayFirst) -> WeeklyStats {
         let (start, end) = weekBounds(for: reference, calendar: calendar)
         var stats = WeeklyStats.empty
         for w in workouts {
@@ -57,7 +61,11 @@ enum WorkoutWeeklyStats {
         return (start, end)
     }
 
-    static func dayStatuses(workouts: [Workout], reference: Date = .now, calendar: Calendar = .currentMondayFirst) -> [WeekTrainingDayStatus] {
+    @MainActor static func dayStatuses(workouts: [Workout], reference: Date = .now, calendar: Calendar = .currentMondayFirst) -> [WeekTrainingDayStatus] {
+        dayStatuses(values: HistoryWorkout.resolved(workouts), reference: reference, calendar: calendar)
+    }
+
+    static func dayStatuses(values workouts: [HistoryWorkout], reference: Date = .now, calendar: Calendar = .currentMondayFirst) -> [WeekTrainingDayStatus] {
         let (start, end) = weekBounds(for: reference, calendar: calendar)
         var countsByDay: [Date: Int] = [:]
         for workout in workouts {

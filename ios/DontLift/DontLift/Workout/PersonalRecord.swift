@@ -21,7 +21,7 @@ final class PRCelebrationCenter {
 }
 
 /// 一条个人记录：由原始训练记录重算得出，不持久化（design.md Non-Goals）。
-struct PersonalRecord: Identifiable, Equatable {
+nonisolated struct PersonalRecord: Identifiable, Equatable , Sendable {
     let exerciseKey: String
     let exerciseName: String
     let weightKg: Double

@@ -30,6 +30,27 @@ enum UITestHooks {
     static func seedLiveWorkoutIfNeeded(container: ModelContainer) {
         guard isLiveWorkoutUITest else { return }
         let context = container.mainContext
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-profile-workout"), let index = args.firstIndex(of: "-profile-history-count"), index + 1 < args.count,
+           let count = Int(args[index + 1]), count >= 0 {
+            // AppModelContainer 已选择独立性能测试库，不触碰日常训练库。
+            let existing = (try? context.fetch(FetchDescriptor<Workout>())) ?? []
+            for workout in existing { context.delete(workout) }
+            try? context.save()
+            for i in 0..<count {
+                let start = Date.now.addingTimeInterval(-Double(i + 1) * 86400)
+                let exercises = (0..<6).map { j in
+                    WorkoutExercise(builtinExerciseCode: "BB_BENCH_PRESS", exerciseName: "杠铃卧推", orderIndex: j,
+                                    sets: (0..<4).map { WorkoutSet(setIndex: $0, weightKg: 60, reps: 10, completed: true) })
+                }
+                context.insert(Workout(title: "性能测试历史 \(i)", startedAt: start,
+                                       timerStartedAt: start, endedAt: start.addingTimeInterval(3600), exercises: exercises))
+            }
+            try? context.save()
+        }
+        if args.contains("-profile-workout"), args.contains("-profile-resume-workout"),
+           WorkoutSession.activeSession(in: context) != nil { return }
+        let isLong = args.contains("-profile-long-workout")
         let isAssisted = ProcessInfo.processInfo.arguments.contains("-uitest-assisted-weight")
         let allWorkouts = (try? context.fetch(FetchDescriptor<Workout>())) ?? []
         for workout in allWorkouts {
@@ -41,10 +62,11 @@ enum UITestHooks {
         }
         try? context.save()
 
-        let exercises = ["上斜杠铃卧推", "杠铃划船", "哑铃肩推"].enumerated().map { index, name in
+        let names = isLong ? (0..<20).map { "测试动作 \($0 + 1)" } : ["上斜杠铃卧推", "杠铃划船", "哑铃肩推"]
+        let exercises = names.enumerated().map { index, name in
             WorkoutExercise(exerciseName: name,
                             orderIndex: index,
-                            sets: (0..<3).map { WorkoutSet(setIndex: $0, weightKg: 60, reps: 10) })
+                            sets: (0..<(isLong ? 5 : 3)).map { WorkoutSet(setIndex: $0, weightKg: 60, reps: 10) })
         }
         if isAssisted, let first = exercises.first {
             first.builtinExerciseCode = "ASSISTED_PULL_UP"

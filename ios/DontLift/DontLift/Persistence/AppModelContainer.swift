@@ -20,11 +20,18 @@ enum AppModelContainer {
     ])
 
     static func make(inMemory: Bool = false) -> ModelContainer {
-        let config = ModelConfiguration(
+        var config = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: inMemory,
             cloudKitDatabase: .none
         )
+        #if DEBUG
+        if !inMemory, UITestHooks.isLiveWorkoutUITest,
+           ProcessInfo.processInfo.arguments.contains("-profile-workout") {
+            let url = URL.applicationSupportDirectory.appending(path: "WorkoutPerformance.store")
+            config = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+        }
+        #endif
         do {
             return try ModelContainer(for: schema, configurations: [config])
         } catch {
