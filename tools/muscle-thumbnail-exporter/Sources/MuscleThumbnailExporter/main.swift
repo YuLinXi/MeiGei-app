@@ -102,7 +102,8 @@ private struct ThumbnailArtwork: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.937, green: 0.925, blue: 0.898)
+            // 缩略图保留透明背景，由动作卡片提供底色。
+            Color.clear
             BodyView(gender: sex.gender, side: spec.side, style: style)
                 .highlight(spec.muscles, color: Color(red: 0.851, green: 0.282, blue: 0.169))
                 .frame(width: size * spec.focus.artworkWidthRatio, height: size * 1.46)
@@ -163,6 +164,7 @@ private struct Exporter {
                 let content = ThumbnailArtwork(sex: sex, spec: spec, size: logicalSize)
                 let renderer = ImageRenderer(content: content)
                 renderer.scale = scale
+                renderer.isOpaque = false
                 guard let cgImage = renderer.cgImage else {
                     throw ExportError.renderFailed(assetName)
                 }
