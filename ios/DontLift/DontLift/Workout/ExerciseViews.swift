@@ -1394,7 +1394,7 @@ struct ExerciseDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                 titleSection
-                yourDataSection
+                WorkoutHistoryReadyView(requiresCurrent: false) { yourDataSection }
                 if !exercise.formCues.isEmpty { cuesSection }
                 if !exercise.primaryRegions.isEmpty { targetMusclesSection }
                 if !exercise.primaryRegions.isEmpty { muscleMapSection }

@@ -62,10 +62,12 @@ struct WorkoutListView: View {
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(spacing: Theme.Spacing.lg) {
-                        heroSection
-                        weekCompletionSection
-                        muscleLoadSection
-                        weekTrainingSection
+                        WorkoutHistoryReadyView(requiresCurrent: false) {
+                            heroSection
+                            weekCompletionSection
+                            muscleLoadSection
+                            weekTrainingSection
+                        }
                         Color.clear.frame(height: 80) // 给底部 CTA 留位
                     }
                     .padding(.horizontal, Theme.Spacing.lg)
@@ -500,6 +502,17 @@ struct WorkoutListView: View {
     }
 
     private func start(from plan: WorkoutPlan) {
+        guard historyStore.isCurrent else {
+            Task { @MainActor in
+                guard await historyStore.waitUntilLoaded() else {
+                    strictStartError = "历史记录暂未就绪，请重试。"
+                    return
+                }
+                start(from: plan)
+            }
+            return
+        }
+
         let brokenItems = PlanItem.unstartableItems(in: plan.items)
         guard brokenItems.isEmpty else {
             strictStartError = PlanItem.unstartableMessage(for: brokenItems)
@@ -840,6 +853,7 @@ struct WorkoutLoggingView: View {
     @Environment(PlanWritebackCenter.self) private var planWriteback
     @Environment(GlobalMessageCenter.self) private var globalMessage
     @Environment(WorkoutHistoryStore.self) private var historyStore
+    @Environment(WorkoutPresentationCenter.self) private var workoutPresentation
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -875,9 +889,16 @@ struct WorkoutLoggingView: View {
     /// 自研数字键盘的焦点单元（nil = 键盘收起）。
     @State private var focused: FocusedCell?
     /// 当前聚焦单元的编辑缓冲串（含 "0." / "72." 等中间态，聚焦单元据此显示）。
-    @State private var buffer: String = ""
+    @State private var editing = WorkoutEditingState()
+    private var buffer: String {
+        get { editing.buffer }
+        nonmutating set { editing.buffer = newValue }
+    }
     /// 「打字即覆盖」标志：聚焦已有值后首个数字键清空重填。
-    @State private var pendingReplace: Bool = false
+    private var pendingReplace: Bool {
+        get { editing.pendingReplace }
+        nonmutating set { editing.pendingReplace = newValue }
+    }
     /// 键盘/滚动布局测量态（行框/视口/键盘顶边）：逐帧变化的测量值收进独立 @Observable，
     /// 避免每次 preference 更新触发整页 body 重估；只有读取它的视图才订阅。
     @State private var keyboardLayout = WorkoutKeyboardLayout()
@@ -890,10 +911,6 @@ struct WorkoutLoggingView: View {
     @State private var confirmDeleteTarget: WorkoutDeleteTarget?
     /// 动作级组间休息菜单的实际尺寸，用于自定义键盘弹出时向上避让。
     @State private var restMenuSize: CGSize = .zero
-    /// 休息悬浮按钮（FAB）拖动后的锚点（FAB 容器本地坐标，nil = 默认右下角）。
-    @State private var fabAnchor: CGPoint?
-    /// FAB 拖动中的实时位移（手势驱动，松手自动归零）；用 @GestureState 保证跟手不延迟。
-    @GestureState private var fabDrag: CGSize = .zero
     /// 就地排序模式：true 时动作列表切换为可拖拽的紧凑行列表，右上按钮变为「完成」。
     @State private var reordering = false
     /// 排序模式中的 unitId 草稿顺序；点「完成」时一次性写回模型。
@@ -1163,9 +1180,9 @@ struct WorkoutLoggingView: View {
                 GeometryReader { viewport in
                     ScrollView {
                         VStack(spacing: Theme.Spacing.md) {
-                            topSection
+                            WorkoutObservationScope { topSection }
                             exerciseSectionHeader
-                            exerciseList
+                            WorkoutObservationScope { exerciseList }
                             Color.clear.frame(height: canShowWorkoutAddBar ? 12 : 80)
                         }
                         .frame(width: viewport.size.width - Theme.Spacing.lg * 2, alignment: .top)
@@ -1219,45 +1236,17 @@ struct WorkoutLoggingView: View {
                         }
                     }
                     // preference 读取置于 safeAreaInset 之后：否则读不到键盘(外层 inset 内容)发出的行位置。
-                    .onPreferenceChange(SetRowFramesKey.self) { keyboardLayout.setRowFrames = $0 }
+                    .onPreferenceChange(SetRowFramesKey.self) { if keyboardLayout.setRowFrames != $0 { keyboardLayout.setRowFrames = $0 } }
                     .transition(.opacity)
                 }
             }
             // 浮动 FAB（rest 进行中且未展开即显示）：可在页面内自由拖动；键盘升起时被顶到键盘上方，
             // 不侵占键盘激活区。本屏无 Tab Bar，默认贴右下角。休息计时卡片已上提到全局 overlay。
             // 排序模式下隐藏：排序区之外不允许任何操作。
-            if restTimer.isRunning && !restTimer.isExpanded && !reordering {
-                GeometryReader { geo in
-                    ZStack { restFAB }
-                        .frame(width: Self.fabRadius * 2, height: Self.fabRadius * 2)
-                        .transaction { transaction in
-                            transaction.animation = nil
-                        }
-                        .position(fabPosition(in: geo))
-                        // 键盘顶边变化时平滑被顶上去/落回（与键盘升降同一条弹簧）；拖动由手势驱动，不经此动画。
-                        .animation(.spring(response: 0.45, dampingFraction: 0.92), value: keyboardLayout.keypadTopY)
-                        .gesture(
-                            // 单一手势同时承担拖动与点按：实时位移跟手，松手按位移阈值区分「点按展开 / 落定」。
-                            DragGesture(minimumDistance: 0, coordinateSpace: .named("fabSpace"))
-                                .updating($fabDrag) { value, state, _ in state = value.translation }
-                                .onEnded { value in
-                                    let dist = hypot(value.translation.width, value.translation.height)
-                                    if dist < 10 {
-                                        prepareForPresentation()
-                                        withAnimation(sheetAnim) { restTimer.isExpanded = true }
-                                    } else {
-                                        let base = fabAnchor ?? fabDefault(in: geo)
-                                        fabAnchor = clampedFabPoint(
-                                            CGPoint(x: base.x + value.translation.width,
-                                                    y: base.y + value.translation.height), in: geo)
-                                    }
-                                }
-                        )
-                        // 「减弱动态效果」开启时只淡入淡出，不做缩放入场。
-                        .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
-                }
-                .coordinateSpace(name: "fabSpace")
-            }
+            WorkoutRestFloatingControl(keyboardLayout: keyboardLayout,
+                                       reordering: reordering,
+                                       canShowWorkoutAddBar: canShowWorkoutAddBar,
+                                       onOpen: prepareForPresentation)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if canShowWorkoutAddBar {
@@ -1323,8 +1312,8 @@ struct WorkoutLoggingView: View {
         .overlay(alignment: .bottom) {
             restDurationKeypadOverlay
         }
-        .onPreferenceChange(KeypadTopKey.self) { keyboardLayout.keypadTopY = $0 }
-        .onPreferenceChange(RestMenuSizeKey.self) { restMenuSize = $0 }
+        .onPreferenceChange(KeypadTopKey.self) { if keyboardLayout.keypadTopY != $0 { keyboardLayout.keypadTopY = $0 } }
+        .onPreferenceChange(RestMenuSizeKey.self) { if restMenuSize != $0 { restMenuSize = $0 } }
         // 组间休息已移入每个动作卡右上 ⋯ 菜单（动作级设置）；已完成训练只读，导航栏不再挂编辑入口。
         // 始终弹出二次确认；有未完成组时文案升级为强警示（finishConfirmTitle/Message）。
         .paperConfirmDialog(
@@ -1361,10 +1350,14 @@ struct WorkoutLoggingView: View {
             onConfirm: confirmExerciseOptionSwitch
         )
         .sheet(isPresented: $pickingExercise) {
-            ExercisePickerView { pick in addExercise(pick, kind: pendingExerciseUnitKind) }
+            WorkoutHistoryReadyView {
+                ExercisePickerView { pick in addExercise(pick, kind: pendingExerciseUnitKind) }
+            }
         }
         .sheet(isPresented: $creatingSuperset) {
-            SupersetCreationSheet(historyPrefill: supersetHistoryPrefill) { result in addSuperset(result) }
+            WorkoutHistoryReadyView {
+                SupersetCreationSheet(historyPrefill: supersetHistoryPrefill) { result in addSuperset(result) }
+            }
         }
         // 排序统一为系统 sheet 弹窗（与「编辑动作」等弹层一致）：原生下滑关闭。
         // 下滑与点「完成」等价——onDismiss 统一提交草稿顺序并退出排序模式。
@@ -1408,6 +1401,7 @@ struct WorkoutLoggingView: View {
                let exercise = workout.exercise(id: exerciseId),
                let unit = switchableUnit(for: exercise),
                let options = unit.exerciseOptions {
+                WorkoutHistoryReadyView {
                 ExerciseOptionPickerSheet(options: options,
                                           currentHistoryKey: exercise.historyKey) { option in
                     switchingExerciseId = nil
@@ -1416,6 +1410,7 @@ struct WorkoutLoggingView: View {
                         option: option
                     )
                 }
+                }
             }
         }
         .onAppear {
@@ -1423,6 +1418,7 @@ struct WorkoutLoggingView: View {
             consumeRestCompletionIfNeeded()
             historyStore.ensureLoaded(reason: .manual)
             workoutLiveActivity.syncWorkout(workout)
+            workoutPresentation.didAppear()
             #if DEBUG
             // UI 测试钩子：直达排序模式，供截图验证蒙层覆盖。
             if UITestHooks.isAutoReorderUITest { beginReorder() }
@@ -2243,75 +2239,6 @@ struct WorkoutLoggingView: View {
         return "\(first.displayExerciseName) + \(second.displayExerciseName)"
     }
 
-    // MARK: FAB
-
-    /// FAB 半径（直径 58）。
-    private static let fabRadius: CGFloat = 29
-
-    /// 把落点钳制在屏幕内；只在键盘升起时上抬，底部工具栏交给用户自行避让。
-    private func clampedFabPoint(_ p: CGPoint, in geo: GeometryProxy) -> CGPoint {
-        let r = Self.fabRadius
-        let margin: CGFloat = 12
-        let minX = margin + r
-        let maxX = max(minX, geo.size.width - margin - r)
-        let minY = margin + r
-        var maxY = geo.size.height - margin - r
-        if keyboardLayout.keypadTopY > 0 {   // 键盘升起：FAB 底边须在键盘顶上方
-            let keypadTopLocal = keyboardLayout.keypadTopY - geo.frame(in: .global).minY
-            maxY = min(maxY, keypadTopLocal - margin - r)
-        }
-        maxY = max(minY, maxY)
-        return CGPoint(x: min(max(p.x, minX), maxX), y: min(max(p.y, minY), maxY))
-    }
-
-    /// FAB 默认位置：右下角；底部添加栏可见时上移避让。
-    private func fabDefault(in geo: GeometryProxy) -> CGPoint {
-        let r = Self.fabRadius
-        let bottomOffset: CGFloat = canShowWorkoutAddBar ? 112 : 28
-        return CGPoint(x: geo.size.width - Theme.Spacing.lg - r,
-                       y: geo.size.height - bottomOffset - r)
-    }
-
-    /// FAB 当前位置：锚点（或默认右下角）+ 实时拖动位移，统一过钳制（含键盘顶上界）。
-    private func fabPosition(in geo: GeometryProxy) -> CGPoint {
-        let base = fabAnchor ?? fabDefault(in: geo)
-        let moved = CGPoint(x: base.x + fabDrag.width, y: base.y + fabDrag.height)
-        return clampedFabPoint(moved, in: geo)
-    }
-
-    private var restFAB: some View {
-        // 整块（圆底 + 计时文字）作为单一视图，由外层 .position 统一移动、拖动跟手不分层。
-        // 点按/拖动由调用点的单一 DragGesture 承担，故此处不再用 Button。无进度环（已移除动画与环形 UI）。
-        TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                let remaining = restTimer.remaining
-                VStack(spacing: 0) {
-                    // 主体：剩余倒计时。
-                    Text("\(Int(remaining.rounded()))s")
-                        .font(Theme.Font.number(size: 17, weight: .heavy))
-                        .foregroundStyle(Theme.Color.accent)
-                    // 底部小一号：本次休息总时长 MM:SS。
-                    Text(formatMMSS(restTimer.totalDuration))
-                        .font(Theme.Font.number(size: 10, weight: .semibold))
-                        .foregroundStyle(Theme.Color.fg2)
-                }
-                .frame(width: 58, height: 58)
-                .background(Circle().fill(Theme.Color.surface))
-                .overlay(Circle().stroke(Theme.Color.accent, lineWidth: 2))
-                // box-shadow: 朱砂红辉光 22% + 中性 sh-md。
-                .shadow(color: Theme.Color.accent.opacity(0.22), radius: 9, x: 0, y: 4)
-                .shadow(color: Theme.Color.fg.opacity(Theme.ShadowLevel.md.opacity), radius: Theme.ShadowLevel.md.radius, x: 0, y: Theme.ShadowLevel.md.y)
-            }
-        .compositingGroup()
-        // 整圆为命中区；VoiceOver 以按钮呈现，默认动作 = 展开休息弹窗。
-        .contentShape(Circle())
-        .accessibilityAddTraits(.isButton)
-        .accessibilityLabel("休息计时，点按展开")
-        .accessibilityAction {
-            prepareForPresentation()
-            withAnimation(sheetAnim) { restTimer.isExpanded = true }
-        }
-    }
-
     // MARK: actions
 
     private func unitHasIncomplete(_ unit: WorkoutUnit) -> Bool {
@@ -2329,10 +2256,16 @@ struct WorkoutLoggingView: View {
     }
 
     private func completeSingleSet(_ set: WorkoutSet, in ex: WorkoutExercise, unitId: UUID, fallbackRestSeconds: Int) {
+        WorkoutPerformanceMonitor.measure("workout.completeSet") {
+            applySingleSetCompletion(set, in: ex, unitId: unitId, fallbackRestSeconds: fallbackRestSeconds)
+        }
+    }
+
+    private func applySingleSetCompletion(_ set: WorkoutSet, in ex: WorkoutExercise, unitId: UUID, fallbackRestSeconds: Int) {
         if focused != nil { dismissKeypad() }
         if accordion == .auto { accordion = .expanded(unitId) }
-        startTimerIfNeeded()
-        recordActiveRestIfNeeded()
+        startTimerIfNeeded(notify: false)
+        recordActiveRestIfNeeded(notify: false)
         let secs = WorkoutRestPolicy.plannedRestSeconds(
             completing: set,
             in: ex,
@@ -2355,8 +2288,8 @@ struct WorkoutLoggingView: View {
     private func completeSupersetRound(anchorSet: WorkoutSet, unit: WorkoutUnit, fallbackRestSeconds: Int) {
         if focused != nil { dismissKeypad() }
         if accordion == .auto { accordion = .expanded(unit.unitId) }
-        startTimerIfNeeded()
-        recordActiveRestIfNeeded()
+        startTimerIfNeeded(notify: false)
+        recordActiveRestIfNeeded(notify: false)
         let secs: Int
         if let ex = exercise(containing: anchorSet.localId) {
             secs = WorkoutRestPolicy.plannedRestSeconds(
@@ -2777,16 +2710,16 @@ struct WorkoutLoggingView: View {
         touch()
     }
 
-    private func recordActiveRestIfNeeded(now: Date = .now) {
+    private func recordActiveRestIfNeeded(now: Date = .now, notify: Bool = true) {
         _ = restTimer.completeForWriteback(now: now)
-        consumeRestCompletionIfNeeded()
+        consumeRestCompletionIfNeeded(notify: notify)
     }
 
     private var workoutSetIds: Set<UUID> {
         Set(workout.exercises.flatMap(\.sets).map(\.localId))
     }
 
-    private func consumeRestCompletionIfNeeded() {
+    private func consumeRestCompletionIfNeeded(notify: Bool = true) {
         guard let event = restTimer.consumeCompletionEvent(matching: workoutSetIds) else { return }
         guard let set = set(for: event.setId), set.completed else {
             continuedRestBaseBySet[event.setId] = nil
@@ -2803,15 +2736,15 @@ struct WorkoutLoggingView: View {
             continuedBaseSeconds: continuedBase,
             persistedActualRestSeconds: set.actualRestSeconds
         )
-        touch()
+        if notify { touch() }
     }
 
     /// 启动训练计时（幂等）：仅在尚未启动时落定 timerStartedAt。
     /// 触发来源：完成第一组（自动）或顶部「开始训练」按钮（手动）。
-    private func startTimerIfNeeded() {
+    private func startTimerIfNeeded(notify: Bool = true) {
         guard workout.timerStartedAt == nil else { return }
         workout.timerStartedAt = .now
-        touch()
+        if notify { touch() }
     }
 
     /// 结束训练（二次确认后调用）：先收束休息计时（FAB/弹窗/通知/灵动岛），
@@ -2890,23 +2823,22 @@ struct WorkoutLoggingView: View {
 
     /// 重算派生数据：PR 检测（命中弹庆祝）+ Team 自动分享偏好（默认仅自己可见）。
     private func recomputeDerived() {
-        let prs = WorkoutPerformanceMonitor.measure("finish.pr.detect") {
-            if historyStore.lastRefreshFinishedAt != nil {
-                workout.exercises.contains(where: \.isAssistedWeight)
-                    ? detectPersonalRecordsFromFallbackHistory()
-                    : detectPersonalRecords(in: workout, priorBestByKey: historyStore.bestWeightByExerciseKey)
-            } else {
-                detectPersonalRecordsFromFallbackHistory()
+        let generation = historyStore.sessionRevision
+        let summary = prSummary
+        let workoutId = workout.localId
+        // 在任何挂起前固定完成时的组、计划和已授予集合，后台回溯抢先写入也不吞掉本次庆祝。
+        if let input = badgeCompletionInput() {
+            Task { @MainActor in
+                await evaluateBadges(input: input, generation: generation, summary: summary)
             }
         }
-        lastDetectedRecords = prs
-        if !prs.isEmpty {
-            // 庆祝弹窗经 App 级 center 由 MainTabView 呈现：结束训练会触发导航把本页换成
-            // 只读详情页，若挂本页 sheet 会随本页销毁而一闪即逝（详见 PRCelebrationCenter）。
-            prCelebration.present(prs, summary: prSummary)
-        }
-        evaluateBadges()
         historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
+        Task { @MainActor in
+            guard await historyStore.waitUntilLoaded(), historyStore.sessionRevision == generation else { return }
+            let prs = historyStore.workoutRecords[workoutId] ?? []
+            lastDetectedRecords = prs
+            if !prs.isEmpty { prCelebration.present(prs, summary: summary) }
+        }
         let draft = TeamShareDraft(workout: workout)
         Task { @MainActor in
             await autoShareCompletedWorkout(draft)
@@ -2914,18 +2846,10 @@ struct WorkoutLoggingView: View {
         recordTeamPlanCompletionIfNeeded()
     }
 
-    private func evaluateBadges() {
+    private func badgeCompletionInput() -> (workout: BadgeWorkoutSnapshot, perfect: Bool, grants: Set<String>)? {
         let grantDescriptor = FetchDescriptor<BadgeGrant>()
         let existingGrants = (try? modelContext.fetch(grantDescriptor)) ?? []
         let currentGrants = Set(existingGrants.map(\.badgeCode))
-
-        let workoutDescriptor = FetchDescriptor<Workout>(
-            predicate: #Predicate { $0.deletedAt == nil }
-        )
-        let rawWorkouts = (try? modelContext.fetch(workoutDescriptor)) ?? []
-        let allFinished = rawWorkouts.filter { $0.endedAt != nil }
-
-        let currentWeight = WorkoutCaloriePreferences.current().bodyWeightKg
 
         var plan: WorkoutPlan? = nil
         if let planId = workout.planId {
@@ -2934,17 +2858,31 @@ struct WorkoutLoggingView: View {
             plan = (try? modelContext.fetch(planDescriptor))?.first
         }
 
-        let candidates = BadgeEngine.evaluateIncremental(
-            workout: workout,
-            allFinishedWorkouts: allFinished,
-            currentGrants: currentGrants,
-            currentWeight: currentWeight,
-            plan: plan
-        )
+        guard let current = BadgeEngine.snapshot(workout) else { return nil }
+        return (current, BadgeEngine.isPerfectPlanExecution(workout: workout, plan: plan), currentGrants)
+    }
 
+    private func evaluateBadges(input: (workout: BadgeWorkoutSnapshot, perfect: Bool, grants: Set<String>),
+                                generation: Int, summary: String) async {
+        let container = modelContext.container
+        let candidates: [BadgeGrantCandidate]
+        do {
+            let history = try await Task.detached(priority: .utility) {
+                try await BadgeHistoryReader(modelContainer: container).readWorkouts()
+            }.value
+            candidates = await Task.detached(priority: .utility) {
+                BadgeEngine.evaluateIncremental(workout: input.workout, allFinishedWorkouts: history,
+                                                currentGrants: input.grants, perfectPlanExecution: input.perfect)
+            }.value
+        } catch { return }
+        guard historyStore.sessionRevision == generation else { return }
+        // 后台回溯或同步可能已授予同一徽章，提交前按最新授予表去重。
+        let grantDescriptor = FetchDescriptor<BadgeGrant>()
+        let granted = Set(((try? modelContext.fetch(grantDescriptor)) ?? []).map(\.badgeCode))
+        let newCandidates = candidates.filter { !granted.contains($0.badgeCode) }
         guard !candidates.isEmpty else { return }
 
-        for candidate in candidates {
+        for candidate in newCandidates {
             let grant = BadgeGrant(
                 badgeCode: candidate.badgeCode,
                 unlockedAt: candidate.unlockedAt,
@@ -2955,7 +2893,7 @@ struct WorkoutLoggingView: View {
         }
         try? modelContext.save()
 
-        badgeCelebration.presentIncremental(candidates, workoutSummary: prSummary)
+        badgeCelebration.presentIncremental(candidates, workoutSummary: summary)
     }
 
     private func autoShareCompletedWorkout(_ draft: TeamShareDraft) async {
@@ -3002,23 +2940,6 @@ struct WorkoutLoggingView: View {
     private var posterPersonalRecords: [PersonalRecord] {
         if !lastDetectedRecords.isEmpty { return lastDetectedRecords }
         return historyStore.workoutRecords[workout.localId] ?? []
-    }
-
-    private func detectPersonalRecordsFromFallbackHistory() -> [PersonalRecord] {
-        let startedAt = workout.startedAt
-        let localId = workout.localId
-        var descriptor = FetchDescriptor<Workout>(
-            predicate: #Predicate {
-                $0.deletedAt == nil
-                && $0.endedAt != nil
-                && $0.startedAt < startedAt
-                && $0.localId != localId
-            },
-            sortBy: [SortDescriptor(\.startedAt, order: .forward)]
-        )
-        descriptor.fetchLimit = 1_000
-        let history = (try? modelContext.fetch(descriptor)) ?? []
-        return detectPersonalRecords(in: workout, history: history)
     }
 
     /// 高频修改统一入口：markDirty 同步（内存态/syncAll 读取即刻正确），
@@ -3137,6 +3058,10 @@ struct WorkoutLoggingView: View {
     // MARK: 自研键盘 · 按键
 
     private func keypadDigit(_ d: Int) {
+        WorkoutPerformanceMonitor.measure("workout.keypadDigit") { applyKeypadDigit(d) }
+    }
+
+    private func applyKeypadDigit(_ d: Int) {
         guard let cell = focused else { return }
         var b = pendingReplace ? "" : buffer
         pendingReplace = false
@@ -4809,6 +4734,7 @@ private struct SetRow: View {
         .frame(width: checkButtonSize)
         .padding(.leading, 4)   // 与次数框多留一点间距（HStack spacing 8 + 4 = 12）
         .accessibilityLabel(set.completed ? "\(rowName)已完成" : "标记\(rowName)完成")
+        .accessibilityIdentifier("workout.set.complete.\(set.setIndex)")
     }
 
     /// 组级「更多操作」⋯：打开父视图顶层菜单浮层（删除等组级操作的入口，便于后续扩展）。

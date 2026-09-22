@@ -1,0 +1,56 @@
+{
+  "workout.presentation.appear": {
+    "n": 11,
+    "min_ms": 157.086417,
+    "p95_ms": 335.908208,
+    "max_ms": 335.908208,
+    "main_threads": [
+      "true"
+    ]
+  },
+  "badge.read.values": {
+    "n": 11,
+    "min_ms": 0.345334,
+    "p95_ms": 2273.9555,
+    "max_ms": 2273.9555,
+    "main_threads": [
+      "false"
+    ]
+  },
+  "history.read.values": {
+    "n": 11,
+    "min_ms": 4.476208,
+    "p95_ms": 2363.772042,
+    "max_ms": 2363.772042,
+    "main_threads": [
+      "false"
+    ]
+  },
+  "history.project.values": {
+    "n": 11,
+    "min_ms": 1.4087500000000002,
+    "p95_ms": 179.713708,
+    "max_ms": 179.713708,
+    "main_threads": [
+      "false"
+    ]
+  },
+  "workout.completeSet": {
+    "n": 30,
+    "min_ms": 7.436458,
+    "p95_ms": 30.173083,
+    "max_ms": 38.517875,
+    "main_threads": [
+      "true"
+    ]
+  },
+  "audio.prepare": {
+    "n": 1,
+    "min_ms": 236.800417,
+    "p95_ms": 236.800417,
+    "max_ms": 236.800417,
+    "main_threads": [
+      "false"
+    ]
+  }
+}

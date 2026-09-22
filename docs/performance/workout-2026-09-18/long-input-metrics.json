@@ -1,0 +1,65 @@
+{
+  "workout.presentation.appear": {
+    "n": 1,
+    "min_ms": 385.29049999999995,
+    "p95_ms": 385.29049999999995,
+    "max_ms": 385.29049999999995,
+    "main_threads": [
+      "true"
+    ]
+  },
+  "badge.read.values": {
+    "n": 1,
+    "min_ms": 3990.798625,
+    "p95_ms": 3990.798625,
+    "max_ms": 3990.798625,
+    "main_threads": [
+      "false"
+    ]
+  },
+  "history.read.values": {
+    "n": 1,
+    "min_ms": 4088.0692910000002,
+    "p95_ms": 4088.0692910000002,
+    "max_ms": 4088.0692910000002,
+    "main_threads": [
+      "false"
+    ]
+  },
+  "history.project.values": {
+    "n": 1,
+    "min_ms": 267.264375,
+    "p95_ms": 267.264375,
+    "max_ms": 267.264375,
+    "main_threads": [
+      "false"
+    ]
+  },
+  "workout.keypadDigit": {
+    "n": 31,
+    "min_ms": 0.548417,
+    "p95_ms": 0.745791,
+    "max_ms": 1.0922079999999998,
+    "main_threads": [
+      "true"
+    ]
+  },
+  "workout.completeSet": {
+    "n": 1,
+    "min_ms": 30.509958,
+    "p95_ms": 30.509958,
+    "max_ms": 30.509958,
+    "main_threads": [
+      "true"
+    ]
+  },
+  "audio.prepare": {
+    "n": 1,
+    "min_ms": 228.173208,
+    "p95_ms": 228.173208,
+    "max_ms": 228.173208,
+    "main_threads": [
+      "false"
+    ]
+  }
+}

@@ -1675,6 +1675,17 @@ struct PlanDetailView: View {
 
     /// 单一活跃会话守卫：存在进行中会话时弹「继续 / 丢弃」，否则新建并进入。
     private func startWorkout() {
+        guard historyStore.isCurrent else {
+            Task { @MainActor in
+                guard await historyStore.waitUntilLoaded() else {
+                    strictStartError = "历史记录暂未就绪，请重试。"
+                    return
+                }
+                startWorkout()
+            }
+            return
+        }
+
         let brokenItems = PlanItem.unstartableItems(in: plan.items)
         guard brokenItems.isEmpty else {
             strictStartError = PlanItem.unstartableMessage(for: brokenItems)

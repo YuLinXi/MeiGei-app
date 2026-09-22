@@ -1,0 +1,113 @@
+PROFILE seeded history=10
+PROFILE profile.stats ms=0.036916579119861126
+PROFILE badge.read.start main=false
+PROFILE history.refresh ms=156.89720842055976
+[WorkoutHistoryStore] workouts=11 finished=10 active=1 pending=11 exercises=63 sets=240
+PROFILE badge.map.start main=true count=10
+PROFILE badge.map.end main=true ms=30.146125005558133
+PROFILE badge.read.end main=true ms=477.44670836254954
+[BadgeEngine] 存量回溯完成，已为老用户生成 6 枚荣誉勋章
+PROFILE profile.stats ms=0.033833435736596584
+PROFILE profile.audio ms=363.6399583192542
+PROFILE profile.complete ms=373.8142083166167
+PROFILE profile.save ms=24.910791660659015
+PROFILE profile.live ms=0.681250006891787
+PROFILE badge.read.start main=false
+PROFILE badge.map.start main=true count=10
+PROFILE badge.map.end main=true ms=43.5911666136235
+PROFILE badge.read.end main=true ms=81.55550004448742
+PROFILE profile.stats ms=0.034791650250554085
+PROFILE profile.stats ms=0.046916655264794827
+PROFILE profile.audio ms=0.018124934285879135
+PROFILE profile.complete ms=31.54050000011921
+PROFILE profile.save ms=2.6204166933894157
+PROFILE profile.live ms=0.7843333296477795
+PROFILE badge.read.start main=false
+PROFILE badge.map.start main=true count=10
+PROFILE badge.map.end main=true ms=38.48387498874217
+PROFILE badge.read.end main=true ms=60.45620841905475
+PROFILE profile.stats ms=0.38404169026762247
+PROFILE profile.stats ms=0.0330416951328516
+PROFILE profile.audio ms=0.004166620783507824
+PROFILE profile.complete ms=24.643374956212938
+PROFILE profile.save ms=4.264041665010154
+PROFILE profile.live ms=0.6010000361129642
+PROFILE badge.read.start main=false
+PROFILE badge.map.start main=true count=10
+PROFILE badge.map.end main=true ms=22.88929163478315
+PROFILE badge.read.end main=true ms=36.780208349227905
+PROFILE profile.stats ms=0.1993332989513874
+PROFILE profile.stats ms=0.03845838364213705
+PROFILE profile.stats ms=0.035125063732266426
+PROFILE profile.audio ms=0.6877083797007799
+PROFILE profile.complete ms=53.862666711211205
+PROFILE profile.save ms=8.223458309657872
+PROFILE profile.live ms=0.6361666601151228
+PROFILE badge.read.start main=false
+PROFILE badge.map.start main=true count=10
+PROFILE badge.map.end main=true ms=22.734625032171607
+PROFILE badge.read.end main=true ms=32.9245834145695
+PROFILE profile.stats ms=0.03875000402331352
+PROFILE profile.stats ms=0.039499951526522636
+PROFILE profile.stats ms=0.03112491685897112
+PROFILE profile.audio ms=0.008291681297123432
+PROFILE profile.complete ms=3.465250018052757
+PROFILE profile.stats ms=0.04283338785171509
+PROFILE profile.stats ms=0.04966673441231251
+PROFILE profile.stats ms=0.0342916464433074
+PROFILE profile.audio ms=0.003374996595084667
+PROFILE profile.complete ms=7.233333308249712
+PROFILE profile.stats ms=0.03420840948820114
+PROFILE profile.stats ms=0.03566662780940533
+PROFILE profile.stats ms=0.0330416951328516
+PROFILE profile.audio ms=0.003500026650726795
+PROFILE profile.complete ms=7.128375000320375
+PROFILE profile.stats ms=0.03650004509836435
+PROFILE profile.stats ms=0.03724999260157347
+PROFILE profile.stats ms=0.037375022657215595
+PROFILE profile.audio ms=0.00500003807246685
+PROFILE profile.complete ms=7.682291558012366
+PROFILE profile.stats ms=0.03600004129111767
+PROFILE profile.stats ms=0.04008330870419741
+PROFILE profile.stats ms=0.033791642636060715
+PROFILE profile.audio ms=0.004166737198829651
+PROFILE profile.complete ms=7.233166717924178
+PROFILE profile.stats ms=0.032625044696033
+PROFILE profile.stats ms=0.026166671887040138
+PROFILE profile.stats ms=0.03270828165113926
+PROFILE profile.audio ms=0.0037084100767970085
+PROFILE profile.complete ms=12.056958279572427
+PROFILE profile.stats ms=0.02620834857225418
+PROFILE profile.stats ms=0.03362505231052637
+PROFILE profile.stats ms=0.02645829226821661
+PROFILE profile.audio ms=0.003625056706368923
+PROFILE profile.complete ms=11.987750069238245
+PROFILE profile.stats ms=0.02633337862789631
+PROFILE profile.stats ms=0.030791619792580605
+PROFILE profile.stats ms=0.02687494270503521
+PROFILE profile.audio ms=0.003541586920619011
+PROFILE profile.complete ms=7.295749965123832
+PROFILE profile.stats ms=0.027791596949100494
+PROFILE profile.stats ms=0.02904166467487812
+PROFILE profile.stats ms=0.026958296075463295
+PROFILE profile.audio ms=0.003166729584336281
+PROFILE profile.complete ms=11.093833367340267
+PROFILE profile.stats ms=0.03183330409228802
+PROFILE profile.stats ms=0.02987496554851532
+PROFILE profile.stats ms=0.02720835618674755
+PROFILE profile.audio ms=0.0034583499655127525
+PROFILE profile.complete ms=6.852458231151104
+PROFILE profile.stats ms=0.029374961741268635
+PROFILE profile.stats ms=0.030249939300119877
+PROFILE profile.audio ms=0.0035832636058330536
+PROFILE profile.complete ms=6.829291698522866
+PROFILE profile.stats ms=0.032499898225069046
+PROFILE profile.stats ms=0.0323333078995347
+PROFILE profile.stats ms=0.027541653253138065
+PROFILE profile.audio ms=0.003791647031903267
+PROFILE profile.complete ms=6.359166698530316
+PROFILE profile.stats ms=0.031000003218650818
+PROFILE profile.stats ms=0.03070826642215252
+PROFILE profile.stats ms=0.02720835618674755
+PROFILE profile.audio ms=0.003291759639978409
+PROFILE profile.complete ms=10.967458365485072

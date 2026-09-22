@@ -4,42 +4,36 @@
   "status": "approved-master",
   "tool": "Codex built-in imagegen",
   "model": "not exposed by built-in tool",
-  "generatedAt": "2026-07-25T19:42:28.387Z",
+  "generatedAt": "2026-09-21T13:45:01.133Z",
   "promptPath": "art/exercise-static/briefs/CHEST_SUPPORTED_T_BAR_ROW.json",
   "briefPath": "art/exercise-static/briefs/CHEST_SUPPORTED_T_BAR_ROW.json",
   "inputs": [
     {
       "kind": "original-text",
       "source": "art/exercise-static/briefs/CHEST_SUPPORTED_T_BAR_ROW.json",
-      "sha256": "11b3a831339e73fe2ddfd4eb6e4f48e0a7828df5b3ebaced04348af7303564da",
+      "sha256": "2d19a1e6228d15b1be9d720a7ab2a01525b913fc92e11df17311f9d491cea098",
       "rightsBasis": "本项目原创动作与器械 brief"
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/candidates/CHEST_SUPPORTED_T_BAR_ROW/CHEST_SUPPORTED_T_BAR_ROW-candidate-01.png",
-      "sha256": "0a9d71bb055c0fd421cae3a8e3876e2ea87af0ec0c1e6c44b99dc92974b7d52a",
+      "source": "art/exercise-static/candidates/CHEST_SUPPORTED_T_BAR_ROW/CHEST_SUPPORTED_T_BAR_ROW-candidate-02.png",
+      "sha256": "435750ac661464ccbfcb866892ecde4d21a183ce32ae83cf83fcc8c0137e5e4b",
       "rightsBasis": "本项目 imagegen 生成候选；候选目录由 Git 忽略"
     },
     {
       "kind": "owned-reference",
-      "source": "art/exercise-static/references/approved/character-v1.png",
-      "sha256": "78005e64d8d35fe19fd15076367ae21865d0b5eeb2208bd5e276c05bd840d590",
-      "rightsBasis": "本项目已批准的原创统一角色母版"
-    },
-    {
-      "kind": "owned-reference",
-      "source": "art/exercise-static/references/approved/style-v1.png",
-      "sha256": "2b5d5158559ee71953eeb57cc88b7a427c2bbcf9d3b77cc9f73a491888376ec0",
-      "rightsBasis": "本项目已批准的原创风格母版"
+      "source": "已按用户要求删除的本项目 CABLE_Y_LATERAL_RAISE-candidate-05.png",
+      "sha256": "0527edc088b862e6f9709c8cb163b3f7f889c7635a16bbaad0cf736861d609e1",
+      "rightsBasis": "实际生成输入为项目自有前序候选，仅延续人物和画风；character-v1/style-v1 当时为 LFS 指针，未作为图片输入。原候选已删除，仅保留来源摘要。"
     }
   ],
   "humanEdits": "无手工像素编辑。",
   "file": "art/exercise-static/masters/approved/CHEST_SUPPORTED_T_BAR_ROW-v1.png",
   "pixelWidth": 1254,
   "pixelHeight": 1254,
-  "sizeBytes": 1748824,
-  "sha256": "0a9d71bb055c0fd421cae3a8e3876e2ea87af0ec0c1e6c44b99dc92974b7d52a",
+  "sizeBytes": 1922413,
+  "sha256": "435750ac661464ccbfcb866892ecde4d21a183ce32ae83cf83fcc8c0137e5e4b",
   "reviewRecord": "art/exercise-static/reviews/CHEST_SUPPORTED_T_BAR_ROW-review.json",
-  "approvedAt": "2026-07-25T19:42:28.387Z",
-  "reviewerId": "production-autopilot"
+  "approvedAt": "2026-09-21T13:45:01.133Z",
+  "reviewerId": "project-owner"
 }

@@ -2091,6 +2091,17 @@ struct TeamPlansView: View {
     }
 
     private func start(_ p: TeamPlanShareCardDTO) {
+        guard historyStore.isCurrent else {
+            Task { @MainActor in
+                guard await historyStore.waitUntilLoaded() else {
+                    error = "历史记录暂未就绪，请重试。"
+                    return
+                }
+                start(p)
+            }
+            return
+        }
+
         let items = p.decodedItems
         let brokenItems = PlanItem.unstartableItems(in: items)
         guard brokenItems.isEmpty else {

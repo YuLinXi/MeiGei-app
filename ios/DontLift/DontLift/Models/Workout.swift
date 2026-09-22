@@ -76,7 +76,7 @@ nonisolated final class Workout: Syncable {
     }
 }
 
-enum WorkoutUnitKind: String, Codable, Hashable {
+nonisolated enum WorkoutUnitKind: String, Codable, Hashable {
     case singleExercise
     case dropSet
     case superset
@@ -510,7 +510,7 @@ nonisolated struct WorkoutSetSegment: Codable, Hashable, Identifiable, Sendable 
     }
 }
 
-struct WorkoutSetStatEntry: Equatable, Hashable {
+nonisolated struct WorkoutSetStatEntry: Equatable, Hashable , Sendable {
     var setId: UUID
     var segmentId: UUID?
     var weightKg: Double?

@@ -130,13 +130,28 @@ final class BadgeWallStore {
 
     func saved(_ notification: Notification) {
         guard let source = notification.object as? ModelContext, source === context else { return }
-        let keys: [ModelContext.NotificationKey] = [.insertedIdentifiers, .updatedIdentifiers, .deletedIdentifiers]
-        let names = Set(keys.flatMap { key -> [PersistentIdentifier] in
+        func identifiers(_ key: ModelContext.NotificationKey) -> [PersistentIdentifier] {
             (notification.userInfo?[key.rawValue] as? [PersistentIdentifier]) ?? []
-        }.map(\.entityName))
-        if !names.isDisjoint(with: ["Workout", "WorkoutExercise", "WorkoutSet", "WorkoutPlan"]) {
+        }
+        let changed = identifiers(.insertedIdentifiers) + identifiers(.updatedIdentifiers)
+        let deleted = identifiers(.deletedIdentifiers)
+        let historyNames: Set<String> = ["Workout", "WorkoutExercise", "WorkoutSet", "WorkoutPlan"]
+        // 删除后归属可能已不可读，保守失效；其余只按变更标识查所属训练，不扫描历史。
+        let historyChanged = deleted.contains { historyNames.contains($0.entityName) } || changed.contains { id in
+            guard historyNames.contains(id.entityName) else { return false }
+            let workout: Workout?
+            switch id.entityName {
+            case "Workout": workout = source.model(for: id) as? Workout
+            case "WorkoutExercise": workout = (source.model(for: id) as? WorkoutExercise)?.workout
+            case "WorkoutSet": workout = (source.model(for: id) as? WorkoutSet)?.exercise?.workout
+            default: return true
+            }
+            guard let workout else { return true }
+            return workout.endedAt != nil || workout.deletedAt != nil
+        }
+        if historyChanged {
             invalidate()
-        } else if names.contains("BadgeGrant"), !isBackfilling {
+        } else if (changed + deleted).contains(where: { $0.entityName == "BadgeGrant" }), !isBackfilling {
             invalidate(historyChanged: false)
         }
     }

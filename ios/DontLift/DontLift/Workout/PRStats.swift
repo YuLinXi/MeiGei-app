@@ -1,7 +1,7 @@
 import Foundation
 
 /// 单个动作的 PR 摘要。
-struct PRSummary: Equatable {
+nonisolated struct PRSummary: Equatable , Sendable {
     let exerciseKey: String
     let weightKg: Double
     let reps: Int

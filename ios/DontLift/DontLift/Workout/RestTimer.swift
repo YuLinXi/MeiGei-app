@@ -1,4 +1,3 @@
-import AVFoundation
 import Foundation
 import os.log
 import SwiftUI
@@ -85,10 +84,7 @@ final class RestTimerController {
     private var startedAt: Date?
     /// 当前休息是否经历过后台；用于避免后台通知已响后回前台再补播 App 内声音。
     private var backgroundedDuringCurrentRest = false
-    /// 提醒音效播放器（懒加载并预备，复用同一实例）。
-    private var audioPlayer: AVAudioPlayer?
-    /// 提醒音播放后延迟释放 audio session 的任务；新一轮播放前必须取消旧任务。
-    private var audioSessionReleaseTask: Task<Void, Never>?
+    @ObservationIgnored private let audio = RestAudioExecutor()
     private static let durationKey = "dontlift.rest.defaultDuration"
     private static let hapticsKey = "dontlift.rest.hapticsEnabled"
     private static let soundKey = "dontlift.rest.soundEnabled"
@@ -236,8 +232,7 @@ final class RestTimerController {
         activeSetId = nil
         startedAt = nil
         backgroundedDuringCurrentRest = false
-        audioSessionReleaseTask?.cancel()
-        audioSessionReleaseTask = nil
+        stopEndSound()
         // isExpanded 不在此清，交给根层 onChange(isRunning) 动画收起，保证渐隐。
     }
 
@@ -282,43 +277,15 @@ final class RestTimerController {
     /// 前台播放一声休息结束提醒音：`AVAudioSession.playback` + duck，无视静音键、瞬时压低背景音乐。
     private func playEndSound() {
         guard soundEnabled else { return }
-        audioSessionReleaseTask?.cancel()
-        audioSessionReleaseTask = nil
-        prepareEndSound()
-        audioPlayer?.volume = 1.0
-        audioPlayer?.prepareToPlay()
-        guard let player = audioPlayer else { return }
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, options: [.duckOthers, .mixWithOthers])
-        try? session.setActive(true)
-        player.currentTime = 0
-        player.play()
-        // 播完释放会话，让被 duck 的用户音乐恢复（不常驻激活）。
-        let releaseAfter = player.duration + 0.3
-        audioSessionReleaseTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(releaseAfter))
-            guard !Task.isCancelled else { return }
-            self?.audioSessionReleaseTask = nil
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        }
+        audio.play()
     }
 
-    /// 休息开始时预加载提示音，避免到点首次解码造成延迟。
     private func prepareEndSound() {
-        if audioPlayer == nil,
-           let url = Bundle.main.url(forResource: "rest_complete", withExtension: "caf") {
-            audioPlayer = try? AVAudioPlayer(contentsOf: url)
-        }
-        audioPlayer?.volume = 1.0
-        audioPlayer?.prepareToPlay()
+        if soundEnabled { audio.prepare() }
     }
 
     private func stopEndSound() {
-        audioSessionReleaseTask?.cancel()
-        audioSessionReleaseTask = nil
-        audioPlayer?.stop()
-        audioPlayer?.currentTime = 0
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        audio.stop()
     }
 
     private func rescheduleCurrentRestNotificationIfNeeded() {

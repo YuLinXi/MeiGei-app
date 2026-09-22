@@ -5,10 +5,18 @@ import SwiftUI
 final class WorkoutPresentationCenter {
     var presentedWorkout: Workout?
     var isExpanded = false
+    @ObservationIgnored private var presentationStartedAt: ContinuousClock.Instant?
 
     func present(_ workout: Workout) {
+        presentationStartedAt = .now
         presentedWorkout = workout
         isExpanded = true
+    }
+
+    func didAppear() {
+        guard let start = presentationStartedAt else { return }
+        WorkoutPerformanceMonitor.record("workout.presentation.appear", since: start)
+        presentationStartedAt = nil
     }
 
     func minimize() {

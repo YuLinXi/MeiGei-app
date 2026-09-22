@@ -183,6 +183,11 @@ final class WorkoutLiveActivityController {
     private func upsert(attributes: RestActivityAttributes,
                         state: RestActivityAttributes.ContentState,
                         staleDate: Date?) {
+        if activity != nil,
+           currentAttributes?.workoutId == attributes.workoutId,
+           currentAttributes?.workoutTitle == attributes.workoutTitle,
+           currentAttributes?.startedAt == attributes.startedAt,
+           currentState == state { return }
         currentAttributes = attributes
         currentState = state
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }

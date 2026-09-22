@@ -78,6 +78,8 @@ struct DontLiftApp: App {
                 .environment(badgeWallStore)
                 .preferredColorScheme(.light)
                 .onChange(of: session.currentUserId, initial: true) { _, userId in
+                    historyStore.reset()
+                    if userId == nil { restTimer.stop() }
                     badgeWallStore.configure(context: modelContainer.mainContext, userId: userId)
                 }
                 .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { notification in
