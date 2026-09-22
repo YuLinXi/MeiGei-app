@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "exerciseCode": "CHEST_SUPPORTED_T_BAR_ROW",
-  "candidateId": "CHEST_SUPPORTED_T_BAR_ROW-candidate-01",
+  "candidateId": "CHEST_SUPPORTED_T_BAR_ROW-candidate-02",
   "masterPath": "art/exercise-static/masters/approved/CHEST_SUPPORTED_T_BAR_ROW-v1.png",
-  "masterSha256": "0a9d71bb055c0fd421cae3a8e3876e2ea87af0ec0c1e6c44b99dc92974b7d52a",
+  "masterSha256": "435750ac661464ccbfcb866892ecde4d21a183ce32ae83cf83fcc8c0137e5e4b",
   "reviews": {
     "identity": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T19:42:28.387Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-09-21T13:45:01.133Z",
       "evidence": [
         "art/exercise-static/references/approved/character-v1.png",
         "art/exercise-static/masters/approved/CHEST_SUPPORTED_T_BAR_ROW-v1.png"
@@ -17,8 +17,8 @@
     },
     "art": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T19:42:28.387Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-09-21T13:45:01.133Z",
       "evidence": [
         "art/exercise-static/references/approved/style-v1.png",
         "art/exercise-static/masters/approved/CHEST_SUPPORTED_T_BAR_ROW-v1.png"
@@ -27,8 +27,8 @@
     },
     "movement": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T19:42:28.387Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-09-21T13:45:01.133Z",
       "evidence": [
         "art/exercise-static/briefs/CHEST_SUPPORTED_T_BAR_ROW.json",
         "art/exercise-static/masters/approved/CHEST_SUPPORTED_T_BAR_ROW-v1.png"
@@ -37,8 +37,8 @@
     },
     "equipment": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T19:42:28.387Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-09-21T13:45:01.133Z",
       "evidence": [
         "art/exercise-static/briefs/CHEST_SUPPORTED_T_BAR_ROW.json",
         "art/exercise-static/masters/approved/CHEST_SUPPORTED_T_BAR_ROW-v1.png"
@@ -47,14 +47,14 @@
     },
     "rights": {
       "status": "approved",
-      "reviewerId": "production-autopilot",
-      "reviewedAt": "2026-07-25T19:42:28.387Z",
+      "reviewerId": "project-owner",
+      "reviewedAt": "2026-09-21T13:45:01.133Z",
       "evidence": [
         "art/exercise-static/reviews/input-policy-v1.md",
         "art/exercise-static/reviews/openai-imagegen-terms-2026-07-24.md",
         "art/exercise-static/masters/approved/CHEST_SUPPORTED_T_BAR_ROW-v1.provenance.json"
       ],
-      "notes": "仅使用原创 brief、character-v1、style-v1 和本项目 imagegen 生成链，未使用第三方图片。"
+      "notes": "使用原创 brief 和本项目自有前序候选延续人物画风，未使用第三方图片；实际输入及已删除候选摘要见 provenance，character-v1/style-v1 未作为图片输入。"
     }
   }
 }

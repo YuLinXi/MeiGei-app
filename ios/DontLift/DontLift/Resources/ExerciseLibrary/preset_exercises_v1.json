@@ -3781,6 +3781,74 @@
       "formCues": [],
       "source": "preset-v1",
       "order": 225
+    },
+    {
+      "code": "CABLE_Y_LATERAL_RAISE",
+      "name": "Y字侧平举",
+      "category": "肩",
+      "subcategory": "中束",
+      "equipmentType": "绳索",
+      "primaryRegions": [
+        "deltSide"
+      ],
+      "secondaryRegions": [
+        "traps",
+        "deltFront"
+      ],
+      "note": "调研新增，兼容“Y字绳索侧平举”",
+      "formCues": [
+        "将器械出绳点调整至腰部高度，单手直接握住绳头",
+        "工作臂沿斜上方抬起，肘部保持轻微屈曲",
+        "控制回落，保持躯干稳定，避免摆动借力"
+      ],
+      "source": "preset-v1",
+      "order": 226
+    },
+    {
+      "code": "MACHINE_HANDLE_LATERAL_RAISE",
+      "name": "单侧器械侧平举",
+      "category": "肩",
+      "subcategory": "中束",
+      "equipmentType": "器械",
+      "primaryRegions": [
+        "deltSide"
+      ],
+      "secondaryRegions": [
+        "deltFront",
+        "deltRear",
+        "traps"
+      ],
+      "note": "调研新增，兼容“器械把手侧平举”",
+      "formCues": [
+        "坐稳并让背部贴住靠垫，单侧独立把手从身体侧方抬至肩高",
+        "非工作侧保持稳定，肘部与手腕保持自然中立",
+        "控制回落，避免耸肩或躯干侧倾"
+      ],
+      "source": "preset-v1",
+      "order": 227
+    },
+    {
+      "code": "MACHINE_LOW_ROW",
+      "name": "低位坐姿划船机",
+      "category": "背",
+      "subcategory": null,
+      "equipmentType": "器械",
+      "primaryRegions": [
+        "lats",
+        "rhomboids"
+      ],
+      "secondaryRegions": [
+        "biceps",
+        "deltRear"
+      ],
+      "note": "调研新增，独立于绳索坐姿划船和高位器械划船",
+      "formCues": [
+        "坐在低位划船机上，胸部或躯干贴合支撑垫，双脚抵住脚踏",
+        "双手中立握独立把手，将肘部沿身体两侧拉向下肋",
+        "肩胛骨后缩后控制回放，保持躯干稳定"
+      ],
+      "source": "preset-v1",
+      "order": 228
     }
   ]
 }

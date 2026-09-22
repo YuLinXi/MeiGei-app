@@ -162,6 +162,7 @@ extension BuiltinExercise {
             .init(code: "CLOSE_GRIP_PULLDOWN", name: "窄握把手下拉", category: "背", subcategory: "背阔", equipmentType: "自重"),
             .init(code: "NEUTRAL_GRIP_PULLDOWN", name: "对握高位下拉", category: "背", subcategory: "背阔", equipmentType: "自重"),
             .init(code: "MACHINE_PLATE_ROW", name: "挂片器划船", category: "背", subcategory: "中背", equipmentType: "器械"),
+            .init(code: "MACHINE_LOW_ROW", name: "低位坐姿划船机", category: "背", subcategory: "中背", equipmentType: "器械"),
             .init(code: "CABLE_SINGLE_ARM_ROW", name: "绳索单边俯身划船", category: "背", subcategory: "中背", equipmentType: "绳索"),
             .init(code: "SEATED_ISOMETRIC_PULL_UP", name: "坐姿等长引体", category: "背", subcategory: "背阔", equipmentType: "自重"),
             .init(code: "BAND_KNEELING_ROW", name: "跪姿弹力带划船", category: "背", subcategory: "中背", equipmentType: "弹力带"),
@@ -219,7 +220,7 @@ extension BuiltinExercise {
         // MARK: 肩（导入 38）
         [
             .init(code: "HAMMER_LATERAL_RAISE", name: "悍马机侧平举", category: "肩", subcategory: "中束", equipmentType: "悍马机"),
-            .init(code: "MACHINE_HANDLE_LATERAL_RAISE", name: "器械把手侧平举", category: "肩", subcategory: "中束", equipmentType: "器械"),
+            .init(code: "MACHINE_HANDLE_LATERAL_RAISE", name: "单侧器械侧平举", category: "肩", subcategory: "中束", equipmentType: "器械"),
             .init(code: "HAMMER_REAR_DELT_RAISE", name: "悍马机半俯身侧平举", category: "肩", subcategory: "后束", equipmentType: "悍马机"),
             .init(code: "INCLINE_DB_HAMMER_PRESS", name: "上斜哑铃锤式推举", category: "肩", subcategory: "前束", equipmentType: "哑铃"),
             .init(code: "SCAPULAR_FLEXION", name: "肩胛屈伸", category: "肩", subcategory: "前束", equipmentType: "自重"),
@@ -242,7 +243,7 @@ extension BuiltinExercise {
             .init(code: "BAND_FRONT_RAISE", name: "弹力带-前平举", category: "肩", subcategory: "前束", equipmentType: "弹力带"),
             .init(code: "BAND_LATERAL_RAISE", name: "弹力带-侧平举", category: "肩", subcategory: "中束", equipmentType: "弹力带"),
             .init(code: "TOWEL_LATERAL_RAISE", name: "毛巾侧平举", category: "肩", subcategory: "中束", equipmentType: "自重"),
-            .init(code: "CABLE_Y_LATERAL_RAISE", name: "Y字绳索侧平举", category: "肩", subcategory: "中束", equipmentType: "绳索"),
+            .init(code: "CABLE_Y_LATERAL_RAISE", name: "Y字侧平举", category: "肩", subcategory: "中束", equipmentType: "绳索"),
             .init(code: "BAND_STANDING_LATERAL_RAISE", name: "弹力带_绳索_站姿侧平举", category: "肩", subcategory: "中束", equipmentType: "弹力带"),
             .init(code: "BAND_STANDING_FACE_PULL", name: "弹力带站姿面拉", category: "肩", subcategory: "后束", equipmentType: "弹力带"),
             .init(code: "KB_ARNOLD_PRESS", name: "壶铃阿诺德推举", category: "肩", subcategory: "前束", equipmentType: "壶铃"),

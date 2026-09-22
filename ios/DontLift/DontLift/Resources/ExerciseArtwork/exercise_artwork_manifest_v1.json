@@ -1158,10 +1158,10 @@
     },
     "CHEST_SUPPORTED_T_BAR_ROW": {
       "file": "exercise_CHEST_SUPPORTED_T_BAR_ROW.jpg",
-      "sha256": "4d190ec63eb6f08be04cc6ec42effea8fa27c764c1ab001b021592eeb93e9e50",
+      "sha256": "a0a8d5d430d164f9a25fc4d9004ffe208981eaf2664d17fef0d1ff440fb96b0a",
       "pixelWidth": 288,
       "pixelHeight": 288,
-      "sizeBytes": 15599
+      "sizeBytes": 23136
     },
     "CLAMSHELL": {
       "file": "exercise_CLAMSHELL.jpg",

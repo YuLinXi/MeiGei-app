@@ -447,6 +447,52 @@
       "requiresNameMatch": false
     },
     {
+      "targetCode": "CABLE_Y_LATERAL_RAISE",
+      "targetName": "Y字侧平举",
+      "legacyCodes": [
+        "CABLE_Y_LATERAL_RAISE"
+      ],
+      "legacyNames": [
+        "Y字绳索侧平举",
+        "Y 字绳索侧平举"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "MACHINE_HANDLE_LATERAL_RAISE",
+      "targetName": "单侧器械侧平举",
+      "legacyCodes": [
+        "MACHINE_HANDLE_LATERAL_RAISE"
+      ],
+      "legacyNames": [
+        "器械把手侧平举"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "MACHINE_LOW_ROW",
+      "targetName": "低位坐姿划船机",
+      "legacyCodes": [],
+      "legacyNames": [
+        "低位坐姿器械划船",
+        "低位划船机",
+        "低位坐姿划船"
+      ],
+      "requiresNameMatch": false
+    },
+    {
+      "targetCode": "CHEST_SUPPORTED_T_BAR_ROW",
+      "targetName": "胸托 T 杠划船",
+      "legacyCodes": [
+        "CHEST_SUPPORTED_T_BAR_ROW"
+      ],
+      "legacyNames": [
+        "胸托T杆划船",
+        "胸托 T 杆划船"
+      ],
+      "requiresNameMatch": false
+    },
+    {
       "targetCode": "SINGLE_ARM_HAMMER_ROW",
       "targetName": "单臂悍马机划船",
       "legacyCodes": [
