@@ -15,21 +15,33 @@ enum SyncDomain: String, CaseIterable {
 
     /// 上次成功 pull 的服务端时间，作为下次增量 since。
     var since: Date? {
-        get {
-            guard let s = UserDefaults.standard.string(forKey: watermarkKey) else { return nil }
-            return JSONCoding.date(from: s)
-        }
-        nonmutating set {
-            if let newValue {
-                UserDefaults.standard.set(JSONCoding.string(from: newValue), forKey: watermarkKey)
-            } else {
-                UserDefaults.standard.removeObject(forKey: watermarkKey)
-            }
+        get { watermark(in: .standard) }
+        nonmutating set { setWatermark(newValue, in: .standard) }
+    }
+
+    func watermark(in defaults: UserDefaults) -> Date? {
+        guard let value = defaults.string(forKey: watermarkKey) else { return nil }
+        return JSONCoding.date(from: value)
+    }
+
+    func setWatermark(_ value: Date?, in defaults: UserDefaults) {
+        if let value {
+            defaults.set(JSONCoding.string(from: value), forKey: watermarkKey)
+        } else {
+            defaults.removeObject(forKey: watermarkKey)
         }
     }
 
     static func resetAllWatermarks() {
         allCases.forEach { $0.since = nil }
+    }
+
+    /// 增量水位只对产生它的本地库有效；新库／重建库必须先全量拉取，不能沿用偏好中的旧水位。
+    static func prepareWatermarks(for storeIdentity: String, in defaults: UserDefaults) {
+        let key = "sync.local-store-identity"
+        guard defaults.string(forKey: key) != storeIdentity else { return }
+        allCases.forEach { $0.setWatermark(nil, in: defaults) }
+        defaults.set(storeIdentity, forKey: key)
     }
 }
 

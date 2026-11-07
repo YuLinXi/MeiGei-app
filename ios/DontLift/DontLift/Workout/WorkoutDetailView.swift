@@ -13,11 +13,14 @@ struct WorkoutDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(WorkoutHistoryStore.self) private var historyStore
+    @Environment(GlobalMessageCenter.self) private var globalMessage
     @Bindable var workout: Workout
 
     @State private var confirmingDelete = false
     @State private var fallbackRecords: [PersonalRecord]?
     @State private var showingPosterPreview = false
+    /// 「另存为个人计划」表单初始值：点击入口时生成一次，表单关闭后清空。
+    @State private var saveAsPlanSeed: PlanEditorSeed?
 
     private static let weekdayFormatter: DateFormatter = {
         let fmt = DateFormatter()
@@ -103,6 +106,20 @@ struct WorkoutDetailView: View {
         .sheet(isPresented: $showingPosterPreview) {
             WorkoutPosterPreviewSheet(workout: workout, personalRecords: personalRecords)
         }
+        // 复用普通新建计划表单：只创建新计划，不改原训练（不改名、不标脏）。
+        .navigationDestination(item: $saveAsPlanSeed) { seed in
+            PlanEditorView(plan: nil,
+                           seed: seed,
+                           canCreate: { canSaveSourceAsPlan },
+                           onCreated: { plan in
+                               globalMessage.show("已保存为「\(plan.name)」", style: .success)
+                           })
+            #if DEBUG
+            .onAppear {
+                UITestHooks.invalidateHistorySaveSourceIfNeeded(workout, context: modelContext)
+            }
+            #endif
+        }
         .task(id: workout.localId) {
             WorkoutPerformanceMonitor.event("workout.detail.appear")
             if historyStore.workoutRecords[workout.localId] == nil {
@@ -114,14 +131,27 @@ struct WorkoutDetailView: View {
     }
 
     private var detailMenuItems: [PaperMenuItem] {
-        [
+        var items = [
             PaperMenuItem(title: "分享训练海报", systemImage: "square.and.arrow.up") {
                 showingPosterPreview = true
-            },
-            PaperMenuItem(title: "删除训练", systemImage: "trash", role: .destructive) {
-                confirmingDelete = true
             }
         ]
+        // 没有可转换正式组的训练不提供另存入口。
+        if canSaveSourceAsPlan {
+            items.append(PaperMenuItem(title: "另存为个人计划", systemImage: "square.and.arrow.down") {
+                guard canSaveSourceAsPlan else { return }
+                saveAsPlanSeed = workout.personalPlanSeed()
+            })
+        }
+        items.append(PaperMenuItem(title: "删除训练", systemImage: "trash", role: .destructive) {
+            confirmingDelete = true
+        })
+        return items
+    }
+
+    /// 原训练仍可另存：未从 context 移除、已完成未软删且有可转换内容。展示入口与保存前都会检查。
+    private var canSaveSourceAsPlan: Bool {
+        !workout.isDeleted && workout.modelContext != nil && workout.canSaveAsPersonalPlanFromHistory
     }
 
     // MARK: 完成头卡（替换记录中 REC 计时条）

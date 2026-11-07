@@ -224,6 +224,213 @@ final class DontLiftUITests: XCTestCase {
         XCTAssertFalse(app.buttons["标记第 2 组完成"].exists)
     }
 
+    // MARK: 历史训练另存为个人计划
+    // 样例由 UITestHooks.seedHistorySaveSamplesIfNeeded 写入假登录的独立 WorkoutUITests.store，不触发同步。
+
+    /// 首页「本周训练」→ 历史详情 → ⋯ → 另存为个人计划：预填、默认模式、取消不新增、改名选分组后保存。
+    @MainActor
+    func testHomeHistoryWorkoutSavesAsPersonalPlan() throws {
+        let app = launchHistorySaveApp()
+
+        // 只有热身组的训练不提供另存入口。
+        let warmRow = historyRow("UI 另存热身", in: app)
+        XCTAssertTrue(waitForElementWithRelaunch(warmRow, in: app), "首页应展示只有热身组的样例")
+        warmRow.tap()
+        let more = app.buttons["训练更多操作"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap()
+        XCTAssertTrue(app.buttons["分享训练海报"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["另存为个人计划"].exists, "无有效正式组时不应提供另存入口")
+        more.tap()
+        tapNavigationBack(in: app)
+
+        let row = historyRow("UI 另存胸背", in: app)
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.tap()
+        openSaveAsPersonalPlan(in: app)
+
+        // 预填名称／整体备注；默认自适应、未分组。
+        let nameField = app.textFields.firstMatch
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        XCTAssertEqual(nameField.value as? String, "UI 另存胸背")
+        XCTAssertEqual(app.textViews["计划备注输入框"].value as? String, "UI 另存备注")
+        XCTAssertTrue(app.buttons["自适应模式"].isSelected)
+        XCTAssertFalse(app.buttons["严格模式"].isSelected)
+        XCTAssertEqual(app.buttons["选择分组"].value as? String, "未分组")
+
+        // 改分组后取消：不创建计划（稍后分组计数仍只有保存的一份）。
+        chooseGroup("UI 另存分组", in: app)
+        tapNavigationBack(in: app)
+        XCTAssertTrue(app.buttons["训练更多操作"].waitForExistence(timeout: 5), "取消后应回到历史详情")
+
+        // 再次打开：改名、选分组、保存。
+        openSaveAsPersonalPlan(in: app)
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        XCTAssertEqual(nameField.value as? String, "UI 另存胸背", "重新打开应重新预填")
+        replaceText(in: nameField, with: "UI 另存进阶")
+        chooseGroup("UI 另存分组", in: app)
+        app.buttons["保存"].tap()
+
+        XCTAssertTrue(app.buttons["训练更多操作"].waitForExistence(timeout: 5), "保存成功后应回到历史详情")
+        XCTAssertTrue(app.staticTexts["UI 另存胸背"].exists, "原训练名称保持不变")
+        XCTAssertFalse(app.staticTexts["UI 另存进阶"].exists)
+
+        // 计划列表：所选分组下只有本次保存的一份。
+        tapNavigationBack(in: app)
+        app.tabBars.buttons["计划"].tap()
+        let groupHeader = app.buttons["展开UI 另存分组"]
+        XCTAssertTrue(groupHeader.waitForExistence(timeout: 10))
+        XCTAssertEqual(groupHeader.value as? String, "1 个计划")
+        groupHeader.tap()
+        XCTAssertTrue(app.buttons["打开计划UI 另存进阶"].waitForExistence(timeout: 5))
+    }
+
+    /// 历史日历 → 当天训练详情 → ⋯ → 另存为个人计划：与首页一致，默认名称直接保存到未分组。
+    @MainActor
+    func testCalendarHistoryWorkoutSavesAsPersonalPlan() throws {
+        let app = launchHistorySaveApp()
+
+        let calendarButton = app.buttons["历史日历"]
+        XCTAssertTrue(waitForElementWithRelaunch(calendarButton, in: app))
+        calendarButton.tap()
+        let row = historyRow("UI 另存胸背", in: app)
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "日历默认选中今天，应展示当天样例")
+        row.tap()
+        openSaveAsPersonalPlan(in: app)
+
+        let nameField = app.textFields.firstMatch
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        XCTAssertEqual(nameField.value as? String, "UI 另存胸背")
+        XCTAssertTrue(app.buttons["自适应模式"].isSelected)
+        app.buttons["保存"].tap()
+
+        XCTAssertTrue(app.buttons["训练更多操作"].waitForExistence(timeout: 5), "保存成功后应回到历史详情")
+        XCTAssertTrue(app.staticTexts["UI 另存胸背"].exists, "原训练名称保持不变")
+
+        tapNavigationBack(in: app)
+        tapNavigationBack(in: app)
+        app.tabBars.buttons["计划"].tap()
+        let ungrouped = app.buttons["展开未分组"]
+        XCTAssertTrue(ungrouped.waitForExistence(timeout: 10))
+        ungrouped.tap()
+        let saved = app.buttons["打开计划UI 另存胸背"]
+        if !saved.waitForExistence(timeout: 3) { app.swipeUp() }
+        XCTAssertTrue(saved.waitForExistence(timeout: 5), "未分组下应出现新计划")
+    }
+
+    /// 另存表单打开后来源失效：保留输入并提示错误，不能产生新计划。
+    @MainActor
+    func testHistorySaveRejectsInvalidatedSource() throws {
+        let app = launchHistorySaveApp(extraArguments: ["-uitest-history-save-invalid-source"])
+        let row = historyRow("UI 另存胸背", in: app)
+        XCTAssertTrue(waitForElementWithRelaunch(row, in: app))
+        row.tap()
+        openSaveAsPersonalPlan(in: app)
+
+        let nameField = app.textFields.firstMatch
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        replaceText(in: nameField, with: "UI 另存失效")
+        chooseGroup("UI 另存分组", in: app)
+        app.buttons["保存"].tap()
+
+        let error = app.staticTexts["planEditor.saveError"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        XCTAssertEqual(error.label, "原训练记录已不可用，无法另存")
+        XCTAssertEqual(nameField.value as? String, "UI 另存失效")
+        XCTAssertEqual(app.buttons["选择分组"].value as? String, "UI 另存分组")
+
+        tapNavigationBack(in: app)
+        tapNavigationBack(in: app)
+        app.tabBars.buttons["计划"].tap()
+        let groupHeader = app.buttons["展开UI 另存分组"]
+        XCTAssertTrue(groupHeader.waitForExistence(timeout: 10))
+        XCTAssertEqual(groupHeader.value as? String, "0 个计划")
+    }
+
+    /// 兼容性：完成页「保存为计划模板」仍对无计划训练展示，保存后把训练名称改为计划名（历史另存不改名）。
+    /// 计划名用「UI 另存」前缀，便于历史另存样例钩子下次启动时清理。
+    @MainActor
+    func testCompletionPageSaveAsPlanStillRenamesWorkout() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uitest-live-workout", "-dismiss-career-review"]
+        app.launch()
+        let finishButton = app.buttons["结束训练"]
+        XCTAssertTrue(waitForElementWithRelaunch(finishButton, in: app), "应直达训练进行中页面")
+        app.buttons["标记第 1 组完成"].firstMatch.tap()
+        Thread.sleep(forTimeInterval: 0.6)
+        if !finishButton.isHittable {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
+            Thread.sleep(forTimeInterval: 0.6)
+        }
+        finishAndAssertAlive(app)
+
+        let prConfirmation = app.buttons["太棒了"]
+        if prConfirmation.waitForExistence(timeout: 2) {
+            prConfirmation.tap()
+            XCTAssertTrue(prConfirmation.waitForNonExistence(timeout: 5))
+        }
+
+        let card = app.buttons.matching(NSPredicate(format: "label CONTAINS '保存为计划模板'")).firstMatch
+        for _ in 0..<4 where !card.exists { app.swipeUp() }
+        XCTAssertTrue(card.waitForExistence(timeout: 5), "无计划训练完成后应展示保存为计划模板")
+        card.tap()
+        let nameField = app.textFields.firstMatch
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        XCTAssertEqual(nameField.value as? String, "UI 测试训练")
+        replaceText(in: nameField, with: "UI 另存完成页")
+        app.buttons["保存"].tap()
+
+        XCTAssertTrue(app.staticTexts["UI 另存完成页"].waitForExistence(timeout: 5), "完成页保存后训练名称应更新为计划名")
+        XCTAssertFalse(card.exists, "保存后不再展示保存行动卡")
+    }
+
+    private func launchHistorySaveApp(extraArguments: [String] = []) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments += ["-dev-auto-login", "-uitest-history-save", "-dismiss-career-review"]
+        app.launchArguments += extraArguments
+        app.launch()
+        return app
+    }
+
+    private func historyRow(_ title: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", title))
+            .firstMatch
+    }
+
+    private func openSaveAsPersonalPlan(in app: XCUIApplication) {
+        let more = app.buttons["训练更多操作"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap()
+        let entry = app.buttons["另存为个人计划"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 5), "有效历史训练应提供另存入口")
+        entry.tap()
+    }
+
+    private func chooseGroup(_ name: String, in app: XCUIApplication) {
+        app.buttons["选择分组"].tap()
+        let option = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", name)).firstMatch
+        XCTAssertTrue(option.waitForExistence(timeout: 5))
+        option.tap()
+        let picker = app.buttons["选择分组"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        XCTAssertEqual(picker.value as? String, name)
+    }
+
+    private func replaceText(in field: XCUIElement, with text: String) {
+        field.tap()
+        let current = field.value as? String ?? ""
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+        field.typeText(text + "\n")
+        XCTAssertEqual(field.value as? String, text)
+    }
+
+    private func tapNavigationBack(in app: XCUIApplication) {
+        let back = app.navigationBars.buttons.element(boundBy: 0)
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        back.tap()
+    }
+
     @MainActor
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.

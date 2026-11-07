@@ -38,11 +38,100 @@ struct SyncCrashRegressionTests {
         #expect(SyncClock.isNewer(local.addingTimeInterval(0.002), than: local))
     }
 
+    @Test func newLocalStorePullsHistoryInsteadOfReusingPreviousStoreWatermark() async throws {
+        try await withHTTPFixture { api, server, defaults in
+            let directory = try makeStoreDirectory()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            server.seedWorkout()
+            let first = try makeStore(at: directory.appending(path: "first.store"))
+            await SyncEngine(modelContext: first.mainContext, api: api, watermarkDefaults: defaults).syncAll()
+            #expect(try first.mainContext.fetchCount(FetchDescriptor<Workout>()) == 1)
+            #expect(SyncDomain.workouts.watermark(in: defaults) != nil)
+
+            let replacement = try makeStore(at: directory.appending(path: "replacement.store"))
+            await SyncEngine(modelContext: replacement.mainContext, api: api, watermarkDefaults: defaults).syncAll()
+
+            #expect(try replacement.mainContext.fetchCount(FetchDescriptor<Workout>()) == 1)
+            #expect(server.pullSinceValues(for: "workouts") == [nil, nil])
+        }
+    }
+
+    @Test func sameLocalStoreKeepsIncrementalWatermarkAcrossEngineRestarts() async throws {
+        try await withHTTPFixture { api, server, defaults in
+            let directory = try makeStoreDirectory()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            server.seedWorkout()
+            let store = try makeStore(at: directory.appending(path: "history.store"))
+            await SyncEngine(modelContext: store.mainContext, api: api, watermarkDefaults: defaults).syncAll()
+            await SyncEngine(modelContext: store.mainContext, api: api, watermarkDefaults: defaults).syncAll()
+
+            #expect(try store.mainContext.fetchCount(FetchDescriptor<Workout>()) == 1)
+            let requests = server.pullSinceValues(for: "workouts")
+            try #require(requests.count == 2)
+            #expect(requests[0] == nil)
+            #expect(requests[1] != nil)
+        }
+    }
+
+    @Test func legacyWatermarkWithoutStoreIdentityCannotSkipRestoringHistory() async throws {
+        try await withHTTPFixture { api, server, defaults in
+            let directory = try makeStoreDirectory()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            server.seedWorkout()
+            for domain in SyncDomain.allCases { domain.setWatermark(.now, in: defaults) }
+            let store = try makeStore(at: directory.appending(path: "empty.store"))
+
+            await SyncEngine(modelContext: store.mainContext, api: api, watermarkDefaults: defaults).syncAll()
+
+            #expect(try store.mainContext.fetchCount(FetchDescriptor<Workout>()) == 1)
+            #expect(server.pullSinceValues(for: "workouts") == [nil])
+        }
+    }
+
+    @Test func failedLocalSaveDoesNotAdvancePullWatermarks() async throws {
+        try await withHTTPFixture { api, server, defaults in
+            let directory = try makeStoreDirectory()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let url = directory.appending(path: "readonly.store")
+            let writable = try makeStore(at: url)
+            try writable.mainContext.save()
+            server.seedWorkout()
+            let readonly = try makeStore(at: url, allowsSave: false)
+
+            await SyncEngine(modelContext: readonly.mainContext, api: api, watermarkDefaults: defaults).syncAll()
+
+            for domain in SyncDomain.allCases { #expect(domain.watermark(in: defaults) == nil) }
+            withExtendedLifetime(writable) {}
+        }
+    }
+
+    private func makeStoreDirectory() throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appending(path: "SyncHistoryRegression-\(UUID())")
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    private func makeStore(at url: URL, allowsSave: Bool = true) throws -> ModelContainer {
+        let config = ModelConfiguration(schema: AppModelContainer.schema, url: url,
+                                        allowsSave: allowsSave, cloudKitDatabase: .none)
+        return try ModelContainer(for: AppModelContainer.schema, configurations: [config])
+    }
+
     private func withFixture(
         _ operation: (ModelContext, SyncEngine, APIClient, SyncCrashHTTPFixture) async throws -> Void) async throws {
-        let oldWatermarks = SyncDomain.allCases.map(\.since)
-        SyncDomain.resetAllWatermarks()
-        defer { for (domain, date) in zip(SyncDomain.allCases, oldWatermarks) { domain.since = date } }
+        try await withHTTPFixture { api, server, defaults in
+            let container = AppModelContainer.make(inMemory: true)
+            let context = ModelContext(container)
+            try await operation(context, SyncEngine(modelContext: context, api: api, watermarkDefaults: defaults), api, server)
+            withExtendedLifetime(container) {}
+        }
+    }
+
+    private func withHTTPFixture(
+        _ operation: (APIClient, SyncCrashHTTPFixture, UserDefaults) async throws -> Void) async throws {
+        let suite = "SyncCrashRegressionTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
         let host = UUID().uuidString.lowercased() + ".invalid"
         let server = SyncCrashHTTPFixture()
         SyncCrashHTTPRegistry.shared.register(server, host: host)
@@ -52,16 +141,31 @@ struct SyncCrashRegressionTests {
         let session = URLSession(configuration: configuration)
         defer { session.invalidateAndCancel() }
         let api = APIClient(baseURL: try #require(URL(string: "https://" + host)), session: session)
-        let container = AppModelContainer.make(inMemory: true)
-        let context = ModelContext(container)
-        try await operation(context, SyncEngine(modelContext: context, api: api), api, server)
-        withExtendedLifetime(container) {}
+        try await operation(api, server, defaults)
     }
 }
 
 nonisolated private final class SyncCrashHTTPFixture: @unchecked Sendable {
     private let lock = NSLock()
     private var items: [String: [[String: Any]]] = [:]
+    private var pullSince: [String: [String?]] = [:]
+
+    func seedWorkout() {
+        lock.lock()
+        defer { lock.unlock() }
+        items["workouts"] = [["workout": [
+            "id": UUID().uuidString, "title": "待恢复历史", "version": 1,
+            "startedAt": "2026-06-01T08:00:00.000Z",
+            "endedAt": "2026-06-01T09:00:00.000Z",
+            "updatedAt": "2026-06-01T09:00:00.000Z"
+        ], "exercises": []]]
+    }
+
+    func pullSinceValues(for domain: String) -> [String?] {
+        lock.lock()
+        defer { lock.unlock() }
+        return pullSince[domain] ?? []
+    }
 
     func respond(_ request: URLRequest) throws -> (Int, Data) {
         lock.lock()
@@ -71,7 +175,15 @@ nonisolated private final class SyncCrashHTTPFixture: @unchecked Sendable {
         let domain = path.split(separator: "/").dropFirst().first.map(String.init) ?? ""
         let time = Date().ISO8601Format(.init(includingFractionalSeconds: true))
         if path.hasSuffix("/pull") {
-            return (200, try JSONSerialization.data(withJSONObject: ["changes": items[domain] ?? [], "serverTime": time]))
+            let since = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?
+                .queryItems?.first { $0.name == "since" }?.value
+            pullSince[domain, default: []].append(since)
+            let changes = (items[domain] ?? []).filter { item in
+                guard let since else { return true }
+                let root = item["workout"] as? [String: Any] ?? item
+                return (root["updatedAt"] as? String).map { $0 > since } ?? false
+            }
+            return (200, try JSONSerialization.data(withJSONObject: ["changes": changes, "serverTime": time]))
         }
         let object = try JSONSerialization.jsonObject(with: body) as? [String: Any]
         let incoming = object?["items"] as? [[String: Any]] ?? []

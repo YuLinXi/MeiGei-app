@@ -2114,17 +2114,35 @@ struct PlanEditorView: View {
     private var groups: [WorkoutPlanGroup]
 
     private let existing: WorkoutPlan?
+    /// 新建时一并写入的初始动作项；编辑已有计划时忽略，不重建动作项。
+    private let seedItems: [PlanItem]
+    /// 新建保存前的来源校验（历史另存检查原训练仍有效）；空白新建恒为 true。
+    private let canCreate: () -> Bool
+    /// 新建本地保存成功后回调（表单已关闭）；失败不回调。
+    private let onCreated: ((WorkoutPlan) -> Void)?
     @State private var name: String
     @State private var note: String
     @State private var mode: WorkoutPlanMode
     @State private var groupId: UUID?
     @State private var choosingGroup = false
+    @State private var submission = PlanCreationSubmission()
+    @State private var saveError: String?
     @FocusState private var noteFocused: Bool
 
-    init(plan: WorkoutPlan?, initialGroupId: UUID? = nil) {
+    /// - Parameters:
+    ///   - plan: 非 nil 为编辑已有计划的基础信息；nil 为新建。
+    ///   - seed: 新建初始名称／备注／动作项（默认空白）；模式默认自适应、分组默认 `initialGroupId`。
+    init(plan: WorkoutPlan?,
+         initialGroupId: UUID? = nil,
+         seed: PlanEditorSeed = .blank,
+         canCreate: @escaping () -> Bool = { true },
+         onCreated: ((WorkoutPlan) -> Void)? = nil) {
         self.existing = plan
-        _name = State(initialValue: plan?.name ?? "")
-        _note = State(initialValue: plan?.note ?? "")
+        self.seedItems = plan == nil ? seed.items : []
+        self.canCreate = canCreate
+        self.onCreated = onCreated
+        _name = State(initialValue: plan?.name ?? seed.name)
+        _note = State(initialValue: plan?.note ?? seed.note)
         _mode = State(initialValue: plan?.mode ?? .adaptive)
         _groupId = State(initialValue: plan?.groupId ?? initialGroupId)
     }
@@ -2189,6 +2207,13 @@ struct PlanEditorView: View {
                     Text("分组").eyebrowStyle()
                     groupPicker
                 }
+                if let saveError {
+                    Text(saveError)
+                        .font(Theme.Font.body(size: 12))
+                        .foregroundStyle(Theme.Color.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("planEditor.saveError")
+                }
                 Spacer()
             }
             .padding(.horizontal, Theme.Spacing.lg)
@@ -2198,7 +2223,7 @@ struct PlanEditorView: View {
         .paperToolbar(title: existing == nil ? "新建计划" : "编辑计划", onBack: { dismiss() }) {
             Button("保存") { save() }
                 .font(Theme.Font.body(size: 15, weight: .semibold))
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || submission.hasCreated)
                 .tint(Theme.Color.accent)
         }
         .sheet(isPresented: $choosingGroup) {
@@ -2209,24 +2234,40 @@ struct PlanEditorView: View {
     }
 
     private func save() {
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
-        let normalizedNote = PlanNoteEditorSheet.normalize(note)
+        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         if let existing {
-            existing.name = trimmed
-            existing.note = normalizedNote
-            existing.mode = mode
-            existing.groupId = groupId
-            existing.markDirty()
-        } else {
-            let plan = WorkoutPlan(name: trimmed,
-                                   note: normalizedNote,
-                                   mode: mode,
-                                   groupId: groupId,
-                                   sortOrder: nextSortOrder(in: groupId))
-            modelContext.insert(plan)
+            Self.applyBasicInfo(to: existing, name: name, note: note, mode: mode, groupId: groupId)
+            try? modelContext.save()
+            dismiss()
+            return
         }
-        try? modelContext.save()
-        dismiss()
+        do {
+            guard let plan = try submission.submit(name: name,
+                                                   note: note,
+                                                   mode: mode,
+                                                   groupId: groupId,
+                                                   items: seedItems,
+                                                   in: modelContext,
+                                                   canCreate: canCreate) else { return }
+            saveError = nil
+            dismiss()
+            onCreated?(plan)
+        } catch {
+            saveError = (error as? LocalizedError)?.errorDescription ?? "保存失败，请重试"
+        }
+    }
+
+    /// 编辑已有计划的基础信息：只改名称／备注／模式／分组，不触碰动作项。
+    static func applyBasicInfo(to plan: WorkoutPlan,
+                               name: String,
+                               note: String,
+                               mode: WorkoutPlanMode,
+                               groupId: UUID?) {
+        plan.name = name.trimmingCharacters(in: .whitespaces)
+        plan.note = PlanNoteEditorSheet.normalize(note)
+        plan.mode = mode
+        plan.groupId = groupId
+        plan.markDirty()
     }
 
     private var orderedGroups: [WorkoutPlanGroup] { sortedPlanGroups(groups) }
@@ -2256,14 +2297,7 @@ struct PlanEditorView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("选择分组")
-    }
-
-    private func nextSortOrder(in groupId: UUID?) -> Int {
-        let descriptor = FetchDescriptor<WorkoutPlan>(
-            predicate: #Predicate { $0.deletedAt == nil }
-        )
-        let sameGroup = (try? modelContext.fetch(descriptor))?.filter { $0.groupId == groupId } ?? []
-        return (sameGroup.map(\.sortOrder).max() ?? -1) + 1
+        .accessibilityValue(selectedGroupName)
     }
 
     @ViewBuilder private func modeOption(_ candidate: WorkoutPlanMode) -> some View {
@@ -2284,6 +2318,8 @@ struct PlanEditorView: View {
             .cardStyle()
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(candidate.title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

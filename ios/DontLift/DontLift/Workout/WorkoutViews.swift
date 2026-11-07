@@ -3250,8 +3250,7 @@ private struct SaveWorkoutAsPlanSheet: View {
     init(workout: Workout, onSaved: @escaping (WorkoutPlan) -> Void) {
         self.workout = workout
         self.onSaved = onSaved
-        let title = workout.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        _name = State(initialValue: title.isEmpty || title == "训练" ? "训练模板" : title)
+        _name = State(initialValue: workout.planTemplateDefaultName)
     }
 
     var body: some View {

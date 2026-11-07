@@ -19,15 +19,17 @@ extension Notification.Name {
 final class SyncEngine {
     private let modelContext: ModelContext
     private let api: APIClient
+    private let watermarkDefaults: UserDefaults
     private(set) var isSyncing = false
     private var needsFollowUpSync = false
     private var scheduledSyncTask: Task<Void, Never>?
     /// 最近一次同步产生的「本地修改被覆盖」提示，供 UI 展示后清空。
     private(set) var pendingConflictNotices: [ConflictNotice] = []
 
-    init(modelContext: ModelContext, api: APIClient = .shared) {
+    init(modelContext: ModelContext, api: APIClient = .shared, watermarkDefaults: UserDefaults = .standard) {
         self.modelContext = modelContext
         self.api = api
+        self.watermarkDefaults = watermarkDefaults
     }
 
     func clearConflictNotices() { pendingConflictNotices = [] }
@@ -58,25 +60,47 @@ final class SyncEngine {
         }
         isSyncing = true
         defer { isSyncing = false }
+        prepareWatermarksForCurrentStore()
         repeat {
             needsFollowUpSync = false
             await syncOnce()
         } while needsFollowUpSync
     }
 
+    private func prepareWatermarksForCurrentStore() {
+        let stores = modelContext.container.configurations.filter { !$0.isStoredInMemoryOnly }
+        guard !stores.isEmpty else { return }
+        let identity = stores.map { configuration in
+            let url = configuration.url.standardizedFileURL.resolvingSymlinksInPath()
+            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+            let fileNumber = (attributes?[.systemFileNumber] as? NSNumber)?.stringValue ?? ""
+            // 路径识别 App Group／容器切换，文件号识别同一路径下的数据库重建。
+            return url.absoluteString + "#" + fileNumber
+        }.sorted().joined(separator: "|")
+        SyncDomain.prepareWatermarks(for: identity, in: watermarkDefaults)
+    }
+
     private func syncOnce() async {
         WorkoutPerformanceMonitor.event("syncAll.started")
-        _ = await runSafely { try await self.syncCustomExercises() }
+        let customExercisesTime = await runSafely { try await self.syncCustomExercises() }
         await Task.yield()
-        _ = await runSafely { try await self.syncWorkoutPlanGroups() }
+        let planGroupsTime = await runSafely { try await self.syncWorkoutPlanGroups() }
         await Task.yield()
-        _ = await runSafely { try await self.syncWorkoutPlans() }
+        let plansTime = await runSafely { try await self.syncWorkoutPlans() }
         await Task.yield()
-        let workoutsSynced = await runSafely { try await self.syncWorkouts() }
+        let workoutsTime = await runSafely { try await self.syncWorkouts() }
         await Task.yield()
         let saved: Bool
         do {
             try modelContext.save()
+            // 本地实体落盘之后才提交各域水位；保存失败或被中断时，下轮仍能重拉遗漏数据。
+            let completedPulls: [(SyncDomain, Date?)] = [
+                (.customExercises, customExercisesTime), (.workoutPlanGroups, planGroupsTime),
+                (.workoutPlans, plansTime), (.workouts, workoutsTime)
+            ]
+            for (domain, time) in completedPulls {
+                if let time { domain.setWatermark(time, in: watermarkDefaults) }
+            }
             saved = true
         } catch {
             saved = false
@@ -84,18 +108,17 @@ final class SyncEngine {
         // 同步周期完成：广播给服务端权威域刷新（失败项仍 pending，下轮再播）。
         WorkoutPerformanceMonitor.event("syncAll.completed")
         NotificationCenter.default.post(name: .dontliftSyncCompleted, object: nil)
-        if workoutsSynced && saved {
+        if workoutsTime != nil && saved {
             NotificationCenter.default.post(name: .dontliftWorkoutSyncSucceeded, object: nil)
         }
     }
 
-    private func runSafely(_ op: () async throws -> Void) async -> Bool {
+    private func runSafely(_ op: () async throws -> Date) async -> Date? {
         do {
-            try await op()
-            return true
+            return try await op()
         } catch {
             // 失败项保持 pending，下次重试。
-            return false
+            return nil
         }
     }
 
@@ -182,7 +205,7 @@ final class SyncEngine {
 
     private func pull<DTO: Decodable>(_ domain: SyncDomain) async throws -> SyncPullResult<DTO> {
         var query: [URLQueryItem] = []
-        if let since = domain.since {
+        if let since = domain.watermark(in: watermarkDefaults) {
             query.append(URLQueryItem(name: "since", value: JSONCoding.string(from: since)))
         }
         return try await api.send("GET", domain.pullPath, query: query)
@@ -190,7 +213,7 @@ final class SyncEngine {
 
     // MARK: - CustomExercise
 
-    private func syncCustomExercises() async throws {
+    private func syncCustomExercises() async throws -> Date {
         let pending = try fetchPendingCustomExercises()
         if !pending.isEmpty {
             let dtos = pending.map(dto(from:))
@@ -203,7 +226,7 @@ final class SyncEngine {
         }
         let pulled: SyncPullResult<CustomExerciseDTO> = try await pull(.customExercises)
         for dto in pulled.changes { upsert(dto) }
-        SyncDomain.customExercises.since = pulled.serverTime
+        return pulled.serverTime
     }
 
     private func fetchPendingCustomExercises() throws -> [CustomExercise] {
@@ -261,7 +284,7 @@ final class SyncEngine {
 
     // MARK: - WorkoutPlanGroup
 
-    private func syncWorkoutPlanGroups() async throws {
+    private func syncWorkoutPlanGroups() async throws -> Date {
         let pending = try fetchPendingWorkoutPlanGroups()
         if !pending.isEmpty {
             let dtos = pending.map(dto(from:))
@@ -274,7 +297,7 @@ final class SyncEngine {
         }
         let pulled: SyncPullResult<WorkoutPlanGroupDTO> = try await pull(.workoutPlanGroups)
         for dto in pulled.changes { upsert(dto) }
-        SyncDomain.workoutPlanGroups.since = pulled.serverTime
+        return pulled.serverTime
     }
 
     private func fetchPendingWorkoutPlanGroups() throws -> [WorkoutPlanGroup] {
@@ -331,7 +354,7 @@ final class SyncEngine {
 
     // MARK: - WorkoutPlan
 
-    private func syncWorkoutPlans() async throws {
+    private func syncWorkoutPlans() async throws -> Date {
         let pending = try fetchPendingWorkoutPlans()
         if !pending.isEmpty {
             let dtos = pending.map(dto(from:))
@@ -344,7 +367,7 @@ final class SyncEngine {
         }
         let pulled: SyncPullResult<WorkoutPlanDTO> = try await pull(.workoutPlans)
         for dto in pulled.changes { upsert(dto) }
-        SyncDomain.workoutPlans.since = pulled.serverTime
+        return pulled.serverTime
     }
 
     private func fetchPendingWorkoutPlans() throws -> [WorkoutPlan] {
@@ -417,7 +440,7 @@ final class SyncEngine {
 
     // MARK: - Workout（聚合树）
 
-    private func syncWorkouts() async throws {
+    private func syncWorkouts() async throws -> Date {
         let pending = try fetchPendingWorkouts()
         if !pending.isEmpty {
             let dtos = pending.map(tree(from:))
@@ -435,7 +458,7 @@ final class SyncEngine {
         }
         let pulled: SyncPullResult<WorkoutTreeDTO> = try await pull(.workouts)
         for tree in pulled.changes { upsert(tree) }
-        SyncDomain.workouts.since = pulled.serverTime
+        return pulled.serverTime
     }
 
     private func fetchPendingWorkouts() throws -> [Workout] {

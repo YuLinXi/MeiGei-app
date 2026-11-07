@@ -268,6 +268,50 @@ struct SupersetTrainingUnitTests {
         #expect(item.totalMemberSuggestionTexts == ["夹胸:60×12", "下斜卧推:40×15"])
     }
 
+    @Test func planTemplateItemsKeepUnifiedSupersetSummaryWhenRoundsDiffer() throws {
+        // 历史另存沿用现有超级组规则：每个成员只取最大重量记录及其次数，不生成逐轮安排。
+        let startedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let workout = Workout(planId: UUID(), title: "背臂", startedAt: startedAt, timerStartedAt: startedAt)
+        let first = workoutExercise(name: "下拉", orderIndex: 0)
+        first.sets = [
+            WorkoutSet(setIndex: 0, weightKg: 30, reps: 12, completed: true, setType: .working),
+            WorkoutSet(setIndex: 1, weightKg: 35, reps: 10, completed: true, setType: .working),
+            WorkoutSet(setIndex: 2, weightKg: 35, reps: 8, completed: true, setType: .working)
+        ]
+        let second = workoutExercise(name: "弯举", orderIndex: 1)
+        second.sets = [
+            WorkoutSet(setIndex: 0, weightKg: 20, reps: 15, completed: true, setType: .working),
+            WorkoutSet(setIndex: 1, weightKg: 22.5, reps: 12, completed: true, setType: .working),
+            WorkoutSet(setIndex: 2, weightKg: 15, reps: 15, completed: true, setType: .working)
+        ]
+        workout.exercises = [first, second]
+        workout.appendSupersetUnit(first: first, second: second, roundCount: 3,
+                                   restAfterRoundSeconds: 120, note: "轮间休息")
+        workout.endedAt = startedAt.addingTimeInterval(3600)
+
+        let items = workout.planTemplateItems()
+        let item = try #require(items.first)
+        let members = item.orderedSupersetMembers
+
+        #expect(workout.canSaveAsPersonalPlanFromHistory)
+        #expect(items.count == 1)
+        #expect(item.isSuperset)
+        #expect(item.supersetRounds == 3)
+        #expect(item.supersetRestAfterRoundSeconds == 120)
+        #expect(item.note == "轮间休息")
+        #expect(members.map(\.exerciseName) == ["下拉", "弯举"])
+        #expect(members.map(\.suggestedWeightKg) == [Double?](arrayLiteral: 35, 22.5))
+        #expect(members.map(\.suggestedReps) == [Int?](arrayLiteral: 10, 12))
+        #expect(item.setPrescriptions == nil)
+
+        // 从该计划启动仍按成员统一值落到每一轮。
+        let restarted = PlanWorkoutBuilder.workout(title: "背臂", items: items, mode: .adaptive, lookup: .empty)
+        let restartedFirst = try #require(restarted.exercises.first { $0.exerciseName == "下拉" })
+        let restartedSecond = try #require(restarted.exercises.first { $0.exerciseName == "弯举" })
+        #expect(restartedFirst.sets.map(\.weightKg) == [Double?](repeating: 35, count: 3))
+        #expect(restartedSecond.sets.map(\.reps) == [Int?](repeating: 12, count: 3))
+    }
+
     @Test func teamPlanShareStripsSupersetWeightsButKeepsStructureAndReps() throws {
         let item = PlanItem.superset(
             orderIndex: 0,

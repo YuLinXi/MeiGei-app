@@ -28,6 +28,7 @@ struct DontLiftApp: App {
         // UI 测试钩子：播种进行中训练；假登录态在 SessionStore 创建后注入（内存态，绕开无签名 build 的 Keychain 限制）。
         UITestHooks.seedLiveWorkoutIfNeeded(container: container)
         UITestHooks.clearActiveWorkoutIfNeeded(container: container)
+        UITestHooks.seedHistorySaveSamplesIfNeeded(container: container)
         UITestHooks.configureLaunchEnvironment()
         #endif
         self.modelContainer = container

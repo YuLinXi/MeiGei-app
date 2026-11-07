@@ -1,12 +1,24 @@
 import Foundation
 
 @MainActor extension Workout {
+    /// 完成页「保存为计划模板」行动卡的默认展示条件：仅无个人计划来源、尚未保存过的训练。
+    /// 历史详情的手动另存使用 `canSaveAsPersonalPlanFromHistory`，不要放宽这里的 `planId` 限制。
     func canOfferSaveAsPlanTemplate(alreadySaved: Bool) -> Bool {
-        isFinished
+        canSaveAsPersonalPlanFromHistory
         && planId == nil
-        && deletedAt == nil
         && !alreadySaved
-        && !planTemplateItems().isEmpty
+    }
+
+    /// 历史详情手动「另存为个人计划」资格：已完成、未软删且至少能转换出一个计划项。
+    /// 不限制来源（无计划／个人计划／Team 分享版本均可），也不读取来源计划。
+    var canSaveAsPersonalPlanFromHistory: Bool {
+        isFinished && !planTemplateItems().isEmpty
+    }
+
+    /// 另存表单的默认计划名：训练标题为空、仅空白或为通用名「训练」时用「训练模板」。
+    var planTemplateDefaultName: String {
+        let title = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return title.isEmpty || title == "训练" ? "训练模板" : title
     }
 
     func planTemplateItems() -> [PlanItem] {
