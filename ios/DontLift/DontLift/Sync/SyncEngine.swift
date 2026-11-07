@@ -195,9 +195,11 @@ final class SyncEngine {
         if !pending.isEmpty {
             let dtos = pending.map(dto(from:))
             let pendingById = Dictionary(uniqueKeysWithValues: pending.map { ($0.localId, $0) })
+            let pushedUpdatedAt = pendingById.mapValues(\.updatedAt)
             let res: SyncPushResult<CustomExerciseDTO> = try await push(
                 .customExercises, dtos, idParts: pending.map { "\($0.localId):\($0.updatedAt.timeIntervalSince1970)" })
-            applyPushResult(res, domain: .customExercises, lookup: { id in pendingById[id] }, apply: applyServer(_:to:))
+            applyPushResult(res, domain: .customExercises, pushedUpdatedAt: pushedUpdatedAt,
+                                lookup: { id in pendingById[id] }, apply: applyServer(_:to:))
         }
         let pulled: SyncPullResult<CustomExerciseDTO> = try await pull(.customExercises)
         for dto in pulled.changes { upsert(dto) }
@@ -239,7 +241,7 @@ final class SyncEngine {
     private func upsert(_ dto: CustomExerciseDTO) {
         if let local = findCustomExercise(localId: dto.id) {
             if dto.deletedAt != nil { modelContext.delete(local); return }
-            if dto.updatedAt > local.updatedAt { applyServer(dto, to: local) }
+            if SyncClock.isNewer(dto.updatedAt, than: local.updatedAt) { applyServer(dto, to: local) }
         } else if dto.deletedAt == nil {
             let m = CustomExercise(localId: dto.id, name: dto.name,
                                    primaryMuscle: dto.primaryMuscle, equipmentType: dto.equipmentType,
@@ -264,9 +266,11 @@ final class SyncEngine {
         if !pending.isEmpty {
             let dtos = pending.map(dto(from:))
             let pendingById = Dictionary(uniqueKeysWithValues: pending.map { ($0.localId, $0) })
+            let pushedUpdatedAt = pendingById.mapValues(\.updatedAt)
             let res: SyncPushResult<WorkoutPlanGroupDTO> = try await push(
                 .workoutPlanGroups, dtos, idParts: pending.map { "\($0.localId):\($0.updatedAt.timeIntervalSince1970)" })
-            applyPushResult(res, domain: .workoutPlanGroups, lookup: { id in pendingById[id] }, apply: applyServer(_:to:))
+            applyPushResult(res, domain: .workoutPlanGroups, pushedUpdatedAt: pushedUpdatedAt,
+                                lookup: { id in pendingById[id] }, apply: applyServer(_:to:))
         }
         let pulled: SyncPullResult<WorkoutPlanGroupDTO> = try await pull(.workoutPlanGroups)
         for dto in pulled.changes { upsert(dto) }
@@ -307,7 +311,7 @@ final class SyncEngine {
     private func upsert(_ dto: WorkoutPlanGroupDTO) {
         if let local = findWorkoutPlanGroup(localId: dto.id) {
             if dto.deletedAt != nil { modelContext.delete(local); return }
-            if dto.updatedAt > local.updatedAt { applyServer(dto, to: local) }
+            if SyncClock.isNewer(dto.updatedAt, than: local.updatedAt) { applyServer(dto, to: local) }
         } else if dto.deletedAt == nil {
             let m = WorkoutPlanGroup(localId: dto.id, name: dto.name,
                                      sortOrder: dto.sortOrder ?? 0,
@@ -332,9 +336,11 @@ final class SyncEngine {
         if !pending.isEmpty {
             let dtos = pending.map(dto(from:))
             let pendingById = Dictionary(uniqueKeysWithValues: pending.map { ($0.localId, $0) })
+            let pushedUpdatedAt = pendingById.mapValues(\.updatedAt)
             let res: SyncPushResult<WorkoutPlanDTO> = try await push(
                 .workoutPlans, dtos, idParts: pending.map { "\($0.localId):\($0.updatedAt.timeIntervalSince1970)" })
-            applyPushResult(res, domain: .workoutPlans, lookup: { id in pendingById[id] }, apply: applyServer(_:to:))
+            applyPushResult(res, domain: .workoutPlans, pushedUpdatedAt: pushedUpdatedAt,
+                                lookup: { id in pendingById[id] }, apply: applyServer(_:to:))
         }
         let pulled: SyncPullResult<WorkoutPlanDTO> = try await pull(.workoutPlans)
         for dto in pulled.changes { upsert(dto) }
@@ -393,7 +399,7 @@ final class SyncEngine {
     private func upsert(_ dto: WorkoutPlanDTO) {
         if let local = findWorkoutPlan(localId: dto.id) {
             if dto.deletedAt != nil { modelContext.delete(local); return }
-            if dto.updatedAt > local.updatedAt { applyServer(dto, to: local) }
+            if SyncClock.isNewer(dto.updatedAt, than: local.updatedAt) { applyServer(dto, to: local) }
         } else if dto.deletedAt == nil {
             let m = WorkoutPlan(localId: dto.id, name: dto.name, now: dto.updatedAt)
             applyServer(dto, to: m)
@@ -416,10 +422,12 @@ final class SyncEngine {
         if !pending.isEmpty {
             let dtos = pending.map(tree(from:))
             let pendingById = Dictionary(uniqueKeysWithValues: pending.map { ($0.localId, $0) })
+            let pushedUpdatedAt = pendingById.mapValues(\.updatedAt)
             let res: SyncPushResult<WorkoutTreeDTO> = try await push(
                 .workouts, dtos, idParts: pending.map { "\($0.localId):\($0.updatedAt.timeIntervalSince1970)" })
             applyPushResult(res,
                             domain: .workouts,
+                            pushedUpdatedAt: pushedUpdatedAt,
                             idOf: { $0.workout.id },
                             nameOf: { $0.workout.title ?? "训练" },
                             lookup: { id in pendingById[id] },
@@ -543,7 +551,10 @@ final class SyncEngine {
     private func upsert(_ dto: WorkoutTreeDTO) {
         if let local = findWorkout(localId: dto.workout.id) {
             if dto.workout.deletedAt != nil { modelContext.delete(local); return }
-            if dto.workout.updatedAt > local.updatedAt { applyServer(tree: dto, to: local) }
+            // 本地仍有未推送改动时不整棵替换：replaceChildren 会删除正在被界面/后台读取遍历的子节点，
+            // 且会吞掉本地较新的编辑；留待下轮 push 由服务端 LWW 裁决。
+            guard local.syncStatus == .synced else { return }
+            if SyncClock.isNewer(dto.workout.updatedAt, than: local.updatedAt) { applyServer(tree: dto, to: local) }
         } else if dto.workout.deletedAt == nil {
             let m = Workout(localId: dto.workout.id, now: dto.workout.updatedAt)
             applyServer(tree: dto, to: m)
@@ -565,24 +576,40 @@ final class SyncEngine {
     private func applyPushResult<DTO: Decodable, M: AnyObject>(
         _ res: SyncPushResult<DTO>,
         domain: SyncDomain,
+        pushedUpdatedAt: [UUID: Date],
         lookup: (UUID) -> M?,
         apply: (DTO, M) -> Void
     ) where DTO: HasEnvelopeId {
-        applyPushResult(res, domain: domain, idOf: { $0.envelopeId }, nameOf: { $0.envelopeName },
-                        lookup: lookup, apply: apply)
+        applyPushResult(res, domain: domain, pushedUpdatedAt: pushedUpdatedAt,
+                            idOf: { $0.envelopeId }, nameOf: { $0.envelopeName },
+                            lookup: lookup, apply: apply)
     }
 
     private func applyPushResult<DTO: Decodable, M: AnyObject>(
         _ res: SyncPushResult<DTO>,
         domain: SyncDomain,
+        pushedUpdatedAt: [UUID: Date],
         idOf: (DTO) -> UUID,
         nameOf: (DTO) -> String,
         lookup: (UUID) -> M?,
         apply: (DTO, M) -> Void
     ) {
-        applyTimestampAdjustments(res.timestampAdjustments, domain: domain, lookup: lookup)
+        // push 在途期间（await 网络）本地又被编辑过的对象：服务端收到的是旧快照，
+        // 不能标 synced（否则较新的本地改动永不上传），也不能用服务端值覆盖本地。
+        let modifiedDuringPush = Set(pushedUpdatedAt.compactMap { id, pushedAt -> UUID? in
+            guard let m = lookup(id) as? (any Syncable), m.updatedAt != pushedAt else { return nil }
+            return id
+        })
+        applyTimestampAdjustments(res.timestampAdjustments.filter { !modifiedDuringPush.contains($0.id) },
+                                  domain: domain, lookup: lookup)
         for id in res.applied {
             guard let m = lookup(id) as? (any Syncable) else { continue }
+            if modifiedDuringPush.contains(id) {
+                // 服务端已落库：补记 serverId，状态保持待上传，下轮推送最新值。
+                m.serverId = m.localId
+                if m.syncStatus == .pendingCreate { m.syncStatus = .pendingUpdate }
+                continue
+            }
             if m.syncStatus == .pendingDelete {
                 if let obj = m as? PersistentModel { modelContext.delete(obj) }
             } else {
@@ -591,7 +618,7 @@ final class SyncEngine {
             }
         }
         for conflict in res.conflicts {
-            guard let m = lookup(conflict.id) else { continue }
+            guard !modifiedDuringPush.contains(conflict.id), let m = lookup(conflict.id) else { continue }
             apply(conflict.serverValue, m)
             pendingConflictNotices.append(
                 ConflictNotice(id: conflict.id, domain: domain, name: nameOf(conflict.serverValue)))

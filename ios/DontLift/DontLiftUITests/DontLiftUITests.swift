@@ -163,6 +163,67 @@ final class DontLiftUITests: XCTestCase {
         XCTAssertTrue(finishButton.isHittable, "退出排序后「结束训练」应恢复可点击")
     }
 
+    /// 复现「结束训练闪退」：勾选部分组后结束训练，未完成组被清理，App 必须存活并进入只读详情。
+    @MainActor
+    func testFinishWorkoutWithIncompleteSetsDoesNotCrash() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uitest-live-workout", "-dismiss-career-review"]
+        app.launch()
+        let finishButton = app.buttons["结束训练"]
+        XCTAssertTrue(waitForElementWithRelaunch(finishButton, in: app), "应直达训练进行中页面")
+        let mark = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '标记'")).firstMatch
+        XCTAssertTrue(mark.waitForExistence(timeout: 5))
+        mark.tap()
+        Thread.sleep(forTimeInterval: 0.6)
+        // 完成一组会弹出休息浮层，点空白处收起后再结束训练。
+        if !finishButton.isHittable {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
+            Thread.sleep(forTimeInterval: 0.6)
+        }
+        finishButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        Thread.sleep(forTimeInterval: 1)
+        print("[CONFIRM-DEBUG]", app.buttons.allElementsBoundByIndex.map(\.label))
+        let confirm = app.buttons.matching(identifier: "结束训练").element(boundBy: 0)
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "应弹出结束确认")
+        confirm.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        Thread.sleep(forTimeInterval: 4)
+        print("[FINISH-DEBUG]", app.buttons.allElementsBoundByIndex.map(\.label))
+        XCTAssertEqual(app.state, .runningForeground, "结束训练后 App 不应崩溃")
+        XCTAssertFalse(app.buttons["结束训练"].exists, "结束后应切到只读详情")
+    }
+
+    @MainActor
+    func testFinishWorkoutWhileKeypadFocusedOnIncompleteSetDoesNotCrash() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uitest-live-workout", "-dismiss-career-review"]
+        app.launch()
+        let finishButton = app.buttons["结束训练"]
+        XCTAssertTrue(waitForElementWithRelaunch(finishButton, in: app))
+        app.buttons["标记第 1 组完成"].firstMatch.tap()
+        Thread.sleep(forTimeInterval: 0.6)
+        if !app.buttons["第 2 组 重量"].firstMatch.isHittable {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
+            Thread.sleep(forTimeInterval: 0.6)
+        }
+        app.buttons["第 2 组 重量"].firstMatch.tap()
+        app.buttons["数字 5"].tap()
+        finishAndAssertAlive(app)
+    }
+
+    @MainActor
+    private func finishAndAssertAlive(_ app: XCUIApplication) {
+        let finishButton = app.buttons["结束训练"].firstMatch
+        for _ in 0..<8 where !finishButton.isHittable { app.swipeDown() }
+        finishButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        Thread.sleep(forTimeInterval: 1)
+        let confirm = app.buttons.matching(identifier: "结束训练").element(boundBy: 0)
+        confirm.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        Thread.sleep(forTimeInterval: 4)
+        print("[FINISH-DEBUG]", app.buttons.allElementsBoundByIndex.map(\.label))
+        XCTAssertEqual(app.state, .runningForeground, "结束训练后 App 不应崩溃")
+        XCTAssertFalse(app.buttons["标记第 2 组完成"].exists)
+    }
+
     @MainActor
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.
