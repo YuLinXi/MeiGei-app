@@ -23,9 +23,12 @@ final class SessionStore {
     private static let launchedBeforeKey = "session.hasLaunchedBefore"
 
     private let modelContext: ModelContext
+    private let loadProfile: () async throws -> ProfileDTO
 
-    init(modelContext: ModelContext) {
+    init(modelContext: ModelContext,
+         loadProfile: @escaping () async throws -> ProfileDTO = { try await ProfileAPI.me() }) {
         self.modelContext = modelContext
+        self.loadProfile = loadProfile
         // 删除重装 = 干净重来：重装首启先清掉残留 Keychain JWT，使重装后回登录页重新 Apple 登录，
         // 而非以孤儿 token 误判为已登录（会跳过登录、且因本地数据已清空而误弹补全页，甚至失效 token 死锁）。
         Self.clearOrphanTokenOnFreshInstall()
@@ -169,10 +172,13 @@ final class SessionStore {
             return
         }
         do {
-            let dto = try await ProfileAPI.me()
+            let dto = try await loadProfile()
             reconcile(dto)
             // 唯一判定真相：GET /me 成功且后端称呼为空 = 需补全。
             needsProfileCompletion = (dto.displayName ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        } catch APIError.http(status: 404, body: _) {
+            // JWT 仍有效但账号已不存在（如本地更换测试库），继续重试无法恢复会话。
+            logout()
         } catch APIError.unauthorized {
             // 401 已由全局处理器触发登出回登录页；此处不动门控（即将离开本视图）。
             return

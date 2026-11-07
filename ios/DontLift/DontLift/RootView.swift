@@ -149,7 +149,7 @@ struct RootView: View {
             // 拉 GET /me 决定路由；失败时 refreshProfile 不会误判为「需补全」（保持门控 nil），
             // 这里做有限重试让瞬时失败自愈，避免停在加载态空转。
             var attempt = 0
-            while session.needsProfileCompletion == nil && attempt < 5 {
+            while session.isLoggedIn && session.needsProfileCompletion == nil && attempt < 5 && !Task.isCancelled {
                 await session.refreshProfile()
                 if session.needsProfileCompletion != nil { break }
                 attempt += 1

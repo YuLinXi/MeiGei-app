@@ -30,6 +30,10 @@ enum AppModelContainer {
            ProcessInfo.processInfo.arguments.contains("-profile-workout") {
             let url = URL.applicationSupportDirectory.appending(path: "WorkoutPerformance.store")
             config = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+        } else if !inMemory, UITestHooks.isLiveWorkoutUITest || UITestHooks.isAutoLogin {
+            // 假登录与测试种子使用独立数据文件，避免后续真实开发者登录上传测试残留。
+            let url = URL.applicationSupportDirectory.appending(path: "WorkoutUITests.store")
+            config = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
         }
         #endif
         do {

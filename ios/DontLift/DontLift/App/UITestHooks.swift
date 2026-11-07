@@ -62,12 +62,7 @@ enum UITestHooks {
         }
         try? context.save()
 
-        let names = isLong ? (0..<20).map { "测试动作 \($0 + 1)" } : ["上斜杠铃卧推", "杠铃划船", "哑铃肩推"]
-        let exercises = names.enumerated().map { index, name in
-            WorkoutExercise(exerciseName: name,
-                            orderIndex: index,
-                            sets: (0..<(isLong ? 5 : 3)).map { WorkoutSet(setIndex: $0, weightKg: 60, reps: 10) })
-        }
+        let exercises = liveWorkoutExercises(isLong: isLong)
         if isAssisted, let first = exercises.first {
             first.builtinExerciseCode = "ASSISTED_PULL_UP"
             first.exerciseName = "辅助引体向上"
@@ -78,6 +73,17 @@ enum UITestHooks {
                               exercises: exercises)
         context.insert(workout)
         try? context.save()
+    }
+
+    @MainActor
+    static func liveWorkoutExercises(isLong: Bool) -> [WorkoutExercise] {
+        let names = isLong ? (0..<20).map { "测试动作 \($0 + 1)" } : ["上斜杠铃卧推", "杠铃划船", "哑铃肩推"]
+        let codes = ["INCLINE_BB_PRESS", "BB_ROW", "DB_SHOULDER_PRESS"]
+        return names.enumerated().map { index, name in
+            WorkoutExercise(builtinExerciseCode: codes[index % codes.count], exerciseName: name,
+                            orderIndex: index,
+                            sets: (0..<(isLong ? 5 : 3)).map { WorkoutSet(setIndex: $0, weightKg: 60, reps: 10) })
+        }
     }
 
     /// 在 App 启动装配期调用：播种演示数据并执行勋章回溯。
