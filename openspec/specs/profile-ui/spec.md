@@ -1,7 +1,8 @@
 # profile-ui Specification
 
 ## Purpose
-TBD - created by archiving change redesign-remaining-neon-screens. Update Purpose after archive.
+定义登录与首登补全、个人资料、训练偏好、法律入口和账号操作的界面行为，使设置状态、编辑结果与数据处理含义清楚。
+
 ## Requirements
 ### Requirement: 个人中心顶部 Profile Header
 
@@ -62,11 +63,13 @@ ProfileView SHALL 在「账号」分组内渲染「退出登录」(`Theme.Color.
 
 ### Requirement: 登录页视觉规范
 
-`LoginView` SHALL 全屏纸白底（`Theme.Color.bg`），以大面积留白 + 极简排版呈现，MUST NOT 使用赛博网格、radial gradient 或 scanline 背景。顶部区域 SHALL 渲染品牌标识：方形「M」标记 + `Theme.Font.mono` 小字「DONTLIFT · NO.0001」。中部/下部 SHALL 渲染大标题「认真训练。/ 严肃记录。/ 仅此而已。」（`Theme.Color.fg`，可单行用 `accent` 点缀）+ 一行说明副标（`fg2`）。底部 SHALL 渲染原生 `SignInWithAppleButton`（黑底白字 `.black` 风格，高 50pt，圆角 `Theme.Radius.md`=13pt），下方 `Theme.Font.mono` 小字法律提示「继续即表示同意 服务条款 与 隐私政策」。法律提示中的「服务条款」与「隐私政策」SHALL 为**可点击**控件，点击经 `SFSafariViewController` 打开与「我的 / 关于」组相同的后端页面 URL（配置项，不再是 `/* 文档链接占位 */`）。DevConfig 启用时 SHALL 渲染开发者快捷登录入口。
+`LoginView` SHALL 使用全屏纸白底、品牌标识、极简标题、原生Apple登录按钮及可点击法律提示，MUST NOT 使用赛博网格、radial gradient 或 scanline背景。法律链接 SHALL 经 `SFSafariViewController` 打开与「我的 / 关于」相同的配置URL。DevConfig启用时 SHALL 显示开发者快捷登录入口。
 
 #### Scenario: 用户首次启动
 - **WHEN** App 启动且 `SessionStore.isSignedIn == false`
 - **THEN** 渲染纸感 LoginView（纸白底、无赛博网格），按钮点击触发 `AuthService.signInWithApple()`。
+- **AND** 顶部为方形「M」标记和 `Theme.Font.mono` 小字「DONTLIFT · NO.0001」；中下部为「认真训练。/ 严肃记录。/ 仅此而已。」大标题（`fg`，允许单行accent点缀）和一行fg2副标
+- **AND** 底部原生 `SignInWithAppleButton` 使用黑底白字 `.black`、50pt高度及 `Theme.Radius.md`（13pt）圆角；其下用Mono小字提示「继续即表示同意 服务条款 与 隐私政策」
 
 #### Scenario: 登录中
 - **WHEN** Apple 登录请求进行中
@@ -79,6 +82,7 @@ ProfileView SHALL 在「账号」分组内渲染「退出登录」(`Theme.Color.
 #### Scenario: 点击法律链接打开页面
 - **WHEN** 用户点击登录页法律提示中的「服务条款」或「隐私政策」
 - **THEN** 经 `SFSafariViewController` 打开对应页面,不中断登录流程。
+- **AND** 链接URL来自配置，与「我的 / 关于」一致，不使用文档链接占位
 
 ### Requirement: 训练偏好分组
 

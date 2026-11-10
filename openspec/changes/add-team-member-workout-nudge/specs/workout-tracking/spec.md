@@ -31,7 +31,7 @@
 - **WHEN** 休息计时进行中，用户确认结束训练（或丢弃该进行中会话）
 - **THEN** 浮动 FAB 与休息弹窗立即收起、待发休息提醒通知被撤销、休息 Live Activity 立即结束，不再残留倒计时
 
-#### Scenario: 自动分享到偏好已开启的 Team
+#### Scenario: 自动分享到已授权 Team
 - **WHEN** 训练已归档，且用户在 Team A 的自动分享偏好为开启
 - **THEN** 系统为 Team A 创建或更新该训练 checkin
 - **AND** 自动分享偏好为关闭的 Team 不出现该训练

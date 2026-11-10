@@ -4,11 +4,12 @@ import Testing
 
 @MainActor
 struct MuscleLoadAggregatorTests {
+    private let testStore = WorkoutTestStore()
 
     // MARK: - 构造辅助
 
-    private func makeWorkout(at startedAt: Date, exercises: [WorkoutExercise]) -> Workout {
-        let workout = Workout(title: "训练", startedAt: startedAt)
+    private func makeWorkout(at startedAt: Date, exercises: [WorkoutExercise]) throws -> Workout {
+        let workout = try testStore.insert(Workout(title: "训练", startedAt: startedAt))
         workout.exercises = exercises
         workout.endedAt = startedAt.addingTimeInterval(3600)
         return workout
@@ -43,7 +44,7 @@ struct MuscleLoadAggregatorTests {
             WorkoutSet(setIndex: 3, weightKg: 20, reps: 12, completed: true, setType: .warmup),
             WorkoutSet(setIndex: 4, weightKg: 80, reps: 8, completed: false, setType: .working)
         ])
-        let workouts = [makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [exercise])]
+        let workouts = [try makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [exercise])]
 
         let entries = MuscleLoadAggregator.load(workouts: workouts, in: week)
 
@@ -61,7 +62,7 @@ struct MuscleLoadAggregatorTests {
             WorkoutSetSegment(segmentIndex: 1, weightKg: 60, reps: 6)
         ])
         let exercise = makeExercise(name: "飞鸟", muscle: "胸", sets: [drop])
-        let workouts = [makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [exercise])]
+        let workouts = [try makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [exercise])]
 
         let chest = MuscleLoadAggregator.load(workouts: workouts, in: week).first { $0.category == .chest }
 
@@ -70,15 +71,15 @@ struct MuscleLoadAggregatorTests {
         #expect(volume == 1000)                                 // 训练量按 segments 展开：80×8 + 60×6
     }
 
-    @Test func excludesSoftDeletedWorkoutsAndOutOfRangeDays() {
+    @Test func excludesSoftDeletedWorkoutsAndOutOfRangeDays() throws {
         let week = MuscleLoadAggregator.weekRange(for: reference)
         // 每个训练独立的动作实例：@Model 关系逆回写会让共享实例从先前数组中移除。
-        let inWeek = makeWorkout(at: week.lowerBound.addingTimeInterval(3600),
+        let inWeek = try makeWorkout(at: week.lowerBound.addingTimeInterval(3600),
                                  exercises: [makeExercise(name: "卧推", muscle: "胸", sets: [workingSet(0)])])
-        let deleted = makeWorkout(at: week.lowerBound.addingTimeInterval(7200),
+        let deleted = try makeWorkout(at: week.lowerBound.addingTimeInterval(7200),
                                   exercises: [makeExercise(name: "卧推", muscle: "胸", sets: [workingSet(0)])])
         deleted.deletedAt = Date()
-        let lastWeek = makeWorkout(at: week.lowerBound.addingTimeInterval(-3600),
+        let lastWeek = try makeWorkout(at: week.lowerBound.addingTimeInterval(-3600),
                                    exercises: [makeExercise(name: "卧推", muscle: "胸", sets: [workingSet(0)])])
 
         let entries = MuscleLoadAggregator.load(workouts: [inWeek, deleted, lastWeek], in: week)
@@ -88,11 +89,11 @@ struct MuscleLoadAggregatorTests {
 
     // MARK: - 归组
 
-    @Test func snapshotTakesPriorityOverLibrary() {
+    @Test func snapshotTakesPriorityOverLibrary() throws {
         // 快照为「肩」，即便动作库能把该名字解析到其它部位，也以快照为准。
         let exercise = makeExercise(name: "卧推", muscle: "肩", sets: [workingSet(0)])
         let week = MuscleLoadAggregator.weekRange(for: reference)
-        let workouts = [makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [exercise])]
+        let workouts = [try makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [exercise])]
 
         let entries = MuscleLoadAggregator.load(workouts: workouts, in: week)
 
@@ -100,22 +101,22 @@ struct MuscleLoadAggregatorTests {
         #expect(entries.first { $0.category == .chest }?.workingSets == 0)
     }
 
-    @Test func missingSnapshotFallsBackToLibrary() {
+    @Test func missingSnapshotFallsBackToLibrary() throws {
         // 快照 nil，但动作库可解析「杠铃卧推」→ 胸
         let exercise = makeExercise(name: "杠铃卧推", muscle: nil, sets: [workingSet(0)])
         exercise.builtinExerciseCode = "BB_BENCH_PRESS"
         let week = MuscleLoadAggregator.weekRange(for: reference)
-        let workouts = [makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [exercise])]
+        let workouts = [try makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [exercise])]
 
         let entries = MuscleLoadAggregator.load(workouts: workouts, in: week)
 
         #expect(entries.first { $0.category == .chest }?.workingSets == 1)
     }
 
-    @Test func unresolvableExerciseGoesToOtherBucket() {
+    @Test func unresolvableExerciseGoesToOtherBucket() throws {
         let exercise = makeExercise(name: "不存在的动作", muscle: nil, sets: [workingSet(0)])
         let week = MuscleLoadAggregator.weekRange(for: reference)
-        let workouts = [makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [exercise])]
+        let workouts = [try makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [exercise])]
 
         let entries = MuscleLoadAggregator.load(workouts: workouts, in: week)
 
@@ -123,10 +124,10 @@ struct MuscleLoadAggregatorTests {
         #expect(entries.last?.workingSets == 1)
     }
 
-    @Test func nonAnatomicalExercisesAreExcludedEntirely() {
+    @Test func nonAnatomicalExercisesAreExcludedEntirely() throws {
         let cardio = makeExercise(name: "慢跑", muscle: "有氧", sets: [workingSet(0)])
         let week = MuscleLoadAggregator.weekRange(for: reference)
-        let workouts = [makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [cardio])]
+        let workouts = [try makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [cardio])]
 
         let entries = MuscleLoadAggregator.load(workouts: workouts, in: week)
 
@@ -134,13 +135,13 @@ struct MuscleLoadAggregatorTests {
         #expect(entries.allSatisfy { $0.category != nil })      // 不进「其他」桶
     }
 
-    @Test func collapsedLegacyCategoriesMapToParentL1() {
+    @Test func collapsedLegacyCategoriesMapToParentL1() throws {
         // 旧细分类收缩：二头→手臂、斜方肌→背、小腿→腿（快照与动作库两条路径都走 collapseL1）。
         let week = MuscleLoadAggregator.weekRange(for: reference)
         let curl = makeExercise(name: "哑铃弯举", muscle: "二头", sets: [workingSet(0)])
         let shrug = makeExercise(name: "杠铃耸肩", muscle: "斜方肌", sets: [workingSet(0)])
         let raise = makeExercise(name: "提踵", muscle: "小腿", sets: [workingSet(0)])
-        let workouts = [makeWorkout(at: week.lowerBound.addingTimeInterval(3600),
+        let workouts = [try makeWorkout(at: week.lowerBound.addingTimeInterval(3600),
                                     exercises: [curl, shrug, raise])]
 
         let entries = MuscleLoadAggregator.load(workouts: workouts, in: week)
@@ -168,7 +169,7 @@ struct MuscleLoadAggregatorTests {
 
     // MARK: - 趋势
 
-    @Test func weeklySeriesBuildsFourWeekRisingSequence() {
+    @Test func weeklySeriesBuildsFourWeekRisingSequence() throws {
         let calendar = Calendar.currentMondayFirst
         let thisWeek = MuscleLoadAggregator.weekRange(for: reference, calendar: calendar)
         var workouts: [Workout] = []
@@ -177,7 +178,7 @@ struct MuscleLoadAggregatorTests {
             let weekStart = calendar.date(byAdding: .weekOfYear, value: offset, to: thisWeek.lowerBound)!
             let sets = (0..<count).map { workingSet($0) }
             let exercise = makeExercise(name: "卧推", muscle: "胸", sets: sets)
-            workouts.append(makeWorkout(at: weekStart.addingTimeInterval(3600), exercises: [exercise]))
+            workouts.append(try makeWorkout(at: weekStart.addingTimeInterval(3600), exercises: [exercise]))
         }
 
         let series = MuscleLoadAggregator.weeklySeries(workouts: workouts, weeks: 4, reference: reference)
@@ -189,23 +190,23 @@ struct MuscleLoadAggregatorTests {
 
     // MARK: - 快照构建
 
-    @Test func snapshotBuildsBoardBaselineSeriesAndContributions() {
+    @Test func snapshotBuildsBoardBaselineSeriesAndContributions() throws {
         let calendar = Calendar.currentMondayFirst
         let thisWeek = MuscleLoadAggregator.weekRange(for: reference, calendar: calendar)
         let thisWeekDay = thisWeek.lowerBound.addingTimeInterval(3600)
         let lastWeekStart = calendar.date(byAdding: .weekOfYear, value: -1, to: thisWeek.lowerBound)!
         var workouts: [Workout] = []
-        workouts.append(makeWorkout(at: thisWeekDay, exercises: [
+        workouts.append(try makeWorkout(at: thisWeekDay, exercises: [
             makeExercise(name: "卧推", muscle: "胸", sets: [workingSet(0), workingSet(1), workingSet(2)])
         ]))
         // 上周一、周二各 2 组
         for day in [0, 1] {
-            workouts.append(makeWorkout(at: lastWeekStart.addingTimeInterval(TimeInterval(day) * 86400 + 3600),
+            workouts.append(try makeWorkout(at: lastWeekStart.addingTimeInterval(TimeInterval(day) * 86400 + 3600),
                                         exercises: [makeExercise(name: "卧推", muscle: "胸",
                                                                  sets: [workingSet(0), workingSet(1)])]))
         }
         // 上周三 1 组（整周基准同样计入）
-        workouts.append(makeWorkout(at: lastWeekStart.addingTimeInterval(2 * 86400 + 3600),
+        workouts.append(try makeWorkout(at: lastWeekStart.addingTimeInterval(2 * 86400 + 3600),
                                     exercises: [makeExercise(name: "卧推", muscle: "胸", sets: [workingSet(0)])]))
 
         let referenceAt = thisWeek.lowerBound.addingTimeInterval(86400)   // 本周二 00:00 视角
@@ -225,7 +226,7 @@ struct MuscleLoadAggregatorTests {
 
     // MARK: - 贡献明细
 
-    @Test func contributionsGroupByHistoryKeyDescending() {
+    @Test func contributionsGroupByHistoryKeyDescending() throws {
         let week = MuscleLoadAggregator.weekRange(for: reference)
         let benchDay1 = makeExercise(name: "杠铃卧推", muscle: "胸", sets: [workingSet(0), workingSet(1)])
         benchDay1.builtinExerciseCode = "BB_BENCH_PRESS"
@@ -233,8 +234,8 @@ struct MuscleLoadAggregatorTests {
         benchDay2.builtinExerciseCode = "BB_BENCH_PRESS"
         let fly = makeExercise(name: "不存在的飞鸟", muscle: "胸", sets: [workingSet(0)])
         let squat = makeExercise(name: "深蹲", muscle: "腿", sets: [workingSet(0)])
-        let day1 = makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [benchDay1, squat])
-        let day2 = makeWorkout(at: week.lowerBound.addingTimeInterval(7200), exercises: [benchDay2, fly])
+        let day1 = try makeWorkout(at: week.lowerBound.addingTimeInterval(3600), exercises: [benchDay1, squat])
+        let day2 = try makeWorkout(at: week.lowerBound.addingTimeInterval(7200), exercises: [benchDay2, fly])
 
         let contributions = MuscleLoadAggregator.contributions(
             workouts: [day1, day2], in: week, category: .chest)

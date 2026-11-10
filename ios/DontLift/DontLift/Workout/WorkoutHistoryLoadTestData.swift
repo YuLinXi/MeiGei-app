@@ -37,6 +37,7 @@ enum WorkoutHistoryLoadTestData {
             )
 
             let exerciseCount = 4 + (workoutIndex % 3)
+            var exercises: [WorkoutExercise] = []
             for exerciseIndex in 0..<exerciseCount {
                 let source = catalog[(workoutIndex + exerciseIndex) % catalog.count]
                 let exercise = WorkoutExercise(
@@ -56,14 +57,15 @@ enum WorkoutHistoryLoadTestData {
                         setType: .working
                     )
                 }
-                insertedSets += exercise.sets.count
+                insertedSets += setCount
                 insertedExercises += 1
-                workout.exercises.append(exercise)
+                exercises.append(exercise)
             }
+            workout.exercises = exercises
             context.insert(workout)
         }
 
-        try context.save()
+        try LocalModelSave.save(context)
         return Result(workouts: count, exercises: insertedExercises, sets: insertedSets)
     }
 }

@@ -39,6 +39,10 @@
 - **WHEN** 用户删号但 Apple `.p8` 凭据缺失或无可撤销 token
 - **THEN** 后端记录 warning 日志、跳过 revoke、仍完整执行本地数据删除并返回 2xx
 
+#### Scenario: 与反向撤销通知对齐
+- **WHEN** Apple 之后就同一 user 发来 S2S `account-delete` 通知,而该账号已被主动删除
+- **THEN** `revokeBySub` 处理为幂等空操作,不报错、不产生异常副作用。
+
 ## ADDED Requirements
 
 ### Requirement: 删除账号清理多 provider 身份

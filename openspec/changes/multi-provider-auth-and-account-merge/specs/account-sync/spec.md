@@ -4,11 +4,11 @@
 
 系统 SHALL 继续提供「使用 Apple 登录」作为身份认证方式之一。客户端获取 Apple identityToken 后提交后端，后端 MUST 通过 Apple 公钥（JWKS，需缓存）验证该 JWT 的签名、issuer、audience 与有效期，并以 token 中的 `sub` 作为该 Apple 身份的唯一标识。Apple 登录不再是唯一登录方式；同一 `app_user` 可同时绑定 Apple、微信和手机号身份。
 
-#### Scenario: 首次 Apple 登录创建账户
+#### Scenario: 首次登录创建账户
 - **WHEN** 用户首次用 Apple 登录且后端校验 identityToken 通过
 - **THEN** 系统创建 `app_user` 记录并关联一条 `identity_provider=apple, provider_user_id=<sub>` 的身份记录，签发应用自有 JWT 会话令牌返回客户端
 
-#### Scenario: Apple 老用户再次登录
+#### Scenario: 老用户再次登录
 - **WHEN** 已存在 `provider=apple, provider_user_id=<sub>` 对应身份的用户再次登录
 - **THEN** 系统复用既有 `app_user`，不创建新账户，签发新的会话令牌
 
@@ -20,7 +20,7 @@
 
 系统 SHALL 采用 `app_user`（业务主体）、`identity_provider`、`provider_user_id` 三层结构存储身份。业务数据 MUST 外键关联 `app_user.id`，MUST NOT 直接以 Apple `sub`、微信 `unionid/openid` 或手机号作为业务主键。`user_identity.provider` SHALL 支持 `apple`、`wechat`、`phone`，同一 provider subject 在全站唯一，同一用户同一 provider 最多保留一个活跃身份。
 
-#### Scenario: 扩展登录方式不需迁移业务数据
+#### Scenario: 未来扩展登录方式不需重构
 - **WHEN** 用户在同一账号上新增手机号或微信登录方式
 - **THEN** 系统仅为同一 `app_user` 增加新的身份记录，已有训练、计划、Team 和同步数据无需迁移
 
@@ -38,12 +38,12 @@
 系统 SHALL 提供接收 Apple 服务器通知的回调端点，处理用户撤销 Apple Sign-In 授权的事件（满足 App Store 审核要求）。在多身份账号中，Apple 撤销 SHALL 优先解绑 Apple 身份并清除 Apple refresh token；若该账号已无其它可登录身份，系统 MUST 进入注销、删除或不可登录兜底流程，避免留下无法登录但仍活跃的账号。
 
 #### Scenario: 多身份用户撤销 Apple 授权
-- **WHEN** 系统收到 Apple 撤销通知且该用户仍绑定微信或手机号
+- **WHEN** 系统收到 Apple 撤销通知且通过签名校验，该用户仍绑定微信或手机号
 - **THEN** 系统删除或停用该用户的 Apple identity
 - **AND** 保留 `app_user`、训练、计划、Team 数据和其它登录身份
 
-#### Scenario: 最后一个身份为 Apple 时撤销
-- **WHEN** 系统收到 Apple 撤销通知且该账号没有其它可登录身份
+#### Scenario: 用户撤销授权
+- **WHEN** 系统收到 Apple 撤销通知且通过签名校验，该账号没有其它可登录身份
 - **THEN** 系统注销、删除或标记该账号不可登录
 - **AND** 旧 JWT 不得继续访问该账号数据
 

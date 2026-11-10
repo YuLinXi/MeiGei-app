@@ -32,6 +32,7 @@ struct MuscleLoadSparkline: View {
 /// 负荷条统一主色（朱砂红），「其他」桶整体弱化；组数为视觉主数字，容量弱化色紧随（「12 组 · 8.6 t」）。
 /// 行内不展示同期对比增量——对比详情在复盘页点按展开的贡献明细面板中呈现。
 struct MuscleLoadRowView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let name: String
     let entry: MuscleLoadEntry
     /// 相对最大组数的条宽比例（0...1）。
@@ -42,11 +43,15 @@ struct MuscleLoadRowView: View {
     var isSecondary = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        let expanded = dynamicTypeSize >= .xxLarge
+        let layout = expanded
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 10))
+        return layout {
             Text(name)
                 .font(Theme.Font.body(size: 13, weight: .semibold))
                 .foregroundStyle(isSecondary ? Theme.Color.muted : Theme.Color.fg)
-                .frame(width: 34, alignment: .leading)
+                .frame(width: expanded ? nil : 34, alignment: .leading)
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -58,23 +63,26 @@ struct MuscleLoadRowView: View {
             }
             .frame(height: 6)
 
-            HStack(spacing: 3) {
+            let summaryLayout = expanded
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3))
+                : AnyLayout(HStackLayout(spacing: 3))
+            summaryLayout {
                 Text("\(entry.workingSets) 组")
                     .font(Theme.Font.mono(size: 12, weight: .semibold))
                     .foregroundStyle(isSecondary ? Theme.Color.muted : Theme.Color.fg)
-                Text("· \(formatMuscleLoadVolume(entry.volumeKg))")
+                Text((expanded ? "" : "· ") + formatMuscleLoadVolume(entry.volumeKg))
                     .font(Theme.Font.mono(size: 11, weight: .medium))
                     .foregroundStyle(Theme.Color.muted)
             }
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .frame(width: 88, alignment: .trailing)
+            .lineLimit(expanded ? nil : 1)
+            .minimumScaleFactor(expanded ? 1 : 0.75)
+            .frame(width: expanded ? nil : 88, alignment: .trailing)
 
             if let series {
                 MuscleLoadSparkline(values: series)
             }
         }
-        .frame(height: 28)
+        .frame(minHeight: 28)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(name)，\(entry.workingSets) 组，\(formatMuscleLoadVolume(entry.volumeKg))")
     }
@@ -220,7 +228,7 @@ struct MuscleLoadReviewView: View {
                 .foregroundStyle(active ? .white : Theme.Color.fg2)
                 .padding(.horizontal, 12)
                 .frame(height: 26)
-                .background(active ? Theme.Color.accent : Color.clear,
+                .background(active ? Theme.Color.action : Color.clear,
                             in: Capsule(style: .continuous))
         }
         .buttonStyle(.plain)

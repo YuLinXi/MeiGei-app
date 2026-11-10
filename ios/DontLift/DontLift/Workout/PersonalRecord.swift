@@ -126,7 +126,7 @@ struct PRCelebrationSheet: View {
                 .font(Theme.Font.mono(size: 10, weight: .bold))
                 .tracking(0.2 * 10)
                 .textCase(.uppercase)
-                .foregroundStyle(Theme.Color.accent)
+                .foregroundStyle(Theme.Color.action)
                 .padding(.top, 16)
             Text(records.count == 1 ? "1 项新纪录！" : "\(records.count) 项新纪录！")
                 .font(Theme.Font.display(size: 23, weight: .heavy))
@@ -204,21 +204,21 @@ struct PRCelebrationSheet: View {
                         .font(Theme.Font.mono(size: 10, weight: .regular))
                         .tracking(0.06 * 10)
                         .textCase(.uppercase)
-                        .foregroundStyle(Theme.Color.accent)
+                        .foregroundStyle(Theme.Color.action)
                 }
             }
             Spacer(minLength: 0)
             HStack(alignment: .center, spacing: 3) {
                 Image(systemName: ExerciseWeightSemantics.isAssisted(pr.exerciseKey) ? "arrowtriangle.down.fill" : "arrowtriangle.up.fill")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
+                    .foregroundStyle(Theme.Color.action)
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text((ExerciseWeightSemantics.isAssisted(pr.exerciseKey) ? "辅助 " : "") + formatKg(pr.weightKg))
                         .numStyle(size: 30, weight: .bold)
-                        .foregroundStyle(Theme.Color.accent)
+                        .foregroundStyle(Theme.Color.action)
                     Text("kg")
                         .font(Theme.Font.mono(size: 12, weight: .semibold))
-                        .foregroundStyle(Theme.Color.accent.opacity(0.7))
+                        .foregroundStyle(Theme.Color.action)
                 }
             }
         }
@@ -235,7 +235,7 @@ struct PRCelebrationSheet: View {
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 15)
-                .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .background(Theme.Color.action, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                 .shadow(color: Theme.Color.accent.opacity(0.26), radius: 7, x: 0, y: 4)
         }
         .buttonStyle(PressableButtonStyle())

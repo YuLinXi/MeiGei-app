@@ -51,6 +51,8 @@ app:
   dev:
     # 本地联调用的免 Apple 造 token 端点；默认关闭，生产勿开
     token-enabled: ${APP_DEV_TOKEN:false}
+    # 可选：直接登录已导入的本地账号，不生成示例数据。
+    user-id: ${APP_DEV_USER_ID:}
   apple:
     # Sign in with Apple 的 client_id / service_id（aud 校验）
     audiences: ${APPLE_AUDIENCES:com.yulinxi.app.DontLift}

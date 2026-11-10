@@ -59,14 +59,22 @@ struct CalendarHistoryBadge: Identifiable, Equatable, Hashable {
 
 /// 个人历史与 Team 历史共用的月历展示壳。数据源、行内容和详情目标由调用方注入。
 struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .body) private var dayNumeralWidth: CGFloat = 18
+    @ScaledMetric(relativeTo: .body) private var dayNumberLineHeight: CGFloat = 18
+    @ScaledMetric(relativeTo: .body) private var daySummaryLineHeight: CGFloat = 13
     @Binding var displayedMonth: Date
     @Binding var selectedDate: Date
 
     let eyebrow: String
     let month: CalendarHistoryMonthSnapshot<Row>
-    let archiveGroups: [CalendarHistoryYearArchiveGroup]
+    /// 月份归档只在选择器打开时生成，普通切月不重复汇总全部历史日期。
+    let archiveGroups: () -> [CalendarHistoryYearArchiveGroup]
     let calendar: Calendar
     var minimumSelectableDate: Date? = nil
+    var hasSnapshot = true
+    var loadMessage: String? = nil
+    var onRetry: (() -> Void)? = nil
     let monthSummaryText: (CalendarHistoryMonthSnapshot<Row>) -> String
     let selectedSummaryText: (CalendarHistoryDaySummary<Row>?) -> String
     let emptySelectedDayText: String
@@ -107,10 +115,12 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
                 ScrollView {
                     VStack(spacing: metrics.sectionSpacing) {
                         monthHeader
-                        calendarGrid(dayCellHeight: metrics.dayCellHeight)
+                        loadFeedback
+                        calendarGrid(dayCellHeight: metrics.dayCellHeight,
+                                     availableWidth: proxy.size.width - Theme.Spacing.lg * 2)
                             .layoutPriority(1)
                         selectedDayDrawer(maxRows: metrics.drawerRows)
-                            .frame(height: metrics.drawerHeight, alignment: .top)
+                            .frame(height: dynamicTypeSize >= .xxLarge ? nil : metrics.drawerHeight, alignment: .top)
                     }
                     .padding(.horizontal, Theme.Spacing.lg)
                     .padding(.top, metrics.topPadding)
@@ -119,13 +129,15 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
                     .frame(minHeight: proxy.size.height, alignment: .top)
                 }
                 .scrollIndicators(.hidden)
+                .accessibilityIdentifier("calendar.history.scroll")
             }
         }
         .sheet(isPresented: $showingMonthArchive) {
             CalendarHistoryMonthArchiveSheet(
                 initialMonth: displayedMonth,
-                yearGroups: archiveGroups,
-                calendar: calendar
+                yearGroups: archiveGroups(),
+                calendar: calendar,
+                emptyMessage: hasSnapshot ? "暂无可查看的训练月份。" : "月份记录尚未就绪。"
             ) { pickedMonth in
                 applyPickedMonth(pickedMonth)
             }
@@ -174,21 +186,35 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
     }
 
     private var monthHeader: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        let expanded = dynamicTypeSize >= .xxLarge
+        let layout = expanded
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 8))
+        return VStack(alignment: .leading, spacing: 7) {
             Text(eyebrow).eyebrowStyle()
-            HStack(spacing: 8) {
-                Text(CalendarHistoryFormatters.month.string(from: month.monthStart))
-                    .font(Theme.Font.display(size: 30, weight: .heavy))
-                    .foregroundStyle(Theme.Color.fg)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                CircleIconButton(systemName: "calendar", size: 34, active: true) {
-                    Theme.Haptics.selection()
-                    showingMonthArchive = true
+            layout {
+                Group {
+                    if expanded {
+                        let year = Text(String(calendar.component(.year, from: month.monthStart)) + "年").fixedSize()
+                        let monthTitle = Text(String(calendar.component(.month, from: month.monthStart)) + "月").fixedSize()
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) { year; monthTitle }
+                            VStack(alignment: .leading, spacing: 0) { year; monthTitle }
+                        }
+                    } else {
+                        Text(CalendarHistoryFormatters.month.string(from: month.monthStart))
+                            .lineLimit(1).minimumScaleFactor(0.78)
+                    }
                 }
-                .accessibilityLabel("选择月份")
-                Spacer(minLength: 0)
+                .font(Theme.Font.display(size: 30, weight: .heavy))
+                .foregroundStyle(Theme.Color.fg)
                 HStack(spacing: 8) {
+                    CircleIconButton(systemName: "calendar", size: 34, active: true) {
+                        Theme.Haptics.selection()
+                        showingMonthArchive = true
+                    }
+                    .accessibilityLabel("选择月份")
+                    Spacer(minLength: 0)
                     CircleIconButton(systemName: "chevron.left", size: 34, action: { shiftMonth(-1) })
                         .disabled(!canGoPreviousMonth)
                         .opacity(canGoPreviousMonth ? 1 : 0.35)
@@ -197,16 +223,43 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
                         .accessibilityLabel("下个月")
                 }
             }
-            HStack(spacing: Theme.Spacing.sm) {
-                Text(monthSummaryText(month))
+            layout {
+                Text(hasSnapshot ? monthSummaryText(month) : "训练记录尚未就绪")
                     .font(Theme.Font.body(size: 13, weight: .medium))
                     .foregroundStyle(Theme.Color.fg2)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                Spacer(minLength: Theme.Spacing.sm)
-                todayButtonSlot
+                    .lineLimit(expanded ? nil : 1)
+                    .minimumScaleFactor(expanded ? 1 : 0.78)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("calendar.month.summary")
+                if !expanded { Spacer(minLength: Theme.Spacing.sm) }
+                if showTodayButton || !expanded { todayButtonSlot }
             }
-            .frame(height: 30)
+            .frame(minHeight: 30)
+        }
+    }
+
+    @ViewBuilder private var loadFeedback: some View {
+        if let loadMessage {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                Text(loadMessage)
+                    .font(Theme.Font.l4)
+                    .foregroundStyle(Theme.Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("calendar.history.status")
+                if let onRetry {
+                    Button(action: onRetry) {
+                        Text("重试加载记录")
+                            .font(Theme.Font.l3)
+                            .foregroundStyle(Theme.Color.action)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("calendar.history.retry")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -216,54 +269,75 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
             Button(action: jumpToToday) {
                 Text("今天")
                     .font(Theme.Font.body(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
-                    .frame(width: 58, height: 30)
+                    .foregroundStyle(Theme.Color.action)
+                    .padding(.horizontal, 12).padding(.vertical, 5)
+                    .frame(minWidth: 58, minHeight: 30)
                     .background(Theme.Color.accentSoft, in: Capsule())
                     .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(PressableButtonStyle())
             .accessibilityLabel("回到今天")
         } else {
             Color.clear
-                .frame(width: 58, height: 30)
+                .frame(width: 58, height: 44)
                 .accessibilityHidden(true)
         }
     }
 
-    private func calendarGrid(dayCellHeight: CGFloat) -> some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 5) {
-                ForEach(weekdayTitles, id: \.self) { title in
-                    Text(title)
-                        .font(Theme.Font.mono(size: 10, weight: .bold))
-                        .foregroundStyle(Theme.Color.muted)
-                        .frame(maxWidth: .infinity)
-                }
+    private func calendarGrid(dayCellHeight: CGFloat, availableWidth: CGFloat) -> some View {
+        let width = max(availableWidth, max(44, dayNumeralWidth + 14) * 7 + 30 + 16)
+        let height = dynamicTypeSize >= .xxLarge
+            ? max(dayCellHeight, dayNumberLineHeight + daySummaryLineHeight + 18) : dayCellHeight
+        return VStack(alignment: .leading, spacing: 6) {
+            if width > availableWidth {
+                Text("左右滑动查看整周")
+                    .font(Theme.Font.body(size: 11))
+                    .foregroundStyle(Theme.Color.muted)
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 5), count: 7), spacing: 5) {
-                ForEach(month.days) { day in
-                    dayCell(day, height: dayCellHeight)
+            ScrollView(.horizontal) {
+                VStack(spacing: 6) {
+                    HStack(spacing: 5) {
+                        ForEach(weekdayTitles, id: \.self) { title in
+                            Text(title)
+                                .font(Theme.Font.mono(size: 10, weight: .bold))
+                                .foregroundStyle(Theme.Color.muted)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 5), count: 7), spacing: 5) {
+                        ForEach(month.days) { day in dayCell(day, height: height) }
+                    }
                 }
+                .frame(width: width - 16)
+                .cardStyle(padding: 8)
             }
+            .fixedSize(horizontal: false, vertical: true)
+            .scrollBounceBehavior(.basedOnSize)
+            .accessibilityIdentifier("calendar.grid")
         }
-        .cardStyle(padding: 8)
     }
 
     private func selectedDayDrawer(maxRows: Int) -> some View {
         let rows = selectedSummary?.rows ?? []
         return VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            HStack(alignment: .firstTextBaseline) {
+            let layout = dynamicTypeSize >= .xxLarge
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+            layout {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(CalendarHistoryFormatters.day.string(from: selectedDate))
                         .font(Theme.Font.body(size: 16, weight: .bold))
                         .foregroundStyle(Theme.Color.fg)
-                    Text(selectedSummaryText(selectedSummary))
+                    Text(hasSnapshot ? selectedSummaryText(selectedSummary) : "所选日期的记录尚未就绪")
                         .font(Theme.Font.body(size: 12))
                         .foregroundStyle(Theme.Color.fg2)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .lineLimit(dynamicTypeSize >= .xxLarge ? nil : 1)
+                        .minimumScaleFactor(dynamicTypeSize >= .xxLarge ? 1 : 0.8)
+                        .accessibilityIdentifier("calendar.day.summary")
                 }
-                Spacer(minLength: Theme.Spacing.sm)
+                if dynamicTypeSize < .xxLarge { Spacer(minLength: Theme.Spacing.sm) }
                 HStack(spacing: 6) {
                     ForEach(selectedSummary.map(selectedBadges) ?? []) { badge in
                         HStack(spacing: 4) {
@@ -274,7 +348,7 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
                             Text(badge.text)
                                 .font(Theme.Font.mono(size: 9, weight: .bold))
                         }
-                        .foregroundStyle(Theme.Color.accent)
+                        .foregroundStyle(Theme.Color.action)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Theme.Color.accentSofter, in: Capsule())
@@ -282,7 +356,12 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
                 }
             }
 
-            if !rows.isEmpty {
+            if !hasSnapshot {
+                Text("加载完成后，可在这里查看当天训练。")
+                    .font(Theme.Font.l4)
+                    .foregroundStyle(Theme.Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if !rows.isEmpty {
                 selectedDayRows(rows, maxRows: maxRows)
             } else {
                 Text(emptySelectedDayText)
@@ -298,7 +377,7 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
 
     @ViewBuilder
     private func selectedDayRows(_ rows: [Row], maxRows: Int) -> some View {
-        if rows.count > maxRows {
+        if rows.count > maxRows && dynamicTypeSize < .xxLarge {
             ScrollView {
                 selectedDayRowButtons(rows)
             }
@@ -309,7 +388,7 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
     }
 
     private func selectedDayRowButtons(_ rows: [Row]) -> some View {
-        VStack(spacing: 8) {
+        LazyVStack(spacing: 8) {
             ForEach(rows) { row in
                 Button { onRowTap(row) } label: {
                     rowContent(row, true)
@@ -342,6 +421,7 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
                 Text("\(calendar.component(.day, from: day.date))")
                     .font(Theme.Font.number(size: compact ? 13 : 15, weight: trained ? .bold : .semibold))
                     .foregroundStyle(dayTextColor(day, selected: selected))
+                    .fixedSize()
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if let summary = day.summary {
                     Text(daySummaryTitle(summary))
@@ -371,8 +451,9 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
         .buttonStyle(PressableButtonStyle())
         .disabled(!selectable)
         .opacity(selectable ? 1 : 0.45)
-        .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel(for: day))
+        .accessibilityValue(selected ? "已选择" : "未选择")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func shiftMonth(_ delta: Int) {
@@ -426,25 +507,26 @@ struct CalendarHistoryScaffold<Row: Identifiable & Hashable, RowContent: View>: 
     private func dayTextColor(_ day: CalendarHistoryDayCell<Row>, selected: Bool) -> Color {
         if !isSelectable(day.date) { return Theme.Color.muted.opacity(0.45) }
         if selected { return Theme.Color.bg }
-        if !day.isInDisplayedMonth { return Theme.Color.muted.opacity(0.55) }
+        if !day.isInDisplayedMonth { return Theme.Color.muted }
         if day.summary != nil { return Theme.Color.fg }
         return Theme.Color.fg2
     }
 
     private func dayBackground(_ day: CalendarHistoryDayCell<Row>, selected: Bool) -> Color {
-        if selected { return Theme.Color.accent }
+        if selected { return Theme.Color.action }
         if day.summary != nil { return Theme.Color.accentSoft }
         return Theme.Color.bg
     }
 
     private func dayBorder(_ day: CalendarHistoryDayCell<Row>, selected: Bool) -> Color {
-        if selected { return Theme.Color.accent }
+        if selected { return Theme.Color.action }
         if day.isToday { return Theme.Color.accentSofter }
         return .clear
     }
 
     private func accessibilityLabel(for day: CalendarHistoryDayCell<Row>) -> String {
         let title = CalendarHistoryFormatters.day.string(from: day.date)
+        guard hasSnapshot else { return "\(title)，训练记录尚未就绪" }
         if let summary = day.summary {
             return "\(title)，\(summary.rowCount) 次训练"
         }
@@ -479,10 +561,12 @@ private struct CalendarHistoryLayoutMetrics {
 
 private struct CalendarHistoryMonthArchiveSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let initialMonth: Date
     let yearGroups: [CalendarHistoryYearArchiveGroup]
     let calendar: Calendar
+    var emptyMessage = "暂无可查看的训练月份。"
     let onPick: (Date) -> Void
     private let topID = "month-archive-top"
 
@@ -494,6 +578,14 @@ private struct CalendarHistoryMonthArchiveSheet: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 10) {
                             Color.clear.frame(height: 0).id(topID)
+                            if yearGroups.isEmpty {
+                                Text(emptyMessage)
+                                    .font(Theme.Font.l4)
+                                    .foregroundStyle(Theme.Color.muted)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding(.vertical, Theme.Spacing.lg)
+                                    .accessibilityIdentifier("calendar.archive.state")
+                            }
                             ForEach(yearGroups) { group in
                                 yearHeader(group.year)
                                     .id(group.id)
@@ -504,7 +596,7 @@ private struct CalendarHistoryMonthArchiveSheet: View {
                             }
                         }
                         .padding(.leading, Theme.Spacing.lg)
-                        .padding(.trailing, Theme.Spacing.xl + 22)
+                        .padding(.trailing, Theme.Spacing.xl + 44)
                         .padding(.vertical, Theme.Spacing.lg)
                     }
                     .background(Theme.Color.bg)
@@ -527,7 +619,7 @@ private struct CalendarHistoryMonthArchiveSheet: View {
 
     private func yearHeader(_ year: Int) -> some View {
         HStack(spacing: 8) {
-            Text("\(year)")
+            Text(String(year))
                 .font(Theme.Font.display(size: 22, weight: .heavy))
                 .foregroundStyle(Theme.Color.fg)
             Rectangle()
@@ -540,41 +632,47 @@ private struct CalendarHistoryMonthArchiveSheet: View {
     }
 
     private func yearIndex(_ proxy: ScrollViewProxy) -> some View {
-        VStack(spacing: 7) {
-            Button {
-                Theme.Haptics.selection()
-                withAnimation(.snappy) {
-                    proxy.scrollTo(topID, anchor: .top)
-                }
-            } label: {
-                Image(systemName: "arrow.up.to.line")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
-                    .frame(width: 26, height: 26)
-                    .background(Theme.Color.accentSoft, in: Circle())
-                    .overlay(Circle().stroke(Theme.Color.accentSofter, lineWidth: 1))
-            }
-            .buttonStyle(PressableButtonStyle())
-            .accessibilityLabel("回到顶部")
-
-            ForEach(yearGroups) { group in
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 7) {
                 Button {
                     Theme.Haptics.selection()
                     withAnimation(.snappy) {
-                        proxy.scrollTo(group.id, anchor: .top)
+                        proxy.scrollTo(topID, anchor: .top)
                     }
                 } label: {
-                    Text(String(String(group.year).suffix(2)))
-                        .font(Theme.Font.mono(size: 10, weight: .bold))
-                        .foregroundStyle(isInitialYear(group.year) ? Theme.Color.accent : Theme.Color.muted)
-                        .frame(width: 26, height: 24)
-                        .background(isInitialYear(group.year) ? Theme.Color.accentSoft : Theme.Color.surface, in: Capsule())
-                        .overlay(Capsule().stroke(isInitialYear(group.year) ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
+                    Image(systemName: "arrow.up.to.line")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Theme.Color.action)
+                        .frame(width: 26, height: 26)
+                        .background(Theme.Color.accentSoft, in: Circle())
+                        .overlay(Circle().stroke(Theme.Color.accentSofter, lineWidth: 1))
+                        .frame(width: 44, height: 44).contentShape(Rectangle())
                 }
                 .buttonStyle(PressableButtonStyle())
-                .accessibilityLabel("跳转到\(group.year)年")
+                .accessibilityLabel("回到顶部")
+
+                ForEach(yearGroups) { group in
+                    Button {
+                        Theme.Haptics.selection()
+                        withAnimation(.snappy) {
+                            proxy.scrollTo(group.id, anchor: .top)
+                        }
+                    } label: {
+                        Text(String(String(group.year).suffix(2)))
+                            .font(Theme.Font.mono(size: 10, weight: .bold))
+                            .foregroundStyle(isInitialYear(group.year) ? Theme.Color.action : Theme.Color.muted)
+                            .frame(width: 26, height: 24)
+                            .background(isInitialYear(group.year) ? Theme.Color.accentSoft : Theme.Color.surface, in: Capsule())
+                            .overlay(Capsule().stroke(isInitialYear(group.year) ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressableButtonStyle())
+                    .accessibilityLabel("跳转到\(group.year)年")
+                }
             }
         }
+        .frame(width: 44)
+        .scrollBounceBehavior(.basedOnSize)
     }
 
     private func isInitialYear(_ year: Int) -> Bool {
@@ -583,13 +681,19 @@ private struct CalendarHistoryMonthArchiveSheet: View {
 
     private func monthArchiveRow(_ item: CalendarHistoryMonthArchiveItem) -> some View {
         let selected = calendar.isDate(item.monthStart, equalTo: initialMonth, toGranularity: .month)
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Spacing.md))
+            : AnyLayout(HStackLayout(spacing: Theme.Spacing.md))
         return Button {
             onPick(item.monthStart)
             dismiss()
         } label: {
-            HStack(spacing: Theme.Spacing.md) {
+            layout {
                 VStack(alignment: .leading, spacing: 7) {
-                    HStack(spacing: 8) {
+                    let titleLayout = dynamicTypeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                        : AnyLayout(HStackLayout(spacing: 8))
+                    titleLayout {
                         Text("\(calendar.component(.month, from: item.monthStart))月")
                             .font(Theme.Font.body(size: 18, weight: .bold))
                             .foregroundStyle(Theme.Color.fg)
@@ -603,7 +707,7 @@ private struct CalendarHistoryMonthArchiveSheet: View {
                         } else if item.trainingDayCount > 0 {
                             Text("\(item.trainingDayCount)天")
                                 .font(Theme.Font.body(size: 12, weight: .bold))
-                                .foregroundStyle(Theme.Color.accent)
+                                .foregroundStyle(Theme.Color.action)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background(Theme.Color.accentSoft, in: Capsule())
@@ -611,7 +715,7 @@ private struct CalendarHistoryMonthArchiveSheet: View {
                     }
                     monthDensityStrip(item)
                 }
-                Spacer(minLength: Theme.Spacing.sm)
+                if dynamicTypeSize < .xxLarge { Spacer(minLength: Theme.Spacing.sm) }
                 HStack(spacing: 8) {
                     VStack(alignment: .trailing, spacing: 3) {
                         Text(!item.isLoaded ? "加载" : (item.workoutCount > 0 ? "\(item.workoutCount)次" : "—"))
@@ -637,6 +741,7 @@ private struct CalendarHistoryMonthArchiveSheet: View {
         }
         .buttonStyle(PressableButtonStyle())
         .accessibilityLabel(monthAccessibilityLabel(item))
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func monthDensityStrip(_ item: CalendarHistoryMonthArchiveItem) -> some View {

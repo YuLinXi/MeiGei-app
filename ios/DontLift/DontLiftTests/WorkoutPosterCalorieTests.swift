@@ -4,8 +4,10 @@ import Testing
 
 @MainActor
 struct WorkoutPosterCalorieTests {
+    private let testStore = WorkoutTestStore()
+
     @Test func posterDataIncludesCalorieEstimateWhenAvailable() throws {
-        let workout = makeWorkout()
+        let workout = try makeWorkout()
 
         let data = WorkoutPosterData(
             workout: workout,
@@ -15,8 +17,8 @@ struct WorkoutPosterCalorieTests {
         #expect(data.calorieValueText == "204")
     }
 
-    @Test func posterDataHidesCaloriesWithoutBodyWeight() {
-        let workout = makeWorkout()
+    @Test func posterDataHidesCaloriesWithoutBodyWeight() throws {
+        let workout = try makeWorkout()
 
         let data = WorkoutPosterData(
             workout: workout,
@@ -26,8 +28,8 @@ struct WorkoutPosterCalorieTests {
         #expect(data.calorieValueText == nil)
     }
 
-    @Test func posterDataHidesCaloriesWhenDisabled() {
-        let workout = makeWorkout()
+    @Test func posterDataHidesCaloriesWhenDisabled() throws {
+        let workout = try makeWorkout()
 
         let data = WorkoutPosterData(
             workout: workout,
@@ -37,12 +39,12 @@ struct WorkoutPosterCalorieTests {
         #expect(data.calorieValueText == nil)
     }
 
-    private func makeWorkout() -> Workout {
+    private func makeWorkout() throws -> Workout {
         let startedAt = Date(timeIntervalSince1970: 1_800_000_000)
-        let workout = Workout(title: "胸背训练",
+        let workout = try testStore.insert(Workout(title: "胸背训练",
                               startedAt: startedAt,
                               timerStartedAt: startedAt,
-                              endedAt: startedAt.addingTimeInterval(60 * 60))
+                              endedAt: startedAt.addingTimeInterval(60 * 60)))
         let exercise = WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0)
         exercise.sets = (0..<12).map { index in
             WorkoutSet(setIndex: index, weightKg: 80, reps: 8, completed: true)

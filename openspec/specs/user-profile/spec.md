@@ -1,7 +1,8 @@
 # user-profile Specification
 
 ## Purpose
-TBD - created by archiving change first-login-profile-completion. Update Purpose after archive.
+约定业务用户画像的持久化、读取、编辑、首登补全及离线恢复，并规定失效登录态和重装后的安全路由。画像以业务用户为归属，明确编辑结果何时保留、何时同步，以及何时应进入补全页或主界面。
+
 ## Requirements
 ### Requirement: 用户画像后端持久化
 

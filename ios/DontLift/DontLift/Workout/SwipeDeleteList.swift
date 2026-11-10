@@ -53,6 +53,7 @@ struct SwipeDeleteList<Data: RandomAccessCollection, ID: Hashable, Row: View>: V
 /// 「同一时刻仅一张展开 + 点击别处收回」由 `openID` 单一来源协调：
 /// 左滑展开时认领 openID=rowID；任一卡片观察到 openID 变成别人（或被置 nil）即自动收回。
 struct SwipeToDeleteCard<Content: View>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var onTap: () -> Void
     /// 回传该行的全局坐标，供父视图把删除确认卡片定位于其正下方。
     var onDelete: (CGRect) -> Void
@@ -69,7 +70,7 @@ struct SwipeToDeleteCard<Content: View>: View {
     @State private var globalFrame: CGRect = .zero
     private let revealed: CGFloat = -76
     /// 显露 / 收回统一回弹，保证手感对称。
-    private let snap: Animation = .spring(response: 0.3, dampingFraction: 0.8)
+    private var snap: Animation? { reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8) }
 
     var body: some View {
         ZStack(alignment: .trailing) {

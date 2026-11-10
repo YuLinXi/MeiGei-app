@@ -133,6 +133,15 @@ struct WorkoutPosterData: Equatable {
     let prLines: [PRLine]
     let context: WorkoutPosterContext
 
+    var accessibilitySummary: String {
+        var parts = [title, dateText, "时长 \(durationText) 分钟", "训练量 \(volumeText) 公斤",
+                     "\(setCountText) 组，\(exerciseCountText) 个动作"]
+        if let calorieValueText { parts.append("估算消耗 \(calorieValueText) 千卡") }
+        parts += exerciseLines.map { "\($0.name)，\($0.topSetText)" }
+        parts += prLines.map { "PR，\($0.name)，\($0.weightText)" }
+        return parts.joined(separator: "；")
+    }
+
     init(
         workout: Workout,
         personalRecords: [PersonalRecord] = [],
@@ -285,6 +294,8 @@ struct WorkoutPosterPreviewSheet: View {
 
     @Environment(GlobalMessageCenter.self) private var globalMessage
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .caption) private var pageCaptionLineHeight = 16
     @State private var shareItem: WorkoutPosterShareItem?
     @State private var isSaving = false
     @State private var hasSavedPoster = false
@@ -370,7 +381,7 @@ struct WorkoutPosterPreviewSheet: View {
                     if isRecommended {
                         Image(systemName: "sparkles")
                             .font(.system(size: 7.5, weight: .bold))
-                            .foregroundStyle(Theme.Color.accent)
+                            .foregroundStyle(Theme.Color.action)
                             .frame(width: 17, height: 17)
                             .background(Theme.Color.surface.opacity(0.92), in: Circle())
                             .offset(x: -4, y: -4)
@@ -380,7 +391,7 @@ struct WorkoutPosterPreviewSheet: View {
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(Theme.Color.accent)
+                            .foregroundStyle(Theme.Color.action)
                             .background(Theme.Color.surface, in: Circle())
                             .offset(x: 5, y: -5)
                     }
@@ -397,7 +408,8 @@ struct WorkoutPosterPreviewSheet: View {
         GeometryReader { proxy in
             let availablePageWidth = max(0, proxy.size.width - 88)
             // 页码与海报同处预览区，计算海报高度时先为页码和间距预留空间。
-            let availablePageHeight = max(0, proxy.size.height - 32)
+            let captionHeight = pageCaptionLineHeight + 10 + Theme.Spacing.sm
+            let availablePageHeight = max(0, proxy.size.height - captionHeight)
             let heightLimitedWidth = availablePageHeight * WorkoutPosterLayout.aspectRatio
             let pageWidth = min(availablePageWidth, heightLimitedWidth)
             let pageHeight = pageWidth / WorkoutPosterLayout.aspectRatio
@@ -415,6 +427,7 @@ struct WorkoutPosterPreviewSheet: View {
                                 .tag(background)
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel("\(background.title)训练海报预览")
+                                .accessibilityValue(data.accessibilitySummary)
                                 .accessibilityHidden(selectedBackground != background)
                         }
                     }
@@ -464,7 +477,7 @@ struct WorkoutPosterPreviewSheet: View {
     private var currentPageCaption: some View {
         Text("\(selectedBackgroundIndex + 1) / \(WorkoutPosterBackground.catalog.count)")
             .font(Theme.Font.mono(size: 11, weight: .heavy))
-            .foregroundStyle(Theme.Color.accent)
+            .foregroundStyle(Theme.Color.action)
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
             .background(Theme.Color.accentSoft, in: Capsule())
@@ -497,7 +510,9 @@ struct WorkoutPosterPreviewSheet: View {
     }
 
     private var actions: some View {
-        HStack(spacing: 10) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 10)) : AnyLayout(HStackLayout(spacing: 10))
+        return layout {
             Button {
                 Task { await savePoster() }
             } label: {
@@ -505,7 +520,8 @@ struct WorkoutPosterPreviewSheet: View {
                     .font(Theme.Font.body(size: 14, weight: .bold))
                     .foregroundStyle(saveButtonForeground)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 48)
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 48)
                     .background(saveButtonBackground, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).stroke(saveButtonBorder, lineWidth: 1))
             }
@@ -519,8 +535,9 @@ struct WorkoutPosterPreviewSheet: View {
                     .font(Theme.Font.body(size: 14, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 48)
+                    .background(Theme.Color.action, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                     .shadow(color: Theme.Color.accent.opacity(0.24), radius: 7, x: 0, y: 4)
             }
             .buttonStyle(PressableButtonStyle())
@@ -580,7 +597,7 @@ struct WorkoutPosterPreviewSheet: View {
             globalMessage.show("已保存到相册", style: .success)
         } catch {
             let text = (error as? LocalizedError)?.errorDescription ?? "保存失败，请检查相册权限。"
-            globalMessage.show(text, style: .error)
+            globalMessage.show(text, style: .error, duration: 5)
         }
     }
 }
@@ -596,13 +613,18 @@ struct WorkoutPosterCanvas: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let width = proxy.size.width
-            let height = proxy.size.height
+            let size = WorkoutPosterLayout.size
+            let scale = min(proxy.size.width / size.width, proxy.size.height / size.height)
             WorkoutPosterVisualCardView(data: data,
                                         background: background,
-                                        width: width,
-                                        height: height)
+                                        width: size.width,
+                                        height: size.height)
+                .frame(width: size.width, height: size.height)
+                .scaleEffect(scale, anchor: .topLeading)
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
         }
+        // 导出画布整体缩放，文字不受设备阅读字号改变；页面操作与语义摘要保持独立。
+        .environment(\.dynamicTypeSize, .large)
     }
 }
 
@@ -904,7 +926,7 @@ enum WorkoutPosterPhotoSaver {
 
         var errorDescription: String? {
             switch self {
-            case .denied: return "未获得相册写入权限。"
+            case .denied: return "未获得相册写入权限，请在系统设置中允许添加照片后重试。"
             case .failed: return "保存失败，请稍后重试。"
             }
         }
@@ -964,7 +986,7 @@ struct WorkoutPosterShareButton: View {
             HStack(spacing: 12) {
                 Image(systemName: "square.and.arrow.up")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Theme.Color.accent)
+                    .foregroundStyle(Theme.Color.action)
                     .frame(width: 38, height: 38)
                     .background(Theme.Color.accentSoft, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {

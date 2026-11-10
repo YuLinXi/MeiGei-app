@@ -8,6 +8,7 @@ struct WorkoutBadgeCelebrationSheet: View {
     let onDismiss: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var validCandidates: [(candidate: BadgeGrantCandidate, definition: BadgeDefinition)] {
         candidates.compactMap { c in
@@ -18,44 +19,44 @@ struct WorkoutBadgeCelebrationSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                // 顶部抓手指示
-                Capsule()
-                    .fill(Color.secondary.opacity(0.25))
-                    .frame(width: 36, height: 4)
-                    .padding(.top, 8)
-
-                if validCandidates.count == 1, let item = validCandidates.first {
-                    singleBadgeView(candidate: item.candidate, definition: item.definition)
-                } else if !validCandidates.isEmpty {
-                    multiBadgeView(items: validCandidates)
+            ScrollView {
+                VStack(spacing: 20) {
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.25))
+                        .frame(width: 36, height: 4)
+                        .padding(.top, 8)
+                        .accessibilityHidden(true)
+                    if validCandidates.count == 1, let item = validCandidates.first {
+                        singleBadgeView(candidate: item.candidate, definition: item.definition)
+                    } else if !validCandidates.isEmpty {
+                        multiBadgeView(items: validCandidates)
+                    }
                 }
-
-                Spacer()
-
-                // 底部 CTA
+                .padding(.horizontal, 16)
+                .padding(.bottom, 20)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
                 Button(action: handleClose) {
                     Text("收下荣誉")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.white)
+                        .font(Theme.Font.body(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(Color(hex: "E04328"))
-                        )
+                        .padding(.vertical, 12)
+                        .frame(minHeight: 50)
+                        .background(Theme.Color.action, in: RoundedRectangle(cornerRadius: 14))
                         .shadow(color: Color(hex: "E04328").opacity(0.35), radius: 8, x: 0, y: 4)
                 }
+                .buttonStyle(.plain)
                 .padding(.horizontal, 24)
+                .padding(.top, 12)
                 .padding(.bottom, 16)
+                .background(Theme.Color.bg)
             }
-            .padding(.horizontal, 16)
             .background(Theme.Color.bg.ignoresSafeArea())
-            .onAppear {
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-            }
+            .onAppear { UINotificationFeedbackGenerator().notificationOccurred(.success) }
         }
-        .presentationDetents([.height(validCandidates.count > 1 ? 460 : 470)])
+        .presentationDetents(dynamicTypeSize >= .xxLarge ? [.large]
+                             : [.height(validCandidates.count > 1 ? 460 : 470), .large])
         .presentationDragIndicator(.hidden)
     }
 
@@ -64,35 +65,36 @@ struct WorkoutBadgeCelebrationSheet: View {
         VStack(spacing: 16) {
             // 大勋章图腾
             BadgeIconView(definition: definition, isUnlocked: true, size: .large)
+                .accessibilityHidden(true)
                 .padding(.top, 12)
 
             VStack(spacing: 6) {
                 Text("新徽章已解锁")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color(hex: "E04328"))
+                    .font(Theme.Font.body(size: 15, weight: .bold))
+                    .foregroundStyle(Theme.Color.action)
 
                 Text(definition.name)
-                    .font(.system(size: 26, weight: .heavy))
-                    .foregroundStyle(Color.primary)
+                    .font(Theme.Font.display(size: 26, weight: .heavy))
+                    .foregroundStyle(Theme.Color.fg)
 
                 if !summary.isEmpty {
                     Text(summary)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.secondary)
+                        .font(Theme.Font.body(size: 13, weight: .regular))
+                        .foregroundStyle(Theme.Color.muted)
                 }
             }
 
             // 达成要求卡片
             VStack(spacing: 8) {
                 Text(definition.requirementDescription)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.primary)
+                    .font(Theme.Font.body(size: 14, weight: .medium))
+                    .foregroundStyle(Theme.Color.fg)
                     .multilineTextAlignment(.center)
 
                 if candidate.snapshotMetric > 0, definition.unit != "次" {
                     Text("达成记录: \(formatSnapshot(candidate.snapshotMetric, unit: definition.unit))")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color(hex: "E04328"))
+                        .font(Theme.Font.body(size: 12, weight: .semibold, relativeTo: .caption))
+                        .foregroundStyle(Theme.Color.action)
                 }
             }
             .padding(.horizontal, 20)
@@ -114,54 +116,61 @@ struct WorkoutBadgeCelebrationSheet: View {
         VStack(spacing: 14) {
             VStack(spacing: 4) {
                 Text("新徽章已解锁")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color(hex: "E04328"))
+                    .font(Theme.Font.body(size: 15, weight: .bold))
+                    .foregroundStyle(Theme.Color.action)
                     .padding(.top, 8)
 
                 Text("同时突破 \(items.count) 项荣誉勋章！")
-                    .font(.system(size: 22, weight: .heavy))
-                    .foregroundStyle(Color.primary)
+                    .font(Theme.Font.display(size: 22, weight: .heavy))
+                    .foregroundStyle(Theme.Color.fg)
 
                 if !summary.isEmpty {
                     Text(summary)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.secondary)
+                        .font(Theme.Font.body(size: 13, weight: .regular))
+                        .foregroundStyle(Theme.Color.muted)
                 }
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+            if dynamicTypeSize >= .xxLarge {
+                VStack(spacing: 12) {
                     ForEach(items, id: \.candidate.badgeCode) { item in
-                        let def = item.definition
-                        VStack(spacing: 8) {
-                            BadgeIconView(definition: def, isUnlocked: true, size: .regular)
-
-                                Text(def.name)
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(Color.primary)
-
-                                Text(def.requirementDescription)
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(Color.secondary)
-                                    .multilineTextAlignment(.center)
-                                    .lineLimit(2)
-                                    .frame(width: 100)
-                            }
-                            .padding(.vertical, 14)
-                            .padding(.horizontal, 10)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Theme.Color.surface)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-                                    )
-                            )
+                        celebrationCard(item.definition)
                     }
                 }
-                .padding(.horizontal, 8)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(items, id: \.candidate.badgeCode) { item in
+                            celebrationCard(item.definition)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    private func celebrationCard(_ definition: BadgeDefinition) -> some View {
+        VStack(spacing: 8) {
+            BadgeIconView(definition: definition, isUnlocked: true, size: .regular)
+                .accessibilityHidden(true)
+            Text(definition.name)
+                .font(Theme.Font.body(size: 13, weight: .bold))
+                .foregroundStyle(Theme.Color.fg)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(definition.requirementDescription)
+                .font(Theme.Font.body(size: 10, relativeTo: .caption))
+                .foregroundStyle(Theme.Color.muted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: dynamicTypeSize >= .xxLarge ? nil : 100)
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: dynamicTypeSize >= .xxLarge ? .infinity : nil)
+        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.06), lineWidth: 1))
     }
 
     private func formatSnapshot(_ value: Double, unit: String) -> String {

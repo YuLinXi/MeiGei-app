@@ -77,45 +77,37 @@ private struct LibraryQuickIndex: View {
     let onActivate: (LibraryQuickIndexItem) -> Void
 
     @State private var activeItemId: String?
-
-    private static let itemHeight: CGFloat = 28
+    private static let itemHeight: CGFloat = 44
     private static let itemSpacing: CGFloat = 6
-    private static let hitWidth: CGFloat = 42
-
-    private var contentHeight: CGFloat {
-        CGFloat(items.count) * Self.itemHeight + CGFloat(max(0, items.count - 1)) * Self.itemSpacing
-    }
+    private static let hitWidth: CGFloat = 44
 
     var body: some View {
-        GeometryReader { proxy in
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: Self.itemSpacing) {
-                ForEach(items) { item in
-                    indexItem(item)
-                        .frame(width: Self.hitWidth, height: Self.itemHeight)
-                }
+                ForEach(items) { item in indexItem(item) }
             }
-            .frame(width: Self.hitWidth, height: contentHeight, alignment: .top)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                    .onChanged { value in
-                        guard let index = LibraryQuickIndexHitTesting.itemIndex(
-                            at: value.location.y,
-                            itemCount: items.count,
-                            itemHeight: Self.itemHeight,
-                            spacing: Self.itemSpacing
-                        ) else { return }
-                        activate(items[index])
-                    }
-                    .onEnded { _ in
-                        activeItemId = nil
-                    }
-            )
-            .accessibilityElement(children: .contain)
-            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+            .overlay {
+                LibraryIndexGestureArea(onTap: { point in
+                    if let item = item(at: point) { select(item) }
+                }, onMove: { point in
+                    if let item = item(at: point) { activate(item) }
+                }, onEnd: { activeItemId = nil })
+            }
+            .padding(.vertical, 6)
         }
-        .frame(width: Self.hitWidth, height: contentHeight)
-        .padding(.vertical, 6)
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(width: Self.hitWidth)
+        // 与右下添加钮留出同样的高度，末项不进入其触控区。
+        .padding(.bottom, 48 + Theme.Spacing.md)
+        .accessibilityIdentifier("exercise.quickIndex")
+        .accessibilityHint("轻点选择器械，按住后可上下拖选；上下滑动可浏览全部选项")
+    }
+
+    private func item(at point: CGPoint) -> LibraryQuickIndexItem? {
+        guard let index = LibraryQuickIndexHitTesting.itemIndex(
+            at: point.y, itemCount: items.count, itemHeight: Self.itemHeight, spacing: Self.itemSpacing
+        ) else { return nil }
+        return items[index]
     }
 
     private func activate(_ item: LibraryQuickIndexItem) {
@@ -125,40 +117,99 @@ private struct LibraryQuickIndex: View {
         onActivate(item)
     }
 
-    @ViewBuilder
+    private func select(_ item: LibraryQuickIndexItem) {
+        activate(item)
+        activeItemId = nil
+    }
+
     private func indexItem(_ item: LibraryQuickIndexItem) -> some View {
         let highlighted = item.isSelected || activeItemId == item.id
-        Group {
-            if let systemName = item.systemName {
-                Image(systemName: systemName)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
-            } else {
-                Text(item.title)
-                    .font(Theme.Font.mono(size: 10, weight: .bold))
-                    .foregroundStyle(highlighted ? Theme.Color.accent : Theme.Color.muted)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
-        }
-        .frame(width: 28, height: 28)
-        .background {
-            Circle()
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    Circle()
-                        .fill((highlighted ? Theme.Color.accentSoft : Theme.Color.surface).opacity(highlighted ? 0.72 : 0.42))
+        return Button { select(item) } label: {
+            Group {
+                if let systemName = item.systemName {
+                    Image(systemName: systemName)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Theme.Color.action)
+                } else {
+                    Text(item.title)
+                        .font(Theme.Font.mono(size: 11, weight: .bold, relativeTo: .caption2))
+                        .foregroundStyle(highlighted ? Theme.Color.action : Theme.Color.muted)
                 }
+            }
+            .frame(width: Self.hitWidth, height: Self.itemHeight)
+            .background {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        Circle().fill((highlighted ? Theme.Color.accentSoft : Theme.Color.surface).opacity(highlighted ? 0.72 : 0.42))
+                    }
+                    .overlay {
+                        Circle().stroke((highlighted ? Theme.Color.accentSofter : Theme.Color.border).opacity(highlighted ? 0.9 : 0.52), lineWidth: 0.75)
+                    }
+                    .frame(width: 28, height: 28)
+            }
+            .contentShape(Rectangle())
         }
-        .overlay {
-            Circle()
-                .stroke((highlighted ? Theme.Color.accentSofter : Theme.Color.border).opacity(highlighted ? 0.9 : 0.52), lineWidth: 0.75)
-        }
-        .accessibilityElement(children: .ignore)
+        .buttonStyle(.plain)
         .accessibilityLabel(item.label)
-        .accessibilityAddTraits(item.isSelected ? [.isButton, .isSelected] : .isButton)
-        .accessibilityAction {
-            activate(item)
+        .accessibilityValue(item.isSelected ? "已选择" : "未选择")
+        .accessibilityAddTraits(item.isSelected ? .isSelected : [])
+    }
+}
+
+/// 同一原生触控层区分轻点、长按拖选与父级滚动；纸感 Button 保留辅助功能默认动作。
+@MainActor
+private struct LibraryIndexGestureArea: UIViewRepresentable {
+    let onTap: (CGPoint) -> Void
+    let onMove: (CGPoint) -> Void
+    let onEnd: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeUIView(context: Context) -> UIView { context.coordinator.makeView() }
+
+    func updateUIView(_ view: UIView, context: Context) {
+        context.coordinator.onTap = onTap
+        context.coordinator.onMove = onMove
+        context.coordinator.onEnd = onEnd
+    }
+
+    final class Coordinator: NSObject {
+        var onTap: (CGPoint) -> Void = { _ in }
+        var onMove: (CGPoint) -> Void = { _ in }
+        var onEnd: () -> Void = {}
+
+        func makeView() -> UIView {
+            let view = UIView()
+            view.backgroundColor = .clear
+            view.isAccessibilityElement = false
+            view.accessibilityElementsHidden = true
+            let press = UILongPressGestureRecognizer(target: self, action: #selector(handlePress))
+            press.minimumPressDuration = 0.15
+            press.allowableMovement = 10
+            press.cancelsTouchesInView = true
+            let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+            tap.require(toFail: press)
+            view.addGestureRecognizer(press)
+            view.addGestureRecognizer(tap)
+            return view
+        }
+
+        @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
+            onTap(gesture.location(in: gesture.view))
+        }
+
+        @objc private func handlePress(_ gesture: UILongPressGestureRecognizer) {
+            switch gesture.state {
+            case .began, .changed:
+                onMove(gesture.location(in: gesture.view))
+            case .ended:
+                onMove(gesture.location(in: gesture.view))
+                onEnd()
+            case .cancelled, .failed:
+                onEnd()
+            default:
+                break
+            }
         }
     }
 }
@@ -231,6 +282,7 @@ struct ExerciseLibraryView: View {
     private var floatingAddButton: some View {
         CircleAddButton(action: { showingCreate = true }, accessibilityLabel: "添加自定义动作")
             .frame(width: 48, height: 48)
+            .workoutOverlayObstacle()
             .padding(.trailing, Theme.Spacing.lg)
             .padding(.top, Theme.Spacing.sm)
             .padding(.bottom, Theme.Spacing.md)
@@ -260,6 +312,7 @@ private struct KeyboardStableHost<Content: View>: UIViewControllerRepresentable 
 
 private struct ExerciseLibraryShell: View {
     @State private var query = ""
+    @FocusState private var searchFocused: Bool
 
     let mode: ExerciseLibraryContentMode
     let emptyHint: String
@@ -291,7 +344,12 @@ private struct ExerciseLibraryShell: View {
                       prompt: Text("搜索动作").foregroundColor(Theme.Color.muted))
                 .font(Theme.Font.body(size: 14))
                 .foregroundStyle(Theme.Color.fg)
+                .focused($searchFocused)
+                .accessibilityLabel("搜索动作")
+                .accessibilityIdentifier("exercise.search")
+                .padding(.vertical, 8)
                 .submitLabel(.search)
+                .onSubmit { searchFocused = false }
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
             if !query.isEmpty {
@@ -299,13 +357,17 @@ private struct ExerciseLibraryShell: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.Color.muted)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("清除搜索")
+            } else {
+                Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .frame(minHeight: 44)
         .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
@@ -316,8 +378,11 @@ private struct ExerciseLibraryShell: View {
 
 /// 可复用动作库主体：不包含顶部标题、右上创建入口或导航外壳，可嵌入 Tab 或底部抽屉。
 private struct ExerciseLibraryContentView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.modelContext) private var modelContext
     @Environment(SyncEngine.self) private var syncEngine
+    @Environment(GlobalMessageCenter.self) private var globalMessage
     @Query(sort: \CustomExercise.updatedAt, order: .reverse) private var custom: [CustomExercise]
 
     @Binding var query: String
@@ -467,7 +532,7 @@ private struct ExerciseLibraryContentView: View {
             .padding(.leading, 6)
             .padding(.trailing, 2)
         }
-        .frame(width: 92)
+        .frame(width: dynamicTypeSize.isAccessibilitySize ? 124 : 92)
     }
 
     /// L2/L3 子行（手风琴展开）。
@@ -516,26 +581,31 @@ private struct ExerciseLibraryContentView: View {
                 Text(title)
                     .font(Theme.Font.body(size: level == 0 ? 16 : (level == 1 ? 14 : 13),
                                           weight: selected ? .bold : (level == 0 ? .semibold : .regular)))
-                    .foregroundStyle(selected ? Theme.Color.accent
+                    .foregroundStyle(selected ? Theme.Color.action
                                      : (dimmed ? Theme.Color.muted : Theme.Color.fg))
-                    .lineLimit(1).minimumScaleFactor(0.7)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.7)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 switch chevron {
                 case .none:  EmptyView()
                 case .right: Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.Color.muted)
-                case .down:  Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.Color.accent)
+                case .down:  Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.Color.action)
                 }
             }
             .padding(.leading, CGFloat(level) * 7)
             .padding(.vertical, 7)
             .padding(.horizontal, 5)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .background(selected ? Theme.Color.accentSoft : .clear,
                         in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .animation(nil, value: selected)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(selected ? "已选择" : "未选择")
+        .accessibilityAddTraits(selected ? .isSelected : [])
         .transaction { transaction in
             transaction.animation = nil
             transaction.disablesAnimations = true
@@ -627,7 +697,7 @@ private struct ExerciseLibraryContentView: View {
                         if gridPage.sections.isEmpty {
                             emptyState
                         } else {
-                            LazyVGrid(columns: Self.cardColumns,
+                            LazyVGrid(columns: dynamicTypeSize.isAccessibilitySize ? [GridItem(.flexible(maximum: 320))] : Self.cardColumns,
                                       alignment: .center,
                                       spacing: Self.cardSpacing) {
                                 ForEach(Array(gridPage.sections.enumerated()), id: \.element.id) { index, section in
@@ -651,7 +721,7 @@ private struct ExerciseLibraryContentView: View {
                         Color.clear.frame(height: 40)
                     }
                     .padding(.leading, Theme.Spacing.md)
-                    .padding(.trailing, Theme.Spacing.xl + 20)
+                    .padding(.trailing, Theme.Spacing.xl + 32)
                     .padding(.top, 8)
                 }
 
@@ -733,7 +803,7 @@ private struct ExerciseLibraryContentView: View {
     /// 平滑回到动作列表顶部（用于重复点击已激活 chip）。
     private func scrollLibToTop(_ proxy: ScrollViewProxy, haptic: Bool = true) {
         if haptic { Theme.Haptics.impact(.light) }
-        withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo("LIB_TOP", anchor: .top) }
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.3)) { proxy.scrollTo("LIB_TOP", anchor: .top) }
     }
 
     private func resetLibraryPaging() {
@@ -877,10 +947,11 @@ private struct ExerciseLibraryContentView: View {
     }
 
     private func deleteCustom(_ ex: CustomExercise) {
-        ex.markDeleted()
-        try? modelContext.save()
-        Theme.Haptics.notification(.warning)
-        syncEngine.scheduleSyncAll()
+        do {
+            try CustomExercisePersistence.delete(ex, in: modelContext)
+            Theme.Haptics.notification(.warning)
+            syncEngine.scheduleSyncAll()
+        } catch { globalMessage.show("删除失败，动作仍保留，请重试", style: .error) }
     }
 
     private func customBrowseCard(_ ex: CustomExercise) -> some View {
@@ -1012,7 +1083,7 @@ private struct ExerciseLibraryContentView: View {
             cardTitle(ex.name)
         }
         .modifier(ExerciseLibraryCardSurface())
-        .frame(maxWidth: Self.cardMaximumWidth)
+        .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : Self.cardMaximumWidth)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(ex.name)，\(meta)")
     }
@@ -1145,7 +1216,7 @@ private struct ExerciseLibraryContentView: View {
             cardTitle(ex.name)
         }
         .modifier(ExerciseLibraryCardSurface())
-        .frame(maxWidth: Self.cardMaximumWidth)
+        .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : Self.cardMaximumWidth)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(ex.name)，\(meta)")
     }
@@ -1169,8 +1240,8 @@ private struct ExerciseLibraryContentView: View {
             .font(Theme.Font.body(size: 12, weight: .semibold))
             .foregroundStyle(Theme.Color.fg)
             .multilineTextAlignment(.center)
-            .lineLimit(2)
-            .minimumScaleFactor(0.82)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+            .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.82)
             .frame(maxWidth: .infinity, minHeight: 26, alignment: .top)
             .padding(.horizontal, 6)
     }
@@ -1191,24 +1262,30 @@ private struct ExerciseLibraryContentView: View {
 struct CustomExerciseEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var name = ""
     @State private var selectedMuscle: String? = nil
     @State private var selectedEquip: String? = nil
     @State private var contentHeight: CGFloat = 520
+    @State private var saveError: String?
+    @State private var didCreate = false
+    @FocusState private var nameFocused: Bool
 
     private var nameTrimmed: String { name.trimmingCharacters(in: .whitespaces) }
-    private var canSave: Bool { !nameTrimmed.isEmpty }
+    private var canSave: Bool { !nameTrimmed.isEmpty && !didCreate }
     private var sheetHeight: CGFloat { min(max(contentHeight, 360), 640) }
 
     private let muscleOptions = ExerciseCategory.allCases.map(\.rawValue)
     private let equipmentOptions = EquipmentType.allCases.map(\.rawValue)
-    private let tagColumns = [GridItem(.adaptive(minimum: 74), spacing: 8)]
+    private var tagColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 148 : 74), spacing: 8)]
+    }
 
     var body: some View {
         formSheet
             .background(Theme.Color.surface)
-            .presentationDetents([.height(sheetHeight)])
+            .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.height(sheetHeight)])
             .presentationCornerRadius(26)
             .presentationBackground(Theme.Color.surface)
             .presentationDragIndicator(.hidden)
@@ -1220,25 +1297,32 @@ struct CustomExerciseEditorView: View {
         VStack(spacing: 0) {
             PaperSheetHeader(
                 title: "新建动作",
-                cancelTitle: nil,
+                cancelTitle: "取消",
                 showsHandle: true,
                 topPadding: 0,
                 bottomPadding: 10,
-                background: Theme.Color.surface
+                background: Theme.Color.surface,
+                onCancel: { dismiss() }
             )
+            LocalSaveErrorLabel(message: saveError)
 
-            VStack(alignment: .leading, spacing: 16) {
-                field("动作名称", required: true) {
-                    TextField("输入名称（必填）", text: $name)
-                        .paperField()
-                        .submitLabel(.done)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    field("动作名称", required: true) {
+                        TextField("输入名称（必填）", text: $name, prompt: Text("输入名称（必填）").foregroundColor(Theme.Color.muted))
+                            .focused($nameFocused)
+                            .paperField()
+                            .submitLabel(.done)
+                            .onSubmit { nameFocused = false }
+                    }
+
+                    tagSection(title: "部位", options: muscleOptions, selection: $selectedMuscle)
+                    tagSection(title: "器械", options: equipmentOptions, selection: $selectedEquip)
                 }
-
-                tagSection(title: "部位", options: muscleOptions, selection: $selectedMuscle)
-                tagSection(title: "器械", options: equipmentOptions, selection: $selectedEquip)
+                .padding(.horizontal, Theme.Spacing.md)
+                .padding(.top, 14)
             }
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.top, 14)
+            .scrollDismissesKeyboard(.interactively)
 
             Button { save() } label: {
                 Text("保存")
@@ -1246,7 +1330,7 @@ struct CustomExerciseEditorView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Theme.Color.accent,
+                    .background(Theme.Color.action,
                                 in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             }
             .buttonStyle(PressableButtonStyle())
@@ -1276,7 +1360,7 @@ struct CustomExerciseEditorView: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(Theme.Color.fg2)
                 if required {
-                    Text("*").font(Theme.Font.l4).foregroundStyle(Theme.Color.accent)
+                    Text("*").font(Theme.Font.l4).foregroundStyle(Theme.Color.action)
                 }
             }
             content()
@@ -1305,17 +1389,20 @@ struct CustomExerciseEditorView: View {
         Button(action: action) {
             Text(title)
                 .font(Theme.Font.body(size: 13, weight: selected ? .bold : .semibold))
-                .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.fg2)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
+                .foregroundStyle(selected ? Theme.Color.action : Theme.Color.fg2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 7)
                 .frame(maxWidth: .infinity)
-                .frame(height: 34)
+                .frame(minHeight: 34)
                 .background(selected ? Theme.Color.accentSoft : Theme.Color.surface2,
                             in: Capsule())
                 .overlay(
                     Capsule()
                         .stroke(selected ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1)
                 )
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle())
         .accessibilityLabel(title)
@@ -1329,13 +1416,16 @@ struct CustomExerciseEditorView: View {
     }
 
     private func save() {
-        let ex = CustomExercise(name: nameTrimmed,
-                                primaryMuscle: selectedMuscle,
-                                equipmentType: selectedEquip)
-        modelContext.insert(ex)
-        try? modelContext.save()
-        Theme.Haptics.notification(.success)
-        dismiss()
+        nameFocused = false
+        guard canSave else { return }
+        do {
+            _ = try CustomExercisePersistence.create(name: nameTrimmed, primaryMuscle: selectedMuscle,
+                                                     equipmentType: selectedEquip, in: modelContext)
+            didCreate = true
+            saveError = nil
+            Theme.Haptics.notification(.success)
+            dismiss()
+        } catch { saveError = "保存失败，当前输入仍保留，请重试" }
     }
 }
 
@@ -1381,10 +1471,12 @@ extension String {
 /// 不含任何写训练数据入口（旧「加入今日训练」CTA 已移除，加动作走 ExercisePicker / 计划编辑）。
 struct ExerciseDetailView: View {
     let exercise: BuiltinExercise
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(SessionStore.self) private var session
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(\.dismiss) private var dismiss
     @Query private var profiles: [UserProfile]
+    @ScaledMetric(relativeTo: .caption) private var cueNumberWidth: CGFloat = 14
 
     /// 用户性别（仅切高亮图底图）。
     private var sex: BodySex {
@@ -1433,7 +1525,10 @@ struct ExerciseDetailView: View {
             Text(exercise.name)
                 .font(Theme.Font.display(size: 28, weight: .bold))
                 .foregroundStyle(Theme.Color.fg)
-            HStack(spacing: 7) {
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 7))
+                : AnyLayout(HStackLayout(spacing: 7))
+            layout {
                 metaChip(exercise.category)
                 if let sub = exercise.subcategory { metaChip(sub) }
                 metaChip(exercise.equipmentType)
@@ -1473,12 +1568,13 @@ struct ExerciseDetailView: View {
     private var dataCard: some View {
         let pr = history.pr
         let last = history.last
-        return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            HStack(spacing: Theme.Spacing.md) {
-                dataCell("上次", lastAgoText(last))
-                dataCell("最近一组", lastSetText(last))
-                dataCell(exercise.isAssistedWeight ? "最低辅助" : "PR", pr.map { "\(formatKg($0.weightKg))kg" } ?? "—", accent: true)
-            }
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Spacing.md))
+            : AnyLayout(HStackLayout(spacing: Theme.Spacing.md))
+        return layout {
+            dataCell("上次", lastAgoText(last))
+            dataCell("最近一组", lastSetText(last))
+            dataCell(exercise.isAssistedWeight ? "最低辅助" : "PR", pr.map { "\(formatKg($0.weightKg))kg" } ?? "—", accent: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
@@ -1488,7 +1584,9 @@ struct ExerciseDetailView: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(k).font(Theme.Font.mono(size: 9)).foregroundStyle(Theme.Color.muted)
             Text(v).font(Theme.Font.body(size: 16, weight: .bold))
-                .foregroundStyle(accent ? Theme.Color.accent : Theme.Color.fg)
+                .foregroundStyle(accent ? Theme.Color.action : Theme.Color.fg)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("exercise.data.\(k)")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -1515,7 +1613,7 @@ struct ExerciseDetailView: View {
                 ForEach(Array(exercise.formCues.enumerated()), id: \.offset) { i, cue in
                     HStack(alignment: .top, spacing: 9) {
                         Text("\(i + 1)").font(Theme.Font.mono(size: 11, weight: .bold))
-                            .foregroundStyle(Theme.Color.accent).frame(width: 14)
+                            .foregroundStyle(Theme.Color.action).frame(width: cueNumberWidth)
                         Text(cue).font(Theme.Font.body(size: 13)).foregroundStyle(Theme.Color.fg2)
                     }
                 }
@@ -1543,10 +1641,15 @@ struct ExerciseDetailView: View {
     private func muscleRow(color: Color, tag: String, regions: [MuscleRegion]) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Circle().fill(color).frame(width: 8, height: 8).padding(.top, 5)
-            Text(tag).font(Theme.Font.mono(size: 10)).foregroundStyle(Theme.Color.muted)
-                .frame(width: 44, alignment: .leading)
-            Text(regions.map(\.displayName).joined(separator: " · "))
-                .font(Theme.Font.body(size: 14, weight: .semibold)).foregroundStyle(Theme.Color.fg)
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3))
+                : AnyLayout(HStackLayout(alignment: .top, spacing: 8))
+            layout {
+                Text(tag).font(Theme.Font.mono(size: 10)).foregroundStyle(Theme.Color.muted)
+                    .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 44, alignment: .leading)
+                Text(regions.map(\.displayName).joined(separator: " · "))
+                    .font(Theme.Font.body(size: 14, weight: .semibold)).foregroundStyle(Theme.Color.fg)
+            }
         }
     }
 }

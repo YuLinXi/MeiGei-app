@@ -76,7 +76,8 @@ Checklist 至少包含：
 - 内部技术变更；
 - 兼容性说明；
 - 已完成验证；
-- TestFlight 回归重点。
+- TestFlight 回归重点；
+- TestFlight 用户文案：可直接复制到 App Store Connect「测试内容 / What to Test」，使用简体中文与用户语言，只含相对已发布基线的最终可感知变化，不含内部技术细节；控制在 TestFlight 字数限制内，必要时附 1–2 句重点验证请求。
 
 用户公告必须满足：
 
@@ -108,33 +109,29 @@ cd backend
 
 ## 4. 执行本地发布门禁
 
-根据改动范围运行最小但完整的发布验证，并保存真实结果。
+本节仅用于发布候选，不作为每次功能开发的默认步骤。根据改动范围运行最小但完整的发布验证，并保存真实结果；同一候选已有有效结果时直接引用，仅在新改动、失败或未解决疑点出现时重跑。
 
 后端在 `backend/` 下使用仓库 Gradle wrapper 和 JDK 21：
 
 ```bash
 export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
-./gradlew clean build
-./gradlew test --rerun-tasks
+./gradlew build
 ```
 
-iOS 在 `ios/DontLift/` 下验证 build 与 tests：
+iOS 遵循 [开发与验证指南](../../../docs/development.md) 选择并复用单个模拟器，先将其 UDID 设置为 `DONTLIFT_SIMULATOR_ID`。在 `ios/DontLift/` 下验证发布候选，`test` 已包含编译，不额外重复 build：
 
 ```bash
-xcodebuild -project DontLift.xcodeproj -scheme DontLift \
-  -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -configuration Debug CODE_SIGNING_ALLOWED=NO build
-
 xcodebuild test -project DontLift.xcodeproj -scheme DontLift \
-  -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -configuration Debug CODE_SIGNING_ALLOWED=NO
+  -sdk iphonesimulator -destination "platform=iOS Simulator,id=$DONTLIFT_SIMULATOR_ID" \
+  -configuration Debug CODE_SIGNING_ALLOWED=NO \
+  -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1
 ```
 
 同时执行：
 
 - `git diff --check`；
 - 对本次相关 active OpenSpec change 逐个运行 `openspec validate <change> --strict`；
-- 对功能差异执行真实 Simulator 路径回归，区分自动测试与人工 UI 验收；
+- 对功能差异执行真实 Simulator 路径回归；相关 UI 自动化已验证同一流程时复用证据，缺少覆盖的路径再做交互检查，区分自动测试与人工 UI 验收；
 - 若动作图或动作库资源有变化，遵循项目 `produce-exercise-artwork` skill 的发布校验，并至少运行静态资源 `validate`、`coverage` 与真实动作库路径检查。
 
 任何命令没有实际运行或没有通过，都不得写成已通过。已知的既有 warning 与本次新增失败分开报告。
@@ -160,7 +157,7 @@ xcodebuild test -project DontLift.xcodeproj -scheme DontLift \
 - TestFlight 对应 build 已为 `VALID`、可安装；
 - 真机主流程回归通过，阻塞问题清零并由用户确认；
 - 候选分支、版本号和两份发版文档已推送，最终范围无遗漏；
-- 合并后相关门禁重新通过。
+- 合并引入新代码、冲突解决或候选差异时，重新验证受影响门禁；代码与已验证候选一致时复用结果。
 
 Tag 使用 `v<version>-b<build>`，优先创建 annotated tag：
 

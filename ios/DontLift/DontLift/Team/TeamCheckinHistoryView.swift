@@ -3,6 +3,7 @@ import SwiftUI
 struct TeamCheckinHistoryView: View {
     @Environment(TeamService.self) private var teamService
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let team: TeamDTO
 
@@ -11,6 +12,7 @@ struct TeamCheckinHistoryView: View {
     @State private var members: [TeamMemberDTO] = []
     @State private var loadedMonths: [Date: TeamCheckinHistoryMonthData] = [:]
     @State private var loadingMonths: Set<Date> = []
+    @State private var monthErrors: [Date: String] = [:]
     @State private var openedCheckin: TeamCheckinDTO?
     @State private var error: String?
 
@@ -30,6 +32,22 @@ struct TeamCheckinHistoryView: View {
 
     private var displayedMonthStart: Date {
         monthStart(for: displayedMonth)
+    }
+
+    private var hasMonthSnapshot: Bool { loadedMonths[displayedMonthStart] != nil }
+
+    private var loadMessage: String? {
+        if let error = monthErrors[displayedMonthStart] {
+            return (hasMonthSnapshot ? "刷新失败，已保留本月记录。" : "未能加载本月记录。") + error
+        }
+        // 已有快照刷新沿用系统下拉指示，不改变正在刷新的滚动内容。
+        if !hasMonthSnapshot { return "正在加载本月训练…" }
+        return nil
+    }
+
+    private var retryMonth: (() -> Void)? {
+        guard monthErrors[displayedMonthStart] != nil else { return nil }
+        return { Task { await load(month: displayedMonthStart, force: true) } }
     }
 
     private var month: CalendarHistoryMonthSnapshot<TeamCheckinHistoryRow> {
@@ -65,9 +83,12 @@ struct TeamCheckinHistoryView: View {
             selectedDate: $selectedDate,
             eyebrow: "Team 历史",
             month: month,
-            archiveGroups: archiveGroups,
+            archiveGroups: { archiveGroups },
             calendar: calendar,
             minimumSelectableDate: teamCreatedDate,
+            hasSnapshot: hasMonthSnapshot,
+            loadMessage: loadMessage,
+            onRetry: retryMonth,
             monthSummaryText: { month in
                 month.rowCount == 0
                 ? "本月没有 Team 训练"
@@ -91,15 +112,6 @@ struct TeamCheckinHistoryView: View {
             }
         )
         .paperToolbar(title: "历史训练", onBack: { dismiss() })
-        .overlay(alignment: .top) {
-            if loadingMonths.contains(displayedMonthStart) {
-                ProgressView()
-                    .padding(10)
-                    .background(Theme.Color.surface, in: Capsule())
-                    .overlay(Capsule().stroke(Theme.Color.border, lineWidth: 1))
-                    .padding(.top, 4)
-            }
-        }
         .refreshable {
             await load(month: displayedMonthStart, force: true)
         }
@@ -107,8 +119,9 @@ struct TeamCheckinHistoryView: View {
             TeamCheckinDetailSheet(checkin: checkin, memberName: displayName(for: checkin.userId))
         }
         .task {
-            await loadMembersIfNeeded()
+            async let memberLoad: Void = loadMembersIfNeeded()
             await load(month: displayedMonthStart)
+            await memberLoad
         }
         .alert("出错了", isPresented: .constant(error != nil)) {
             Button("好") { error = nil }
@@ -131,6 +144,7 @@ struct TeamCheckinHistoryView: View {
         guard force || loadedMonths[month] == nil else { return }
         guard !loadingMonths.contains(month) else { return }
         loadingMonths.insert(month)
+        monthErrors[month] = nil
         defer { loadingMonths.remove(month) }
         do {
             let feed = try await teamService.checkinHistory(teamId: team.id, month: month)
@@ -141,7 +155,7 @@ struct TeamCheckinHistoryView: View {
             )
         } catch {
             guard !error.isCancellationError else { return }
-            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            monthErrors[month] = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
 
@@ -175,33 +189,38 @@ struct TeamCheckinHistoryView: View {
     }
 
     private func teamCheckinRow(_ row: TeamCheckinHistoryRow, compact: Bool) -> some View {
-        HStack(spacing: Theme.Spacing.sm) {
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+            : AnyLayout(HStackLayout(spacing: Theme.Spacing.sm))
+        return layout {
             VStack(spacing: 2) {
                 Text(Self.timeFormatter.string(from: row.checkin.createdAt ?? row.date))
                     .font(Theme.Font.mono(size: compact ? 10 : 11, weight: .bold))
                     .foregroundStyle(Theme.Color.fg)
                 Text(String(row.memberName.prefix(1)))
                     .font(Theme.Font.body(size: compact ? 9 : 10, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
+                    .foregroundStyle(Theme.Color.action)
             }
-            .frame(width: compact ? 48 : 52, height: compact ? 40 : 46)
+            .frame(width: dynamicTypeSize >= .xxLarge ? nil : (compact ? 48 : 52),
+                   height: dynamicTypeSize >= .xxLarge ? nil : (compact ? 40 : 46))
+            .padding(.vertical, dynamicTypeSize >= .xxLarge ? 6 : 0)
             .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("\(row.memberName) · \(row.title)")
                     .font(Theme.Font.body(size: compact ? 13 : 14, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                 if row.summary == nil {
                     Text("训练快照不可用")
                         .font(Theme.Font.body(size: compact ? 10.5 : 11.5))
                         .foregroundStyle(Theme.Color.muted)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                 } else {
                     Text("\(row.exerciseCount) 动作 · \(row.setCount) 组 · \(formatTons(row.volumeKg))t")
                         .font(Theme.Font.body(size: compact ? 10.5 : 11.5))
                         .foregroundStyle(Theme.Color.fg2)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer(minLength: 0)
@@ -234,6 +253,8 @@ struct TeamCheckinHistoryView: View {
 }
 
 struct TeamCheckinDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let checkin: TeamCheckinDTO
     let memberName: String
 
@@ -247,7 +268,8 @@ struct TeamCheckinDetailSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PaperSheetTitleHeader(title: "训练详情", background: Theme.Color.bg)
+            PaperSheetHeader(title: "训练详情", cancelTitle: "关闭", background: Theme.Color.bg,
+                             onCancel: { dismiss() })
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     header
@@ -270,14 +292,18 @@ struct TeamCheckinDetailSheet: View {
 
     private var header: some View {
         let title = summary?.title?.isEmpty == false ? summary?.title ?? "训练" : "训练"
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 8))
         return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             HStack(spacing: Theme.Spacing.sm) {
                 Text(String(memberName.prefix(1)))
-                    .font(Theme.Font.body(size: 14, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.Color.action)
                     .frame(width: 34, height: 34)
                     .background(Theme.Color.accentSoft, in: Circle())
                     .overlay(Circle().stroke(Theme.Color.accentSofter, lineWidth: 1))
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(memberName)
                         .font(Theme.Font.body(size: 14, weight: .semibold))
@@ -291,10 +317,9 @@ struct TeamCheckinDetailSheet: View {
             Text(title)
                 .font(Theme.Font.display(size: 26, weight: .heavy))
                 .foregroundStyle(Theme.Color.fg)
-                .lineLimit(2)
-                .minimumScaleFactor(0.82)
+                .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 8) {
+            layout {
                 statPill(title: "动作", value: summary.map { "\($0.exerciseCount)" } ?? "—")
                 statPill(title: "组数", value: summary.map { "\($0.totalSets)" } ?? "—")
                 statPill(title: "训练量", value: summary.map { formatKg($0.totalVolumeKg) + "kg·rep" } ?? "—")
@@ -360,7 +385,7 @@ struct TeamCheckinDetailSheet: View {
                         Text(unit.title)
                             .font(Theme.Font.body(size: 15, weight: .bold))
                             .foregroundStyle(Theme.Color.fg)
-                            .lineLimit(1)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     if unit.kind == .superset, let rounds = unit.roundCount {
                         Text("\(rounds) 组 · 共 \(rounds * unit.exercises.count) 组动作")
@@ -391,7 +416,8 @@ struct TeamCheckinDetailSheet: View {
                 Text("#\(index + 1)")
                     .font(Theme.Font.mono(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.muted)
-                    .frame(width: 34, alignment: .leading)
+                    .fixedSize()
+                    .frame(minWidth: 34, alignment: .leading)
                 if set.setType == .drop {
                     WorkoutStructureIcon(kind: .dropSet)
                 } else {
@@ -405,7 +431,8 @@ struct TeamCheckinDetailSheet: View {
                         Text("组 \(segment.segmentIndex + 1)")
                             .font(Theme.Font.mono(size: 10, weight: .semibold))
                             .foregroundStyle(Theme.Color.muted)
-                            .frame(width: 34, alignment: .leading)
+                            .fixedSize()
+                            .frame(minWidth: 34, alignment: .leading)
                         setValueLine(weightKg: segment.weightKg, reps: segment.reps, assisted: assisted)
                         Spacer(minLength: 0)
                     }
@@ -420,7 +447,10 @@ struct TeamCheckinDetailSheet: View {
     }
 
     private func setValueLine(weightKg: Double?, reps: Int?, assisted: Bool) -> some View {
-        HStack(spacing: 6) {
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(spacing: 6))
+        return layout {
             Text((assisted ? "辅助 " : "") + (weightKg.map { formatKg($0) + " kg" } ?? "— kg"))
                 .font(Theme.Font.mono(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.Color.fg)
@@ -437,7 +467,7 @@ struct TeamCheckinDetailSheet: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(Theme.Color.accent)
+                .foregroundStyle(Theme.Color.action)
             Text("训练快照不可用")
                 .font(Theme.Font.body(size: 16, weight: .bold))
                 .foregroundStyle(Theme.Color.fg)

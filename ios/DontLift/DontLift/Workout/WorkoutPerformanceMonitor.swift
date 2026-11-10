@@ -26,6 +26,24 @@ nonisolated enum WorkoutPerformanceMonitor {
         return try body()
     }
 
+    static func measureAsync<T: Sendable>(_ name: StaticString,
+                                        _ body: @Sendable () async throws -> T) async rethrows -> T {
+        let id = signposter.makeSignpostID()
+        let state = signposter.beginInterval(name, id: id)
+        #if DEBUG
+        let start = ContinuousClock.now
+        #endif
+        defer {
+            signposter.endInterval(name, state)
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-profile-workout") {
+                print("PROFILE \(name) async duration=\(start.duration(to: .now))")
+            }
+            #endif
+        }
+        return try await body()
+    }
+
     static func record(_ name: StaticString, since start: ContinuousClock.Instant) {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-profile-workout") {

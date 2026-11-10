@@ -50,8 +50,9 @@ struct WorkoutHistoryScaleTests {
                 WorkoutSetSegment(segmentIndex: 0, weightKg: 50, reps: 8)
             ])])
         let workout = Workout(startedAt: .now.addingTimeInterval(-3600), endedAt: .now, exercises: [first, second])
-        workout.appendSupersetUnit(first: first, second: second, roundCount: 1)
         context.insert(workout)
+        try context.save()
+        workout.appendSupersetUnit(first: first, second: second, roundCount: 1)
         try context.save()
         let raw = try await Task.detached { try await WorkoutHistoryReader(modelContainer: container).read() }.value
         let metadata = HistoryWorkout.metadata(for: raw)

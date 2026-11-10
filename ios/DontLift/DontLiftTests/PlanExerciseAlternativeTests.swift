@@ -4,6 +4,8 @@ import Testing
 
 @MainActor
 struct PlanExerciseAlternativeTests {
+    private let testStore = WorkoutTestStore()
+
     private let main = PlanExerciseOption(builtinExerciseCode: "MAIN_PRESS",
                                           exerciseName: "杠铃卧推",
                                           primaryMuscle: "胸",
@@ -35,8 +37,8 @@ struct PlanExerciseAlternativeTests {
                                  name: String,
                                  itemId: UUID,
                                  weight: Double,
-                                 date: Date) -> Workout {
-        let workout = Workout(startedAt: date, endedAt: date.addingTimeInterval(3600))
+                                 date: Date) throws -> Workout {
+        let workout = try testStore.insert(Workout(startedAt: date, endedAt: date.addingTimeInterval(3600)))
         let exercise = WorkoutExercise(builtinExerciseCode: code,
                                        exerciseName: name,
                                        orderIndex: 0,
@@ -84,10 +86,10 @@ struct PlanExerciseAlternativeTests {
 
     @Test func builderPersistsOptionsModeAndDefaultSetsInWorkoutUnit() throws {
         let planItem = item()
-        let workout = PlanWorkoutBuilder.workout(title: "胸",
+        let workout = try testStore.insert(PlanWorkoutBuilder.workout(title: "胸",
                                                  items: [planItem],
                                                  mode: .strict,
-                                                 lookup: .empty)
+                                                 lookup: .empty))
         let unit = try #require(workout.trainingUnits.first)
 
         #expect(unit.exerciseOptions?.map(\.historyKey) == [main.historyKey, alternative.historyKey])
@@ -101,10 +103,10 @@ struct PlanExerciseAlternativeTests {
 
     @Test func strictAlternativeClearsWeightsAndSwitchingBackRestoresDefaults() throws {
         let planItem = item()
-        let workout = PlanWorkoutBuilder.workout(title: "胸",
+        let workout = try testStore.insert(PlanWorkoutBuilder.workout(title: "胸",
                                                  items: [planItem],
                                                  mode: .strict,
-                                                 lookup: .empty)
+                                                 lookup: .empty))
         let unit = try #require(workout.trainingUnits.first)
 
         let alternativeSets = PlanPrefill.replacementSets(planItemId: planItem.itemId,
@@ -125,21 +127,21 @@ struct PlanExerciseAlternativeTests {
     @Test func adaptiveHistoriesStaySeparatedByPlanItemAndActualExercise() throws {
         let itemId = UUID()
         let planItem = item(itemId: itemId)
-        let mainWorkout = finishedWorkout(code: "MAIN_PRESS",
+        let mainWorkout = try finishedWorkout(code: "MAIN_PRESS",
                                           name: "杠铃卧推",
                                           itemId: itemId,
                                           weight: 80,
                                           date: Date(timeIntervalSince1970: 1_000))
-        let alternativeWorkout = finishedWorkout(code: "ALT_PRESS",
+        let alternativeWorkout = try finishedWorkout(code: "ALT_PRESS",
                                                  name: "哑铃卧推",
                                                  itemId: itemId,
                                                  weight: 30,
                                                  date: Date(timeIntervalSince1970: 2_000))
         let lookup = PlanHistoryLookup.build(from: [alternativeWorkout, mainWorkout])
-        let workout = PlanWorkoutBuilder.workout(title: "胸",
+        let workout = try testStore.insert(PlanWorkoutBuilder.workout(title: "胸",
                                                  items: [planItem],
                                                  mode: .adaptive,
-                                                 lookup: lookup)
+                                                 lookup: lookup))
         let unit = try #require(workout.trainingUnits.first)
 
         #expect(workout.exercises.first?.sets.first?.weightKg == 80)
@@ -150,10 +152,10 @@ struct PlanExerciseAlternativeTests {
         #expect(alternativeSets.first?.weightKg == 30)
     }
 
-    @Test func alternativeCompletionDoesNotOverwriteOrAppendPlanItem() {
+    @Test func alternativeCompletionDoesNotOverwriteOrAppendPlanItem() throws {
         let itemId = UUID()
         let planItem = item(itemId: itemId)
-        let workout = finishedWorkout(code: "ALT_PRESS",
+        let workout = try finishedWorkout(code: "ALT_PRESS",
                                       name: "哑铃卧推",
                                       itemId: itemId,
                                       weight: 30,

@@ -7,6 +7,7 @@ import AuthenticationServices
 /// + 黑底 Sign in with Apple + 合规链接 + 模拟器开发者入口。
 struct LoginView: View {
     @Environment(SessionStore.self) private var session
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var authService: AuthService?
     @State private var errorMessage: String?
     @State private var loading = false
@@ -16,30 +17,36 @@ struct LoginView: View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 0) {
-                brandMark
-                    .padding(.top, Theme.Spacing.md)
-                Spacer(minLength: Theme.Spacing.lg)
-                copyBlock
-                Spacer(minLength: 26)
-                appleButton
-                legalSmallPrint
-                    .padding(.top, Theme.Spacing.md)
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(Theme.Font.l5)
-                        .foregroundStyle(Theme.Color.danger)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, Theme.Spacing.sm)
+            GeometryReader { viewport in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        brandMark
+                            .padding(.top, Theme.Spacing.md)
+                        Spacer(minLength: Theme.Spacing.lg)
+                        copyBlock
+                        Spacer(minLength: 26)
+                        appleButton
+                        legalSmallPrint
+                            .padding(.top, Theme.Spacing.md)
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .font(Theme.Font.l5)
+                                .foregroundStyle(Theme.Color.danger)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, Theme.Spacing.sm)
+                        }
+                        if AppConfig.devLoginEnabled {
+                            devLoginButton
+                                .padding(.top, Theme.Spacing.md)
+                        }
+                    }
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.bottom, Theme.Spacing.xl)
+                    .frame(maxWidth: .infinity, minHeight: viewport.size.height, alignment: .leading)
                 }
-                if AppConfig.devLoginEnabled {
-                    devLoginButton
-                        .padding(.top, Theme.Spacing.md)
-                }
+                .scrollBounceBehavior(.basedOnSize)
+                .clipped()
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.bottom, Theme.Spacing.xl)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .preferredColorScheme(.light)
         .onAppear { if authService == nil { authService = AuthService(session: session) } }
@@ -73,7 +80,7 @@ struct LoginView: View {
             Text("NO. 0001")
                 .font(Theme.Font.mono(size: 12))
                 .tracking(2)
-                .foregroundStyle(Theme.Color.accent)
+                .foregroundStyle(Theme.Color.action)
             (Text("别练了。\n再练就成\n")
                 + Text("彦祖").foregroundStyle(Theme.Color.accent)
                 + Text("了。"))
@@ -88,6 +95,7 @@ struct LoginView: View {
                 .padding(.top, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var appleButton: some View {
@@ -112,13 +120,25 @@ struct LoginView: View {
     }
 
     private var legalSmallPrint: some View {
-        HStack(spacing: 6) {
-            Button("服务条款") { legalURL = IdentifiableURL(url: AppConfig.termsOfServiceURL) }
-                .foregroundStyle(Theme.Color.fg2)
-            Text("·")
-            Button("隐私政策") { legalURL = IdentifiableURL(url: AppConfig.privacyPolicyURL) }
-                .foregroundStyle(Theme.Color.fg2)
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 6))
+            : AnyLayout(HStackLayout(spacing: 6))
+        return layout {
+            Button { legalURL = IdentifiableURL(url: AppConfig.termsOfServiceURL) } label: {
+                Text("服务条款")
+                    .foregroundStyle(Theme.Color.fg2)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            if !dynamicTypeSize.isAccessibilitySize { Text("·") }
+            Button { legalURL = IdentifiableURL(url: AppConfig.privacyPolicyURL) } label: {
+                Text("隐私政策")
+                    .foregroundStyle(Theme.Color.fg2)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
         }
+        .buttonStyle(.plain)
         .font(Theme.Font.body(size: 12))
         .foregroundStyle(Theme.Color.muted)
         .frame(maxWidth: .infinity)
@@ -131,7 +151,9 @@ struct LoginView: View {
                 .font(Theme.Font.mono(size: 11))
                 .foregroundStyle(Theme.Color.muted)
                 .frame(maxWidth: .infinity)
-                .frame(height: 44)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 12)
+                .frame(minHeight: 44)
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                         .strokeBorder(Theme.Color.border2, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
@@ -156,6 +178,9 @@ struct LoginView: View {
     }
 
     private func preflightNetworkPermission() async {
+        #if DEBUG
+        if UITestHooks.isAutoLogin { return }
+        #endif
         // iOS 没有显式网络权限申请 API；登录页先打一笔匿名请求，让系统首次网络弹窗前置到 Apple 登录前。
         _ = try? await APIClient.shared.sendVoid(
             "GET",

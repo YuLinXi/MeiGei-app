@@ -12,6 +12,8 @@ struct ProfileView: View {
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(BadgeWallStore.self) private var badgeWallStore
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .title2) private var avatarDiameter: CGFloat = 64
 
     @Query private var profiles: [UserProfile]
 
@@ -28,6 +30,19 @@ struct ProfileView: View {
     @State private var editingName = false
     @State private var nameDraft = ""
     @FocusState private var nameFieldFocused: Bool
+    @State private var profileSaveFailure: ProfileSaveFailure?
+
+    private enum ProfileSaveFailure: Equatable {
+        case name
+        case sex(BodySex)
+
+        var message: String {
+            switch self {
+            case .name: "称呼保存失败，当前输入仍保留。"
+            case .sex: "性别保存失败，请重试。"
+            }
+        }
+    }
 
     // 删号流程态
     @State private var deletionImpact: DeletionImpactDTO?
@@ -39,8 +54,14 @@ struct ProfileView: View {
     @State private var profileSheet: ProfileSheet?
     @State private var healthAuthorized = false
     @State private var notificationsEnabled: Bool?
-    @State private var caloriePreferences = WorkoutCaloriePreferences.current()
+    private let calorieDefaults: UserDefaults
+    @State private var caloriePreferences: WorkoutCaloriePreferences
     @State private var showBadgeWall = ProcessInfo.processInfo.arguments.contains("-open-badge-wall")
+
+    init(calorieDefaults: UserDefaults = .standard) {
+        self.calorieDefaults = calorieDefaults
+        _caloriePreferences = State(initialValue: WorkoutCaloriePreferences.current(defaults: calorieDefaults))
+    }
 
     private var badgeGrants: [BadgeGrantCandidate] {
         badgeWallStore.progress.compactMap(\.grant).sorted { $0.unlockedAt > $1.unlockedAt }
@@ -78,6 +99,11 @@ struct ProfileView: View {
             }
         }
         .rootTabTopScrim()
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let profileSaveFailure {
+                LocalSaveRetryBanner(message: profileSaveFailure.message, onRetry: retryProfileSave)
+            }
+        }
         // 我的页不展示顶部标题，隐藏系统导航栏。
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showBadgeWall) {
@@ -98,7 +124,7 @@ struct ProfileView: View {
         .task {
             WorkoutPerformanceMonitor.event("profile.appear")
             healthAuthorized = healthKit.isAuthorized
-            caloriePreferences = .current()
+            caloriePreferences = .current(defaults: calorieDefaults)
             await refreshNotificationStatus()
         }
         .sheet(item: $profileSheet) { sheet in
@@ -146,7 +172,7 @@ struct ProfileView: View {
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button("关闭") { showDesignSystem = false }
-                                .tint(Theme.Color.accent)
+                                .tint(Theme.Color.action)
                         }
                     }
             }
@@ -158,7 +184,10 @@ struct ProfileView: View {
 
     private var header: some View {
         let name = profile?.displayName ?? "已登录"
-        return HStack(spacing: Theme.Spacing.md) {
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Spacing.md))
+            : AnyLayout(HStackLayout(spacing: Theme.Spacing.md))
+        return layout {
             avatarCircle(initial: String(name.prefix(1)))
             VStack(alignment: .leading, spacing: 4) {
                 // 顶部称呼纯展示，不在此编辑——编辑统一进「个人资料」组。
@@ -169,14 +198,14 @@ struct ProfileView: View {
                     .font(Theme.Font.mono(size: 12))
                     .foregroundStyle(Theme.Color.muted)
             }
-            Spacer()
+            if dynamicTypeSize < .xxLarge { Spacer() }
         }
     }
 
     private func avatarCircle(initial: String) -> some View {
         // 头像统一用主色调（朱砂红），与全局单点强调一致。
         ZStack {
-            Circle().fill(Theme.Color.accent).frame(width: 64, height: 64)
+            Circle().fill(Theme.Color.accent).frame(width: avatarDiameter, height: avatarDiameter)
             Text(initial)
                 .font(Theme.Font.display(size: 28, weight: .bold))
                 .foregroundStyle(Theme.Color.bg)
@@ -191,20 +220,23 @@ struct ProfileView: View {
     // MARK: - 成就徽章概览卡片
 
     private var badgeOverviewCard: some View {
-        Button {
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+            : AnyLayout(HStackLayout(spacing: 10))
+        return Button {
             showBadgeWall = true
         } label: {
             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                HStack(alignment: .center) {
+                layout {
                     HStack(spacing: 8) {
                         Image(systemName: "medal.fill")
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(Theme.Color.accent)
+                            .foregroundStyle(Theme.Color.action)
                         Text("成就徽章")
                             .font(Theme.Font.body(size: 15, weight: .bold))
                             .foregroundStyle(Theme.Color.fg)
                     }
-                    Spacer()
+                    if dynamicTypeSize < .xxLarge { Spacer() }
                     HStack(spacing: 4) {
                         Text("已解锁 \(badgeGrants.count) / \(BadgeDefinition.all.count)")
                             .font(Theme.Font.mono(size: 13, weight: .medium))
@@ -216,21 +248,20 @@ struct ProfileView: View {
                 }
 
                 if badgeGrants.isEmpty {
-                    HStack(spacing: 10) {
-                        ForEach(0..<5, id: \.self) { _ in
-                            Circle()
-                                .fill(Theme.Color.surface2.opacity(0.6))
-                                .frame(width: 34, height: 34)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Theme.Color.border, lineWidth: 1)
-                                )
+                    layout {
+                        HStack(spacing: 10) {
+                            ForEach(0..<5, id: \.self) { _ in
+                                Circle()
+                                    .fill(Theme.Color.surface2.opacity(0.6))
+                                    .frame(width: 34, height: 34)
+                                    .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
+                            }
                         }
                         Text("完成训练点亮专属勋章")
                             .font(Theme.Font.body(size: 12))
                             .foregroundStyle(Theme.Color.muted)
                             .padding(.leading, 4)
-                        Spacer()
+                        if dynamicTypeSize < .xxLarge { Spacer() }
                     }
                     .padding(.top, 2)
                 } else {
@@ -283,25 +314,32 @@ struct ProfileView: View {
     }
 
     private var nameDisplayRow: some View {
-        HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: "person")
-                .foregroundStyle(Theme.Color.fg2)
-                .frame(width: 24)
-            Text("称呼")
-                .font(Theme.Font.body(size: 14))
-                .foregroundStyle(Theme.Color.fg)
-            Spacer()
-            Text(profile?.displayName ?? "未设置")
-                .font(Theme.Font.body(size: 14, weight: .semibold))
-                .foregroundStyle(Theme.Color.fg)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.Color.muted)
+        Button(action: beginEditName) {
+            HStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "person")
+                    .foregroundStyle(Theme.Color.fg2)
+                    .font(.system(size: 16))
+                    .frame(width: 24)
+                Text("称呼")
+                    .font(Theme.Font.body(size: 14))
+                    .foregroundStyle(Theme.Color.fg)
+                Spacer()
+                Text(profile?.displayName ?? "未设置")
+                    .font(Theme.Font.body(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.Color.fg)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.Color.muted)
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, 8)
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, Theme.Spacing.md)
-        .frame(height: 48)
-        .contentShape(Rectangle())
-        .onTapGesture { beginEditName() }
+        .buttonStyle(.plain)
+        .accessibilityLabel("编辑称呼")
+        .accessibilityValue(profile?.displayName ?? "未设置")
+        .workoutOverlayObstacle()
     }
 
     private var nameEditingRow: some View {
@@ -310,9 +348,11 @@ struct ProfileView: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: Theme.Spacing.md) {
                 Image(systemName: "person")
-                    .foregroundStyle(Theme.Color.accent)
+                    .foregroundStyle(Theme.Color.action)
+                    .font(.system(size: 16))
                     .frame(width: 24)
-                TextField("称呼", text: $nameDraft)
+                TextField("称呼", text: $nameDraft, prompt: Text("称呼").foregroundColor(Theme.Color.muted))
+                    .accessibilityIdentifier("profile.name.input")
                     .font(Theme.Font.body(size: 15))
                     .foregroundStyle(Theme.Color.fg)
                     .focused($nameFieldFocused)
@@ -327,9 +367,12 @@ struct ProfileView: View {
                 Button("取消") { cancelEditName() }
                     .font(Theme.Font.body(size: 13))
                     .foregroundStyle(Theme.Color.fg2)
+                    .frame(minWidth: 44, minHeight: 44)
                 Button("保存") { saveName() }
+                    .accessibilityIdentifier("profile.name.save")
                     .font(Theme.Font.body(size: 13, weight: .semibold))
-                    .foregroundStyle(valid ? Theme.Color.accent : Theme.Color.muted)
+                    .foregroundStyle(valid ? Theme.Color.action : Theme.Color.muted)
+                    .frame(minWidth: 44, minHeight: 44)
                     .disabled(!valid)
             }
             .padding(.leading, 24 + Theme.Spacing.md)
@@ -340,14 +383,21 @@ struct ProfileView: View {
 
     private var sexRow: some View {
         let current = profile?.sex ?? .male
-        return HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: "figure.stand")
-                .foregroundStyle(Theme.Color.fg2)
-                .frame(width: 24)
-            Text("性别")
-                .font(Theme.Font.body(size: 14))
-                .foregroundStyle(Theme.Color.fg)
-            Spacer()
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Spacing.sm))
+            : AnyLayout(HStackLayout(spacing: Theme.Spacing.md))
+        return layout {
+            HStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "figure.stand")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.Color.fg2)
+                    .frame(width: 24)
+                    .accessibilityHidden(true)
+                Text("性别")
+                    .font(Theme.Font.body(size: 14))
+                    .foregroundStyle(Theme.Color.fg)
+            }
+            if !dynamicTypeSize.isAccessibilitySize { Spacer() }
             HStack(spacing: 6) {
                 ForEach(BodySex.allCases) { s in
                     sexPill(s, selected: current == s)
@@ -355,19 +405,27 @@ struct ProfileView: View {
             }
         }
         .padding(.horizontal, Theme.Spacing.md)
-        .frame(height: 48)
+        .padding(.vertical, 8)
+        .frame(minHeight: 48)
     }
 
     private func sexPill(_ s: BodySex, selected: Bool) -> some View {
-        Text(s.displayName)
+        Button { setSex(s) } label: {
+            Text(s.displayName)
             .font(Theme.Font.body(size: 13, weight: selected ? .semibold : .regular))
             .foregroundStyle(selected ? Color.white : Theme.Color.fg2)
-            .frame(width: 40, height: 28)
-            .background(selected ? Theme.Color.accent : Theme.Color.surface2,
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .frame(minWidth: 40, minHeight: 28)
+            .background(selected ? Theme.Color.action : Theme.Color.surface2,
                         in: Capsule())
             .overlay(Capsule().stroke(selected ? Color.clear : Theme.Color.border, lineWidth: 1))
-            .contentShape(Capsule())
-            .onTapGesture { setSex(s) }
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("性别：\(s.displayName)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func beginEditName() {
@@ -377,20 +435,22 @@ struct ProfileView: View {
     }
 
     private func cancelEditName() {
+        if profileSaveFailure == .name { profileSaveFailure = nil }
         editingName = false
         nameFieldFocused = false
     }
 
-    /// 保存称呼：乐观本地写 + PATCH 上行（失败静默重试）。
+    /// 本地保存成功才收起编辑；网络补传失败由会话保留待传标记。
     private func saveName() {
         let trimmed = nameDraft.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, trimmed.count <= 20, let profile = session.ensureProfile() else { return }
-        profile.displayName = trimmed
-        try? modelContext.save()
-        session.scheduleProfilePush()
-        Theme.Haptics.selection()
-        editingName = false
-        nameFieldFocused = false
+        guard !trimmed.isEmpty, trimmed.count <= 20 else { return }
+        do {
+            try session.saveDisplayName(trimmed)
+            profileSaveFailure = nil
+            Theme.Haptics.selection()
+            editingName = false
+            nameFieldFocused = false
+        } catch { profileSaveFailure = .name }
     }
 
     /// 切换性别：资料字段，乐观本地写 + PATCH 上行（驱动肌群图 + 回灌后端）。
@@ -398,10 +458,19 @@ struct ProfileView: View {
         // 用 ensureProfile 兜底：desync 场景下（token 在、本地档案缺失）@Query 查不到 profile，
         // 此处补建后再写，避免点击性别胶囊静默无效。
         guard let profile = session.ensureProfile(), profile.sex != s else { return }
-        profile.sex = s
-        try? modelContext.save()
-        session.scheduleProfilePush()
-        Theme.Haptics.selection()
+        do {
+            try session.saveSex(s)
+            profileSaveFailure = nil
+            Theme.Haptics.selection()
+        } catch { profileSaveFailure = .sex(s) }
+    }
+
+    private func retryProfileSave() {
+        switch profileSaveFailure {
+        case .name: saveName()
+        case .sex(let sex): setSex(sex)
+        case nil: break
+        }
     }
 
     // MARK: - 数据 · 同步
@@ -412,33 +481,26 @@ struct ProfileView: View {
             rowDivider
             SyncRow(syncEngine: syncEngine)
         }
+        .workoutOverlayObstacle()
     }
 
     /// HealthKit 行：未授权时可点击发起授权，授权态实时刷新。
     private var healthKitRow: some View {
         let available = HKHealthStore.isHealthDataAvailable()
-        return HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: "heart.text.square")
-                .foregroundStyle(Theme.Color.fg2)
-                .frame(width: 24)
-            Text("HealthKit")
-                .font(Theme.Font.body(size: 14))
-                .foregroundStyle(Theme.Color.fg)
-            Spacer()
-            Text(healthAuthorized ? "已连接" : (available ? "未授权" : "不可用"))
-                .font(Theme.Font.mono(size: 12))
-                .foregroundStyle(healthAuthorized ? Theme.Color.ok : Theme.Color.danger)
-        }
-        .padding(.horizontal, Theme.Spacing.md)
-        .frame(height: 48)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            guard available, !healthAuthorized else { return }
+        let status = healthAuthorized ? "已连接" : (available ? "未授权" : "不可用")
+        return Button {
             Task {
                 await healthKit.requestAuthorization()
                 healthAuthorized = healthKit.isAuthorized
             }
+        } label: {
+            preferenceSummary(title: "HealthKit", icon: "heart.text.square", value: status,
+                              valueColor: healthAuthorized ? Theme.Color.ok : Theme.Color.danger)
         }
+        .buttonStyle(.plain)
+        .disabled(!available || healthAuthorized)
+        .accessibilityLabel("HealthKit")
+        .accessibilityValue(status)
     }
 
     // MARK: - 训练偏好
@@ -458,76 +520,58 @@ struct ProfileView: View {
             rowDivider
 
             // 震动开关
-            HStack(spacing: Theme.Spacing.md) {
-                Image(systemName: "iphone.radiowaves.left.and.right").foregroundStyle(Theme.Color.fg2).frame(width: 24)
-                Text("震动")
+            Toggle(isOn: restTimerHapticsBinding) {
+                Label("震动", systemImage: "iphone.radiowaves.left.and.right")
                     .font(Theme.Font.body(size: 14))
                     .foregroundStyle(Theme.Color.fg)
-                Spacer()
-                Toggle("", isOn: restTimerHapticsBinding)
-                    .labelsHidden()
-                    .tint(Theme.Color.accent)
+    .frame(minHeight: 44)
             }
+            .tint(Theme.Color.action)
+            .accessibilityLabel("震动")
+            .accessibilityIdentifier("profile.haptics")
             .padding(.horizontal, Theme.Spacing.md)
-            .frame(height: 48)
+            .padding(.vertical, 2)
+            .frame(minHeight: 48)
 
             rowDivider
 
             // 声音开关：统一控制前台 App 内音效与后台/锁屏本地通知音。
-            HStack(spacing: Theme.Spacing.md) {
-                Image(systemName: "speaker.wave.2").foregroundStyle(Theme.Color.fg2).frame(width: 24)
-                Text("声音")
+            Toggle(isOn: restTimerSoundBinding) {
+                Label("声音", systemImage: "speaker.wave.2")
                     .font(Theme.Font.body(size: 14))
                     .foregroundStyle(Theme.Color.fg)
-                Spacer()
-                Toggle("", isOn: restTimerSoundBinding)
-                    .labelsHidden()
-                    .tint(Theme.Color.accent)
+    .frame(minHeight: 44)
             }
+            .tint(Theme.Color.action)
+            .accessibilityLabel("声音")
+            .accessibilityIdentifier("profile.sound")
             .padding(.horizontal, Theme.Spacing.md)
-            .frame(height: 48)
+            .padding(.vertical, 2)
+            .frame(minHeight: 48)
 
             rowDivider
 
             // 通知（展示系统授权态 + 跳系统设置）
-            HStack(spacing: Theme.Spacing.md) {
-                Image(systemName: "bell").foregroundStyle(Theme.Color.fg2).frame(width: 24)
-                Text("通知")
-                    .font(Theme.Font.body(size: 14))
-                    .foregroundStyle(Theme.Color.fg)
-                Spacer()
-                Text(notificationStatusText)
-                    .font(Theme.Font.mono(size: 12))
-                    .foregroundStyle(notificationsEnabled == true ? Theme.Color.ok : Theme.Color.muted)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.Color.muted)
+            Button(action: openSystemSettings) {
+                preferenceSummary(title: "通知", icon: "bell", value: notificationStatusText,
+                                  valueColor: notificationsEnabled == true ? Theme.Color.ok : Theme.Color.muted,
+                                  disclosure: true)
             }
-            .padding(.horizontal, Theme.Spacing.md)
-            .frame(height: 48)
-            .contentShape(Rectangle())
-            .onTapGesture { openSystemSettings() }
+            .buttonStyle(.plain)
+            .accessibilityLabel("通知设置")
+            .accessibilityValue(notificationStatusText)
         }
     }
 
     private var defaultRestDurationRow: some View {
-        HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: "timer").foregroundStyle(Theme.Color.fg2).frame(width: 24)
-            Text("默认休息时长")
-                .font(Theme.Font.body(size: 14))
-                .foregroundStyle(Theme.Color.fg)
-            Spacer()
-            Text(profileRestDurationText(restTimer.defaultDuration))
-                .font(Theme.Font.mono(size: 12))
-                .foregroundStyle(Theme.Color.fg)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.Color.muted)
+        Button { profileSheet = .restDuration } label: {
+            preferenceSummary(title: "默认休息时长", icon: "timer",
+                              value: profileRestDurationText(restTimer.defaultDuration), disclosure: true)
         }
-        .padding(.horizontal, Theme.Spacing.md)
-        .frame(height: 48)
-        .contentShape(Rectangle())
-        .onTapGesture { profileSheet = .restDuration }
+        .buttonStyle(.plain)
+        .accessibilityLabel("默认休息时长")
+        .accessibilityValue(profileRestDurationText(restTimer.defaultDuration))
+        .accessibilityIdentifier("profile.defaultRest")
     }
 
     private var restTimerHapticsBinding: Binding<Bool> {
@@ -558,56 +602,42 @@ struct ProfileView: View {
     }
 
     private var calorieEstimateToggleRow: some View {
-        HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: "flame")
-                .foregroundStyle(Theme.Color.fg2)
-                .frame(width: 24)
-            Text("消耗估算")
+        Toggle(isOn: calorieEstimateEnabledBinding) {
+            Label("消耗估算", systemImage: "flame")
                 .font(Theme.Font.body(size: 14))
                 .foregroundStyle(Theme.Color.fg)
-            Spacer()
-            Toggle("", isOn: calorieEstimateEnabledBinding)
-                .labelsHidden()
-                .tint(Theme.Color.accent)
+    .frame(minHeight: 44)
         }
+        .tint(Theme.Color.action)
+        .accessibilityLabel("消耗估算")
+        .accessibilityIdentifier("profile.calorieEstimate")
         .padding(.horizontal, Theme.Spacing.md)
-        .frame(height: 48)
+        .padding(.vertical, 2)
+        .frame(minHeight: 48)
     }
 
     private var calorieBodyWeightRow: some View {
-        HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: "scalemass")
-                .foregroundStyle(Theme.Color.fg2)
-                .frame(width: 24)
-            Text("估算体重")
-                .font(Theme.Font.body(size: 14))
-                .foregroundStyle(Theme.Color.fg)
-            Spacer()
-            Text(calorieBodyWeightText)
-                .font(Theme.Font.mono(size: 12))
-                .foregroundStyle(calorieBodyWeightColor)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.Color.muted)
+        Button {
+            profileSheet = .calorieWeight(enableAfterSave: calorieEstimatesEnabled)
+        } label: {
+            preferenceSummary(title: "估算体重", icon: "scalemass", value: calorieBodyWeightText,
+                              valueColor: calorieBodyWeightColor, disclosure: true)
         }
-        .padding(.horizontal, Theme.Spacing.md)
-        .frame(height: 48)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            profileSheet = .calorieWeight(enableAfterSave: caloriePreferences.showsEstimates)
-        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("估算体重")
+        .accessibilityValue(calorieBodyWeightText)
     }
 
     private var calorieBodyWeightText: String {
         guard let kg = caloriePreferences.bodyWeightKg else {
-            return caloriePreferences.showsEstimates ? "必填" : "未设置"
+            return "未设置（可选）"
         }
         return "\(formatKg(kg))kg"
     }
 
     private var calorieBodyWeightColor: Color {
-        caloriePreferences.bodyWeightKg == nil && caloriePreferences.showsEstimates
-            ? Theme.Color.danger
+        caloriePreferences.bodyWeightKg == nil
+            ? Theme.Color.muted
             : Theme.Color.fg
     }
 
@@ -616,16 +646,14 @@ struct ProfileView: View {
             profileSheet = .calorieWeight(enableAfterSave: true)
             return
         }
-        WorkoutCaloriePreferences.setShowsEstimates(enabled)
-        caloriePreferences = WorkoutCaloriePreferences.current()
+        WorkoutCaloriePreferences.setShowsEstimates(enabled, defaults: calorieDefaults)
+        caloriePreferences = WorkoutCaloriePreferences.current(defaults: calorieDefaults)
     }
 
     private func saveCalorieBodyWeight(_ kg: Double, enableAfterSave: Bool) {
-        WorkoutCaloriePreferences.setBodyWeightKg(kg)
-        if enableAfterSave {
-            WorkoutCaloriePreferences.setShowsEstimates(true)
-        }
-        caloriePreferences = WorkoutCaloriePreferences.current()
+        WorkoutCaloriePreferences.setBodyWeightKg(kg, defaults: calorieDefaults)
+        WorkoutCaloriePreferences.setShowsEstimates(enableAfterSave, defaults: calorieDefaults)
+        caloriePreferences = WorkoutCaloriePreferences.current(defaults: calorieDefaults)
         Theme.Haptics.selection()
     }
 
@@ -662,7 +690,7 @@ struct ProfileView: View {
     private var aboutGroup: some View {
         groupCard(title: "关于") {
             HStack {
-                Image(systemName: "info.circle").foregroundStyle(Theme.Color.fg2).frame(width: 24)
+                Image(systemName: "info.circle").foregroundStyle(Theme.Color.fg2).font(.system(size: 16)).frame(width: 24)
                 Text("版本")
                     .font(Theme.Font.body(size: 14))
                     .foregroundStyle(Theme.Color.fg)
@@ -672,9 +700,15 @@ struct ProfileView: View {
                     .foregroundStyle(Theme.Color.muted)
             }
             .padding(.horizontal, Theme.Spacing.md)
-            .frame(height: 48)
+            .padding(.vertical, 8)
+            .frame(minHeight: 48)
             .contentShape(Rectangle())
             .onTapGesture { handleVersionTap() }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("版本")
+            .accessibilityValue(appVersion)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { handleVersionTap() }
 
             rowDivider
             legalRow(icon: "hand.raised", title: "隐私政策", url: AppConfig.privacyPolicyURL)
@@ -684,7 +718,7 @@ struct ProfileView: View {
             rowDivider
             // DEBUG-only：为 Simulator 测试账号一键生成近 6 周演示训练与计划。
             HStack(spacing: Theme.Spacing.md) {
-                Image(systemName: "hammer").foregroundStyle(Theme.Color.fg2).frame(width: 24)
+                Image(systemName: "hammer").foregroundStyle(Theme.Color.fg2).font(.system(size: 16)).frame(width: 24)
                 Text("生成演示数据")
                     .font(Theme.Font.body(size: 14))
                     .foregroundStyle(Theme.Color.fg)
@@ -694,11 +728,14 @@ struct ProfileView: View {
                     .foregroundStyle(Theme.Color.muted)
             }
             .padding(.horizontal, Theme.Spacing.md)
-            .frame(height: 48)
+            .padding(.vertical, 8)
+            .frame(minHeight: 48)
             .contentShape(Rectangle())
             .onTapGesture { seedDemoData() }
             .accessibilityLabel("生成演示数据")
             .accessibilityHint("生成近 6 周演示训练与计划（仅开发环境）")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { seedDemoData() }
             #endif
         }
     }
@@ -708,8 +745,8 @@ struct ProfileView: View {
     private func seedDemoData() {
         do {
             if caloriePreferences.bodyWeightKg == nil {
-                WorkoutCaloriePreferences.setBodyWeightKg(75.0)
-                caloriePreferences = WorkoutCaloriePreferences.current()
+                WorkoutCaloriePreferences.setBodyWeightKg(75.0, defaults: calorieDefaults)
+                caloriePreferences = WorkoutCaloriePreferences.current(defaults: calorieDefaults)
             }
             let result = try WorkoutDemoSeedData.seed(in: modelContext)
             historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
@@ -727,20 +764,49 @@ struct ProfileView: View {
     #endif
 
     private func legalRow(icon: String, title: String, url: URL) -> some View {
+        Button { profileSheet = .legal(url) } label: {
+            preferenceSummary(title: title, icon: icon, disclosure: true)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+    }
+
+    /// 标签与值在大字下纵排，触达区位于真实 Button label 内。
+    private func preferenceSummary(title: String, icon: String, value: String? = nil,
+                                   valueColor: Color = Theme.Color.fg, disclosure: Bool = false) -> some View {
         HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: icon).foregroundStyle(Theme.Color.fg2).frame(width: 24)
-            Text(title)
-                .font(Theme.Font.body(size: 14))
-                .foregroundStyle(Theme.Color.fg)
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.Color.muted)
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(Theme.Color.fg2)
+                .frame(width: 24)
+                .accessibilityHidden(true)
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                : AnyLayout(HStackLayout(spacing: Theme.Spacing.md))
+            layout {
+                Text(title)
+                    .font(Theme.Font.body(size: 14))
+                    .foregroundStyle(Theme.Color.fg)
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
+                if let value {
+                    Text(value)
+                        .font(Theme.Font.mono(size: 12))
+                        .foregroundStyle(valueColor)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if disclosure {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.Color.muted)
+                    .accessibilityHidden(true)
+            }
         }
         .padding(.horizontal, Theme.Spacing.md)
-        .frame(height: 48)
+        .padding(.vertical, 8)
+        .frame(minHeight: 48)
         .contentShape(Rectangle())
-        .onTapGesture { profileSheet = .legal(url) }
+        .workoutOverlayObstacle()
     }
 
     // MARK: - 账号
@@ -751,17 +817,19 @@ struct ProfileView: View {
             Button { confirmLogout = true } label: {
                 HStack(spacing: Theme.Spacing.md) {
                     Image(systemName: "rectangle.portrait.and.arrow.right")
-                        .foregroundStyle(Theme.Color.danger).frame(width: 24)
+                        .foregroundStyle(Theme.Color.danger).font(.system(size: 16)).frame(width: 24)
                     Text("退出登录")
                         .font(Theme.Font.body(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.Color.danger)
                     Spacer()
                 }
                 .padding(.horizontal, Theme.Spacing.md)
-                .frame(height: 48)
+                .padding(.vertical, 8)
+                .frame(minHeight: 48)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .disabled(deleting)
         }
     }
 
@@ -823,8 +891,7 @@ struct ProfileView: View {
         Task {
             do {
                 try await AccountAPI.deleteAccount()
-                // 成功：清本地 + 登出 → RootView 监听 isLoggedIn 自动回 LoginView
-                session.wipeLocalDataAndLogout()
+                session.beginDeletedAccountCleanup()
                 // 视图随登出销毁，无需复位 deleting
             } catch {
                 deleteError = (error as? APIError)?.errorDescription ?? error.localizedDescription
@@ -888,6 +955,7 @@ private enum ProfileSheet: Identifiable {
 
 struct CalorieBodyWeightSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @FocusState private var weightFocused: Bool
 
     let enableAfterSave: Bool
@@ -913,40 +981,45 @@ struct CalorieBodyWeightSheet: View {
                 onConfirm: save
             )
 
-            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                Text("体重")
-                    .eyebrowStyle()
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    Text("体重")
+                        .eyebrowStyle()
 
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    TextField("30–250", text: $weightText)
-                        .font(Theme.Font.number(size: 30, weight: .bold))
-                        .foregroundStyle(Theme.Color.fg)
-                        .keyboardType(.decimalPad)
-                        .focused($weightFocused)
-                    Text("kg")
-                        .font(Theme.Font.body(size: 14, weight: .bold))
-                        .foregroundStyle(Theme.Color.muted)
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        TextField("30–250", text: $weightText, prompt: Text("30–250").foregroundColor(Theme.Color.muted))
+                            .accessibilityIdentifier("profile.calorieWeight.input")
+                            .font(Theme.Font.number(size: 30, weight: .bold))
+                            .foregroundStyle(Theme.Color.fg)
+                            .keyboardType(.decimalPad)
+                            .focused($weightFocused)
+                        Text("kg")
+                            .font(Theme.Font.body(size: 14, weight: .bold))
+                            .foregroundStyle(Theme.Color.muted)
+                    }
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 68)
+                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                            .stroke(inputBorderColor, lineWidth: 1)
+                    )
+
+                    Text(helperText)
+                        .accessibilityIdentifier("profile.calorieWeight.helper")
+                        .font(Theme.Font.mono(size: 11))
+                        .foregroundStyle(helperColor)
                 }
-                .padding(.horizontal, Theme.Spacing.md)
-                .frame(height: 68)
-                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                        .stroke(inputBorderColor, lineWidth: 1)
-                )
-
-                Text(helperText)
-                    .font(Theme.Font.mono(size: 11))
-                    .foregroundStyle(helperColor)
+                .padding(Theme.Spacing.lg)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(Theme.Spacing.lg)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .scrollDismissesKeyboard(.interactively)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         .background(Theme.Color.bg.ignoresSafeArea())
         .presentationBackground(Theme.Color.bg)
-        .presentationDetents([.height(260)])
+        .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.height(260)])
         .onAppear { weightFocused = true }
     }
 
@@ -982,6 +1055,7 @@ struct CalorieBodyWeightSheet: View {
 
 private struct RestDurationEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @FocusState private var focusedField: DurationField?
 
     let onSave: (TimeInterval) -> Void
@@ -1008,32 +1082,34 @@ private struct RestDurationEditorSheet: View {
                 onConfirm: save
             )
 
-            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                Text("时长")
-                    .font(Theme.Font.body(size: 16, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg2)
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    Text("时长")
+                        .font(Theme.Font.body(size: 16, weight: .bold))
+                        .foregroundStyle(Theme.Color.fg2)
 
-                VStack(spacing: Theme.Spacing.md) {
-                    HStack(spacing: Theme.Spacing.sm) {
-                        durationField(title: "分钟", text: $minuteText, field: .minutes)
-                        durationField(title: "秒", text: $secondText, field: .seconds)
+                    VStack(spacing: Theme.Spacing.md) {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            durationField(title: "分钟", text: $minuteText, field: .minutes)
+                            durationField(title: "秒", text: $secondText, field: .seconds)
+                        }
                     }
+                    .padding(Theme.Spacing.md)
+                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                            .stroke(Theme.Color.border, lineWidth: 1)
+                    )
                 }
-                .padding(Theme.Spacing.md)
-                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                        .stroke(Theme.Color.border, lineWidth: 1)
-                )
+                .padding(Theme.Spacing.lg)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(Theme.Spacing.lg)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .scrollDismissesKeyboard(.interactively)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         .background(Theme.Color.bg.ignoresSafeArea())
         .presentationBackground(Theme.Color.bg)
-        .presentationDetents([.height(260)])
+        .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.height(260)])
         .onAppear { focusedField = .minutes }
     }
 
@@ -1062,22 +1138,22 @@ private struct RestDurationEditorSheet: View {
     }
 
     private func durationField(title: String, text: Binding<String>, field: DurationField) -> some View {
-        ZStack(alignment: .bottomTrailing) {
-            TextField("0", text: text)
+        VStack(spacing: 6) {
+            TextField("0", text: text, prompt: Text("0").foregroundColor(Theme.Color.muted))
                 .font(Theme.Font.number(size: 28, weight: .bold))
                 .foregroundStyle(Theme.Color.fg)
                 .keyboardType(.numberPad)
                 .multilineTextAlignment(.center)
                 .focused($focusedField, equals: field)
                 .padding(.horizontal, Theme.Spacing.md)
-                .padding(.bottom, 12)
+                .accessibilityLabel(title)
             Text(title)
                 .font(Theme.Font.body(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.Color.muted)
-                .padding(.trailing, 12)
-                .padding(.bottom, 9)
+                .accessibilityHidden(true)
         }
-        .frame(height: 68)
+        .padding(.vertical, 8)
+        .frame(minHeight: 68)
         .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
@@ -1112,31 +1188,48 @@ struct SyncRow: View {
     let syncEngine: SyncEngine
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: "arrow.triangle.2.circlepath")
-                .foregroundStyle(Theme.Color.fg2)
-                .frame(width: 24)
-            Text("立即同步")
-                .font(Theme.Font.body(size: 14))
-                .foregroundStyle(Theme.Color.fg)
-            Spacer()
-            if syncEngine.isSyncing {
-                ProgressView().tint(Theme.Color.accent)
-                Text("同步中…")
-                    .font(Theme.Font.mono(size: 11))
-                    .foregroundStyle(Theme.Color.fg2)
-            } else {
-                Text("空闲")
-                    .font(Theme.Font.mono(size: 11))
-                    .foregroundStyle(Theme.Color.muted)
-            }
-        }
-        .padding(.horizontal, Theme.Spacing.md)
-        .frame(height: 48)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            guard !syncEngine.isSyncing else { return }
+        Button {
             Task { await syncEngine.syncAll() }
+        } label: {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                HStack(spacing: Theme.Spacing.md) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .foregroundStyle(Theme.Color.fg2)
+                        .font(.system(size: 16))
+                        .frame(width: 24)
+                        .accessibilityHidden(true)
+                    Text("立即同步")
+                        .font(Theme.Font.body(size: 14))
+                        .foregroundStyle(Theme.Color.fg)
+                    Spacer()
+                    if syncEngine.isSyncing {
+                        ProgressView().tint(Theme.Color.action)
+                            .accessibilityHidden(true)
+                    }
+                    Text(syncEngine.isSyncing ? "同步中…" : (syncEngine.lastResult?.summary ?? "尚未同步"))
+                        .font(Theme.Font.l5)
+                        .foregroundStyle(Theme.Color.fg2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if !syncEngine.isSyncing, let hint = syncEngine.lastResult?.recoveryHint {
+                    Text(hint)
+                        .font(Theme.Font.l5)
+                        .foregroundStyle(Theme.Color.fg2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 24 + Theme.Spacing.md)
+                }
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.md)
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .disabled(syncEngine.isSyncing)
+        .accessibilityIdentifier("profile.sync")
+        .accessibilityLabel("立即同步")
+        .accessibilityValue(syncEngine.isSyncing ? "同步中" : (syncEngine.lastResult?.summary ?? "尚未同步"))
+        .accessibilityHint(syncEngine.isSyncing ? "正在同步，请稍候。"
+                           : (syncEngine.lastResult?.recoveryHint ?? "同步本机与账号中的训练数据"))
     }
 }

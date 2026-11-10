@@ -73,7 +73,7 @@ iOS SHALL 允许用户在普通动作计划项中定义热身组处方。热身�
 - **THEN** 下次训练生成同样数量的热身组和正式组
 - **AND** 各组按上次同序号 completed 值落值
 
-#### Scenario: 自适应模式历史递减组优先但不保留热身
+#### Scenario: 自适应模式历史递减组优先
 - **WHEN** 用户从自适应计划开始训练，且该动作上次 completed 实绩包含递减组 `80kg×8 / 60kg×6`
 - **THEN** 下次训练生成同结构递减组并落值对应 segments
 - **AND** 系统不生成热身递减组
@@ -89,6 +89,10 @@ iOS SHALL 允许用户在普通动作计划项中定义热身组处方。热身�
 - **THEN** 仅保留这 4 个 completed 组
 - **AND** 未打勾的热身组和正式组均被丢弃
 - **AND** 被保留的热身组不参与统计与 PR
+
+#### Scenario: 自适应模式历史优先落值
+- **WHEN** 用户从自适应计划开始训练，且该动作上次 completed 实绩为逐组 62.5kg×8
+- **THEN** 各组按上次同序号 completed 值落值（如 62.5kg×8），计划处方或 `suggested*` 仅在无历史时作为回退
 
 ### Requirement: 计划详情展示下次有效处方
 
@@ -167,7 +171,7 @@ iOS SHALL 允许用户在普通动作计划项中定义热身组处方。热身�
 - **THEN** 回写的 `suggestedWeightKg=80、suggestedReps=8`
 - **AND** 热身组 `100kg×1` 只作为热身处方保留，不刷新正式强度摘要
 
-#### Scenario: 递减组回写处方不带热身
+#### Scenario: 递减组回写处方
 - **WHEN** 本次某动作完成一个递减组 `80kg×8 / 60kg×6`
 - **THEN** 回写后的计划项包含递减组 `setPrescriptions`
 - **AND** `suggestedSets` 至少为 1

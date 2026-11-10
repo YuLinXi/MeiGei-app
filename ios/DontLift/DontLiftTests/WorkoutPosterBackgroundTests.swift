@@ -6,6 +6,33 @@ import UIKit
 
 @MainActor
 struct WorkoutPosterBackgroundTests {
+    private let testStore = WorkoutTestStore()
+
+    @Test func accessibleSummaryIncludesLastExerciseAndKeyMetrics() throws {
+        let data = try posterData(exerciseNames: (1...8).map { "动作 \($0)" })
+        #expect(data.accessibilitySummary.contains("动作 8"))
+        #expect(data.accessibilitySummary.contains("时长 \(data.durationText) 分钟"))
+        #expect(data.accessibilitySummary.contains("训练量 \(data.volumeText) 公斤"))
+        #expect(data.accessibilitySummary.contains("\(data.setCountText) 组"))
+    }
+
+    @Test func fixedCanvasKeepsItsLayoutAcrossReadingSizes() throws {
+        let data = try posterData(exerciseNames: (1...8).map { "动作 \($0)" })
+        func render(at size: DynamicTypeSize) throws -> UIImage {
+            let renderer = ImageRenderer(content:
+                WorkoutPosterCanvas(data: data, background: .equipmentWreath)
+                    .frame(width: 360, height: 640)
+                    .environment(\.dynamicTypeSize, size)
+            )
+            renderer.scale = 3
+            return try #require(renderer.uiImage)
+        }
+        let normal = try render(at: .large)
+        let enlarged = try render(at: .accessibility5)
+        #expect(enlarged.cgImage?.width == 1080 && enlarged.cgImage?.height == 1920)
+        #expect(try #require(normal.pngData()) == #require(enlarged.pngData()))
+    }
+
     @Test func catalogContainsFiveBundledIllustrationAssets() {
         #expect(WorkoutPosterBackground.catalog == [
             .celebration,
@@ -73,13 +100,13 @@ struct WorkoutPosterBackgroundTests {
     @Test func posterDataDerivesRecommendationContextFromWorkout() throws {
         let startedAt = Date(timeIntervalSince1970: 1_800_000_000)
         let shareId = try #require(UUID(uuidString: "019f6633-a0e0-74e0-a85f-ad7be94af460"))
-        let workout = Workout(
+        let workout = try testStore.insert(Workout(
             sourceShareId: shareId,
             title: "胸背训练",
             startedAt: startedAt,
             timerStartedAt: startedAt,
             endedAt: startedAt.addingTimeInterval(75 * 60)
-        )
+        ))
         let exercise = WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0)
         exercise.sets = (0..<20).map {
             WorkoutSet(setIndex: $0, weightKg: 80, reps: 8, completed: true)
@@ -108,13 +135,13 @@ struct WorkoutPosterBackgroundTests {
     @Test func previewAndExportUseSameExplicitBackgroundWithoutChangingPosterData() throws {
         let startedAt = Date(timeIntervalSince1970: 1_800_000_000)
         let workoutId = try #require(UUID(uuidString: "019f6633-a0e0-74e0-a85f-ad7be94af459"))
-        let workout = Workout(
+        let workout = try testStore.insert(Workout(
             localId: workoutId,
             title: "胸背训练",
             startedAt: startedAt,
             timerStartedAt: startedAt,
             endedAt: startedAt.addingTimeInterval(3_600)
-        )
+        ))
         workout.exercises = (0..<8).map { index in
             let exercise = WorkoutExercise(exerciseName: "动作 \(index + 1)", orderIndex: index)
             exercise.sets = [WorkoutSet(setIndex: 0,
@@ -158,8 +185,8 @@ struct WorkoutPosterBackgroundTests {
     @Test func exportedPosterIncludesExerciseAfterPreviousSixLineLimit() throws {
         let originalNames = (1...7).map { "动作 \($0)" } + ["末尾动作甲"]
         let changedNames = Array(originalNames.dropLast()) + ["末尾动作乙"]
-        let originalData = posterData(exerciseNames: originalNames)
-        let changedData = posterData(exerciseNames: changedNames)
+        let originalData = try posterData(exerciseNames: originalNames)
+        let changedData = try posterData(exerciseNames: changedNames)
 
         #expect(originalData.exerciseLines.map(\.name) == originalNames)
         #expect(changedData.exerciseLines.map(\.name) == changedNames)
@@ -199,15 +226,17 @@ struct WorkoutPosterBackgroundTests {
         )
     }
 
-    private func posterData(exerciseNames: [String]) -> WorkoutPosterData {
+    private func posterData(exerciseNames: [String]) throws -> WorkoutPosterData {
+        // 同一训练 ID 的两份海报样本使用各自的容器，避免 unique 合并使另一份关系失效。
+        let store = WorkoutTestStore()
         let startedAt = Date(timeIntervalSince1970: 1_800_000_000)
-        let workout = Workout(
+        let workout = try store.insert(Workout(
             localId: UUID(uuidString: "019f6633-a0e0-74e0-a85f-ad7be94af459")!,
             title: "全部动作训练",
             startedAt: startedAt,
             timerStartedAt: startedAt,
             endedAt: startedAt.addingTimeInterval(3_600)
-        )
+        ))
         workout.exercises = exerciseNames.enumerated().map { index, name in
             let exercise = WorkoutExercise(exerciseName: name, orderIndex: index)
             exercise.sets = [WorkoutSet(setIndex: 0,

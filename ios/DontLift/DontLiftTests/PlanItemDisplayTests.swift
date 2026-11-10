@@ -4,6 +4,7 @@ import Testing
 
 @MainActor
 struct PlanItemDisplayTests {
+    private let testStore = WorkoutTestStore()
     @Test func compactSummaryUsesStaticPlanSetsAndReps() {
         let item = PlanItem(exerciseName: "卧推",
                             orderIndex: 0,
@@ -83,7 +84,7 @@ struct PlanItemDisplayTests {
 
         let preview = PlanPrescriptionPreview.make(for: item, mode: .adaptive, lookup: lookup)
         let groups = PlanItemDisplay.groups(from: preview.sets)
-        let workout = PlanWorkoutBuilder.workout(title: "推日", items: [item], mode: .adaptive, lookup: lookup)
+        let workout = try testStore.insert(PlanWorkoutBuilder.workout(title: "推日", items: [item], mode: .adaptive, lookup: lookup))
         let builtSets = try #require(workout.exercises.first?.sets.sorted { $0.setIndex < $1.setIndex })
 
         #expect(groups.count == 3)
@@ -130,7 +131,7 @@ struct PlanItemDisplayTests {
                 == "1 热身组 + 2 正式组 · 各组设置不同")
 
         let preview = PlanPrescriptionPreview.make(for: item, mode: .strict, lookup: .empty)
-        let workout = PlanWorkoutBuilder.workout(title: "严格训练", items: [item], mode: .strict, lookup: .empty)
+        let workout = try testStore.insert(PlanWorkoutBuilder.workout(title: "严格训练", items: [item], mode: .strict, lookup: .empty))
         let builtSets = try #require(workout.exercises.first?.sets.sorted { $0.setIndex < $1.setIndex })
 
         #expect(preview.source == .strict)
@@ -176,7 +177,7 @@ struct PlanItemDisplayTests {
 
         let preview = PlanPrescriptionPreview.make(for: item, mode: .adaptive, lookup: lookup)
         let groups = PlanItemDisplay.groups(from: preview.sets)
-        let workout = PlanWorkoutBuilder.workout(title: "递减组", items: [item], mode: .adaptive, lookup: lookup)
+        let workout = try testStore.insert(PlanWorkoutBuilder.workout(title: "递减组", items: [item], mode: .adaptive, lookup: lookup))
         let builtSets = try #require(workout.exercises.first?.sets.sorted { $0.setIndex < $1.setIndex })
 
         #expect(groups.count == 2)
@@ -210,7 +211,7 @@ struct PlanItemDisplayTests {
         )
 
         let members = PlanItemDisplay.supersetMembers(for: item)
-        let workout = PlanWorkoutBuilder.workout(title: "胸部", items: [item], mode: .adaptive, lookup: .empty)
+        let workout = try testStore.insert(PlanWorkoutBuilder.workout(title: "胸部", items: [item], mode: .adaptive, lookup: .empty))
         let unit = try #require(workout.trainingUnits.first?.superset)
         let exercises = workout.exercises.sorted { $0.orderIndex < $1.orderIndex }
 

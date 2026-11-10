@@ -4,6 +4,8 @@ import Testing
 
 @MainActor
 struct TeamPlanSharingLoopTests {
+    private let testStore = WorkoutTestStore()
+
     @Test func shareSnapshotPreservesNotesWhileStrippingWeights() throws {
         var drop = PlanItem.dropSet(orderIndex: 1, exerciseName: "飞鸟",
                                     segments: [WorkoutSetSegment(segmentIndex: 0, weightKg: 20, reps: 10)])
@@ -203,7 +205,7 @@ struct TeamPlanSharingLoopTests {
         #expect(card.hasUnstartableItems == false)
     }
 
-    @Test func directStartFromTeamShareKeepsSoftShareRelationAndNoPersonalPlanLink() {
+    @Test func directStartFromTeamShareKeepsSoftShareRelationAndNoPersonalPlanLink() throws {
         let shareId = UUID()
         let versionId = UUID()
         let item = PlanItem(builtinExerciseCode: "BB_BENCH_PRESS",
@@ -213,10 +215,10 @@ struct TeamPlanSharingLoopTests {
                             suggestedReps: 8,
                             restAfterSetSeconds: 120)
 
-        let workout = PlanWorkoutBuilder.workout(title: "Team 胸推",
+        let workout = try testStore.insert(PlanWorkoutBuilder.workout(title: "Team 胸推",
                                                  items: [item],
                                                  mode: .adaptive,
-                                                 lookup: .empty)
+                                                 lookup: .empty))
         workout.sourceShareId = shareId
         workout.sourceShareVersionId = versionId
         workout.sourcePlanNameSnapshot = "Team 胸推"
@@ -231,8 +233,8 @@ struct TeamPlanSharingLoopTests {
         #expect(workout.trainingUnits.first?.restAfterSetSeconds == 120)
     }
 
-    @Test func checkinSummaryPreservesDropSetSegments() {
-        let workout = Workout(title: "胸推", startedAt: Date(), endedAt: Date())
+    @Test func checkinSummaryPreservesDropSetSegments() throws {
+        let workout = try testStore.insert(Workout(title: "胸推", startedAt: Date(), endedAt: Date()))
         let exercise = WorkoutExercise(builtinExerciseCode: "BB_BENCH_PRESS",
                                        exerciseName: "杠铃卧推",
                                        orderIndex: 0)
@@ -259,11 +261,11 @@ struct TeamPlanSharingLoopTests {
         #expect(set?.segments?.map(\.reps) == [8, 6])
     }
 
-    @Test func completedTeamShareWorkoutCanBeSavedAsPlanTemplateOnce() {
-        let workout = Workout(planId: nil,
+    @Test func completedTeamShareWorkoutCanBeSavedAsPlanTemplateOnce() throws {
+        let workout = try testStore.insert(Workout(planId: nil,
                               sourceShareId: UUID(),
                               sourceShareVersionId: UUID(),
-                              title: "Team 腿")
+                              title: "Team 腿"))
         let exercise = WorkoutExercise(builtinExerciseCode: "BB_SQUAT",
                                        exerciseName: "杠铃深蹲",
                                        primaryMuscle: "腿",

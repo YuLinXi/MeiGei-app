@@ -1,74 +1,40 @@
 # DesignSystem
 
-DontLift iOS 的 Neon Techwear 视觉 token 层。视图代码 **禁止** 直接写 `Color(red:...)` 或 `Color.cyan`，统一从 `Theme.*` 取。
+DontLift iOS 使用浅色 Paper 视觉：纸白背景、白卡与暖底、近黑正文、朱砂红强调。当前视觉以 `Theme+Color.swift`、`Theme+Font.swift`、`Theme+Layout.swift` 和实际颜色资源为准；App 顶层固定 `.preferredColorScheme(.light)`。
 
-## 5 行示例
+## 颜色与字体
 
-```swift
-import SwiftUI
-
-struct VolumeCard: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            Text("VOLUME").eyebrowStyle()
-            Text("28,420 kg").numStyle(size: 28).foregroundStyle(Theme.Color.accentCyan)
-            Text("本周总训练量").font(Theme.Font.body(size: 13)).foregroundStyle(Theme.Color.fg2)
-        }
-        .cardStyle()
-        .neonGlow(.cyan, intensity: .sm)
-    }
-}
-```
-
-## Token 速查
-
-- 颜色：`Theme.Color.{bg,surface,surface2,border,fg,fg2,muted,accentCyan,accentMagenta,danger,ok}`
-- 字体：`Theme.Font.display(size:)` / `body(size:)` / `mono(size:)` / `number(size:)`
-- 间距：`Theme.Spacing.{xs,sm,md,lg,xl,xxl}` = 4 / 8 / 14 / 22 / 32 / 44
-- 圆角：`Theme.Radius.{sm,md,lg,pill}` = 8 / 14 / 22 / 999
-- Modifier：`.cardStyle()` / `.eyebrowStyle()` / `.numStyle(size:)` / `.neonGlow(.cyan|.magenta, intensity:)`
-
-## 红线
-
-- `Theme.Color.accentMagenta` **仅** 用于 Personal Record 相关视觉（PR 卡边光/徽标/庆祝），非 PR 场景禁用，普通错误用 `danger`，普通高亮用 `accentCyan`。
-- App 顶层已锁 `.preferredColorScheme(.dark)`，不再做浅色适配。
-- 等宽字体走 JetBrains Mono（Bundle 内 ttf），缺失自动 fallback `.system(.monospaced)`，详见 `Theme+Font.swift` 的 `verifyOrFallback()`。
-
-## 页面 Header / 导航栏
-
-统一规范（见 OpenSpec change `unify-page-header`）。两套范式：
-
-- **Tab 根页**（训练 / 计划 / 动作 / Team / 我的）：隐藏系统导航栏（`.toolbar(.hidden, for: .navigationBar)`）+ 自绘大标题 `Theme.Font.display(size: 36, weight: .heavy)` + `tracking(-1.08)`，左对齐，右上可挂 `CircleAddButton`。
-- **子页**（push/sheet 二级及以上）：统一用 `.paperToolbar(title:onBack:trailing:)`，内部封装 `navigationBarBackButtonHidden` + iOS 26 双环处理（`sharedBackgroundVisibility(.hidden)`）+ 左返回 / 中标题（`Theme.Font.l2`）/ 右操作三槽位。
+- 表面：`Theme.Color.{bg,surface,surface2,border,border2}`。
+- 正文：`Theme.Color.{fg,fg2,muted}`；`muted` 仍承载内容，须满足所在浅底的正文对比度。
+- 品牌装饰：`accent`、`accentSoft`、`accentSofter`。操作文字和白字按钮使用深朱砂 `action`；错误用 `danger`，成功用 `ok`。颜色不能单独表达状态。
+- 字体：`Theme.Font.display(size:weight:relativeTo:design:)`、`body`、`mono`、`number`，以及 `hero`、`l1`–`l5`、`timer` 语义 token。
+- 字号传入默认阅读尺寸，由公共字体修饰符按角色和当前 Dynamic Type 环境缩放一次；不再叠加 `UIFontMetrics` 或 `@ScaledMetric` 预缩放。
+- 等宽数据使用已注册的 JetBrains Mono；缺失时回退系统等宽，保留相同缩放规则。固定导出画布可固定字号，但预览操作和辅助功能摘要继续响应系统设置。
 
 ```swift
-// 仅返回
-.paperToolbar(title: "记录中", onBack: { dismiss() })
-// 返回 + ⋯ 菜单
-.paperToolbar(title: team.name, onBack: { dismiss() }) {
-    CircleIconMenu(systemName: "ellipsis") { /* Menu items */ }
+VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+    Text("本周训练量").font(Theme.Font.l3).foregroundStyle(Theme.Color.muted)
+    Text("28,420 kg").font(Theme.Font.number(size: 28, weight: .bold))
+        .foregroundStyle(Theme.Color.fg)
 }
+.cardStyle()
 ```
 
-**圆形图标钮单一来源**：`CircleIconButton`（点击版）/ `CircleIconMenu`（Menu 版）共用 `CircleIconLabel` 外观。默认直径 **36**，图标字号按直径 ×0.42 推导（勿在调用点硬编码）。支持 `active`（accent 高亮）/ `rotated`（旋转 90°）。**禁止**在页面内本地复制等价圆钮实现。
+间距 `xs/sm/md/lg/xl/xxl` 为 4/8/14/22/32/44pt；圆角 `sm/md/lg/pill` 为 8/13/18/999pt。优先复用 token，避免在页面另建相同用途的颜色或组件。
 
-## 纸感动作菜单
+## 导航与操作
 
-统一使用 `PaperMenuItem` + `CircleIconMenu` / `PaperActionMenuButton` 渲染，不在页面内自定义同类菜单行。菜单行规范集中在 `PaperActionMenuMetrics`：
+- Tab 根页隐藏系统导航栏，保留现有自绘标题；子页使用 `.paperToolbar(title:onBack:trailing:)`。
+- `CircleIconButton` 与 `CircleIconMenu` 共用 `CircleIconLabel`。默认视觉直径 36pt，实际目标至少 44pt；添加按钮视觉 42pt、实际目标 48pt。调用处提供明确操作名称。
+- 动作菜单使用 `PaperMenuItem`、`CircleIconMenu` 或 `PaperActionMenuButton`。52pt 是行高下限，长文字和大字号可增高；受限高度时滚动，保留取消操作。
+- 菜单基准水平内边距 14pt，图文间距 10pt，图标 15pt 并占位 20pt，文字 14pt；普通图标使用 `action`、正文使用 `fg`，危险项使用 `danger`。
+- Sheet 使用 `PaperSheetHeader`；长标题或长操作随内容换行或纵排。短操作按钮最小 74×48pt，用实际呈现尺寸核对至少 44pt 触达。只读无操作标题可使用 `PaperSheetTitleHeader`。
+- 原生 Button、Toggle 等控件优先保留原生角色。装饰图形可隐藏，名称、选中状态、数值、展开状态和默认动作需要可查询、可执行。
 
-- 行高 **52**，水平内边距 **14**，图标与文字间距 **10**。
-- SF Symbol 图标 **15pt semibold**，固定占位宽 **20pt**。
-- 菜单文字 **14pt semibold**。
-- 普通项图标用 `Theme.Color.accent`、文字用 `Theme.Color.fg`；危险项图标和文字统一用 `Theme.Color.danger`。
+## 资源与验证
 
-## 色板刷新
+当前色板保存在 `Assets.xcassets/*.colorset/Contents.json`。`scripts/gen-colorsets.mjs` 和 `scripts/oklch-to-srgb.mjs` 仍为历史霓虹色板工具，不适用于当前 Paper 色板；不要用它们重写当前资源。若未来恢复自动生成，应先对齐当前 token 并以资源对比测试验证结果。
 
-设计稿微调时，修改 `scripts/oklch-to-srgb.mjs` 中的 `tokens` 表，运行：
+字体与颜色分别由 `ThemeTypographyTests`、`ThemeColorContrastTests` 定向验证；交互需在实际页面覆盖默认、XXXL 和辅助功能最大字号。编译、辅助功能树与截图各自只证明对应范围，不能替代真实 VoiceOver 或设备验收。
 
-```bash
-node scripts/gen-colorsets.mjs    # 重写 Assets.xcassets/*.colorset/Contents.json
-```
-
-## DEBUG 预览
-
-`SettingsView` 的「关于 → 版本」连续点 5 次进入 `DesignSystemPreviewView`，可视化回归色板/字阶/间距/Modifier。
+DEBUG 构建可在「我的 → 关于 → 版本」连续点击 5 次进入 `DesignSystemPreviewView`；该预览辅助观察，不作为全产品验收。

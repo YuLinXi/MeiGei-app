@@ -9,21 +9,21 @@
 - **THEN** Team A 的 `autoShareWorkouts` 默认为开启
 - **AND** 用户后续完成训练时，系统按该偏好为 Team A 创建或更新 checkin
 
-#### Scenario: 全部关闭时仅自己可见
-- **WHEN** 用户完成并保存一次训练，且已关闭所有 Team 的自动分享
+#### Scenario: 默认仅自己可见
+- **WHEN** 用户完成并保存一次训练，且未加入任何 Team 或已关闭所有 Team 的自动分享
 - **THEN** 系统仅保存个人训练记录，不创建任何 Team checkin
 
-#### Scenario: 重新开启自动分享需确认
+#### Scenario: 首次开启自动分享需确认
 - **WHEN** 用户曾关闭 Team A 的自动分享，之后在 Team A 设置中重新打开
 - **THEN** 客户端展示一次确认，说明训练摘要和每组记录将对 Team A 成员可见、可随时关闭且可按次撤回
 - **AND** 仅当用户确认后，系统才重新保存 Team A 的自动分享偏好
 
-#### Scenario: 自动分享到单个已开启 Team
+#### Scenario: 自动分享到单个已授权 Team
 - **WHEN** 用户对 Team A 开启自动分享、对 Team B 关闭自动分享，并完成训练
 - **THEN** 系统仅在 Team A 中创建或更新该训练的 checkin
 - **AND** Team B 不出现该训练
 
-#### Scenario: 自动分享到多个已开启 Team
+#### Scenario: 自动分享到多个已授权 Team
 - **WHEN** 用户对 Team A 与 Team B 均开启自动分享，并完成训练
 - **THEN** 系统在 Team A 与 Team B 中分别创建或更新该训练的 checkin
 - **AND** 每个 checkin 使用同一份训练摘要快照

@@ -8,16 +8,15 @@ nonisolated private struct BadgeExerciseIdentity: Hashable, Sendable {
     let customId: UUID?
 }
 
-@ModelActor
 actor BadgeHistoryReader {
-    private func readValues() throws -> [(BadgeWorkoutSnapshot, [BadgeExerciseIdentity])] {
-        assert(!Thread.isMainThread)
-        let workouts = try modelContext.fetch(FetchDescriptor<Workout>(
-            predicate: #Predicate { $0.deletedAt == nil && $0.endedAt != nil },
-            sortBy: [SortDescriptor(\.startedAt)]
-        ))
-        try Task.checkCancellation()
-        return workouts.compactMap { workout in
+    let modelContainer: ModelContainer
+
+    init(modelContainer: ModelContainer) {
+        self.modelContainer = modelContainer
+    }
+
+    private func readValues() async throws -> [(BadgeWorkoutSnapshot, [BadgeExerciseIdentity])] {
+        try await WorkoutSnapshotCapture.read(from: modelContainer, completedOnly: true, order: .forward) { workout in
             guard let endedAt = workout.endedAt else { return nil }
             let snapshot = BadgeWorkoutSnapshot(
                 id: workout.localId, planId: workout.planId, startedAt: workout.startedAt,
@@ -48,10 +47,9 @@ actor BadgeHistoryReader {
     }
 
     func readWorkouts() async throws -> [BadgeWorkoutSnapshot] {
-        // 无挂起点地完成关系读取；离开此方法后不再持有或访问模型。
-        let values = try WorkoutPerformanceMonitor.measure("badge.read.values") { try readValues() }
+        let values = try await WorkoutPerformanceMonitor.measureAsync("badge.read.values") { try await readValues() }
         let identities = Set(values.flatMap { $0.1 })
-        // 同一动作只解析一次。关系读取和统计扫描均在后台进行。
+        // 模型字段已复制为值；同一动作只解析一次，后续批量变换继续在后台进行。
         let resolved = await MainActor.run {
             Dictionary(uniqueKeysWithValues: identities.map { identity in
                 let code = ExerciseLibrary.resolve(code: identity.code, name: identity.name)?.code ?? identity.code

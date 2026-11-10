@@ -1,7 +1,8 @@
 # release-compliance Specification
 
 ## Purpose
-TBD - created by archiving change mvp-launch-risk-hardening. Update Purpose after archive.
+规定发布前法律页面、链接与隐私说明的核对范围，确保 Team 分享及账号删除语义与实际产品行为一致。
+
 ## Requirements
 ### Requirement: 独立法律文档页面
 

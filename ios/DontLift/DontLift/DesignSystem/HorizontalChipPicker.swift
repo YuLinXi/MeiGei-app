@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// 横向滑动 chip 选择器。规范见 `design-system` spec 「横向 Chip 选择器组件」：
-/// 单选；chip 高 32、横 padding 14、`Theme.Radius.pill` 圆角；
-/// 选中 = accent 朱砂红实底 + 白字（无辉光）；
+/// 单选；chip 默认视觉高 32、实际触达至少 44，随阅读字号增长；
+/// 选中 = action 深朱砂实底 + 白字（无辉光）；
 /// 未选 = surface 白底 + 1pt border + fg2 文字。
 struct HorizontalChipPicker<Item: Identifiable & Hashable>: View {
     let items: [Item]
@@ -44,18 +44,24 @@ struct HorizontalChipPicker<Item: Identifiable & Hashable>: View {
             Text(label(item))
                 .font(Theme.Font.body(size: 13, weight: .semibold))
                 .padding(.horizontal, 14)
-                .frame(height: 32)
+                .padding(.vertical, 6)
+                .frame(minHeight: 32)
+                .fixedSize(horizontal: true, vertical: true)
                 .foregroundStyle(isSelected ? Color.white : Theme.Color.fg2)
                 .background(
-                    isSelected ? Theme.Color.accent : Theme.Color.surface,
+                    isSelected ? Theme.Color.action : Theme.Color.surface,
                     in: RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
                         .stroke(isSelected ? Color.clear : Theme.Color.border, lineWidth: 1)
                 )
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityValue(isSelected ? "已选择" : "未选择")
     }
 }
 

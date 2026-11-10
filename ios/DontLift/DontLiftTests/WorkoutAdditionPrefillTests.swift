@@ -4,18 +4,19 @@ import Testing
 
 @MainActor
 struct WorkoutAdditionPrefillTests {
+    private let testStore = WorkoutTestStore()
 
     private let benchKey = "BB_BENCH_PRESS"
     private let rowKey = "MACHINE_ROW"
 
-    private func finishedWorkout(startedAt: TimeInterval) -> Workout {
+    private func finishedWorkout(startedAt: TimeInterval) throws -> Workout {
         let date = Date(timeIntervalSince1970: startedAt)
-        return Workout(
+        return try testStore.insert(Workout(
             title: "训练",
             startedAt: date,
             timerStartedAt: date,
             endedAt: date.addingTimeInterval(3_600)
-        )
+        ))
     }
 
     private func exercise(_ historyKey: String,
@@ -58,8 +59,8 @@ struct WorkoutAdditionPrefillTests {
         )
     }
 
-    @Test func normalAndDropHistoryAreKeptInSeparateIndexes() {
-        let normalWorkout = finishedWorkout(startedAt: 1_000)
+    @Test func normalAndDropHistoryAreKeptInSeparateIndexes() throws {
+        let normalWorkout = try finishedWorkout(startedAt: 1_000)
         let normalExercise = exercise(
             benchKey,
             name: "杠铃卧推",
@@ -73,7 +74,7 @@ struct WorkoutAdditionPrefillTests {
         normalWorkout.exercises = [normalExercise]
         normalWorkout.appendSingleExerciseUnit(for: normalExercise)
 
-        let dropWorkout = finishedWorkout(startedAt: 2_000)
+        let dropWorkout = try finishedWorkout(startedAt: 2_000)
         let dropExercise = exercise(
             benchKey,
             name: "杠铃卧推",
@@ -97,8 +98,8 @@ struct WorkoutAdditionPrefillTests {
         #expect(prefills.map(\.isWarmup) == [true, false, false])
     }
 
-    @Test func regularHistorySkipsWarmupOnlyAndUnfinishedSets() {
-        let active = Workout(title: "进行中训练")
+    @Test func regularHistorySkipsWarmupOnlyAndUnfinishedSets() throws {
+        let active = try testStore.insert(Workout(title: "进行中训练"))
         let activeExercise = exercise(
             benchKey,
             name: "杠铃卧推",
@@ -108,7 +109,7 @@ struct WorkoutAdditionPrefillTests {
         active.exercises = [activeExercise]
         active.appendSingleExerciseUnit(for: activeExercise)
 
-        let warmupOnly = finishedWorkout(startedAt: 3_000)
+        let warmupOnly = try finishedWorkout(startedAt: 3_000)
         let warmupExercise = exercise(
             benchKey,
             name: "杠铃卧推",
@@ -118,7 +119,7 @@ struct WorkoutAdditionPrefillTests {
         warmupOnly.exercises = [warmupExercise]
         warmupOnly.appendSingleExerciseUnit(for: warmupExercise)
 
-        let unfinished = finishedWorkout(startedAt: 2_000)
+        let unfinished = try finishedWorkout(startedAt: 2_000)
         let unfinishedExercise = exercise(
             benchKey,
             name: "杠铃卧推",
@@ -128,7 +129,7 @@ struct WorkoutAdditionPrefillTests {
         unfinished.exercises = [unfinishedExercise]
         unfinished.appendSingleExerciseUnit(for: unfinishedExercise)
 
-        let valid = finishedWorkout(startedAt: 1_000)
+        let valid = try finishedWorkout(startedAt: 1_000)
         let validExercise = exercise(
             benchKey,
             name: "杠铃卧推",
@@ -138,7 +139,7 @@ struct WorkoutAdditionPrefillTests {
         valid.exercises = [validExercise]
         valid.appendSingleExerciseUnit(for: validExercise)
 
-        let deleted = finishedWorkout(startedAt: 4_000)
+        let deleted = try finishedWorkout(startedAt: 4_000)
         let deletedExercise = exercise(
             benchKey,
             name: "杠铃卧推",
@@ -153,7 +154,7 @@ struct WorkoutAdditionPrefillTests {
         #expect(lookup.latestSets(forWorkoutHistoryKey: benchKey, kind: .singleExercise).map(\.weightKg) == [60])
     }
 
-    @Test func canonicalAliasMatchesButDifferentExercisesDoNot() {
+    @Test func canonicalAliasMatchesButDifferentExercisesDoNot() throws {
         let legacyKey = ExerciseLibrary.canonicalHistoryKey(
             code: "REVERSE_PEC_DECK",
             name: "反向蝴蝶机",
@@ -166,7 +167,7 @@ struct WorkoutAdditionPrefillTests {
         )
         #expect(legacyKey == canonicalKey)
 
-        let workout = finishedWorkout(startedAt: 1_000)
+        let workout = try finishedWorkout(startedAt: 1_000)
         let legacyExercise = exercise(
             "REVERSE_PEC_DECK",
             name: "反向蝴蝶机",
@@ -181,8 +182,8 @@ struct WorkoutAdditionPrefillTests {
         #expect(lookup.latestSets(forWorkoutHistoryKey: benchKey, kind: .singleExercise).isEmpty)
     }
 
-    @Test func supersetPairMatchesReverseAndExcludesPartialOrWarmupRounds() {
-        let complete = finishedWorkout(startedAt: 1_000)
+    @Test func supersetPairMatchesReverseAndExcludesPartialOrWarmupRounds() throws {
+        let complete = try finishedWorkout(startedAt: 1_000)
         let bench = exercise(
             benchKey,
             name: "杠铃卧推",
@@ -198,7 +199,7 @@ struct WorkoutAdditionPrefillTests {
         complete.exercises = [bench, row]
         complete.appendSupersetUnit(first: bench, second: row, roundCount: 2)
 
-        let invalidNewer = finishedWorkout(startedAt: 2_000)
+        let invalidNewer = try finishedWorkout(startedAt: 2_000)
         let partialBench = exercise(
             benchKey,
             name: "杠铃卧推",

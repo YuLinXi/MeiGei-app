@@ -22,9 +22,11 @@ struct AssistedExerciseTests {
 
     @Test func volumePreservesCountsAndRawWeight() throws {
         let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+        defer { withExtendedLifetime(context) {} }
         let w = workout(20)
-        container.mainContext.insert(w)
-        try container.mainContext.save()
+        context.insert(w)
+        try context.save()
         #expect(w.completedStatVolumeKg == 0)
         let stats = WorkoutWeeklyStats.compute(workouts: [w], reference: w.startedAt)
         #expect(stats.volumeKg == 0)
@@ -56,8 +58,15 @@ struct AssistedExerciseTests {
         for invalid in [P(weight: .nan, reps: 8), P(weight: -1, reps: 8), P(weight: 10, reps: 0)] {
             #expect(!ExerciseWeightSemantics.isAssistanceBreakthrough(invalid, prior: prior))
         }
+        let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+        defer { withExtendedLifetime(context) {} }
+        defer { withExtendedLifetime(container) {} }
         let old = workout(30)
         let better = workout(20, date: 2000)
+        context.insert(old)
+        context.insert(better)
+        context.processPendingChanges()
         #expect(detectPersonalRecords(in: better, history: [old]).count == 1)
         #expect(BadgeEngine.detectBrokenPRCount(in: better, priorWorkouts: [old]) == 1)
         #expect(detectPersonalRecords(in: old, history: []).isEmpty)
@@ -65,7 +74,14 @@ struct AssistedExerciseTests {
     }
 
     @Test func teamSummaryRoundTripsIdentityAndAcceptsOldJSON() throws {
-        let summary = CheckinSummary(workout: workout(20))
+        let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+        defer { withExtendedLifetime(context) {} }
+        defer { withExtendedLifetime(container) {} }
+        let w = workout(20)
+        context.insert(w)
+        context.processPendingChanges()
+        let summary = CheckinSummary(workout: w)
         let decoded = try JSONDecoder().decode(CheckinSummary.self, from: JSONEncoder().encode(summary))
         #expect(decoded.exercises.first?.builtinExerciseCode == "ASSISTED_PULL_UP")
         let old = Data(#"{"name":"辅助引体向上","sets":[]}"#.utf8)
@@ -75,7 +91,11 @@ struct AssistedExerciseTests {
 
     @Test func dropSetsPlanAndBackgroundReaderAgree() async throws {
         let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+        defer { withExtendedLifetime(context) {} }
         let w = workout(30, count: 1)
+        context.insert(w)
+        context.processPendingChanges()
         let exercise = w.exercises[0]
         let set = exercise.sets[0]
         set.exercise = exercise
@@ -87,8 +107,7 @@ struct AssistedExerciseTests {
         #expect(set.segments.map(\.weightKg) == [20, 30])
         let item = PlanItem(itemId: UUID(), builtinExerciseCode: "ASSISTED_PULL_UP", exerciseName: "辅助引体向上", orderIndex: 0)
         exercise.planItemId = item.itemId
-        container.mainContext.insert(w)
-        try container.mainContext.save()
+        try context.save()
         #expect(w.completedStatVolumeKg == 0)
         #expect(WorkoutWeeklyStats.compute(workouts: [w], reference: w.startedAt).repCount == 18)
         let snapshots = try await Task.detached { try await BadgeHistoryReader(modelContainer: container).readWorkouts() }.value
@@ -99,14 +118,17 @@ struct AssistedExerciseTests {
 
     @Test func assistanceSummaryPrefersLowestWithoutChangingSets() throws {
         let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+        defer { withExtendedLifetime(context) {} }
         let w = workout(30, count: 2)
+        context.insert(w)
+        context.processPendingChanges()
         w.exercises[0].sets.forEach { $0.exercise = w.exercises[0] }
         w.exercises[0].sets.first { $0.setIndex == 1 }?.weightKg = 20
         let item = PlanItem(itemId: UUID(), builtinExerciseCode: "ASSISTED_PULL_UP", exerciseName: "辅助引体向上", orderIndex: 0,
                             suggestedSets: 2, suggestedReps: 8, suggestedWeightKg: 30)
         w.exercises[0].planItemId = item.itemId
-        container.mainContext.insert(w)
-        try container.mainContext.save()
+        try context.save()
         let merged = PlanWriteback.merge(planItems: [item], workout: w)
         #expect(merged.newItems.first?.suggestedWeightKg == 20)
         #expect(w.exercises[0].sets.sorted { $0.setIndex < $1.setIndex }.map(\.weightKg) == [30, 20])
@@ -114,12 +136,14 @@ struct AssistedExerciseTests {
 
     @Test func historyProjectionUsesAssistanceRules() async throws {
         let container = AppModelContainer.make(inMemory: true)
+        let context = container.mainContext
+        defer { withExtendedLifetime(context) {} }
         let old = workout(30)
         let better = workout(20, date: 2000)
-        container.mainContext.insert(old)
-        container.mainContext.insert(better)
-        try container.mainContext.save()
-        let store = WorkoutHistoryStore(modelContext: container.mainContext)
+        context.insert(old)
+        context.insert(better)
+        try context.save()
+        let store = WorkoutHistoryStore(modelContext: context)
         await store.refresh(reason: .manual)
         #expect(store.workoutRecords[better.localId]?.count == 1)
         #expect(store.workoutRecords[old.localId]?.isEmpty != false)

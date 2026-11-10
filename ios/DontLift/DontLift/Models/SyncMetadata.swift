@@ -14,6 +14,17 @@ enum SyncStatus: String, Codable, CaseIterable {
     case conflicted
 }
 
+/// LWW 时间比较。传输层以毫秒精度（四舍五入）编码时间，本地原值回传后可能「变新」不到 1ms；
+/// 若按原始精度比较，刚推送的数据被原样拉回时会被误判为服务端较新，触发整棵子树替换。
+enum SyncClock {
+    static let precision: TimeInterval = 0.001
+
+    /// 服务端时间是否确实晚于本地（至少相差一个传输精度单位）。
+    static func isNewer(_ server: Date, than local: Date) -> Bool {
+        server.timeIntervalSince(local) >= precision
+    }
+}
+
 /// 统一同步信封：所有参与云同步的本地实体都携带这组字段。
 ///
 /// 主键策略（design.md Resolved）：客户端用 UUID v7 离线预生成 `localId`，

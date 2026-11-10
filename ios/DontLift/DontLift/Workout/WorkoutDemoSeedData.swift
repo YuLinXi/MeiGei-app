@@ -97,7 +97,7 @@ enum WorkoutDemoSeedData {
             seedChestCoreDay(at: day(weekStart, 6), weekIndex: weekIndex, planId: pushPull.localId, in: context)
         }
 
-        try context.save()
+        try LocalModelSave.save(context)
         return Result(workouts: 24, plans: 2)
     }
 

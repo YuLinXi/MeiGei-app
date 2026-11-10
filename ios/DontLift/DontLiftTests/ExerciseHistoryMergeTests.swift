@@ -13,6 +13,76 @@ import SwiftData
 
 @MainActor
 struct ExerciseHistoryMergeTests {
+    private struct MigrationFailure: Error {}
+
+    @Test func failedReadOrSaveLeavesMigrationRetryableAndKeepsOtherEdits() throws {
+        let container = makeContainer()
+        let context = container.mainContext
+        context.autosaveEnabled = false
+        let ex = WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0)
+        let workout = try insertWorkout(with: ex, in: context)
+        let originalUpdatedAt = workout.updatedAt
+        let other = WorkoutPlan(name: "其他计划")
+        context.insert(other)
+        try context.save()
+        other.note = "不应丢失的编辑"
+        let suite = "HistoryMergeRetry.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        #expect(ExerciseHistoryMerge.runIfNeeded(in: context, defaults: defaults,
+                                                 fetch: { _ in throw MigrationFailure() }) == 0)
+        #expect(!defaults.bool(forKey: ExerciseHistoryMerge.completionKey))
+        #expect(ExerciseHistoryMerge.runIfNeeded(in: context, defaults: defaults,
+                                                 persist: { _ in throw MigrationFailure() }) == 0)
+        #expect(!defaults.bool(forKey: ExerciseHistoryMerge.completionKey))
+        #expect(ex.builtinExerciseCode == nil && other.note == "不应丢失的编辑")
+        #expect(workout.updatedAt == originalUpdatedAt)
+        #expect(ExerciseHistoryMerge.runIfNeeded(in: context, defaults: defaults) == 1)
+        #expect(defaults.bool(forKey: ExerciseHistoryMerge.completionKey))
+        let reread = try #require(try ModelContext(container).fetch(FetchDescriptor<WorkoutExercise>()).first)
+        #expect(reread.builtinExerciseCode == "BB_BENCH_PRESS")
+    }
+
+    @Test func completedMigrationDoesNotFetchAgain() throws {
+        let container = makeContainer()
+        let suite = "HistoryMergeFastPath.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(true, forKey: ExerciseHistoryMerge.completionKey)
+        var fetched = false
+        #expect(ExerciseHistoryMerge.runIfNeeded(in: container.mainContext, defaults: defaults, fetch: { _ in
+            fetched = true
+            throw MigrationFailure()
+        }) == 0)
+        #expect(!fetched)
+    }
+
+    @Test func readonlySaveDoesNotMarkMigrationCompleteOrLeaveUnstoredReference() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "HistoryMerge-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appending(path: "readonly.store")
+        let writable = try ModelContainer(for: AppModelContainer.schema, configurations: [
+            ModelConfiguration(schema: AppModelContainer.schema, url: url, cloudKitDatabase: .none)
+        ])
+        let ex = WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0)
+        try insertWorkout(with: ex, in: writable.mainContext)
+        let readonly = try ModelContainer(for: AppModelContainer.schema, configurations: [
+            ModelConfiguration(schema: AppModelContainer.schema, url: url, allowsSave: false, cloudKitDatabase: .none)
+        ])
+        readonly.mainContext.autosaveEnabled = false
+        let loaded = try #require(try readonly.mainContext.fetch(FetchDescriptor<WorkoutExercise>()).first)
+        let suite = "HistoryMergeReadonly.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let migrated = ExerciseHistoryMerge.runIfNeeded(in: readonly.mainContext, defaults: defaults)
+
+        #expect(migrated == 0)
+        #expect(!defaults.bool(forKey: ExerciseHistoryMerge.completionKey))
+        #expect(loaded.builtinExerciseCode == nil)
+        withExtendedLifetime(writable) {}
+    }
 
     private func makeContainer() -> ModelContainer {
         AppModelContainer.make(inMemory: true)
