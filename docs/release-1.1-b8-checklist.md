@@ -2,7 +2,7 @@
 
 ## 版本、基线与候选范围
 
-- 准备日期：2026-11-10（上海时区）。状态：**build 8 的设备 Archive 与归档签名校验已通过，候选已推送；尚未上传、不可安装。用户已反馈接受新版协议，但刷新 Apple 账户页仍显示待接受，合同门禁尚未独立确认解除。**
+- 准备日期：2026-11-10（上海时区）。状态：**build 8 已归档并推送，但实际上传再次被 Apple 合同门禁拒绝，不可安装；此候选关闭，后续使用 [build 9](release-1.1-b9-checklist.md)。**
 - `MARKETING_VERSION=1.1`，`CURRENT_PROJECT_VERSION=8`；App、widget、单元测试和 UI 测试的 Debug／Release 共 8 处配置一致。
 - build 6 按用户确认已占用；build 7 虽完成归档与分发重签，实际上传返回 ContentDelivery 403，按发版流程不复用。失败事实及日志见 [build 7 记录](release-1.1-b7-checklist.md)。
 - 已发布基线仍为 `v1.1-b5`（`ea6d1c0fc05e70c3227a76202d7223e1062919c1`）；不把失败的 build 7 作为已发布基线。
@@ -48,10 +48,10 @@
 
 发布顺序：build 8 冻结推送 → 完成设备 Archive／分发准备 → 账户持有人接受新版 Apple Developer Program 许可协议 → 验证合同门禁解除 → 上传 → `VALID`／可安装 → 真机回归 → main／tag。
 
-- [ ] 账户持有人在 Apple Developer 账号页接受新许可协议。用户已回复“已接受新版协议，继续上传”，但 11:39 复核同一团队 `D566UZ8QG4`：App Store Connect 的本人资料确认具有“账户持有人、管理”职能，Apple Developer 刷新后仍有协议告警，2026-10-29 版协议的“同意”按钮仍可用。当前证据不支持权限不足，也尚不能确认接受已在服务端生效；没有代用户点击“同意”或提交协议，已准备把这一具体页面交由用户核对。
-- [ ] 独立确认合同告警解除，Xcode／App Store Connect 对应权限恢复；确认前不重复上传 build 8。
-- [ ] 使用标准 Xcode 分发流程或 `xcodebuild -exportArchive`，目标为 App Store Connect Upload，保留 1.1／8，不自动改成其他 build；使用现有团队自动管理分发签名。
-- [ ] 上传成功并记录准确时间、回执及构建身份。若失败，不将尝试记为提交成功，并按流程改用新的未占用 build。
+- [x] 当前账号已确认具有团队 `D566UZ8QG4` 的“账户持有人、管理”职能。用户先后反馈接受及点击同意；13:48 页面仍有告警，实际上传亦未放行。随后依据用户已确认的同意决定，在刷新会话的同一份 2026-10-29 协议表单再次提交“同意”；13:50 账户页刷新后告警消失，证书、标识符和描述文件入口恢复。合同页面状态解除发生在 build 8 上传失败之后。
+- [x] 13:50 独立确认网页合同告警解除、开发者资源入口恢复；后续以新 build 的真实上传回执复核上传权限。
+- [x] 使用 `xcodebuild -exportArchive` 实际尝试 App Store Connect Upload，固定 1.1／8、自动分发签名；命令退出 70，未成功上传。
+- [ ] 上传成功：**未通过，候选关闭。** 13:48:51 ContentDelivery 返回 403 `You do not have required contracts to perform an operation`，最终请求 ID `98e9451d-2bef-4d52-b9f8-9f8425b14f33`；此前同次流程亦有请求 `2b364d3c-8717-459d-887d-b017a7859921` 被同样拒绝。按流程改用 build 9，不重试 8。
 - [ ] App Store Connect 中 build 8 为 `VALID` 且 TestFlight 可安装；处理完成、可安装及外部测试审核是不同状态，按实际结果回填。
 - [ ] 填写[测试内容](release-1.1-b8-feature-intro.md#testflight测试内容文案)，核对既有内部／外部群组的实际分发状态，不默认外部测试已通过审核。
 
@@ -77,4 +77,4 @@
 
 回滚：停止分发有阻塞问题的候选，保留已确认可用历史版本，修复后用新 build；不清理用户训练库。本次没有数据库迁移，不执行降库。法律页面可用已保存备份恢复，但旧文案恢复后对应正文门禁重新变为未完成。
 
-当前只有 build 8 的设备 Archive／归档签名验证完成，尚无成功上传、`VALID`、真机、main 合并或 tag 结果。上传参数已按当前 `xcodebuild -help` 准备在 `/tmp/dontlift-release-b8-ExportOptions-20261110.plist`，目标为 App Store Connect upload、自动分发签名且不自动更改 build；协议门禁确认解除后再执行。
+build 8 没有成功上传、`VALID`、真机、main 合并或 tag 结果，不再作为待发布候选。上传日志 `/tmp/dontlift-release-b8-upload-20261110.log`，分发日志 `/var/folders/yx/jf84mf0d6gd0hsk5wpftv2rm0000gn/T/DontLift_2026-11-10_13-48-24.663.xcdistributionlogs`，核验记录 `/tmp/dontlift-release-b8-upload-result-20261110.json`。同次日志另有一次空账号的 `No provider associated` 配置请求警告；实际上传的最终错误明确为合同 403，未据此更改团队或账号。后续状态见 build 9。
