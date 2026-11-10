@@ -316,9 +316,7 @@ final class WorkoutHistoryStore {
 
     init(modelContext: ModelContext,
          readHistory: @escaping @Sendable (ModelContainer) async throws -> [HistoryWorkout] = { container in
-             try await Task.detached(priority: .userInitiated) {
-                 try WorkoutHistoryReader(modelContainer: container).read()
-             }.value
+             try await WorkoutHistoryReader(modelContainer: container).read()
          }) {
         self.modelContext = modelContext
         self.readHistory = readHistory

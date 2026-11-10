@@ -55,9 +55,9 @@ struct MainTabView: View {
 
     init() {
         // Tab bar 纸感配置（对齐设计图 .tabs）：纸白底 + 顶部 border 分隔线；
-        // 未选 muted / 选中 accent；label fs-l5=10。
+        // 未选 muted / 选中可读操作色；系统 Tab 标签沿用原生紧凑尺寸。
         let muted = UIColor(named: "muted") ?? .gray
-        let accent = UIColor(named: "accent") ?? .systemRed
+        let action = UIColor(named: "action") ?? .systemRed
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = UIColor(named: "bg") ?? .white
@@ -69,9 +69,9 @@ struct MainTabView: View {
                 .foregroundColor: muted,
                 .font: UIFont.systemFont(ofSize: 10, weight: .regular)
             ]
-            item.selected.iconColor = accent
+            item.selected.iconColor = action
             item.selected.titleTextAttributes = [
-                .foregroundColor: accent,
+                .foregroundColor: action,
                 .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
             ]
         }
@@ -126,7 +126,7 @@ struct MainTabView: View {
                 .toolbarBackground(Theme.Color.bg, for: .navigationBar)
                 .toolbarColorScheme(.light, for: .navigationBar)
         }
-        .tint(Theme.Color.accent)
+        .tint(Theme.Color.action)
         .onAppear {
             handleOnAppear()
         }
@@ -158,8 +158,14 @@ struct MainTabView: View {
         }
         // 全局训练中悬浮窗/训练浮层：挂在 NavigationStack 之外，push 子页面上也可见；
         // 展开和收起都不改变当前 Tab 或导航层级。
-        .overlay {
-            WorkoutLiveOverlayContainer(activeSession: activeSession)
+        .overlayPreferenceValue(WorkoutOverlayRegionsKey.self) { regions in
+            GeometryReader { proxy in
+                WorkoutLiveOverlayContainer(activeSession: activeSession,
+                                            prefersCompactCapsule: selectedTab == .profile,
+                                            availableBounds: regions.viewport.map { proxy[$0] }
+                                                ?? CGRect(origin: .zero, size: proxy.size),
+                                            exclusionFrames: regions.actions.map { proxy[$0] })
+            }
         }
         // 休息计时浮层：挂在全局 NavigationStack 之上的 overlay，层级高于 push 页与 Tab Bar；
         // 卡片与背景遮罩同步淡入淡出，收起后回到训练页 FAB。
@@ -175,18 +181,29 @@ struct MainTabView: View {
     private var tabContent: some View {
         TabView(selection: $selectedTab) {
             WorkoutListView()
+                .workoutOverlayViewport()
                 .tabItem { Label("训练", image: "tabTrain") }
                 .tag(MainTab.workout)
             PlanListView()
+                .workoutOverlayViewport()
                 .tabItem { Label("计划", image: "tabPlan") }
                 .tag(MainTab.plan)
             ExerciseLibraryView()
+                .workoutOverlayViewport()
                 .tabItem { Label("动作", image: "tabExercise") }
                 .tag(MainTab.exercise)
             TeamListView()
+                .workoutOverlayViewport()
                 .tabItem { Label("Team", image: "tabTeam") }
                 .tag(MainTab.team)
-            ProfileView()
+            Group {
+                #if DEBUG
+                ProfileView(calorieDefaults: UITestHooks.profileCalorieDefaults)
+                #else
+                ProfileView()
+                #endif
+            }
+                .workoutOverlayViewport()
                 .tabItem { Label("我的", image: "tabProfile") }
                 .tag(MainTab.profile)
         }
@@ -244,6 +261,7 @@ struct MainTabView: View {
         refreshActiveSession()
         // 存量荣誉勋章自愈与静默回溯（独立运行，不被活跃训练拦截）
         #if DEBUG
+        UITestHooks.presentWritebackRecoveryIfNeeded(in: modelContext, center: planWriteback)
         if ProcessInfo.processInfo.arguments.contains("-test-career-review") {
             Task { await checkCareerReviewOnLaunch(force: true) }
         } else {
@@ -264,7 +282,9 @@ struct MainTabView: View {
                     snapshotMetric: 100_000
                 )
             ]
-            badgeCelebration.presentIncremental(mockCandidates, workoutSummary: "胸背超级组爆发训练 · 达成 2 项荣誉突破")
+            let candidates = ProcessInfo.processInfo.arguments.contains("-test-badge-celebration-single")
+                ? Array(mockCandidates.prefix(1)) : mockCandidates
+            badgeCelebration.presentIncremental(candidates, workoutSummary: "胸背超级组爆发训练 · 荣誉突破")
         }
         // UI 测试钩子：直达「训练进行中」浮层。直接查库而不读 @State，避免同 runloop 时序抖动。
         if UITestHooks.isLiveWorkoutUITest,
@@ -302,7 +322,8 @@ struct MainTabView: View {
     }
 
     private func presentNextRootSheetIfNeeded() {
-        guard activeRootSheet == nil else { return }
+        // 系统会先清空绑定再调用 onDismiss；等待旧弹层完成清理，避免误清下一项结果。
+        guard activeRootSheet == nil, presentedRootSheet == nil else { return }
         let next: RootSheet?
         if planWriteback.receipt != nil {
             next = .planWriteback

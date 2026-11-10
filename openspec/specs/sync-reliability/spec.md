@@ -1,7 +1,8 @@
 # sync-reliability Specification
 
 ## Purpose
-TBD - created by archiving change mvp-launch-risk-hardening. Update Purpose after archive.
+约束同步写入的客户端时间偏移、服务端校正反馈及既有异常时间修复，防止不可信时间破坏同步水位与冲突裁决。
+
 ## Requirements
 ### Requirement: 同步写入时间偏移防护
 

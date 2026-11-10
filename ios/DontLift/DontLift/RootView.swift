@@ -23,12 +23,15 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if session.isLoggedIn {
+            if session.requiresLocalCleanup {
+                cleanupGate
+            } else if session.isLoggedIn {
                 switch session.needsProfileCompletion {
                 case .some(false):
                     mainApp
                 case .some(true):
                     ProfileCompletionView()
+                        .id(session.currentUserId)
                 case .none:
                     // 冷启动已登录但尚未拉到画像：先拉 GET /me 决定路由，期间纸白加载态。
                     loadingGate
@@ -40,7 +43,7 @@ struct RootView: View {
     }
 
     private var mainApp: some View {
-        MainTabView()
+        mainAppContent
             .task {
                 #if DEBUG
                 // UI 测试场景：跳过推送授权与同步（假 token 打后端会 401 触发全局登出）。
@@ -71,6 +74,60 @@ struct RootView: View {
                     break
                 }
             }
+    }
+
+    @ViewBuilder private var mainAppContent: some View {
+        #if DEBUG
+        if UITestHooks.isBulkSyncUITest {
+            MainTabView()
+                .overlay(alignment: .topTrailing) { UITestBulkSyncProgress() }
+        } else if UITestHooks.isTeamSharingUITest {
+            UITestTeamSharingFixture()
+        } else if UITestHooks.isHistoryLoadingUITest {
+            MainTabView()
+                .overlay(alignment: .topTrailing) { UITestHistoryReadCounter() }
+        } else if UITestHooks.isAutoLogin,
+           ProcessInfo.processInfo.arguments.contains("-uitest-native-controls") {
+            UITestNativeControlsFixture()
+        } else {
+            MainTabView()
+        }
+        #else
+        MainTabView()
+        #endif
+    }
+
+    private var cleanupGate: some View {
+        ZStack {
+            Theme.Color.bg.ignoresSafeArea()
+            VStack(spacing: Theme.Spacing.lg) {
+                Text(session.localCleanupFailed ? "本机数据尚未清理完成" : "正在清理本机数据")
+                    .font(Theme.Font.l2)
+                    .foregroundStyle(Theme.Color.fg)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("accountCleanup.title")
+                Text("账号已删除。完成本机清理后可重新登录。")
+                    .font(Theme.Font.l4)
+                    .foregroundStyle(Theme.Color.fg2)
+                    .multilineTextAlignment(.center)
+                if session.localCleanupFailed {
+                    Button("重试清理") { session.retryLocalCleanup() }
+                        .frame(minWidth: 120, minHeight: 44)
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.Color.action)
+                        .accessibilityIdentifier("accountCleanup.retry")
+                } else {
+                    ProgressView().tint(Theme.Color.action)
+                }
+            }
+            .padding(Theme.Spacing.lg)
+        }
+        .task {
+            // 先移除原页面及其编辑回调，再清理旧数据。
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            session.retryLocalCleanup()
+        }
     }
 
     private func handleAppBecameActive() {
@@ -142,19 +199,60 @@ struct RootView: View {
     private var loadingGate: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
-            ProgressView().tint(Theme.Color.accent)
+            if session.profileLoadFailed {
+                VStack(spacing: Theme.Spacing.lg) {
+                    Image(systemName: "wifi.exclamationmark")
+                        .font(Theme.Font.hero)
+                        .foregroundStyle(Theme.Color.fg2)
+                        .accessibilityHidden(true)
+                    Text("暂时无法读取账号资料")
+                        .font(Theme.Font.l2)
+                        .foregroundStyle(Theme.Color.fg)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("profileGate.failure")
+                    Text("请检查网络后重试，或返回登录。\n本机已有的训练与计划不会被删除。")
+                        .font(Theme.Font.l4)
+                        .foregroundStyle(Theme.Color.fg2)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        Task { await session.resolveProfile() }
+                    } label: {
+                        Text("重试")
+                            .frame(minWidth: 88, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.Color.fg)
+                    .accessibilityIdentifier("profileGate.retry")
+                    returnToLoginButton
+                }
+                .padding(Theme.Spacing.xl)
+            } else {
+                VStack(spacing: Theme.Spacing.lg) {
+                    ProgressView("正在读取账号资料…")
+                        .tint(Theme.Color.action)
+                        .foregroundStyle(Theme.Color.fg2)
+                        .accessibilityIdentifier("profileGate.loading")
+                    returnToLoginButton
+                }
+                .padding(Theme.Spacing.xl)
+            }
         }
         .preferredColorScheme(.light)
         .task {
-            // 拉 GET /me 决定路由；失败时 refreshProfile 不会误判为「需补全」（保持门控 nil），
-            // 这里做有限重试让瞬时失败自愈，避免停在加载态空转。
-            var attempt = 0
-            while session.isLoggedIn && session.needsProfileCompletion == nil && attempt < 5 && !Task.isCancelled {
-                await session.refreshProfile()
-                if session.needsProfileCompletion != nil { break }
-                attempt += 1
-                try? await Task.sleep(for: .seconds(2))
-            }
+            await session.resolveProfile()
         }
+    }
+
+    private var returnToLoginButton: some View {
+        Button { session.logout() } label: {
+            Text("返回登录")
+                .font(Theme.Font.l3)
+                .frame(minWidth: 88, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Theme.Color.fg2)
+        .accessibilityIdentifier("profileGate.login")
     }
 }

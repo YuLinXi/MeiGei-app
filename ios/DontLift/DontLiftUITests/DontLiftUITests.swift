@@ -190,6 +190,8 @@ final class DontLiftUITests: XCTestCase {
         print("[FINISH-DEBUG]", app.buttons.allElementsBoundByIndex.map(\.label))
         XCTAssertEqual(app.state, .runningForeground, "结束训练后 App 不应崩溃")
         XCTAssertFalse(app.buttons["结束训练"].exists, "结束后应切到只读详情")
+        XCTAssertFalse(app.buttons["调整训练动作顺序"].exists, "已完成详情不提供排序")
+        XCTAssertFalse(app.buttons["调整动作顺序"].exists, "已完成详情不提供计划排序")
     }
 
     @MainActor
@@ -280,7 +282,7 @@ final class DontLiftUITests: XCTestCase {
         app.tabBars.buttons["计划"].tap()
         let groupHeader = app.buttons["展开UI 另存分组"]
         XCTAssertTrue(groupHeader.waitForExistence(timeout: 10))
-        XCTAssertEqual(groupHeader.value as? String, "1 个计划")
+        XCTAssertEqual(groupHeader.value as? String, "已折叠，1 个计划")
         groupHeader.tap()
         XCTAssertTrue(app.buttons["打开计划UI 另存进阶"].waitForExistence(timeout: 5))
     }
@@ -344,7 +346,7 @@ final class DontLiftUITests: XCTestCase {
         app.tabBars.buttons["计划"].tap()
         let groupHeader = app.buttons["展开UI 另存分组"]
         XCTAssertTrue(groupHeader.waitForExistence(timeout: 10))
-        XCTAssertEqual(groupHeader.value as? String, "0 个计划")
+        XCTAssertEqual(groupHeader.value as? String, "已折叠，0 个计划")
     }
 
     /// 兼容性：完成页「保存为计划模板」仍对无计划训练展示，保存后把训练名称改为计划名（历史另存不改名）。
@@ -382,6 +384,35 @@ final class DontLiftUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["UI 另存完成页"].waitForExistence(timeout: 5), "完成页保存后训练名称应更新为计划名")
         XCTAssertFalse(card.exists, "保存后不再展示保存行动卡")
+    }
+
+    @MainActor
+    func testCompletionTemplateFailureRetainsFormAndRetryRenamesWorkout() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uitest-live-workout", "-uitest-fail-template-save", "-dismiss-career-review"]
+        app.launch()
+        let finish = app.buttons["结束训练"]
+        XCTAssertTrue(waitForElementWithRelaunch(finish, in: app))
+        app.buttons["标记第 1 组完成"].firstMatch.tap()
+        if !finish.isHittable { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap() }
+        finishAndAssertAlive(app)
+        let celebration = app.buttons["太棒了"]
+        if celebration.waitForExistence(timeout: 2) { celebration.tap() }
+        let card = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "保存为计划模板")).firstMatch
+        for _ in 0..<4 where !card.exists { app.swipeUp() }
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        card.tap()
+        let name = app.textFields.firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        replaceText(in: name, with: "UI 另存失败重试")
+        app.buttons["保存"].tap()
+        let error = app.staticTexts["workoutTemplate.saveError"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        XCTAssertEqual(name.value as? String, "UI 另存失败重试")
+        app.buttons["保存"].tap()
+        XCTAssertTrue(name.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["UI 另存失败重试"].waitForExistence(timeout: 5))
+        XCTAssertFalse(card.exists)
     }
 
     private func launchHistorySaveApp(extraArguments: [String] = []) -> XCUIApplication {

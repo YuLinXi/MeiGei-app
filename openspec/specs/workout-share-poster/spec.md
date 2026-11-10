@@ -1,7 +1,8 @@
 # workout-share-poster Specification
 
 ## Purpose
-TBD - created by archiving change add-workout-share-poster. Update Purpose after archive.
+约定个人训练海报的入口、内容、预览、图片保存与系统分享，使导出内容反映训练记录并保持本地生成边界。区分页面操作、预览版式与导出结果，确保用户能够核对训练摘要并选择适用的保存或分享动作。
+
 ## Requirements
 ### Requirement: 训练结束海报入口
 系统 SHALL 在用户完成训练后的结束流程中提供生成训练海报图片的入口。

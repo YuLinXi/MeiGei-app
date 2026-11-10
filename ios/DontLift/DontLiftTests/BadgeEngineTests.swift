@@ -4,6 +4,7 @@ import Testing
 @testable import DontLift
 
 @MainActor struct BadgeEngineTests {
+    private let testStore = WorkoutTestStore()
 
     // MARK: - 辅助测试构建器
 
@@ -37,19 +38,18 @@ import Testing
         return ex
     }
 
-    private static func makeWorkout(
+    private func makeWorkout(
         exercises: [WorkoutExercise],
         startedAt: Date = .now,
         endedAt: Date? = .now,
         planId: UUID? = nil
-    ) -> Workout {
-        let w = Workout(
+    ) throws -> Workout {
+        let w = try testStore.insert(Workout(
             planId: planId,
             startedAt: startedAt,
             endedAt: endedAt,
             exercises: exercises
-        )
-        for ex in exercises { ex.workout = w }
+        ))
         return w
     }
 
@@ -79,10 +79,10 @@ import Testing
         #expect(Big3Lift.identify(exercise: customEx) == nil)
     }
 
-    @Test func deadliftConventionalAndSumoTakesMax() {
+    @Test func deadliftConventionalAndSumoTakesMax() throws {
         let ex1 = Self.makeExercise(code: "DEADLIFT", name: "硬拉", weight: 180)
         let ex2 = Self.makeExercise(code: "SUMO_DEADLIFT", name: "相扑硬拉", weight: 195)
-        let w = Self.makeWorkout(exercises: [ex1, ex2])
+        let w = try makeWorkout(exercises: [ex1, ex2])
 
         let maxDl = BadgeEngine.maxWeight(in: w, for: .deadlift)
         #expect(maxDl == 195)
@@ -90,11 +90,11 @@ import Testing
 
     // MARK: - 2. 体重防护与倍数勋章判定
 
-    @Test func bodyweightMultiplierBadgesWithAndWithoutWeight() {
+    @Test func bodyweightMultiplierBadgesWithAndWithoutWeight() throws {
         let bench = Self.makeExercise(code: "BB_BENCH_PRESS", name: "杠铃卧推", weight: 105) // 1.5x of 70kg
         let squat = Self.makeExercise(code: "BB_SQUAT", name: "杠铃深蹲", weight: 140) // 2.0x of 70kg
         let dl = Self.makeExercise(code: "DEADLIFT", name: "硬拉", weight: 175) // 2.5x of 70kg
-        let w = Self.makeWorkout(exercises: [bench, squat, dl])
+        let w = try makeWorkout(exercises: [bench, squat, dl])
 
         // 边界防护：未录入体重时，严禁解锁任何体重倍数勋章
         let unweightedResults = BadgeEngine.evaluateIncremental(
@@ -123,13 +123,13 @@ import Testing
         #expect(bwCodes.contains("strength_bw_deadlift_2_5"))
     }
 
-    @Test func bodyweightBadgeUsesTheTriggeringWorkoutInsteadOfAnOlderPR() {
-        let oldBench = Self.makeWorkout(
+    @Test func bodyweightBadgeUsesTheTriggeringWorkoutInsteadOfAnOlderPR() throws {
+        let oldBench = try makeWorkout(
             exercises: [Self.makeExercise(code: "BB_BENCH_PRESS", name: "杠铃卧推", weight: 100)],
             startedAt: Date(timeIntervalSince1970: 1_000),
             endedAt: Date(timeIntervalSince1970: 2_000)
         )
-        let unrelatedWorkout = Self.makeWorkout(
+        let unrelatedWorkout = try makeWorkout(
             exercises: [Self.makeExercise(code: "CABLE_ROW", name: "坐姿划船", weight: 50)],
             startedAt: Date(timeIntervalSince1970: 3_000),
             endedAt: Date(timeIntervalSince1970: 4_000)
@@ -145,14 +145,14 @@ import Testing
         #expect(results.allSatisfy { !$0.badgeCode.starts(with: "strength_bw_") })
     }
 
-    @Test @MainActor func historyBackfillUsesEachWorkoutBodyweightSnapshot() {
-        let oldBench = Self.makeWorkout(
+    @Test @MainActor func historyBackfillUsesEachWorkoutBodyweightSnapshot() throws {
+        let oldBench = try makeWorkout(
             exercises: [Self.makeExercise(code: "BB_BENCH_PRESS", name: "杠铃卧推", weight: 100)],
             startedAt: Date(timeIntervalSince1970: 1_000),
             endedAt: Date(timeIntervalSince1970: 2_000)
         )
         oldBench.bodyWeightKgAtCompletion = 110
-        let laterUnrelatedWorkout = Self.makeWorkout(
+        let laterUnrelatedWorkout = try makeWorkout(
             exercises: [Self.makeExercise(code: "CABLE_ROW", name: "坐姿划船", weight: 50)],
             startedAt: Date(timeIntervalSince1970: 3_000),
             endedAt: Date(timeIntervalSince1970: 4_000)
@@ -170,11 +170,11 @@ import Testing
 
     // MARK: - 3. 三大项俱乐部总和判定
 
-    @Test func big3ClubTotalRequiresAllThreeLifts() {
+    @Test func big3ClubTotalRequiresAllThreeLifts() throws {
         // 只有两项：深蹲 180 + 卧推 140 = 320kg（缺硬拉）
         let squat = Self.makeExercise(code: "BB_SQUAT", name: "杠铃深蹲", weight: 180)
         let bench = Self.makeExercise(code: "BB_BENCH_PRESS", name: "杠铃卧推", weight: 140)
-        let incompleteW = Self.makeWorkout(exercises: [squat, bench])
+        let incompleteW = try makeWorkout(exercises: [squat, bench])
 
         #expect(BadgeEngine.big3Total(in: [incompleteW]) == nil)
         let incompleteResults = BadgeEngine.evaluateIncremental(
@@ -188,7 +188,7 @@ import Testing
 
         // 补上硬拉 200kg：总和 520kg，跨越 300、400、500 俱乐部
         let dl = Self.makeExercise(code: "DEADLIFT", name: "硬拉", weight: 200)
-        let completeW = Self.makeWorkout(exercises: [squat, bench, dl])
+        let completeW = try makeWorkout(exercises: [squat, bench, dl])
 
         #expect(BadgeEngine.big3Total(in: [completeW]) == 520)
         let completeResults = BadgeEngine.evaluateIncremental(
@@ -205,10 +205,10 @@ import Testing
 
     // MARK: - 4. 累计吨位与纪律历程判定
 
-    @Test func cumulativeTonnageAndCareerMilestones() {
+    @Test func cumulativeTonnageAndCareerMilestones() throws {
         // 单场 10 组 100kg x 10次 = 10,000kg
         let ex = Self.makeExercise(code: "BB_BENCH_PRESS", name: "卧推", weight: 100, reps: 10, setsCount: 10)
-        let w1 = Self.makeWorkout(exercises: [ex])
+        let w1 = try makeWorkout(exercises: [ex])
 
         let results1 = BadgeEngine.evaluateIncremental(
             workout: w1,
@@ -225,7 +225,7 @@ import Testing
         var allWorkouts: [Workout] = [w1]
         for _ in 1..<10 {
             let nextEx = Self.makeExercise(code: "BB_BENCH_PRESS", name: "卧推", weight: 100, reps: 10, setsCount: 10)
-            allWorkouts.append(Self.makeWorkout(exercises: [nextEx]))
+            allWorkouts.append(try makeWorkout(exercises: [nextEx]))
         }
         let w10 = allWorkouts.last!
         let results10 = BadgeEngine.evaluateIncremental(
@@ -242,11 +242,11 @@ import Testing
 
     // MARK: - 5. 单次极限：铁血容量、3 PR 与严丝合缝计划
 
-    @Test func singleWorkoutFeatsEvaluation() {
+    @Test func singleWorkoutFeatsEvaluation() throws {
         // A. 铁血容量 (>= 25 组) & 力竭深渊 (>= 20,000kg)
         // 25 组 100kg x 10 次 = 25,000kg
         let exDense = Self.makeExercise(code: "BB_SQUAT", name: "深蹲", weight: 100, reps: 10, setsCount: 25)
-        let wDense = Self.makeWorkout(exercises: [exDense])
+        let wDense = try makeWorkout(exercises: [exDense])
 
         let resultsDense = BadgeEngine.evaluateIncremental(
             workout: wDense,
@@ -263,13 +263,13 @@ import Testing
         let exA0 = Self.makeExercise(code: "EX_A", name: "动作A", weight: 50)
         let exB0 = Self.makeExercise(code: "EX_B", name: "动作B", weight: 60)
         let exC0 = Self.makeExercise(code: "EX_C", name: "动作C", weight: 70)
-        let priorW = Self.makeWorkout(exercises: [exA0, exB0, exC0], startedAt: .now.addingTimeInterval(-3600))
+        let priorW = try makeWorkout(exercises: [exA0, exB0, exC0], startedAt: .now.addingTimeInterval(-3600))
 
         // 本次训练：A 动作 55kg，B 动作 65kg，C 动作 75kg（均打破历史）
         let exA1 = Self.makeExercise(code: "EX_A", name: "动作A", weight: 55)
         let exB1 = Self.makeExercise(code: "EX_B", name: "动作B", weight: 65)
         let exC1 = Self.makeExercise(code: "EX_C", name: "动作C", weight: 75)
-        let breakW = Self.makeWorkout(exercises: [exA1, exB1, exC1], startedAt: .now)
+        let breakW = try makeWorkout(exercises: [exA1, exB1, exC1], startedAt: .now)
 
         let breakResults = BadgeEngine.evaluateIncremental(
             workout: breakW,
@@ -292,7 +292,7 @@ import Testing
 
         // 训练中完全执行了该 planItemId 的 3 组
         let planEx = Self.makeExercise(code: "BB_BENCH_PRESS", name: "杠铃卧推", weight: 80, reps: 5, setsCount: 3, planItemId: planItemId)
-        let planW = Self.makeWorkout(exercises: [planEx], planId: plan.localId)
+        let planW = try makeWorkout(exercises: [planEx], planId: plan.localId)
 
         let planResults = BadgeEngine.evaluateIncremental(
             workout: planW,
@@ -305,7 +305,7 @@ import Testing
         #expect(planCodes.contains("feat_perfect_plan"))
     }
 
-    @Test func missingPlanCannotUnlockPerfectExecution() {
+    @Test func missingPlanCannotUnlockPerfectExecution() throws {
         let planId = UUID()
         let exercise = Self.makeExercise(
             code: "BB_BENCH_PRESS",
@@ -314,7 +314,7 @@ import Testing
             setsCount: 3,
             planItemId: UUID()
         )
-        let workout = Self.makeWorkout(exercises: [exercise], planId: planId)
+        let workout = try makeWorkout(exercises: [exercise], planId: planId)
 
         let results = BadgeEngine.evaluateIncremental(
             workout: workout,
@@ -330,23 +330,20 @@ import Testing
     // MARK: - 6. 存量回溯与幂等性验证
 
     @Test @MainActor func backfillPipelineAndIdempotency() async throws {
-        let container = AppModelContainer.make(inMemory: true)
-        let context = container.mainContext
+        let context = testStore.context
         let testDefaults = UserDefaults(suiteName: "BadgeEngineTests.\(UUID().uuidString)")!
 
         // 插入 2 次历史训练
-        let w1 = Self.makeWorkout(
+        let w1 = try makeWorkout(
             exercises: [Self.makeExercise(code: "BB_BENCH_PRESS", name: "卧推", weight: 100, reps: 10, setsCount: 10)],
             startedAt: Date(timeIntervalSince1970: 1000),
             endedAt: Date(timeIntervalSince1970: 4600)
         )
-        let w2 = Self.makeWorkout(
+        let w2 = try makeWorkout(
             exercises: [Self.makeExercise(code: "BB_SQUAT", name: "深蹲", weight: 120, reps: 10, setsCount: 10)],
             startedAt: Date(timeIntervalSince1970: 10000),
             endedAt: Date(timeIntervalSince1970: 13600)
         )
-        context.insert(w1)
-        context.insert(w2)
         try context.save()
 
         // 首次执行 Backfill
@@ -381,9 +378,9 @@ import Testing
 
     // MARK: - 7. 徽章进度展示计算
 
-    @Test func progressCalculationOutputsCorrectDisplay() {
+    @Test func progressCalculationOutputsCorrectDisplay() throws {
         let bench = Self.makeExercise(code: "BB_BENCH_PRESS", name: "卧推", weight: 70)
-        let w = Self.makeWorkout(exercises: [bench])
+        let w = try makeWorkout(exercises: [bench])
 
         // 无体重时展示引导
         let unweightedProgress = BadgeEngine.calculateProgress(

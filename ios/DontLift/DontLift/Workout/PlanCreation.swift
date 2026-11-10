@@ -46,11 +46,17 @@ enum PlanCreationError: LocalizedError, Equatable {
     }
 }
 
+enum PlanEditingError: LocalizedError {
+    case sourceUnavailable
+
+    var errorDescription: String? { "当前计划内容已变化，请重新打开后再编辑。" }
+}
+
 /// 一次新建计划表单的提交。
 ///
 /// - 同一表单最多成功创建一个计划：成功后再次提交直接忽略（防连续点击）。
-/// - 只有 `persist` 成功才返回计划；失败时只撤回本次插入的候选计划，
-///   不回滚整个共享 context，避免丢弃其他未保存编辑；表单可重试。
+/// - 候选在独立 context 保存，只有 `persist` 成功才返回调用方 context 中的计划；
+///   不触碰共享 context 的其他未保存编辑，失败后表单可重试。
 /// - 新计划为私有普通计划：新身份、`pendingCreate` 信封、无 Fork／分享关联，追加到所选分组末尾。
 @MainActor
 final class PlanCreationSubmission {
@@ -59,6 +65,47 @@ final class PlanCreationSubmission {
 
     var hasCreated: Bool { createdPlan != nil }
 
+    /// 完成页另存沿用同一提交防重入；只在该入口更新训练名称，失败恢复其原信封。
+    func submitCompletedWorkout(_ workout: Workout,
+                                name: String,
+                                mode: WorkoutPlanMode,
+                                groupId: UUID?,
+                                in context: ModelContext,
+                                persist: (ModelContext) throws -> Void = { try LocalModelSave.save($0) }) throws -> WorkoutPlan? {
+        guard let sourceContext = workout.modelContext,
+              !workout.isDeleted,
+              !sourceContext.insertedModelsArray.contains(where: { $0 === workout }) else {
+            throw PlanCreationError.sourceUnavailable
+        }
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var renamedEnvelope: (updatedAt: Date, syncStatusRaw: String)?
+        let plan = try submit(name: trimmedName, note: workout.note ?? "", mode: mode, groupId: groupId,
+                              items: workout.planTemplateItems(), in: context,
+                              canCreate: { workout.modelContext != nil && !workout.isDeleted
+                                  && workout.canOfferSaveAsPlanTemplate(alreadySaved: false) },
+                              persist: { creationContext in
+            let id = workout.localId
+            let descriptor = FetchDescriptor<Workout>(predicate: #Predicate { $0.localId == id })
+            guard let stored = try creationContext.fetch(descriptor).first,
+                  !stored.isDeleted, stored.canOfferSaveAsPlanTemplate(alreadySaved: false) else {
+                throw PlanCreationError.sourceUnavailable
+            }
+            stored.title = trimmedName
+            stored.markDirty()
+            #if DEBUG
+            try UITestHooks.failFirstSaveIfNeeded("template")
+            #endif
+            try persist(creationContext)
+            renamedEnvelope = (stored.updatedAt, stored.syncStatusRaw)
+        })
+        if let renamedEnvelope {
+            workout.title = trimmedName
+            workout.updatedAt = renamedEnvelope.updatedAt
+            workout.syncStatusRaw = renamedEnvelope.syncStatusRaw
+        }
+        return plan
+    }
+
     func submit(name: String,
                 note: String,
                 mode: WorkoutPlanMode,
@@ -66,23 +113,24 @@ final class PlanCreationSubmission {
                 items: [PlanItem],
                 in context: ModelContext,
                 canCreate: () -> Bool = { true },
-                persist: (ModelContext) throws -> Void = { try $0.save() }) throws -> WorkoutPlan? {
+                persist: (ModelContext) throws -> Void = { try LocalModelSave.save($0) }) throws -> WorkoutPlan? {
         guard createdPlan == nil, !isSubmitting else { return nil }
         isSubmitting = true
         defer { isSubmitting = false }
         guard canCreate() else { throw PlanCreationError.sourceUnavailable }
 
-        let plan = WorkoutPlan(name: name.trimmingCharacters(in: .whitespaces),
-                               note: PlanNoteEditorSheet.normalize(note),
-                               items: items,
-                               mode: mode,
-                               groupId: groupId,
-                               sortOrder: Self.nextSortOrder(in: groupId, context: context))
-        context.insert(plan)
+        let candidate = WorkoutPlan(name: name.trimmingCharacters(in: .whitespaces),
+                                    note: PlanNoteEditorSheet.normalize(note),
+                                    items: items,
+                                    mode: mode,
+                                    groupId: groupId,
+                                    sortOrder: Self.nextSortOrder(in: groupId, context: context))
+        let plan: WorkoutPlan
         do {
-            try persist(context)
+            plan = try LocalModelCommit.insert(candidate, in: context, persist: persist)
+        } catch let error as PlanCreationError {
+            throw error
         } catch {
-            context.delete(plan)
             throw PlanCreationError.saveFailed(error.localizedDescription)
         }
         createdPlan = plan

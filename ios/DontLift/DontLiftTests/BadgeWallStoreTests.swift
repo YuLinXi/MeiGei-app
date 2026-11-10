@@ -17,7 +17,7 @@ struct BadgeWallStoreTests {
         let container = AppModelContainer.make(inMemory: true)
         let context = container.mainContext
         context.insert(workout())
-        try context.save()
+        try LocalModelSave.save(context)
         let store = BadgeWallStore()
         store.configure(context: context, userId: UUID())
         #expect(store.progress.count == 24)
@@ -40,22 +40,22 @@ struct BadgeWallStoreTests {
         let context = container.mainContext
         let item = workout()
         context.insert(item)
-        try context.save()
+        try LocalModelSave.save(context)
         let store = BadgeWallStore()
         store.configure(context: context, userId: UUID())
         await store.waitUntilLoaded()
-        let observer = NotificationCenter.default.addObserver(forName: ModelContext.didSave, object: context, queue: .main) { notification in
+        let observer = NotificationCenter.default.addObserver(forName: LocalModelSave.didSave, object: context, queue: .main) { notification in
             MainActor.assumeIsolated { store.saved(notification) }
         }
         defer { NotificationCenter.default.removeObserver(observer) }
         item.exercises[0].sets[0].weightKg = 120
         item.markDirty()
-        try context.save()
+        try LocalModelSave.save(context)
         await store.waitUntilLoaded()
         #expect(store.progress.first { $0.id == "tonnage_10t" }?.currentMetric == 1200)
         #expect(store.completedRefreshCount >= 2)
         item.markDeleted()
-        try context.save()
+        try LocalModelSave.save(context)
         await store.waitUntilLoaded()
         #expect(store.progress.first { $0.id == "tonnage_10t" }?.currentMetric == 0)
         #expect(store.progress.first { $0.id == "career_first_workout" }?.isUnlocked == true)
@@ -67,12 +67,12 @@ struct BadgeWallStoreTests {
         let item = workout()
         item.endedAt = nil
         context.insert(item)
-        try context.save()
+        try LocalModelSave.save(context)
         let store = BadgeWallStore()
         store.configure(context: context, userId: UUID())
         await store.waitUntilLoaded()
         let reads = store.historyReadCount
-        let observer = NotificationCenter.default.addObserver(forName: ModelContext.didSave, object: context, queue: .main) { notification in
+        let observer = NotificationCenter.default.addObserver(forName: LocalModelSave.didSave, object: context, queue: .main) { notification in
             MainActor.assumeIsolated { store.saved(notification) }
         }
         defer { NotificationCenter.default.removeObserver(observer) }
@@ -82,12 +82,12 @@ struct BadgeWallStoreTests {
             set.weightKg = Double(index)
             set.actualRestSeconds = index
             item.markDirty()
-            try context.save()
+            try LocalModelSave.save(context)
             await store.waitUntilLoaded()
         }
         #expect(store.historyReadCount == reads)
         item.endedAt = .now
-        try context.save()
+        try LocalModelSave.save(context)
         await store.waitUntilLoaded()
         #expect(store.historyReadCount == reads + 1)
     }
@@ -96,13 +96,14 @@ struct BadgeWallStoreTests {
         let container = AppModelContainer.make(inMemory: true)
         let context = container.mainContext
         let item = workout()
+        context.insert(item)
+        try LocalModelSave.save(context)
         item.exercises[0].sets.append(WorkoutSet(setIndex: 1, weightKg: 100, reps: 5, completed: true, isWarmup: true))
         item.exercises[0].sets.append(WorkoutSet(setIndex: 2, completed: true, setType: .drop, segments: [
             WorkoutSetSegment(segmentIndex: 0, weightKg: 50, reps: 8),
             WorkoutSetSegment(segmentIndex: 1, weightKg: 40, reps: 10)
         ]))
-        context.insert(item)
-        try context.save()
+        try LocalModelSave.save(context)
         let expected = BadgeEngine.calculateProgress(allFinishedWorkouts: [item], grants: [], currentWeight: 70)
         let snapshots = try await Task.detached {
             try await BadgeHistoryReader(modelContainer: container).readWorkouts()
@@ -139,7 +140,7 @@ struct BadgeWallStoreTests {
         WorkoutCaloriePreferences.setBodyWeightKg(100)
         let container = AppModelContainer.make(inMemory: true)
         container.mainContext.insert(workout())
-        try container.mainContext.save()
+        try LocalModelSave.save(container.mainContext)
         let store = BadgeWallStore()
         store.configure(context: container.mainContext, userId: UUID())
         await store.waitUntilLoaded()
@@ -160,12 +161,12 @@ struct BadgeWallStoreTests {
         let container = AppModelContainer.make(inMemory: true)
         let item = workout()
         container.mainContext.insert(item)
-        try container.mainContext.save()
+        try LocalModelSave.save(container.mainContext)
         let store = BadgeWallStore()
         store.configure(context: container.mainContext, userId: UUID())
         for weight in [80.0, 100.0, 120.0] {
             item.exercises[0].sets[0].weightKg = weight
-            try container.mainContext.save()
+            try LocalModelSave.save(container.mainContext)
             store.invalidate()
         }
         await store.waitUntilLoaded()
@@ -176,7 +177,7 @@ struct BadgeWallStoreTests {
     @Test func thousandWorkoutsReusePreparedResult() async throws {
         let container = AppModelContainer.make(inMemory: true)
         for _ in 0..<1000 { container.mainContext.insert(workout()) }
-        try container.mainContext.save()
+        try LocalModelSave.save(container.mainContext)
         let store = BadgeWallStore()
         let start = ContinuousClock.now
         store.configure(context: container.mainContext, userId: UUID())

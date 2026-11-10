@@ -37,7 +37,7 @@ nonisolated final class Workout: Syncable {
     @Transient private var cachedUnits: [WorkoutUnit]?
 
     @Relationship(deleteRule: .cascade, inverse: \WorkoutExercise.workout)
-    var exercises: [WorkoutExercise]
+    var exercises: [WorkoutExercise] = []
 
     @MainActor init(
         localId: UUID = UUID(),
@@ -461,7 +461,7 @@ nonisolated final class WorkoutExercise {
     var workout: Workout?
 
     @Relationship(deleteRule: .cascade, inverse: \WorkoutSet.exercise)
-    var sets: [WorkoutSet]
+    var sets: [WorkoutSet] = []
 
     init(
         localId: UUID = UUID(),

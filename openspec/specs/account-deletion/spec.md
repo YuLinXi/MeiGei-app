@@ -1,7 +1,8 @@
 # account-deletion Specification
 
 ## Purpose
-TBD - created by archiving change profile-account-deletion-and-prefs. Update Purpose after archive.
+定义账号删除的鉴权、数据级联清理、Apple 授权撤销、Team 影响面与本地退出规则，使删除范围和失败后的行为明确且可验证。
+
 ## Requirements
 ### Requirement: 账号删除接口鉴权与范围
 
@@ -17,7 +18,7 @@ TBD - created by archiving change profile-account-deletion-and-prefs. Update Pur
 
 ### Requirement: 服务端账号级联硬删
 
-账号删除 SHALL 在单一数据库事务内**物理硬删**(非软删墓碑)该 user 名下的个人数据,使 Apple 审核可验证「数据已真正删除」。删除范围 MUST 覆盖:`user_identity`、`idempotency_key`、`device_token`、`custom_exercise`、`workout_plan`、`workout` 及其子树(`workout_exercise` / `workout_set`,随聚合根 CASCADE)、该用户自己的 `team_member`、该用户自己的 `team_checkin`、该用户自己的 `checkin_reaction`,以及最后的 `app_user` 行。事务内任一步失败 MUST 整体回滚,不留半删状态。
+账号删除 SHALL 在单一数据库事务内物理硬删(非软删墓碑)该 user 名下的个人数据,使 Apple 审核可验证「数据已真正删除」。删除范围 MUST 覆盖:`user_identity`、`idempotency_key`、`device_token`、`custom_exercise`、`workout_plan`、`workout` 及其子树(`workout_exercise` / `workout_set`,随聚合根 CASCADE)、该用户自己的 `team_member`、该用户自己的 `team_checkin`、该用户自己的 `checkin_reaction`,以及最后的 `app_user` 行。事务内任一步失败 MUST 整体回滚,不留半删状态。
 
 账号删除 MUST NOT 默认物理删除其他用户的 `team_member`、`team_checkin` 或 `checkin_reaction`。若被删用户是 Team owner,系统 SHALL 按「团主删号转移 Team owner」处理 Team 归属,而不是把其他成员数据纳入本次账号级联硬删。
 

@@ -4,6 +4,8 @@ import Testing
 
 @MainActor
 struct WorkoutPlanTemplateFactoryTests {
+    private let testStore = WorkoutTestStore()
+
     @Test func homepageStartCreatesNoPlanWorkoutShape() {
         let workout = Workout(planId: nil, title: "训练")
 
@@ -11,13 +13,13 @@ struct WorkoutPlanTemplateFactoryTests {
         #expect(workout.sourceShareVersionId == nil)
     }
 
-    @Test func teamShareWorkoutCanGenerateTemplateItemsFromCompletedWorkingSets() {
+    @Test func teamShareWorkoutCanGenerateTemplateItemsFromCompletedWorkingSets() throws {
         let shareId = UUID()
         let versionId = UUID()
-        let workout = Workout(planId: nil,
+        let workout = try testStore.insert(Workout(planId: nil,
                               sourceShareId: shareId,
                               sourceShareVersionId: versionId,
-                              title: "Team 推")
+                              title: "Team 推"))
         let first = WorkoutExercise(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 2)
         first.sets = [
             WorkoutSet(setIndex: 0, weightKg: 20, reps: 10, completed: true, setType: .warmup),
@@ -45,8 +47,8 @@ struct WorkoutPlanTemplateFactoryTests {
         #expect(items[0].setPrescriptions?.dropFirst().allSatisfy { !$0.isWarmupEffective } == true)
     }
 
-    @Test func planTemplateItemsPreserveCompletedDropSetPrescription() {
-        let workout = Workout(planId: nil, title: "胸推", endedAt: Date())
+    @Test func planTemplateItemsPreserveCompletedDropSetPrescription() throws {
+        let workout = try testStore.insert(Workout(planId: nil, title: "胸推", endedAt: Date()))
         let exercise = WorkoutExercise(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0)
         exercise.sets = [
             WorkoutSet(
@@ -75,8 +77,8 @@ struct WorkoutPlanTemplateFactoryTests {
         #expect(items[0].setPrescriptions?.first?.segments.map(\.reps) == [8, 6])
     }
 
-    @Test func personalPlanWorkoutDoesNotOfferSaveAsTemplate() {
-        let workout = Workout(planId: UUID(), endedAt: Date())
+    @Test func personalPlanWorkoutDoesNotOfferSaveAsTemplate() throws {
+        let workout = try testStore.insert(Workout(planId: UUID(), endedAt: Date()))
         let exercise = WorkoutExercise(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0)
         exercise.sets = [WorkoutSet(setIndex: 0, weightKg: 80, reps: 8, completed: true, setType: .working)]
         workout.exercises = [exercise]
@@ -125,8 +127,8 @@ struct WorkoutPlanTemplateFactoryTests {
         #expect(copies.map(\.note) == ["顶峰收缩", "控制离心", "组间不休息"])
     }
 
-    @Test func planTemplateItemsCarryWorkoutNotes() {
-        let workout = Workout(planId: nil, title: "胸推", endedAt: Date())
+    @Test func planTemplateItemsCarryWorkoutNotes() throws {
+        let workout = try testStore.insert(Workout(planId: nil, title: "胸推", endedAt: Date()))
         workout.note = "本周减载"
         let single = WorkoutExercise(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0)
         single.note = "顶峰收缩 1 秒"
@@ -151,10 +153,10 @@ struct WorkoutPlanTemplateFactoryTests {
 
     // MARK: 历史手动另存资格
 
-    @Test func historySaveIsAvailableRegardlessOfPlanSource() {
-        let noPlan = finishedWorkout(planId: nil)
-        let personal = finishedWorkout(planId: UUID())
-        let team = finishedWorkout(planId: nil)
+    @Test func historySaveIsAvailableRegardlessOfPlanSource() throws {
+        let noPlan = try finishedWorkout(planId: nil)
+        let personal = try finishedWorkout(planId: UUID())
+        let team = try finishedWorkout(planId: nil)
         team.sourceShareId = UUID()
         team.sourceShareVersionId = UUID()
 
@@ -168,23 +170,23 @@ struct WorkoutPlanTemplateFactoryTests {
         #expect(team.canOfferSaveAsPlanTemplate(alreadySaved: false))
     }
 
-    @Test func historySaveRequiresFinishedLiveWorkoutWithFormalSets() {
-        let inProgress = finishedWorkout(planId: nil)
+    @Test func historySaveRequiresFinishedLiveWorkoutWithFormalSets() throws {
+        let inProgress = try finishedWorkout(planId: nil)
         inProgress.endedAt = nil
-        let deleted = finishedWorkout(planId: nil)
+        let deleted = try finishedWorkout(planId: nil)
         deleted.deletedAt = Date()
 
-        let incompleteOnly = Workout(planId: nil, title: "空", endedAt: Date())
+        let incompleteOnly = try testStore.insert(Workout(planId: nil, title: "空", endedAt: Date()))
         let pending = WorkoutExercise(exerciseName: "卧推", orderIndex: 0)
         pending.sets = [WorkoutSet(setIndex: 0, weightKg: 60, reps: 8, completed: false, setType: .working)]
         incompleteOnly.exercises = [pending]
 
-        let warmupOnly = Workout(planId: nil, title: "热身", endedAt: Date())
+        let warmupOnly = try testStore.insert(Workout(planId: nil, title: "热身", endedAt: Date()))
         let warm = WorkoutExercise(exerciseName: "卧推", orderIndex: 0)
         warm.sets = [WorkoutSet(setIndex: 0, weightKg: 20, reps: 10, completed: true, setType: .warmup)]
         warmupOnly.exercises = [warm]
 
-        let empty = Workout(planId: nil, title: "无动作", endedAt: Date())
+        let empty = try testStore.insert(Workout(planId: nil, title: "无动作", endedAt: Date()))
 
         for workout in [inProgress, deleted, incompleteOnly, warmupOnly, empty] {
             #expect(!workout.canSaveAsPersonalPlanFromHistory)
@@ -203,7 +205,7 @@ struct WorkoutPlanTemplateFactoryTests {
     // MARK: 历史另存内容转换
 
     @Test func planTemplateItemsKeepEachCompletedSetValue() throws {
-        let workout = Workout(planId: nil, title: "胸", endedAt: Date())
+        let workout = try testStore.insert(Workout(planId: nil, title: "胸", endedAt: Date()))
         let bench = WorkoutExercise(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0)
         bench.sets = [
             WorkoutSet(setIndex: 0, weightKg: 60, reps: 10, completed: true, setType: .working),
@@ -225,7 +227,7 @@ struct WorkoutPlanTemplateFactoryTests {
     }
 
     @Test func planTemplateItemsKeepCompletedWarmupAndDropIncompleteSets() throws {
-        let workout = Workout(planId: nil, title: "胸", endedAt: Date())
+        let workout = try testStore.insert(Workout(planId: nil, title: "胸", endedAt: Date()))
         let bench = WorkoutExercise(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0)
         bench.sets = [
             WorkoutSet(setIndex: 0, weightKg: 20, reps: 10, completed: true, setType: .warmup),
@@ -246,7 +248,7 @@ struct WorkoutPlanTemplateFactoryTests {
     }
 
     @Test func planTemplateItemsKeepEachDropSetGroupSegments() throws {
-        let workout = Workout(planId: nil, title: "胸", endedAt: Date())
+        let workout = try testStore.insert(Workout(planId: nil, title: "胸", endedAt: Date()))
         let bench = WorkoutExercise(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0)
         bench.sets = [
             WorkoutSet(setIndex: 0, completed: true, setType: .drop, segments: [
@@ -277,9 +279,9 @@ struct WorkoutPlanTemplateFactoryTests {
         #expect(groups.map(\.orderIndex) == [0, 1])
     }
 
-    @Test func planTemplateItemsFollowActualOrderWithoutRestoringSkippedOrAlternatives() {
+    @Test func planTemplateItemsFollowActualOrderWithoutRestoringSkippedOrAlternatives() throws {
         // 来源计划含 A、B 且 A 有备选；实际跳过 B、临时新增 C。转换只看本次训练，不读来源计划。
-        let workout = Workout(planId: UUID(), title: "计划训练", endedAt: Date())
+        let workout = try testStore.insert(Workout(planId: UUID(), title: "计划训练", endedAt: Date()))
         let a = WorkoutExercise(exerciseName: "A", orderIndex: 0)
         a.sets = [WorkoutSet(setIndex: 0, weightKg: 50, reps: 10, completed: true, setType: .working)]
         let b = WorkoutExercise(exerciseName: "B", orderIndex: 1)
@@ -302,7 +304,7 @@ struct WorkoutPlanTemplateFactoryTests {
     }
 
     @Test func planTemplateItemsKeepNotesAndRestSemantics() throws {
-        let workout = Workout(planId: nil, title: "全身", endedAt: Date())
+        let workout = try testStore.insert(Workout(planId: nil, title: "全身", endedAt: Date()))
         workout.note = "控制离心"
         let single = WorkoutExercise(exerciseName: "卧推", orderIndex: 0)
         single.note = "顶峰收缩"
@@ -333,8 +335,8 @@ struct WorkoutPlanTemplateFactoryTests {
         #expect(workout.note == "控制离心")
     }
 
-    private func finishedWorkout(planId: UUID?) -> Workout {
-        let workout = Workout(planId: planId, title: "周二胸背", endedAt: Date())
+    private func finishedWorkout(planId: UUID?) throws -> Workout {
+        let workout = try testStore.insert(Workout(planId: planId, title: "周二胸背", endedAt: Date()))
         let bench = WorkoutExercise(builtinExerciseCode: "BB_BENCH", exerciseName: "卧推", orderIndex: 0)
         bench.sets = [WorkoutSet(setIndex: 0, weightKg: 80, reps: 8, completed: true, setType: .working)]
         workout.exercises = [bench]

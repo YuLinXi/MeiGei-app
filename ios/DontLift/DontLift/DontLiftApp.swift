@@ -29,24 +29,70 @@ struct DontLiftApp: App {
         UITestHooks.seedLiveWorkoutIfNeeded(container: container)
         UITestHooks.clearActiveWorkoutIfNeeded(container: container)
         UITestHooks.seedHistorySaveSamplesIfNeeded(container: container)
+        UITestHooks.seedProfileRecoveryIfNeeded(container: container)
+        UITestHooks.seedPlanSaveRecoveryIfNeeded(container: container)
+        UITestHooks.seedPlanReadabilityIfNeeded(container: container)
+        UITestHooks.seedBadgeReadabilityIfNeeded(container: container)
         UITestHooks.configureLaunchEnvironment()
         #endif
         self.modelContainer = container
-        // 同名动作历史合并（一次性本地迁移，幂等）：把旧手填记录挂到同名内置动作 code，避免历史断裂。
-        ExerciseHistoryMerge.runIfNeeded(in: container.mainContext)
-        let session = SessionStore(modelContext: container.mainContext)
+        let session: SessionStore
         #if DEBUG
-        if UITestHooks.isLiveWorkoutUITest || UITestHooks.isAutoLogin {
-            session.uitestInjectFakeSession()
+        if UITestHooks.isProfileRecoveryUITest || UITestHooks.isProfileCompletionUITest {
+            session = SessionStore(modelContext: container.mainContext,
+                                   profileDefaults: UserDefaults(suiteName: "dontlift.uitest.profileRecovery") ?? .standard,
+                                   loadProfile: { try UITestHooks.profileRecoveryResponse() },
+                                   updateProfile: { try UITestHooks.profileCompletionResponse($0) })
+        } else if UITestHooks.isLiveWorkoutUITest || UITestHooks.isAutoLogin {
+            session = SessionStore(modelContext: container.mainContext,
+                                   profileDefaults: UserDefaults(suiteName: UITestHooks.isLocalCleanupRecoveryUITest
+                                                               ? "dontlift.uitest.cleanup" : "dontlift.uitest.session")!,
+                                   loadProfile: { UITestHooks.profileUpdateResponse(.init(displayName: "测试用户", sex: "male")) },
+                                   updateProfile: { UITestHooks.profileUpdateResponse($0) })
+        } else {
+            session = SessionStore(modelContext: container.mainContext)
         }
+        if UITestHooks.isLiveWorkoutUITest || UITestHooks.isAutoLogin {
+            session.uitestInjectFakeSession(profileResolved: !UITestHooks.isProfileRecoveryUITest
+                                           && !UITestHooks.isProfileCompletionUITest)
+        }
+        if UITestHooks.isLocalCleanupRecoveryUITest { session.beginDeletedAccountCleanup() }
         if UITestHooks.isSeedDemoData {
             UITestHooks.seedDemoDataAndBadges(in: container.mainContext)
         }
+        if UITestHooks.isTeamReadabilityUITest, let userId = session.currentUserId {
+            _teamService = State(initialValue: UITestHooks.teamReadabilityService(userId: userId))
+        }
+        #else
+        session = SessionStore(modelContext: container.mainContext)
         #endif
+        if !session.requiresLocalCleanup {
+            // 同名动作历史合并一次性执行；待清理缓存不再进入正常启动迁移。
+            ExerciseHistoryMerge.runIfNeeded(in: container.mainContext)
+        }
+        #if DEBUG
+        let historyStore = UITestHooks.makeHistoryStore(modelContext: container.mainContext)
+        #else
         let historyStore = WorkoutHistoryStore(modelContext: container.mainContext)
+        #endif
         let workoutLiveActivity = WorkoutLiveActivityController()
         _session = State(initialValue: session)
-        _syncEngine = State(initialValue: SyncEngine(modelContext: container.mainContext))
+        let syncEngine: SyncEngine
+        #if DEBUG
+        if UITestHooks.isSyncRecoveryUITest {
+            syncEngine = UITestHooks.syncRecoveryEngine(context: container.mainContext)
+        } else {
+            syncEngine = SyncEngine(modelContext: container.mainContext, canSync: { [weak session] in
+                session?.isLoggedIn == true && session?.requiresLocalCleanup == false
+            })
+        }
+        #else
+        syncEngine = SyncEngine(modelContext: container.mainContext, canSync: { [weak session] in
+            session?.isLoggedIn == true && session?.requiresLocalCleanup == false
+        })
+        #endif
+        _syncEngine = State(initialValue: syncEngine)
+        session.onSessionInvalidated = { syncEngine.resetResult() }
         _historyStore = State(initialValue: historyStore)
         _workoutLiveActivity = State(initialValue: workoutLiveActivity)
         _restTimer = State(initialValue: RestTimerController(liveActivityController: workoutLiveActivity))
@@ -78,12 +124,16 @@ struct DontLiftApp: App {
                 .environment(badgeCelebration)
                 .environment(badgeWallStore)
                 .preferredColorScheme(.light)
-                .onChange(of: session.currentUserId, initial: true) { _, userId in
+                #if DEBUG
+                .task { UITestHooks.applyTypographyTraits() }
+                #endif
+                .onChange(of: session.currentUserId, initial: true) { oldUserId, userId in
+                    if oldUserId != userId { planWriteback.clearRetainedReceipt() }
                     historyStore.reset()
                     if userId == nil { restTimer.stop() }
                     badgeWallStore.configure(context: modelContainer.mainContext, userId: userId)
                 }
-                .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { notification in
+                .onReceive(NotificationCenter.default.publisher(for: LocalModelSave.didSave)) { notification in
                     badgeWallStore.saved(notification)
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .badgeBodyWeightChanged)) { _ in

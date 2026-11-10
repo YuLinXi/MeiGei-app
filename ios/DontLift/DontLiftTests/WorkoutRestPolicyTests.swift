@@ -5,6 +5,7 @@ import Testing
 
 @MainActor
 struct WorkoutRestPolicyTests {
+    private let testStore = WorkoutTestStore()
 
     @Test func workoutSetRestSecondsPersistInSwiftData() throws {
         let container = AppModelContainer.make(inMemory: true)
@@ -31,8 +32,8 @@ struct WorkoutRestPolicyTests {
         #expect(fetched.actualRestSeconds == 137)
     }
 
-    @Test func completedWarmupPreviousSetUsesFinalTargetRestSeconds() {
-        let exercise = WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0)
+    @Test func completedWarmupPreviousSetUsesFinalTargetRestSeconds() throws {
+        let exercise = try testStore.insert(WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0))
         let warmup = WorkoutSet(setIndex: 0,
                                 completed: true,
                                 plannedRestSeconds: 45,
@@ -48,8 +49,8 @@ struct WorkoutRestPolicyTests {
         #expect(seconds == 45)
     }
 
-    @Test func workingPreviousSetUsesPlannedRestSecondsNotActualSeconds() {
-        let exercise = WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0)
+    @Test func workingPreviousSetUsesPlannedRestSecondsNotActualSeconds() throws {
+        let exercise = try testStore.insert(WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0))
         let first = WorkoutSet(setIndex: 0,
                                completed: true,
                                plannedRestSeconds: 120,
@@ -65,8 +66,8 @@ struct WorkoutRestPolicyTests {
         #expect(seconds == 120)
     }
 
-    @Test func workingPreviousSetWithoutPlannedRestFallsBack() {
-        let exercise = WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0)
+    @Test func workingPreviousSetWithoutPlannedRestFallsBack() throws {
+        let exercise = try testStore.insert(WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0))
         let first = WorkoutSet(setIndex: 0,
                                completed: true,
                                actualRestSeconds: 173,
@@ -81,8 +82,8 @@ struct WorkoutRestPolicyTests {
         #expect(seconds == 90)
     }
 
-    @Test func unfinishedPreviousRestFallsBackInsteadOfUsingProvisionalTarget() {
-        let exercise = WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0)
+    @Test func unfinishedPreviousRestFallsBackInsteadOfUsingProvisionalTarget() throws {
+        let exercise = try testStore.insert(WorkoutExercise(exerciseName: "杠铃卧推", orderIndex: 0))
         let first = WorkoutSet(setIndex: 0,
                                completed: true,
                                plannedRestSeconds: 120,
@@ -217,8 +218,8 @@ struct WorkoutRestPolicyTests {
         #expect(event.elapsedSeconds == 100)
     }
 
-    @Test func supersetNextRoundInheritsPreviousRoundAnchorFinalTarget() {
-        let anchorExercise = WorkoutExercise(exerciseName: "下斜卧推", orderIndex: 1)
+    @Test func supersetNextRoundInheritsPreviousRoundAnchorFinalTarget() throws {
+        let anchorExercise = try testStore.insert(WorkoutExercise(exerciseName: "下斜卧推", orderIndex: 1))
         let firstRound = WorkoutSet(setIndex: 0,
                                     completed: true,
                                     plannedRestSeconds: 100,
@@ -234,8 +235,8 @@ struct WorkoutRestPolicyTests {
         #expect(seconds == 100)
     }
 
-    @Test func firstSupersetRoundUsesRoundDefaultFallback() {
-        let anchorExercise = WorkoutExercise(exerciseName: "下斜卧推", orderIndex: 1)
+    @Test func firstSupersetRoundUsesRoundDefaultFallback() throws {
+        let anchorExercise = try testStore.insert(WorkoutExercise(exerciseName: "下斜卧推", orderIndex: 1))
         let firstRound = WorkoutSet(setIndex: 0, completed: true, setType: .working)
         anchorExercise.sets = [firstRound]
 
@@ -263,67 +264,67 @@ struct WorkoutRestPolicyTests {
     }
 
     @Test func nextSetAfterSkippedEarlierExerciseContinuesWithinCurrentExercise() throws {
-        let skipped = workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
-        let current = workoutExercise(name: "坐姿划船", orderIndex: 1, completed: [true, false])
-        let workout = workout(exercises: [skipped, current])
+        let skipped = try workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
+        let current = try workoutExercise(name: "坐姿划船", orderIndex: 1, completed: [true, false])
+        let workout = try workout(exercises: [skipped, current])
 
         let next = try #require(WorkoutRestPolicy.nextSet(
-            afterCompletedSetId: current.sets[0].localId,
+            afterCompletedSetId: try setID(in: current, at: 0),
             in: workout
         ))
 
         #expect(next.exerciseName == "坐姿划船")
         #expect(next.setIndex == 2)
-        #expect(next.setId == current.sets[1].localId)
+        #expect(try next.setId == setID(in: current, at: 1))
     }
 
     @Test func nextSetAfterCurrentExerciseFinishedMovesForward() throws {
-        let skipped = workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
-        let current = workoutExercise(name: "坐姿划船", orderIndex: 1, completed: [true])
-        let nextExercise = workoutExercise(name: "高位下拉", orderIndex: 2, completed: [false])
-        let workout = workout(exercises: [skipped, current, nextExercise])
+        let skipped = try workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
+        let current = try workoutExercise(name: "坐姿划船", orderIndex: 1, completed: [true])
+        let nextExercise = try workoutExercise(name: "高位下拉", orderIndex: 2, completed: [false])
+        let workout = try workout(exercises: [skipped, current, nextExercise])
 
         let next = try #require(WorkoutRestPolicy.nextSet(
-            afterCompletedSetId: current.sets[0].localId,
+            afterCompletedSetId: try setID(in: current, at: 0),
             in: workout
         ))
 
         #expect(next.exerciseName == "高位下拉")
         #expect(next.setIndex == 1)
-        #expect(next.setId == nextExercise.sets[0].localId)
+        #expect(try next.setId == setID(in: nextExercise, at: 0))
     }
 
     @Test func nextSetWrapsBackToSkippedEarlierExerciseWhenNoForwardSetExists() throws {
-        let skipped = workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
-        let current = workoutExercise(name: "坐姿划船", orderIndex: 1, completed: [true])
-        let workout = workout(exercises: [skipped, current])
+        let skipped = try workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
+        let current = try workoutExercise(name: "坐姿划船", orderIndex: 1, completed: [true])
+        let workout = try workout(exercises: [skipped, current])
 
         let next = try #require(WorkoutRestPolicy.nextSet(
-            afterCompletedSetId: current.sets[0].localId,
+            afterCompletedSetId: try setID(in: current, at: 0),
             in: workout
         ))
 
         #expect(next.exerciseName == "杠铃卧推")
         #expect(next.setIndex == 1)
-        #expect(next.setId == skipped.sets[0].localId)
+        #expect(try next.setId == setID(in: skipped, at: 0))
     }
 
     @Test func nextSetFallbackWithoutAnchorUsesFirstIncompleteSet() throws {
-        let first = workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
-        let second = workoutExercise(name: "坐姿划船", orderIndex: 1, completed: [false])
-        let workout = workout(exercises: [first, second])
+        let first = try workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
+        let second = try workoutExercise(name: "坐姿划船", orderIndex: 1, completed: [false])
+        let workout = try workout(exercises: [first, second])
 
         let next = try #require(WorkoutRestPolicy.nextSet(afterCompletedSetId: nil, in: workout))
 
         #expect(next.exerciseName == "杠铃卧推")
-        #expect(next.setId == first.sets[0].localId)
+        #expect(try next.setId == setID(in: first, at: 0))
     }
 
     @Test func nextSetAfterSupersetRoundContinuesToNextRoundBeforeSkippedEarlierExercise() throws {
-        let skipped = workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
-        let firstMember = workoutExercise(name: "夹胸", orderIndex: 1, completed: [true, false])
-        let secondMember = workoutExercise(name: "下斜卧推", orderIndex: 2, completed: [true, false])
-        let workout = workout(exercises: [skipped, firstMember, secondMember])
+        let skipped = try workoutExercise(name: "杠铃卧推", orderIndex: 0, completed: [false])
+        let firstMember = try workoutExercise(name: "夹胸", orderIndex: 1, completed: [true, false])
+        let secondMember = try workoutExercise(name: "下斜卧推", orderIndex: 2, completed: [true, false])
+        let workout = try workout(exercises: [skipped, firstMember, secondMember])
         workout.updateTrainingUnits([
             WorkoutUnit(kind: .singleExercise,
                         orderIndex: 0,
@@ -340,17 +341,22 @@ struct WorkoutRestPolicyTests {
         ])
 
         let next = try #require(WorkoutRestPolicy.nextSet(
-            afterCompletedSetId: secondMember.sets[0].localId,
+            afterCompletedSetId: try setID(in: secondMember, at: 0),
             in: workout
         ))
 
         #expect(next.exerciseName == "夹胸")
         #expect(next.setIndex == 2)
-        #expect(next.setId == firstMember.sets[1].localId)
+        #expect(try next.setId == setID(in: firstMember, at: 1))
     }
 
-    private func workout(exercises: [WorkoutExercise]) -> Workout {
-        let workout = Workout(exercises: exercises)
+    /// 夹具按显式索引定位组，不将关系数组顺序作为组身份。
+    private func setID(in exercise: WorkoutExercise, at setIndex: Int) throws -> UUID {
+        try #require(exercise.sets.first { $0.setIndex == setIndex }).localId
+    }
+
+    private func workout(exercises: [WorkoutExercise]) throws -> Workout {
+        let workout = try testStore.insert(Workout(exercises: exercises))
         workout.updateTrainingUnits(exercises.enumerated().map { index, exercise in
             WorkoutUnit(kind: .singleExercise,
                         orderIndex: index,
@@ -359,8 +365,8 @@ struct WorkoutRestPolicyTests {
         return workout
     }
 
-    private func workoutExercise(name: String, orderIndex: Int, completed: [Bool]) -> WorkoutExercise {
-        let exercise = WorkoutExercise(exerciseName: name, orderIndex: orderIndex)
+    private func workoutExercise(name: String, orderIndex: Int, completed: [Bool]) throws -> WorkoutExercise {
+        let exercise = try testStore.insert(WorkoutExercise(exerciseName: name, orderIndex: orderIndex))
         exercise.sets = completed.enumerated().map { index, isCompleted in
             WorkoutSet(setIndex: index,
                        weightKg: 60 + Double(index) * 2.5,

@@ -26,7 +26,12 @@ enum AppModelContainer {
             cloudKitDatabase: .none
         )
         #if DEBUG
-        if !inMemory, UITestHooks.isLiveWorkoutUITest,
+        if !inMemory, UITestHooks.isBulkSyncUITest {
+            let url = FileManager.default.temporaryDirectory.appending(path: "BulkSyncUITest-\(UUID()).store")
+            config = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+        } else if !inMemory, UITestHooks.isFinishFlowUITest {
+            config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        } else if !inMemory, UITestHooks.isLiveWorkoutUITest,
            ProcessInfo.processInfo.arguments.contains("-profile-workout") {
             let url = URL.applicationSupportDirectory.appending(path: "WorkoutPerformance.store")
             config = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)

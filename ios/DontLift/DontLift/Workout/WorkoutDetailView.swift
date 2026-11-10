@@ -10,13 +10,16 @@ import SwiftData
 /// → 逐动作逐组的「重量 × 次数」只读流水。朱砂红仅留给 PR / 顶组，无输入框、无勾选圈。
 /// 已完成训练产品上不可二次编辑，故全程只读；删除经导航栏右上 ⋯。
 struct WorkoutDetailView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(GlobalMessageCenter.self) private var globalMessage
+    @Environment(PlanWritebackCenter.self) private var planWriteback
     @Bindable var workout: Workout
 
     @State private var confirmingDelete = false
+    @State private var deletionFailed = false
     @State private var fallbackRecords: [PersonalRecord]?
     @State private var showingPosterPreview = false
     /// 「另存为个人计划」表单初始值：点击入口时生成一次，表单关闭后清空。
@@ -103,6 +106,12 @@ struct WorkoutDetailView: View {
             confirmTitle: "删除",
             onConfirm: { deleteWorkout() }
         )
+        .alert("未能删除训练", isPresented: $deletionFailed) {
+            Button("重试", role: .destructive) { deleteWorkout() }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("训练记录仍保留，请重试。")
+        }
         .sheet(isPresented: $showingPosterPreview) {
             WorkoutPosterPreviewSheet(workout: workout, personalRecords: personalRecords)
         }
@@ -136,6 +145,11 @@ struct WorkoutDetailView: View {
                 showingPosterPreview = true
             }
         ]
+        if let receipt = planWriteback.retainedReceipt(for: workout.localId) {
+            items.append(PaperMenuItem(title: "查看计划更新", systemImage: "doc.text") {
+                planWriteback.present(receipt)
+            })
+        }
         // 没有可转换正式组的训练不提供另存入口。
         if canSaveSourceAsPlan {
             items.append(PaperMenuItem(title: "另存为个人计划", systemImage: "square.and.arrow.down") {
@@ -175,24 +189,29 @@ struct WorkoutDetailView: View {
     }
 
     private var summaryCard: some View {
-        HStack(spacing: Theme.Spacing.md) {
+        let expanded = dynamicTypeSize >= .xxLarge
+        let layout = expanded
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Spacing.md))
+            : AnyLayout(HStackLayout(spacing: Theme.Spacing.md))
+        return layout {
             dateBlock(workout.startedAt)
             VStack(alignment: .leading, spacing: 5) {
                 Text(workout.title ?? "训练")
                     .font(Theme.Font.l2)
                     .foregroundStyle(Theme.Color.fg)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .lineLimit(expanded ? nil : 1)
+                    .minimumScaleFactor(expanded ? 1 : 0.8)
                 Text(rangeText)
                     .font(Theme.Font.mono(size: 11, weight: .medium))
                     .foregroundStyle(Theme.Color.fg2)
                 donePill
             }
-            Spacer(minLength: 0)
+            if !expanded { Spacer(minLength: 0) }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(workout.title ?? "训练")，\(rangeText)，已完成")
+        .accessibilityLabel("\(workout.title ?? "训练")，\(workout.startedAt.formatted(.dateTime.year().month().day()))，\(rangeText)，已完成")
     }
 
     /// 日期方块：日 + 「M月 · 周E」（沿用首页本周训练样式）。
@@ -201,13 +220,18 @@ struct WorkoutDetailView: View {
         let day = cal.component(.day, from: date)
         let month = cal.component(.month, from: date)
         let weekday = Self.weekdayFormatter.string(from: date)
-        return VStack(spacing: 2) {
+        let expanded = dynamicTypeSize >= .xxLarge
+        let layout = expanded
+            ? AnyLayout(HStackLayout(spacing: 8))
+            : AnyLayout(VStackLayout(spacing: 2))
+        return layout {
             Text(String(format: "%02d", day)).numStyle(size: 21).foregroundStyle(Theme.Color.fg)
             Text("\(month)月 · \(weekday)")
                 .font(Theme.Font.mono(size: 9, weight: .medium))
                 .foregroundStyle(Theme.Color.muted)
         }
-        .frame(width: 54, height: 54)
+        .padding(expanded ? 8 : 0)
+        .frame(minWidth: 54, minHeight: 54)
         .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm).stroke(Theme.Color.border, lineWidth: 1))
     }
@@ -238,26 +262,36 @@ struct WorkoutDetailView: View {
     // MARK: 三联数（时长 / 总组数 / 训练量，已完成口径，无「剩余动作」）
 
     private var triadStats: some View {
-        HStack(spacing: 0) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 0))
+            : AnyLayout(HStackLayout(spacing: 0))
+        return layout {
             triadCell(value: durationText, label: "时长", mono: true)
-            divider
+            if !dynamicTypeSize.isAccessibilitySize { divider }
             triadCell(value: "\(completedSetCount)", label: "总组数", mono: false)
-            divider
+            if !dynamicTypeSize.isAccessibilitySize { divider }
             triadCell(value: formatVolume(totalVolume), label: "训练量", mono: false)
         }
         .cardStyle(padding: 0)
-        .frame(height: 76)
+        .frame(minHeight: 76)
     }
 
     private func triadCell(value: String, label: String, mono: Bool) -> some View {
-        VStack(spacing: 7) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 12))
+            : AnyLayout(VStackLayout(spacing: 7))
+        return layout {
             Text(value)
                 .font(mono ? Theme.Font.number(size: 19, weight: .bold)
                            : Theme.Font.display(size: 23, weight: .heavy))
                 .foregroundStyle(Theme.Color.fg)
-                .lineLimit(1).minimumScaleFactor(0.6)
-            Text(label).eyebrowStyle()
-        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                .fixedSize(horizontal: dynamicTypeSize.isAccessibilitySize, vertical: true)
+            Text(label).eyebrowStyle().fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil, alignment: .trailing)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? 14 : 0)
+        .frame(maxWidth: .infinity)
     }
 
     private var divider: some View {
@@ -268,12 +302,12 @@ struct WorkoutDetailView: View {
         HStack(spacing: 8) {
             Image(systemName: "flame.fill")
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Theme.Color.accent)
+                .foregroundStyle(Theme.Color.action)
             Text(estimate.fullText)
                 .font(Theme.Font.mono(size: 12, weight: .bold))
                 .foregroundStyle(Theme.Color.fg)
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
+                .lineLimit(dynamicTypeSize >= .xxLarge ? nil : 1)
+                .minimumScaleFactor(dynamicTypeSize >= .xxLarge ? 1 : 0.78)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 14)
@@ -307,27 +341,30 @@ struct WorkoutDetailView: View {
             HStack(spacing: 7) {
                 Image(systemName: "arrowtriangle.up.fill")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
+                    .foregroundStyle(Theme.Color.action)
                 Text(personalRecords.count == 1 ? "本次 1 项新纪录" : "本次 \(personalRecords.count) 项新纪录")
                     .font(Theme.Font.mono(size: 10, weight: .bold))
                     .tracking(0.1 * 10)
                     .textCase(.uppercase)
-                    .foregroundStyle(Theme.Color.accent)
+                    .foregroundStyle(Theme.Color.action)
             }
             VStack(spacing: 6) {
                 ForEach(personalRecords) { pr in
-                    HStack(alignment: .firstTextBaseline) {
+                    let layout = dynamicTypeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                        : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+                    layout {
                         Text(pr.exerciseName)
                             .font(Theme.Font.body(size: 12.5, weight: .semibold))
                             .foregroundStyle(Theme.Color.fg)
-                        Spacer(minLength: Theme.Spacing.sm)
+                        if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: Theme.Spacing.sm) }
                         HStack(alignment: .firstTextBaseline, spacing: 1) {
                             Text((ExerciseWeightSemantics.isAssisted(pr.exerciseKey) ? "辅助 " : "") + formatKg(pr.weightKg))
                                 .font(Theme.Font.number(size: 13, weight: .bold))
-                                .foregroundStyle(Theme.Color.accent)
+                                .foregroundStyle(Theme.Color.action)
                             Text("kg")
                                 .font(Theme.Font.mono(size: 9, weight: .semibold))
-                                .foregroundStyle(Theme.Color.accent.opacity(0.7))
+                                .foregroundStyle(Theme.Color.action)
                         }
                     }
                 }
@@ -380,11 +417,14 @@ struct WorkoutDetailView: View {
     // MARK: actions
 
     private func deleteWorkout() {
-        Theme.Haptics.impact(.rigid)
-        workout.markDeleted()
-        try? modelContext.save()
-        historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
-        dismiss()
+        do {
+            try WorkoutPersistence.delete(workout, in: modelContext)
+            Theme.Haptics.impact(.rigid)
+            historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
+            dismiss()
+        } catch {
+            deletionFailed = true
+        }
     }
 
     private func computeFallbackRecords() -> [PersonalRecord] {
@@ -408,6 +448,7 @@ struct WorkoutDetailView: View {
 // MARK: - 单个动作的只读日志卡
 
 private struct SupersetLogCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let first: WorkoutExercise
     let second: WorkoutExercise
     let roundCount: Int
@@ -423,14 +464,17 @@ private struct SupersetLogCard: View {
             Button {
                 isExpanded.toggle()
             } label: {
-                HStack(spacing: 8) {
+                let layout = dynamicTypeSize >= .xxLarge
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                    : AnyLayout(HStackLayout(spacing: 8))
+                layout {
                     WorkoutStructureIcon(kind: .superset)
                     Text(titleText)
                         .font(Theme.Font.l2)
                         .foregroundStyle(Theme.Color.fg)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize >= .xxLarge ? nil : 1)
                         .truncationMode(.tail)
-                    Spacer(minLength: 8)
+                    if dynamicTypeSize < .xxLarge { Spacer(minLength: 8) }
                     HStack(spacing: 8) {
                         Text("\(effectiveRoundCount) 组")
                             .font(Theme.Font.mono(size: 11, weight: .medium))
@@ -443,6 +487,7 @@ private struct SupersetLogCard: View {
                 }
                 .padding(.horizontal, 15)
                 .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -473,28 +518,32 @@ private struct SupersetLogCard: View {
     }
 
     private func roundRow(_ index: Int) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack {
+        let expanded = dynamicTypeSize >= .xxLarge
+        let layout = expanded
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 5))
+            : AnyLayout(HStackLayout())
+        return VStack(alignment: .leading, spacing: 7) {
+            layout {
                 Text("#\(index + 1)")
                     .font(Theme.Font.mono(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.muted)
-                    .frame(width: 34, alignment: .leading)
+                    .frame(minWidth: 34, alignment: .leading)
                 Text(first.displayExerciseName)
                     .font(Theme.Font.body(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg2)
-                Spacer(minLength: 8)
+                if !expanded { Spacer(minLength: 8) }
                 valueText(firstSets[index])
             }
-            HStack {
-                Text("")
-                    .frame(width: 34)
+            layout {
+                if !expanded { Color.clear.frame(width: 34, height: 0) }
                 Text(second.displayExerciseName)
                     .font(Theme.Font.body(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg2)
-                Spacer(minLength: 8)
+                if !expanded { Spacer(minLength: 8) }
                 valueText(secondSets[index])
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 15)
         .padding(.vertical, 10)
     }
@@ -508,6 +557,7 @@ private struct SupersetLogCard: View {
 }
 
 private struct ExerciseLogCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let exercise: WorkoutExercise
     /// 该动作本次的 PR 重量（非 nil 时，等于此重量的首个组标 ▲ PR）。
     var prMaxWeight: Double?
@@ -561,7 +611,10 @@ private struct ExerciseLogCard: View {
             Button {
                 isExpanded.toggle()
             } label: {
-                HStack {
+                let layout = dynamicTypeSize >= .xxLarge
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                    : AnyLayout(HStackLayout())
+                layout {
                     HStack(spacing: 6) {
                         if isDropSet {
                             WorkoutStructureIcon(kind: .dropSet)
@@ -569,10 +622,10 @@ private struct ExerciseLogCard: View {
                         Text(exercise.displayExerciseName)
                             .font(Theme.Font.l2)
                             .foregroundStyle(Theme.Color.fg)
-                            .lineLimit(1)
+                            .lineLimit(dynamicTypeSize >= .xxLarge ? nil : 1)
                             .truncationMode(.tail)
                     }
-                    Spacer(minLength: 8)
+                    if dynamicTypeSize < .xxLarge { Spacer(minLength: 8) }
                     HStack(spacing: 8) {
                         Text(aggText)
                             .font(Theme.Font.mono(size: 11, weight: .medium))
@@ -585,6 +638,7 @@ private struct ExerciseLogCard: View {
                 }
                 .padding(.horizontal, 15)
                 .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -696,6 +750,7 @@ private struct ExerciseFullNoteSheet: View {
 // MARK: - 只读账本行：[组号][重量 × 次数][▲PR?]，无输入框、无勾选
 
 private struct LogSetRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let set: WorkoutSet
     /// 序号徽章：热身组 `W`，正式组相对序号。
     var badgeText: String = ""
@@ -710,22 +765,26 @@ private struct LogSetRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 10))
+        return layout {
             Text(badgeText)
                 .font(Theme.Font.mono(size: 11, weight: .bold))
-                .foregroundStyle(set.isWarmupEffective ? Theme.Color.accent : Theme.Color.muted)
-                .frame(width: 22, height: 18)
+                .foregroundStyle(set.isWarmupEffective ? Theme.Color.action : Theme.Color.muted)
+                .frame(minWidth: 22, minHeight: 18)
                 .background(set.isWarmupEffective ? Theme.Color.accentSoft : Color.clear,
                             in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
 
             valueContent
 
-            Spacer(minLength: 0)
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
 
             if let actualRestText { restTag(actualRestText) }
 
             if isPR { prTag }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 15)
         .padding(.vertical, 7)
         .accessibilityElement(children: .combine)
@@ -737,53 +796,45 @@ private struct LogSetRow: View {
         if set.isDropSet {
             VStack(alignment: .leading, spacing: 5) {
                 ForEach(set.effectiveSegments) { segment in
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text((set.exercise?.isAssistedWeight == true ? "辅助 " : "") + (segment.weightKg.map(formatKg) ?? "—"))
-                            .font(Theme.Font.number(size: 13, weight: .bold))
-                            .foregroundStyle(valueColor)
-                        Text("kg")
-                            .font(Theme.Font.mono(size: 9, weight: .medium))
-                            .foregroundStyle(Theme.Color.muted)
-                            .padding(.trailing, 4)
-                        Text("×")
-                            .font(Theme.Font.mono(size: 10))
-                            .foregroundStyle(Theme.Color.muted)
-                            .padding(.trailing, 4)
-                        Text(segment.reps.map(String.init) ?? "—")
-                            .font(Theme.Font.number(size: 13, weight: .bold))
-                            .foregroundStyle(valueColor)
-                        Text("次")
-                            .font(Theme.Font.mono(size: 9, weight: .medium))
-                            .foregroundStyle(Theme.Color.muted)
-                    }
+                    valueLine(weight: segment.weightKg, reps: segment.reps, numberSize: 13, unitSize: 9)
                 }
             }
         } else {
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text((set.exercise?.isAssistedWeight == true ? "辅助 " : "") + (set.weightKg.map(formatKg) ?? "—"))
-                    .font(Theme.Font.number(size: 15, weight: .bold))
-                    .foregroundStyle(valueColor)
-                Text("kg")
-                    .font(Theme.Font.mono(size: 9.5, weight: .medium))
-                    .foregroundStyle(Theme.Color.muted)
-                    .padding(.trailing, 5)
-                Text("×")
-                    .font(Theme.Font.mono(size: 11))
-                    .foregroundStyle(Theme.Color.muted)
-                    .padding(.trailing, 5)
-                Text(set.reps.map(String.init) ?? "—")
-                    .font(Theme.Font.number(size: 15, weight: .bold))
-                    .foregroundStyle(valueColor)
-                Text("次")
-                    .font(Theme.Font.mono(size: 9.5, weight: .medium))
-                    .foregroundStyle(Theme.Color.muted)
+            valueLine(weight: set.weightKg, reps: set.reps, numberSize: 15, unitSize: 9.5)
+        }
+    }
+
+    private func valueLine(weight: Double?, reps: Int?, numberSize: CGFloat, unitSize: CGFloat) -> some View {
+        let weightText = HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text((set.exercise?.isAssistedWeight == true ? "辅助 " : "") + (weight.map(formatKg) ?? "—"))
+                .font(Theme.Font.number(size: numberSize, weight: .bold))
+                .foregroundStyle(valueColor)
+            Text("kg").font(Theme.Font.mono(size: unitSize, weight: .medium))
+                .foregroundStyle(Theme.Color.muted)
+        }
+        let repsText = HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(reps.map(String.init) ?? "—")
+                .font(Theme.Font.number(size: numberSize, weight: .bold))
+                .foregroundStyle(valueColor)
+            Text("次").font(Theme.Font.mono(size: unitSize, weight: .medium))
+                .foregroundStyle(Theme.Color.muted)
+        }
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                weightText.fixedSize()
+                Text("×").font(Theme.Font.mono(size: 11)).foregroundStyle(Theme.Color.muted)
+                repsText.fixedSize()
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                weightText
+                repsText
             }
         }
     }
 
     private var valueColor: Color {
         if isSkipped { return Theme.Color.muted }
-        return isPR ? Theme.Color.accent : Theme.Color.fg
+        return isPR ? Theme.Color.action : Theme.Color.fg
     }
 
     private var prTag: some View {
@@ -791,7 +842,7 @@ private struct LogSetRow: View {
             Image(systemName: "arrowtriangle.up.fill").font(.system(size: 7, weight: .bold))
             Text("PR").font(Theme.Font.mono(size: 9, weight: .bold)).tracking(0.04 * 9)
         }
-        .foregroundStyle(Theme.Color.accent)
+        .foregroundStyle(Theme.Color.action)
         .padding(.horizontal, 7)
         .padding(.vertical, 2)
         .background(Theme.Color.accentSofter, in: Capsule())

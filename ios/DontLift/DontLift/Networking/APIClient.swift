@@ -13,9 +13,19 @@ enum APIError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unauthorized: return "登录已失效，请重新登录。"
-        case .http(let status, let body): return "请求失败（\(status)）：\(body)"
-        case .transport(let e): return "网络异常：\(e.localizedDescription)"
-        case .decoding(let e): return "数据解析失败：\(e.localizedDescription)"
+        case .http(let status, _):
+            switch status {
+            case 401: return "登录已失效，请重新登录。"
+            case 403: return "当前账号无权执行此操作，请确认账号和权限。"
+            case 404: return "这项内容已不可用，请刷新后重试。"
+            case 409: return "内容已发生变化，请刷新后重试。"
+            case 429: return "操作太频繁，请稍后重试。"
+            case 400, 422: return "这些内容暂时无法提交，请检查输入后重试。"
+            case 500...599: return "服务暂时不可用，请稍后重试。"
+            default: return "请求未能完成，请稍后重试。"
+            }
+        case .transport: return "网络连接未能完成，请检查网络后重试。"
+        case .decoding: return "暂时无法读取返回内容，请稍后重试。"
         }
     }
 }
@@ -203,7 +213,10 @@ actor APIClient {
             // 仅对带鉴权的请求触发全局登出（登录/造 token 等 authorized=false 的 401 是凭据问题，不应登出）。
             if authorized {
                 netLog.error("❌ #\(id, privacy: .public) 401 \(method, privacy: .public) \(endpoint, privacy: .public) · ⏱\(ms, privacy: .public)ms · 登录失效")
-                onUnauthorized?()
+                let currentAuthorization = tokenProvider?().map { "Bearer \($0)" }
+                if req.value(forHTTPHeaderField: "Authorization") == currentAuthorization {
+                    onUnauthorized?()
+                }
                 throw APIError.unauthorized
             }
             netLog.error("❌ #\(id, privacy: .public) 401 \(method, privacy: .public) \(endpoint, privacy: .public) · ⏱\(ms, privacy: .public)ms")

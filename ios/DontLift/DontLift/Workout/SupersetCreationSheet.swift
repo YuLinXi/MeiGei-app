@@ -55,9 +55,11 @@ struct SupersetCreationSheet: View {
     let title: String
     let initial: SupersetCreationResult?
     let historyPrefill: ((ExercisePick?, ExercisePick?) -> SupersetCreationPrefill?)?
-    let onSave: (SupersetCreationResult) -> Void
+    let onSave: (SupersetCreationResult) throws -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var firstPick: ExercisePick?
     @State private var secondPick: ExercisePick?
     @State private var firstMemberId: UUID?
@@ -73,11 +75,12 @@ struct SupersetCreationSheet: View {
     @State private var manuallyEditedFields = Set<InputField>()
     @State private var note: String
     @State private var editingNote = false
+    @State private var saveError: String?
 
     init(title: String = "创建超级组",
          initial: SupersetCreationResult? = nil,
          historyPrefill: ((ExercisePick?, ExercisePick?) -> SupersetCreationPrefill?)? = nil,
-         onSave: @escaping (SupersetCreationResult) -> Void) {
+         onSave: @escaping (SupersetCreationResult) throws -> Void) {
         self.title = title
         self.initial = initial
         self.historyPrefill = historyPrefill
@@ -101,33 +104,49 @@ struct SupersetCreationSheet: View {
                 cancelTitle: "取消",
                 confirmTitle: "完成",
                 confirmEnabled: canSave,
+                topPadding: dynamicTypeSize.isAccessibilitySize && focusedField != nil ? 4 : 16,
                 background: Theme.Color.bg,
                 onCancel: { dismiss() },
                 onConfirm: save
             )
+            LocalSaveErrorLabel(message: saveError)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    memberEditor(slot: .first,
-                                 title: "动作 1",
-                                 pick: firstPick,
-                                 weightField: .firstWeight,
-                                 repsField: .firstReps)
-                    memberEditor(slot: .second,
-                                 title: "动作 2",
-                                 pick: secondPick,
-                                 weightField: .secondWeight,
-                                 repsField: .secondReps)
-                    roundEditor
-                    noteEditor
-                    Color.clear.frame(height: 18)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                        memberEditor(slot: .first,
+                                     title: "动作 1",
+                                     pick: firstPick,
+                                     weightField: .firstWeight,
+                                     repsField: .firstReps)
+                        memberEditor(slot: .second,
+                                     title: "动作 2",
+                                     pick: secondPick,
+                                     weightField: .secondWeight,
+                                     repsField: .secondReps)
+                        roundEditor
+                        noteEditor
+                        Color.clear.frame(height: 18)
+                    }
+                    .padding(Theme.Spacing.lg)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                .padding(Theme.Spacing.lg)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .background(Theme.Color.bg)
+                .background {
+                    if reduceMotion {
+                        NumericFormViewportObserver {
+                            guard let field = focusedField else { return }
+                            proxy.scrollTo(field, anchor: .center)
+                        }
+                    }
+                }
+                .onChange(of: focusedField) { _, field in
+                    guard let field else { return }
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
+                        proxy.scrollTo(field, anchor: .center)
+                    }
+                }
             }
-            .background(Theme.Color.bg)
-        }
-        .safeAreaInset(edge: .bottom) {
             if let focusedField {
                 NumericFormKeypad(decimalEnabled: focusedField.decimalEnabled,
                                   onDigit: keypadDigit,
@@ -191,20 +210,21 @@ struct SupersetCreationSheet: View {
                 HStack(spacing: 10) {
                     Image(systemName: "note.text")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(note.isEmpty ? Theme.Color.muted : Theme.Color.accent)
+                        .foregroundStyle(note.isEmpty ? Theme.Color.muted : Theme.Color.action)
                     Text(note.isEmpty ? "添加备注" : note)
                         .font(Theme.Font.body(size: 13, weight: .semibold))
                         .foregroundStyle(note.isEmpty ? Theme.Color.muted : Theme.Color.fg)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize >= .xxLarge ? nil : 2)
                         .truncationMode(.tail)
                         .multilineTextAlignment(.leading)
                     Spacer(minLength: 0)
                     Image(systemName: note.isEmpty ? "plus.circle" : "square.and.pencil")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(note.isEmpty ? Theme.Color.accent : Theme.Color.muted)
+                        .foregroundStyle(note.isEmpty ? Theme.Color.action : Theme.Color.muted)
                 }
                 .padding(.horizontal, 12)
-                .frame(minHeight: 42)
+                .padding(.vertical, 8)
+                .frame(minHeight: 44)
                 .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
@@ -236,18 +256,19 @@ struct SupersetCreationSheet: View {
                 HStack(spacing: Theme.Spacing.md) {
                     Image(systemName: "figure.strengthtraining.traditional")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Theme.Color.accent)
+                        .foregroundStyle(Theme.Color.action)
                         .frame(width: 24)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(pick?.name ?? "选择动作")
                             .font(Theme.Font.body(size: 15, weight: .bold))
                             .foregroundStyle(pick == nil ? Theme.Color.muted : Theme.Color.fg)
-                            .lineLimit(1)
+                            .lineLimit(dynamicTypeSize >= .xxLarge ? nil : 1)
+                            .fixedSize(horizontal: false, vertical: true)
                         if let pick {
                             Text([pick.primaryMuscle, pick.equipmentType].compactMap { $0 }.joined(separator: " · "))
                                 .font(Theme.Font.body(size: 12))
                                 .foregroundStyle(Theme.Color.fg2)
-                                .lineLimit(1)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     Spacer(minLength: 0)
@@ -259,12 +280,15 @@ struct SupersetCreationSheet: View {
             }
             .buttonStyle(.plain)
 
-            HStack(spacing: 8) {
+            let layout = dynamicTypeSize >= .xxLarge
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(spacing: 8))
+            layout {
                 valueField(title: "重量", placeholder: "kg", field: weightField)
-                Text("×")
+                if dynamicTypeSize < .xxLarge { Text("×")
                     .font(Theme.Font.mono(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.Color.muted)
-                    .padding(.top, 18)
+                    .padding(.top, 18) }
                 valueField(title: "次数", placeholder: "次", field: repsField)
             }
         }
@@ -299,13 +323,16 @@ struct SupersetCreationSheet: View {
             Text(text.isEmpty ? placeholder : text)
                 .font(Theme.Font.number(size: fontSize, weight: .bold))
                 .foregroundStyle(text.isEmpty ? Theme.Color.muted : Theme.Color.fg)
+                .fixedSize()
                 .frame(maxWidth: .infinity)
-                .frame(height: height)
+                .padding(.vertical, 8)
+                .frame(minHeight: max(44, height))
                 .background(Theme.Color.surface, in: shape)
                 .overlay(shape.stroke(isFocused ? Theme.Color.accent : Theme.Color.border,
                                       lineWidth: isFocused ? 1.7 : 1))
         }
         .buttonStyle(.plain)
+        .id(field)
         .accessibilityLabel(inputAccessibilityLabel(for: field))
         .accessibilityValue(text.isEmpty ? "未填写" : text)
     }
@@ -461,8 +488,13 @@ struct SupersetCreationSheet: View {
                           reps: supersetIntValue(secondReps)),
             note: PlanNoteEditorSheet.normalize(note)
         )
-        onSave(result)
-        dismiss()
+        do {
+            try onSave(result)
+            saveError = nil
+            dismiss()
+        } catch {
+            saveError = (error as? PlanEditingError)?.errorDescription ?? "保存失败，当前输入仍保留，请重试"
+        }
     }
 }
 

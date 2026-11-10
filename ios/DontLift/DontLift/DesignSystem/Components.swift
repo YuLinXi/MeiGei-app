@@ -15,11 +15,13 @@ struct CircleIconLabel: View {
     var body: some View {
         Image(systemName: systemName)
             .font(.system(size: size * 0.42, weight: .semibold))
-            .foregroundStyle(active ? Theme.Color.accent : Theme.Color.fg)
+            .foregroundStyle(active ? Theme.Color.action : Theme.Color.fg)
             .rotationEffect(.degrees(rotated ? 90 : 0))
             .frame(width: size, height: size)
             .background(active ? Theme.Color.accentSoft : Theme.Color.surface, in: Circle())
             .overlay(Circle().stroke(active ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
+            .frame(width: max(44, size), height: max(44, size))
+            .contentShape(Rectangle())
     }
 }
 
@@ -29,6 +31,7 @@ struct CircleIconButton: View {
     var size: CGFloat = 36
     var active: Bool = false
     var rotated: Bool = false
+    var accessibilityLabel: String? = nil
     let action: () -> Void
 
     var body: some View {
@@ -36,6 +39,19 @@ struct CircleIconButton: View {
             CircleIconLabel(systemName: systemName, size: size, active: active, rotated: rotated)
         }
         .buttonStyle(PressableButtonStyle())
+        .accessibilityLabel(accessibilityLabel ?? defaultAccessibilityLabel)
+    }
+
+    private var defaultAccessibilityLabel: String {
+        switch systemName {
+        case "chevron.left": return "返回"
+        case "chevron.right": return "下一页"
+        case "chevron.down": return "收起"
+        case "xmark": return "关闭"
+        case "calendar": return "日历"
+        case "ellipsis": return "更多操作"
+        default: return systemName
+        }
     }
 }
 
@@ -134,7 +150,6 @@ struct PaperActionMenuButton<Label: View>: View {
                                    anchorFrame: anchorFrame,
                                    items: items,
                                    placement: placement)
-                .ignoresSafeArea()
                 .presentationBackground(.clear)
                 .interactiveDismissDisabled()
         }
@@ -150,10 +165,11 @@ private struct PaperActionMenuOverlay: View {
     let placement: PaperActionMenuPlacement
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var shown = false
+    @State private var contentHeight: CGFloat = 0
 
     private let menuWidth: CGFloat = 232
-    private let rowHeight: CGFloat = PaperActionMenuMetrics.rowHeight
     private let edgePadding: CGFloat = 12
     /// 统一浮层锚定规范：菜单卡片与触发圆钮保持 8pt 垂直间距。
     private let anchorGap: CGFloat = 8
@@ -161,28 +177,50 @@ private struct PaperActionMenuOverlay: View {
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
-            let safe = proxy.safeAreaInsets
-            let width = min(menuWidth, max(0, size.width - safe.leading - safe.trailing - edgePadding * 2))
-            let height = rowHeight * CGFloat(items.count) + CGFloat(max(0, items.count - 1))
-            let origin = menuOrigin(container: size, safeArea: safe, menuSize: CGSize(width: width, height: height))
+            let availableWidth = max(0, size.width - edgePadding * 2)
+            let width = dynamicTypeSize.isAccessibilitySize ? availableWidth : min(menuWidth, availableWidth)
+            let initialHeight = PaperActionMenuMetrics.rowHeight * CGFloat(items.count)
+            let height = min(contentHeight > 0 ? contentHeight : initialHeight,
+                             max(0, size.height - edgePadding * 2))
+            let containerOrigin = proxy.frame(in: .global).origin
+            let localAnchor = anchorFrame.offsetBy(dx: -containerOrigin.x, dy: -containerOrigin.y)
+            let origin = menuOrigin(container: size, anchor: localAnchor, menuSize: CGSize(width: width, height: height))
 
             ZStack(alignment: .topLeading) {
                 Theme.Color.fg.opacity(0.001)
                     .ignoresSafeArea()
                     .onTapGesture { close() }
+                    .accessibilityLabel("关闭菜单")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { close() }
 
-                PaperActionMenuCard(items: items) { item in
-                    close(after: item.action)
+                ScrollView {
+                    PaperActionMenuCard(items: items) { item in
+                        close(after: item.action)
+                    }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                        contentHeight = $0
+                    }
                 }
-                .frame(width: width)
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(width: width, height: height)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                        .stroke(Theme.Color.border, lineWidth: 1)
+                }
+                .paperShadow(.md, cornerRadius: Theme.Radius.lg)
+                .accessibilityIdentifier("paper.actionMenu")
                 .offset(x: origin.x, y: origin.y)
-                .opacity(shown ? 1 : 0)
+                .opacity(shown && contentHeight > 0 ? 1 : 0)
                 .scaleEffect(reduceMotion ? 1 : (shown ? 1 : 0.98), anchor: .topTrailing)
                 .offset(y: reduceMotion ? 0 : (shown ? 0 : -4))
             }
             .onAppear {
                 withAnimation(animation) { shown = true }
             }
+            .accessibilityAction(.escape) { close() }
         }
         .background(Color.clear.ignoresSafeArea())
     }
@@ -199,16 +237,16 @@ private struct PaperActionMenuOverlay: View {
         }
     }
 
-    private func menuOrigin(container: CGSize, safeArea: EdgeInsets, menuSize: CGSize) -> CGPoint {
-        let minX = safeArea.leading + edgePadding
-        let maxX = container.width - safeArea.trailing - edgePadding - menuSize.width
-        let proposedX = anchorFrame.maxX - menuSize.width
+    private func menuOrigin(container: CGSize, anchor: CGRect, menuSize: CGSize) -> CGPoint {
+        let minX = edgePadding
+        let maxX = container.width - edgePadding - menuSize.width
+        let proposedX = anchor.maxX - menuSize.width
         let x = min(max(proposedX, minX), max(minX, maxX))
 
-        let minY = safeArea.top + edgePadding
-        let maxY = container.height - safeArea.bottom - edgePadding - menuSize.height
-        let belowY = anchorFrame.maxY + anchorGap
-        let aboveY = anchorFrame.minY - anchorGap - menuSize.height
+        let minY = edgePadding
+        let maxY = container.height - edgePadding - menuSize.height
+        let belowY = anchor.maxY + anchorGap
+        let aboveY = anchor.minY - anchorGap - menuSize.height
         let proposedY: CGFloat
         switch placement {
         case .automatic:
@@ -243,12 +281,6 @@ private struct PaperActionMenuCard: View {
                 }
             }
         }
-        .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
-                .stroke(Theme.Color.border, lineWidth: 1)
-        )
-        .paperShadow(.md, cornerRadius: Theme.Radius.lg)
     }
 }
 
@@ -260,7 +292,7 @@ private enum PaperActionMenuMetrics {
     static let iconFrameWidth: CGFloat = 20
     static let dividerLeading: CGFloat = horizontalPadding + iconFrameWidth + itemSpacing
 
-    static var titleFont: Font {
+    static var titleFont: Theme.Font.Token {
         Theme.Font.body(size: 14, weight: .semibold)
     }
 }
@@ -279,11 +311,11 @@ private struct PaperActionMenuRow: View {
                 Text(item.title)
                     .font(PaperActionMenuMetrics.titleFont)
                     .foregroundStyle(textColor)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
-            .frame(height: PaperActionMenuMetrics.rowHeight)
+            .padding(.vertical, 14)
+            .frame(minHeight: PaperActionMenuMetrics.rowHeight)
             .padding(.horizontal, PaperActionMenuMetrics.horizontalPadding)
             .contentShape(Rectangle())
         }
@@ -299,7 +331,7 @@ private struct PaperActionMenuRow: View {
 
     private var iconColor: Color {
         guard item.isEnabled else { return Theme.Color.muted }
-        return item.role == .destructive ? Theme.Color.danger : Theme.Color.accent
+        return item.role == .destructive ? Theme.Color.danger : Theme.Color.action
     }
 }
 
@@ -373,8 +405,7 @@ extension View {
     ) -> some View {
         self
             .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(true)
-            // 隐藏系统返回钮会连带禁用左边缘侧滑返回手势；在此单一收口处恢复，全 push 子页通吃。
+            // 以纸感 leading 控件替换返回项，保留系统返回语义。
             .background(SwipeBackEnabler())
             .toolbar {
                 PaperToolbarContent(title: title, leading: leading, trailing: trailing)
@@ -400,20 +431,25 @@ extension View {
 
 /// `interactivePopGestureRecognizer` 的接管 delegate（全局单例，长生命周期）。
 /// `interactivePopGestureRecognizer.delegate` 为 weak，必须由长生命引用持有，否则手势行为回退。
-/// 本工程是「全局唯一 NavigationStack 包 TabView」，全栈共享同一 `UINavigationController`，
-/// 故单例持有其 weak 引用即可；`shouldBegin` 只依赖运行时 `viewControllers.count`，不缓存栈状态。
+/// 每次从手势所属视图寻找导航栈，避免 sheet 内的 NavigationStack 覆盖外层栈引用。
 final class SwipeBackGestureDelegate: NSObject, UIGestureRecognizerDelegate {
     static let shared = SwipeBackGestureDelegate()
-    weak var navigationController: UINavigationController?
 
     /// 根页保护：仅当栈深 > 1 时允许侧滑开始，避免 Tab 根页误触发 pop。
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        (navigationController?.viewControllers.count ?? 0) > 1
+        var responder: UIResponder? = gestureRecognizer.view
+        while let current = responder {
+            if let navigation = current as? UINavigationController {
+                return navigation.viewControllers.count > 1
+            }
+            responder = current.next
+        }
+        return false
     }
 
-    /// 允许与页面内部横滑控件（ScrollView / List / Swift Charts）并存——边缘手势仅占最左 ~20pt，互不抢占。
+    /// 边缘返回优先判定，避免同一次拖动结束后再触发页面按钮或列表行操作。
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
-                           shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+                           shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
         true
     }
 }
@@ -427,6 +463,9 @@ struct SwipeBackEnabler: UIViewControllerRepresentable {
 }
 
 final class SwipeBackProbeController: UIViewController {
+    private weak var observedNavigationItem: UINavigationItem?
+    private var navigationItemObservation: NSKeyValueObservation?
+
     override func loadView() {
         // 透明且不参与命中测试，纯探针，绝不覆盖或拦截页面内容。
         let v = UIView()
@@ -440,20 +479,43 @@ final class SwipeBackProbeController: UIViewController {
         installSwipeBackGesture()
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        installSwipeBackGesture()
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         installSwipeBackGesture()
     }
 
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        navigationItemObservation?.invalidate()
+        navigationItemObservation = nil
+        observedNavigationItem = nil
+    }
+
     private func installSwipeBackGesture() {
         // 首帧 navigationController 可能尚为 nil，async 兜底竞态。
         DispatchQueue.main.async { [weak self] in
-            guard let nav = self?.navigationController else { return }
-            SwipeBackGestureDelegate.shared.navigationController = nav
+            guard let self, let nav = navigationController else { return }
+            if let item = parent?.navigationItem, observedNavigationItem !== item {
+                navigationItemObservation?.invalidate()
+                observedNavigationItem = item
+                // SwiftUI 重新配置工具栏时，保持纸感 leading 替换而非补充系统返回项。
+                navigationItemObservation = item.observe(\.leftItemsSupplementBackButton,
+                                                         options: [.initial, .new]) { item, _ in
+                    MainActor.assumeIsolated {
+                        if item.leftItemsSupplementBackButton { item.leftItemsSupplementBackButton = false }
+                    }
+                }
+            }
             nav.interactivePopGestureRecognizer?.delegate = SwipeBackGestureDelegate.shared
             nav.interactivePopGestureRecognizer?.isEnabled = true
         }
     }
+
 }
 
 // MARK: - 圆形「添加」按钮（主操作，accent 朱砂红 + 白底 + border + sm 阴影，42×42）
@@ -465,7 +527,7 @@ struct CircleAddLabel: View {
     var body: some View {
         Image(systemName: "plus")
             .font(.system(size: 20, weight: .semibold))
-            .foregroundStyle(Theme.Color.accent)
+            .foregroundStyle(Theme.Color.action)
             .frame(width: 42, height: 42)
             .background(active ? Theme.Color.accentSoft : Theme.Color.surface, in: Circle())
             .overlay(Circle().stroke(active ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
@@ -514,10 +576,10 @@ struct PaperSheetTitleHeader: View {
         Text(title)
             .font(Theme.Font.display(size: 21, weight: .heavy))
             .foregroundStyle(Theme.Color.fg)
-            .lineLimit(1)
-            .minimumScaleFactor(0.82)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity)
-            .frame(height: PaperSheetHeaderActionButton.height)
+            .frame(minHeight: PaperSheetHeaderActionButton.height)
             .padding(.horizontal, 18)
             .padding(.top, topPadding)
             .padding(.bottom, bottomPadding)
@@ -550,34 +612,30 @@ struct PaperSheetHeader: View {
                 PaperSheetHandle()
             }
 
-            ZStack {
-                Text(title)
-                    .font(Theme.Font.body(size: 17, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg)
-                    .lineLimit(1)
-                    .padding(.horizontal, 96)
-
-                HStack {
-                    if let cancelTitle, let onCancel {
-                        PaperSheetHeaderActionButton(title: cancelTitle, role: .cancel, action: onCancel)
-                    } else {
-                        PaperSheetHeaderActionButton.placeholder
-                    }
-
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    cancelAction(wrapping: false)
                     Spacer(minLength: 0)
-
-                    if let confirmTitle, let onConfirm {
-                        PaperSheetHeaderActionButton(
-                            title: confirmTitle,
-                            role: .confirm,
-                            enabled: confirmEnabled,
-                            action: onConfirm
-                        )
-                    } else {
-                        PaperSheetHeaderActionButton.placeholder
+                    headerTitle.fixedSize()
+                    Spacer(minLength: 0)
+                    confirmAction(wrapping: false)
+                }
+                VStack(spacing: Theme.Spacing.sm) {
+                    headerTitle
+                        .fixedSize(horizontal: false, vertical: true)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            cancelAction(wrapping: false)
+                            confirmAction(wrapping: false)
+                        }
+                        VStack(spacing: Theme.Spacing.sm) {
+                            cancelAction(wrapping: true)
+                            confirmAction(wrapping: true)
+                        }
                     }
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 18)
             .padding(.top, showsHandle ? 0 : topPadding)
             .padding(.bottom, bottomPadding)
@@ -585,6 +643,32 @@ struct PaperSheetHeader: View {
         .background(background)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.border).frame(height: 1)
+        }
+    }
+
+    private var headerTitle: some View {
+        Text(title)
+            .font(Theme.Font.body(size: 17, weight: .bold))
+            .foregroundStyle(Theme.Color.fg)
+            .multilineTextAlignment(.center)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    @ViewBuilder private func cancelAction(wrapping: Bool) -> some View {
+        if let cancelTitle, let onCancel {
+            PaperSheetHeaderActionButton(title: cancelTitle, role: .cancel,
+                                         allowsWrapping: wrapping, action: onCancel)
+        } else if !wrapping {
+            PaperSheetHeaderActionButton.placeholder
+        }
+    }
+
+    @ViewBuilder private func confirmAction(wrapping: Bool) -> some View {
+        if let confirmTitle, let onConfirm {
+            PaperSheetHeaderActionButton(title: confirmTitle, role: .confirm, enabled: confirmEnabled,
+                                         allowsWrapping: wrapping, action: onConfirm)
+        } else if !wrapping {
+            PaperSheetHeaderActionButton.placeholder
         }
     }
 }
@@ -607,11 +691,12 @@ struct PaperSheetHeaderActionButton: View {
     }
 
     static let width: CGFloat = 74
-    static let height: CGFloat = 44
+    static let height: CGFloat = 48
 
     let title: String
     var role: Role
     var enabled: Bool = true
+    var allowsWrapping: Bool = true
     let action: () -> Void
 
     static var placeholder: some View {
@@ -623,7 +708,11 @@ struct PaperSheetHeaderActionButton: View {
             Text(title)
                 .font(Theme.Font.body(size: 15, weight: .bold))
                 .foregroundStyle(foreground)
-                .frame(width: Self.width, height: Self.height)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: !allowsWrapping, vertical: true)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .frame(minWidth: Self.width, minHeight: Self.height)
                 .background(backgroundFill, in: Capsule())
                 .overlay(Capsule().strokeBorder(border, lineWidth: 1))
         }
@@ -635,7 +724,7 @@ struct PaperSheetHeaderActionButton: View {
         guard enabled else { return Theme.Color.muted }
         switch role {
         case .cancel: return Theme.Color.fg2
-        case .confirm: return Theme.Color.accent
+        case .confirm: return Theme.Color.action
         }
     }
 
@@ -696,11 +785,16 @@ struct PaperStepper: View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Theme.Color.accent)
+                .foregroundStyle(Theme.Color.action)
                 .frame(width: 34, height: 34)
                 .overlay(Circle().stroke(Theme.Color.accentSofter, lineWidth: 1.5))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle())
+        .accessibilityLabel(icon == "minus" ? "减少" : "增加")
+        .accessibilityValue("\(value)")
+        .disabled(icon == "minus" ? value <= range.lowerBound : value >= range.upperBound)
     }
 }
 
@@ -712,7 +806,9 @@ extension View {
     /// - Parameters:
     ///   - secondaryTitle: 可选的次要动作（描边样式）。传入后按钮区改为「主（填充）/ 次（描边）」垂直堆叠。
     ///   - onSecondary: 次要动作回调。
-    ///   - showCancel: 是否渲染独立「取消」按钮；为 false 时仅靠点蒙层取消（如训练冲突弹窗）。
+    ///   - secondaryDestructive: 次要动作是否为破坏性操作。
+    ///   - showCancel: 是否渲染独立「取消」按钮；为 false 时仍可点蒙层取消。
+    ///   - onCancel: 取消时清理本次确认的暂存状态，不执行确认或次要动作。
     func paperConfirmDialog(
         isPresented: Binding<Bool>,
         title: String,
@@ -721,22 +817,38 @@ extension View {
         destructive: Bool = true,
         secondaryTitle: String? = nil,
         onSecondary: (() -> Void)? = nil,
+        secondaryDestructive: Bool = false,
         showCancel: Bool = true,
+        onCancel: (() -> Void)? = nil,
         onConfirm: @escaping () -> Void
     ) -> some View {
         fullScreenCover(isPresented: isPresented) {
             PaperConfirmDialog(isPresented: isPresented, title: title, message: message,
                                confirmTitle: confirmTitle, destructive: destructive,
                                secondaryTitle: secondaryTitle, onSecondary: onSecondary,
-                               showCancel: showCancel, onConfirm: onConfirm)
+                               secondaryDestructive: secondaryDestructive,
+                               showCancel: showCancel, onCancel: onCancel, onConfirm: onConfirm)
                 .presentationBackground(.clear)
         }
         // 关闭系统的下滑入场动画（仅在开关时生效，不影响其它动画）；改由内部 scrim/卡片淡入。
         .transaction(value: isPresented.wrappedValue) { $0.disablesAnimations = true }
     }
+
+    func activeWorkoutConflictDialog(isPresented: Binding<Bool>,
+                                     onContinue: @escaping () -> Void,
+                                     onDiscard: @escaping () -> Void,
+                                     onCancel: @escaping () -> Void) -> some View {
+        paperConfirmDialog(isPresented: isPresented,
+                           title: "已有进行中的训练",
+                           message: "继续现有训练可保留已记录的内容。丢弃后将开始新的训练。",
+                           confirmTitle: "继续训练", destructive: false,
+                           secondaryTitle: "丢弃并开始新训练", onSecondary: onDiscard,
+                           secondaryDestructive: true, onCancel: onCancel, onConfirm: onContinue)
+    }
 }
 
 struct PaperConfirmDialog: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var isPresented: Bool
     let title: String
     let message: String
@@ -744,7 +856,9 @@ struct PaperConfirmDialog: View {
     var destructive: Bool = true
     var secondaryTitle: String? = nil
     var onSecondary: (() -> Void)? = nil
+    var secondaryDestructive: Bool = false
     var showCancel: Bool = true
+    var onCancel: (() -> Void)? = nil
     let onConfirm: () -> Void
 
     /// 进出场都用淡入淡出（+ 轻微缩放）：fullScreenCover 自身瞬时呈现/移除，动画交给内部 `shown`。
@@ -755,17 +869,23 @@ struct PaperConfirmDialog: View {
         ZStack {
             Theme.Color.fg.opacity(shown ? 0.32 : 0)
                 .ignoresSafeArea()
-                .onTapGesture { close {} }
-            card
-                .scaleEffect(shown ? 1 : 0.94)
+                .onTapGesture { close { onCancel?() } }
+            ViewThatFits(in: .vertical) {
+                card.fixedSize(horizontal: false, vertical: true)
+                ScrollView { card }
+                    .scrollBounceBehavior(.basedOnSize)
+            }
+                .scaleEffect(reduceMotion ? 1 : (shown ? 1 : 0.94))
                 .opacity(shown ? 1 : 0)
         }
+        .accessibilityAction(.escape) { close { onCancel?() } }
         .onAppear { withAnimation(anim) { shown = true } }
     }
 
     /// 先淡出，再执行动作，最后移除 cover。
     /// 动作必须先于 `isPresented = false`，否则 optional 绑定会先清空待确认对象。
     private func close(_ action: @escaping () -> Void) {
+        guard shown else { return }
         withAnimation(anim) { shown = false } completion: {
             PaperConfirmDialogLifecycle.confirm(action: action) {
                 isPresented = false
@@ -779,10 +899,13 @@ struct PaperConfirmDialog: View {
                 Text(title)
                     .font(Theme.Font.display(size: 20, weight: .bold))
                     .foregroundStyle(Theme.Color.fg)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(message)
                     .font(Theme.Font.l4)
                     .foregroundStyle(Theme.Color.muted)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             buttons
         }
@@ -814,31 +937,47 @@ struct PaperConfirmDialog: View {
             Text(title)
                 .font(Theme.Font.l2)
                 .foregroundStyle(.white)
-                .frame(maxWidth: .infinity).frame(height: 50)
-                .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .frame(minHeight: 50)
+                .background(Theme.Color.action, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .contentShape(Rectangle())
         }.buttonStyle(PressableButtonStyle())
     }
 
     /// 白底 + 描边 + 深字（次要操作）。
     private func outlinedButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button(role: secondaryDestructive ? .destructive : nil, action: action) {
             Text(title)
                 .font(Theme.Font.l2)
-                .foregroundStyle(Theme.Color.fg)
-                .frame(maxWidth: .infinity).frame(height: 50)
+                .foregroundStyle(secondaryDestructive ? Theme.Color.danger : Theme.Color.fg)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .frame(minHeight: 50)
                 .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.Color.border, lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .strokeBorder(secondaryDestructive ? Theme.Color.danger : Theme.Color.border, lineWidth: 1))
+                .contentShape(Rectangle())
         }.buttonStyle(PressableButtonStyle())
     }
 
     /// 暖底浅灰「取消」。
     private var cancelButton: some View {
-        Button { close {} } label: {
+        Button { close { onCancel?() } } label: {
             Text("取消")
                 .font(Theme.Font.l2)
                 .foregroundStyle(Theme.Color.fg)
-                .frame(maxWidth: .infinity).frame(height: 50)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .frame(minHeight: 50)
                 .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .contentShape(Rectangle())
         }.buttonStyle(PressableButtonStyle())
     }
 }

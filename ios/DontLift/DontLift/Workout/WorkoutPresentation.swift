@@ -40,6 +40,9 @@ struct WorkoutLiveOverlayContainer: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let activeSession: Workout?
+    let prefersCompactCapsule: Bool
+    let availableBounds: CGRect
+    let exclusionFrames: [CGRect]
 
     private var capsuleWorkout: Workout? {
         if let activeSession { return activeSession }
@@ -52,7 +55,9 @@ struct WorkoutLiveOverlayContainer: View {
             if let workout = capsuleWorkout, !presentation.isExpanded {
                 LiveSessionCapsule(title: workout.title ?? "训练",
                                    timerStartedAt: workout.timerStartedAt,
-                                   nextSetBrief: nextSetBrief(for: workout)) {
+                                   nextSetBrief: nextSetBrief(for: workout),
+                                   availableBounds: availableBounds, exclusionFrames: exclusionFrames,
+                                   prefersCompact: prefersCompactCapsule) {
                     presentation.present(workout)
                 }
                 .transition(capsuleTransition)

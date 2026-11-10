@@ -26,6 +26,12 @@
 - **WHEN** 用户点击登录页法律提示中的「服务条款」或「隐私政策」
 - **THEN** 经 `SFSafariViewController` 打开对应页面，且不中断登录流程
 
+#### Scenario: 用户首次启动
+- **WHEN** App 启动且 `SessionStore.isSignedIn == false`
+- **THEN** 渲染纸感 LoginView（纸白底、无赛博网格），点击Apple登录入口触发 `AuthService.signInWithApple()`。
+- **AND** 顶部为方形「M」标记和 `Theme.Font.mono` 小字「DONTLIFT · NO.0001」；中下部为「认真训练。/ 严肃记录。/ 仅此而已。」大标题（`fg`，允许单行accent点缀）和一行fg2副标
+- **AND** 底部原生 `SignInWithAppleButton` 使用黑底白字 `.black`、50pt高度及 `Theme.Radius.md`（13pt）圆角；其下用Mono小字提示「继续即表示同意 服务条款 与 隐私政策」
+
 ## ADDED Requirements
 
 ### Requirement: 手机号验证码登录页

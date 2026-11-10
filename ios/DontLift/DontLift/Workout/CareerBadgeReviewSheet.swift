@@ -10,6 +10,13 @@ struct CareerBadgeReviewSheet: View {
     let onDismiss: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var rowLayout: AnyLayout {
+        dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(spacing: 12))
+    }
 
     private var big3TotalText: String {
         guard let b = big3.bench, let s = big3.squat, let d = big3.deadlift else {
@@ -44,20 +51,24 @@ struct CareerBadgeReviewSheet: View {
                                 )
                             )
                             .padding(.top, 8)
+                            .accessibilityHidden(true)
 
                         Text("力量生涯成就回顾")
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(Color.primary)
+                            .font(Theme.Font.display(size: 22, weight: .bold))
+                            .foregroundStyle(Theme.Color.fg)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 20)
 
                         Text("你的每一次向心收缩与流淌汗水，皆已被刻度量化")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color.secondary)
+                            .font(Theme.Font.body(size: 13, weight: .regular))
+                            .foregroundStyle(Theme.Color.muted)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 20)
                     }
 
                     // 2. 生涯核心数据卡片
-                    HStack(spacing: 12) {
+                    rowLayout {
                         statCell(
                             title: "累计总吨位",
                             value: formattedTonnage,
@@ -78,38 +89,36 @@ struct CareerBadgeReviewSheet: View {
 
                     // 3. 已点亮徽章橱窗
                     VStack(alignment: .leading, spacing: 14) {
-                        HStack {
+                        rowLayout {
                             Text("已为你点亮 \(grants.count) 枚荣誉勋章")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(Color.primary)
-                            Spacer()
+                                .font(Theme.Font.body(size: 15, weight: .bold))
+                                .foregroundStyle(Theme.Color.fg)
+                            if dynamicTypeSize < .xxLarge { Spacer() }
                             Text("一次性解锁")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color(hex: "E04328"))
+                                .font(Theme.Font.body(size: 12, weight: .regular, relativeTo: .caption))
+                                .foregroundStyle(Theme.Color.action)
                         }
                         .padding(.horizontal, 16)
 
                         LazyVGrid(
-                            columns: [
-                                GridItem(.flexible(), spacing: 12),
-                                GridItem(.flexible(), spacing: 12),
-                                GridItem(.flexible(), spacing: 12)
-                            ],
+                            columns: Array(repeating: GridItem(.flexible(), spacing: 12),
+                                           count: dynamicTypeSize.isAccessibilitySize ? 1 : (dynamicTypeSize >= .xxLarge ? 2 : 3)),
                             spacing: 14
                         ) {
                             ForEach(grants, id: \.badgeCode) { grant in
                                 if let def = grant.definition {
                                     VStack(spacing: 6) {
                                         BadgeIconView(definition: def, isUnlocked: true, size: .regular)
+                                            .accessibilityHidden(true)
 
                                         Text(def.name)
-                                            .font(.system(size: 13, weight: .bold))
-                                            .foregroundStyle(Color.primary)
-                                            .lineLimit(1)
+                                            .font(Theme.Font.body(size: 13, weight: .bold))
+                                            .foregroundStyle(Theme.Color.fg)
+                                            .fixedSize(horizontal: false, vertical: true)
 
                                         Text(def.category.displayName)
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(Color.secondary)
+                                            .font(Theme.Font.body(size: 10, weight: .regular, relativeTo: .caption))
+                                            .foregroundStyle(Theme.Color.muted)
                                     }
                                     .padding(.vertical, 10)
                                     .frame(maxWidth: .infinity)
@@ -136,13 +145,14 @@ struct CareerBadgeReviewSheet: View {
                 // 底部 CTA：全部收入我的徽章馆
                 Button(action: handleDismiss) {
                     Text("全部收入我的徽章馆")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(Theme.Font.body(size: 16, weight: .bold))
                         .foregroundStyle(Color.white)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 50)
+                        .padding(.vertical, 12)
+                        .frame(minHeight: 50)
                         .background(
                             RoundedRectangle(cornerRadius: 14)
-                                .fill(Color(hex: "E04328"))
+                                .fill(Theme.Color.action)
                         )
                         .shadow(color: Color(hex: "E04328").opacity(0.35), radius: 8, x: 0, y: 4)
                 }
@@ -156,10 +166,7 @@ struct CareerBadgeReviewSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: handleDismiss) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(Color.secondary)
-                    }
+                    CircleIconButton(systemName: "xmark", accessibilityLabel: "关闭生涯回顾", action: handleDismiss)
                 }
             }
         }
@@ -168,17 +175,17 @@ struct CareerBadgeReviewSheet: View {
     private func statCell(title: String, value: String, unit: String) -> some View {
         VStack(spacing: 4) {
             Text(title)
-                .font(.system(size: 11))
-                .foregroundStyle(Color.secondary)
+                .font(Theme.Font.body(size: 11, weight: .regular, relativeTo: .caption))
+                .foregroundStyle(Theme.Color.muted)
 
-            HStack(alignment: .lastTextBaseline, spacing: 2) {
+            rowLayout {
                 Text(value)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.primary)
+                    .font(Theme.Font.body(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(Theme.Color.fg)
                 if !unit.isEmpty {
                     Text(unit)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Color.secondary)
+                        .font(Theme.Font.body(size: 10, weight: .medium, relativeTo: .caption))
+                        .foregroundStyle(Theme.Color.muted)
                 }
             }
         }

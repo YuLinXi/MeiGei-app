@@ -6,6 +6,10 @@ import SwiftUI
 /// 键位：`0-9` · `.` · `⌫` · `上一项` · `下一项` · `加一组` + 右上角图标「收起」。
 /// 无「完成」键——组打卡仍由每行右侧勾选按钮承担，与键盘解耦。
 struct WorkoutKeypad: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .title3) private var digitLineHeight: CGFloat = 29
+    @ScaledMetric(relativeTo: .body) private var navigationLineHeight: CGFloat = 16
     /// 小数点是否可用：重量态 true、次数态 false（次数为整数，`.` 灰显无效）。
     var decimalEnabled: Bool
     var onDigit: (Int) -> Void
@@ -18,7 +22,10 @@ struct WorkoutKeypad: View {
     var onDismiss: () -> Void
 
     /// 单键高度；数字区 4 行、右侧导航列三等分对齐其总高。
-    private let keyH: CGFloat = 52
+    private var keyH: CGFloat {
+        let navigationHeight = navigationLineHeight * (dynamicTypeSize.isAccessibilitySize ? 2 : 1) + 34
+        return max(52, digitLineHeight + 12, (navigationHeight * 3 - gap) / 4)
+    }
     private let gap: CGFloat = 8
 
     private var gridHeight: CGFloat { keyH * 4 + gap * 3 }
@@ -34,7 +41,7 @@ struct WorkoutKeypad: View {
                     removal: .opacity.animation(.easeOut(duration: 0.12))))
             keypadPanel
                 // 面板整体上下滑 + 淡入淡出；曲线继承父视图 focused 动画（与 inset 收起、内容回流同步），不单独覆盖。
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
         }
     }
 
@@ -65,6 +72,8 @@ struct WorkoutKeypad: View {
                     .frame(width: 40, height: 30)
                     .background(Theme.Color.surface, in: keyShape)
                     .overlay(keyShape.stroke(Theme.Color.border, lineWidth: 1))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(KeyPressStyle())
             .accessibilityLabel("收起键盘")
@@ -99,7 +108,7 @@ struct WorkoutKeypad: View {
             navKey("下一项", systemImage: "chevron.down", action: onNext)
             navKey("加一组", systemImage: "plus", action: onAddSet)
         }
-        .frame(width: 92, height: gridHeight)
+        .frame(width: dynamicTypeSize.isAccessibilitySize ? 112 : 92, height: gridHeight)
     }
 
     // MARK: 键
@@ -107,7 +116,7 @@ struct WorkoutKeypad: View {
     private func digitKey(_ d: Int) -> some View {
         Button { onDigit(d) } label: {
             Text("\(d)")
-                .font(Theme.Font.number(size: 24, weight: .bold))
+                .font(Theme.Font.number(size: 24, weight: .bold, relativeTo: .title3))
                 .foregroundStyle(Theme.Color.fg)
                 .frame(maxWidth: .infinity).frame(height: keyH)
                 .background(Theme.Color.surface, in: keyShape)
@@ -120,7 +129,7 @@ struct WorkoutKeypad: View {
     private var dotKey: some View {
         Button { if decimalEnabled { onDot() } } label: {
             Text(".")
-                .font(Theme.Font.number(size: 24, weight: .bold))
+                .font(Theme.Font.number(size: 24, weight: .bold, relativeTo: .title3))
                 .foregroundStyle(decimalEnabled ? Theme.Color.fg : Theme.Color.muted.opacity(0.4))
                 .frame(maxWidth: .infinity).frame(height: keyH)
                 .background(Theme.Color.surface.opacity(decimalEnabled ? 1 : 0.5), in: keyShape)
@@ -149,8 +158,11 @@ struct WorkoutKeypad: View {
             VStack(spacing: 6) {
                 Image(systemName: systemImage).font(.system(size: 16, weight: .bold))
                 Text(title).font(Theme.Font.body(size: 13, weight: .semibold))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .foregroundStyle(Theme.Color.fg2)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.Color.surface, in: keyShape)
             .overlay(keyShape.stroke(Theme.Color.border, lineWidth: 1))
@@ -167,6 +179,10 @@ struct WorkoutKeypad: View {
 /// 表单数字键盘：用于计划/创建类表单中的重量、次数、组数输入。
 /// 复用训练键盘的数字区视觉，但右侧动作为「上一项 / 下一项 / 完成」，避免带入训练中的「加一组」语义。
 struct NumericFormKeypad: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .title3) private var digitLineHeight: CGFloat = 29
+    @ScaledMetric(relativeTo: .body) private var navigationLineHeight: CGFloat = 16
     var decimalEnabled: Bool
     var onDigit: (Int) -> Void
     var onDot: () -> Void
@@ -175,19 +191,24 @@ struct NumericFormKeypad: View {
     var onNext: () -> Void
     var onDone: () -> Void
 
-    private let keyH: CGFloat = 52
-    private let gap: CGFloat = 8
+    private var keyH: CGFloat {
+        let navigationHeight = navigationLineHeight * (dynamicTypeSize.isAccessibilitySize ? 2 : 1) + 34
+        return max(52, digitLineHeight + 12, (navigationHeight * 3 - gap) / 4)
+    }
+    private var gap: CGFloat { dynamicTypeSize.isAccessibilitySize ? 4 : 8 }
 
     private var gridHeight: CGFloat { keyH * 4 + gap * 3 }
 
     var body: some View {
         VStack(spacing: 8) {
-            dismissBar
-                .transition(.asymmetric(
-                    insertion: .opacity.animation(.easeOut(duration: 0.3)),
-                    removal: .opacity.animation(.easeOut(duration: 0.12))))
+            if !dynamicTypeSize.isAccessibilitySize {
+                dismissBar
+                    .transition(.asymmetric(
+                        insertion: .opacity.animation(.easeOut(duration: 0.3)),
+                        removal: .opacity.animation(.easeOut(duration: 0.12))))
+            }
             keypadPanel
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
         }
     }
 
@@ -197,8 +218,8 @@ struct NumericFormKeypad: View {
             navColumn
         }
         .padding(.horizontal, Theme.Spacing.md)
-        .padding(.top, 8)
-        .padding(.bottom, 6)
+        .padding(.top, dynamicTypeSize.isAccessibilitySize ? 4 : 8)
+        .padding(.bottom, dynamicTypeSize.isAccessibilitySize ? 2 : 6)
         .background(alignment: .top) {
             Theme.Color.bg
                 .overlay(Rectangle().fill(Theme.Color.border).frame(height: 1), alignment: .top)
@@ -216,6 +237,8 @@ struct NumericFormKeypad: View {
                     .frame(width: 40, height: 30)
                     .background(Theme.Color.surface, in: keyShape)
                     .overlay(keyShape.stroke(Theme.Color.border, lineWidth: 1))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(KeyPressStyle())
             .accessibilityLabel("收起键盘")
@@ -248,13 +271,13 @@ struct NumericFormKeypad: View {
             navKey("下一项", systemImage: "chevron.down", action: onNext)
             navKey("完成", systemImage: "checkmark", action: onDone)
         }
-        .frame(width: 92, height: gridHeight)
+        .frame(width: dynamicTypeSize.isAccessibilitySize ? 112 : 92, height: gridHeight)
     }
 
     private func digitKey(_ d: Int) -> some View {
         Button { onDigit(d) } label: {
             Text("\(d)")
-                .font(Theme.Font.number(size: 24, weight: .bold))
+                .font(Theme.Font.number(size: 24, weight: .bold, relativeTo: .title3))
                 .foregroundStyle(Theme.Color.fg)
                 .frame(maxWidth: .infinity).frame(height: keyH)
                 .background(Theme.Color.surface, in: keyShape)
@@ -267,7 +290,7 @@ struct NumericFormKeypad: View {
     private var dotKey: some View {
         Button { if decimalEnabled { onDot() } } label: {
             Text(".")
-                .font(Theme.Font.number(size: 24, weight: .bold))
+                .font(Theme.Font.number(size: 24, weight: .bold, relativeTo: .title3))
                 .foregroundStyle(decimalEnabled ? Theme.Color.fg : Theme.Color.muted.opacity(0.4))
                 .frame(maxWidth: .infinity).frame(height: keyH)
                 .background(Theme.Color.surface.opacity(decimalEnabled ? 1 : 0.5), in: keyShape)
@@ -296,8 +319,11 @@ struct NumericFormKeypad: View {
             VStack(spacing: 6) {
                 Image(systemName: systemImage).font(.system(size: 16, weight: .bold))
                 Text(title).font(Theme.Font.body(size: 13, weight: .semibold))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .foregroundStyle(Theme.Color.fg2)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.Color.surface, in: keyShape)
             .overlay(keyShape.stroke(Theme.Color.border, lineWidth: 1))
@@ -313,6 +339,7 @@ struct NumericFormKeypad: View {
 
 /// 纯数字键盘：用于组间休息自定义秒数，只保留 0-9 和删除。
 struct CompactNumberKeypad: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var onDigit: (Int) -> Void
     var onBackspace: () -> Void
 
@@ -348,7 +375,7 @@ struct CompactNumberKeypad: View {
                 .overlay(Rectangle().fill(Theme.Color.border).frame(height: 1), alignment: .top)
                 .ignoresSafeArea(edges: .bottom)
         }
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
     }
 
     private func digitKey(_ d: Int) -> some View {
@@ -382,10 +409,25 @@ struct CompactNumberKeypad: View {
 
 /// 键按压反馈：按下时轻微缩放 + 降透明。
 private struct KeyPressStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.94 : 1))
             .opacity(configuration.isPressed ? 0.7 : 1)
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+/// 数字表单的可用高度变化后校正焦点，避免依赖入场动画完成的时机。
+struct NumericFormViewportObserver: View {
+    let onResize: () -> Void
+
+    var body: some View {
+        Color.clear
+            .onGeometryChange(for: CGSize.self) { geometry in
+                CGSize(width: geometry.size.width,
+                       height: max(0, geometry.size.height - geometry.safeAreaInsets.top - geometry.safeAreaInsets.bottom))
+            } action: { _ in onResize() }
     }
 }

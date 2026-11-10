@@ -124,19 +124,15 @@ App SHALL 加载 JetBrains Mono 字体用于所有等宽数字展示（训练量
 
 ### Requirement: 统一圆形图标按钮
 
-设计系统 SHALL 提供唯一的圆形图标按钮组件 `CircleIconButton`，作为所有 Header / 导航栏中「返回 / 更多操作 / 次级图标动作」的单一来源；视图代码 MUST NOT 在页面内本地复制等价实现（如自绘 `navCircle`、自绘 Menu 圆形 label）。
-
-- 默认直径 SHALL 为 36pt（导航类圆钮与主操作钮 `CircleAddButton` 直径对齐）。
-- 图标字号 SHALL 由组件按统一规则从直径推导，MUST NOT 在调用点硬编码图标字号；同一直径下所有圆钮的图标视觉重量一致。
-- 外观为白底（`Theme.Color.surface`）+ 1pt `Theme.Color.border` 描边 + 圆形，按压走 `PressableButtonStyle`。
-- SHALL 支持 `active` 高亮态（选中/展开时用 `Theme.Color.accent` 前景 + `Theme.Color.accentSoft` 底 + `Theme.Color.accentSofter` 描边）与 `rotated` 旋转态（如 `...` 展开时旋转 90°）。
-- SHALL 提供动作菜单入口：以同一外观 label 触发 `PaperActionMenu`，确保「点击触发」与「弹出菜单」两类圆钮视觉完全一致；该动作菜单入口 MUST NOT 继续包装 SwiftUI `Menu`。
+设计系统 SHALL 提供唯一的圆形图标按钮组件 `CircleIconButton`，作为所有 Header / 导航栏中「返回 / 更多操作 / 次级图标动作」的单一来源。组件 SHALL 统一尺寸、图标推导、纸感外观及 active / rotated 状态，并提供同源 `PaperActionMenu` 入口；页面 MUST NOT 复制等价实现，菜单入口 MUST NOT 包装 SwiftUI `Menu`。
 
 #### Scenario: 子页接入返回按钮
 
 - **WHEN** 任一 push/sheet 子页需要返回按钮
 - **THEN** 使用 `CircleIconButton(systemName: "chevron.left", ...)`，直径 36pt，图标字号由组件推导，外观为纸感白底圆形
 - **AND** 不出现系统默认蓝色返回箭头
+- **AND** 默认直径与 `CircleAddButton` 对齐；同一直径下图标视觉重量一致，调用点不硬编码图标字号
+- **AND** 使用 `Theme.Color.surface` 白底、1pt `Theme.Color.border` 描边和 `PressableButtonStyle`
 
 #### Scenario: 更多操作菜单圆钮
 
@@ -144,6 +140,7 @@ App SHALL 加载 JetBrains Mono 字体用于所有等宽数字展示（训练量
 - **THEN** 使用圆形图标按钮的动作菜单入口，其外观与点击触发版完全一致
 - **AND** 菜单展开时圆钮进入 `active` + `rotated` 态
 - **AND** 弹出的菜单为项目自绘 `PaperActionMenu`，不是 SwiftUI `Menu`
+- **AND** active 态使用 `Theme.Color.accent` 前景、`accentSoft` 背景与 `accentSofter` 描边，`...` 展开时旋转90°
 
 #### Scenario: 禁止本地复制实现
 
@@ -153,28 +150,22 @@ App SHALL 加载 JetBrains Mono 字体用于所有等宽数字展示（训练量
 
 ### Requirement: 统一子页 Header 容器
 
-设计系统 SHALL 提供子页（push/sheet 二级及以上页面）的 Header 容器 `PaperNavBar`（或等价的 `.paperToolbar()` 修饰符），封装以下职责，使各子页以单一接入点获得一致的导航栏：
-
-- 隐藏系统默认返回按钮（`navigationBarBackButtonHidden(true)`）。
-- 在隐藏系统返回按钮的同时，SHALL 恢复 iOS 左边缘侧滑返回手势（`interactivePopGestureRecognizer`），使所有 push 子页可通过侧滑返回上一页，行为与点击纸感圆形返回钮等价（标准 pop + 原生跟手转场）；该恢复 MUST 收口在容器内部，受益子页 MUST NOT 逐页自行处理。
-- 侧滑返回的接管 MUST 做栈根页保护：仅当导航栈 `viewControllers.count > 1` 时允许手势开始，避免在 Tab 根页误触发 pop。
-- 在 iOS 26+ 对工具栏按钮施加 `sharedBackgroundVisibility(.hidden)`，消除 Liquid Glass 自动圆形背景与纸感圆钮叠成的「双环」；低于 iOS 26 走等价无背景分支。
-- 提供左（返回）/ 中（标题）/ 右（操作）三槽位；左、右槽位默认承载 `CircleIconButton`。
-- 标题 SHALL 使用单一字体 token（取代既有系统 inline / `body(15,heavy)` / `display(30)` 等并存写法），居中、单行截断。
-
-所有 push/sheet 子页的标题栏 MUST 经由该容器实现；MUST NOT 直接散用裸 `.toolbar { … }` + 手搓圆钮 + 逐 `ToolbarItem` 打 `sharedBackgroundVisibility` 补丁的旧写法。Tab 根页（训练 / 计划 / 动作 / Team / 我的）的自绘大标题范式不受此要求约束——其中「我的」(`ProfileView`) 作为 Tab 根页（无返回箭头）SHALL 归入自绘大标题范式（`display(36, heavy)`），不走 `.paperToolbar()`。侧滑返回手势仅作用于 push 出的子页，`fullScreenCover` / `sheet` 模态页不在此手势范围（其退出语义为下滑 dismiss）。
+设计系统 SHALL 以 `PaperNavBar` 或等价 `.paperToolbar()` 统一所有 push/sheet 子页的 Header、返回手势与系统背景兼容。容器 SHALL 提供左返回、中标题、右操作三槽位，左右默认使用 `CircleIconButton`；标题使用单一字体 token、居中且单行截断。页面 MUST NOT 散用裸 toolbar、自绘圆钮或逐项背景补丁。五个 Tab 根页继续使用自绘大标题，不接入子页容器；边缘返回仅作用于 push 子页。
 
 #### Scenario: 子页统一接入
 
 - **WHEN** `WorkoutDetailView` / `PlanDetailView` / `TeamDetailView` / `ExerciseDetailView` / `TeamPlansView`（push/sheet 子页）渲染顶部标题栏
 - **THEN** 均经由 `.paperToolbar()` 接入，标题字体一致、返回/操作钮均为 36pt 纸感圆钮
 - **AND** 不再各自处理 `navigationBarBackButtonHidden` 与 iOS 26 双环补丁
+- **AND** 容器统一设置 `navigationBarBackButtonHidden(true)`；标题不再混用系统 inline、`body(15,heavy)` 与 `display(30)`
 
 #### Scenario: push 子页支持侧滑返回
 
 - **WHEN** 用户在任一经 `.paperToolbar()` 接入的 push 子页（`PlanDetailView` / `PlanEditorView` / `WorkoutLoggingView` / `WorkoutDetailView` / `TeamDetailView` / `TeamPlansView` / `ExerciseDetailView`）从屏幕左边缘向右侧滑
 - **THEN** 触发标准 pop 返回上一页，带原生跟手转场动画，效果与点击纸感圆形返回钮一致
 - **AND** 该行为由 `.paperToolbar()` 容器统一提供，无需子页各自实现
+- **AND** 容器恢复 `interactivePopGestureRecognizer`；`fullScreenCover` / `sheet` 模态页不接管此手势，继续使用下滑 dismiss 语义
+- **AND** 仅当导航栈 `viewControllers.count > 1` 时允许边缘返回手势开始
 
 #### Scenario: Tab 根页不被误触发返回
 
@@ -191,6 +182,7 @@ App SHALL 加载 JetBrains Mono 字体用于所有等宽数字展示（训练量
 
 - **WHEN** 在 iOS 26+ 设备上进入任一接入了 `PaperNavBar` 的子页
 - **THEN** Header 圆钮仅显示纸感白底圆形一层背景，不出现系统 Liquid Glass 叠加的第二层圆环
+- **AND** 容器对工具栏按钮使用 `sharedBackgroundVisibility(.hidden)`；低于iOS 26走等价无背景分支
 
 #### Scenario: 子页标题字体统一
 
@@ -199,19 +191,7 @@ App SHALL 加载 JetBrains Mono 字体用于所有等宽数字展示（训练量
 
 ### Requirement: 统一纸感动作菜单
 
-设计系统 SHALL 提供统一纸感动作菜单组件，用于呈现轻量动作入口（例如顶部 `+`、Header `...`、分组 `...`）。本组件 MUST 使用项目自绘浮层，不得依赖 SwiftUI `Menu`、`.confirmationDialog` 或系统 action sheet 作为主要呈现方式。
-
-菜单组件 MUST 支持：
-
-- 由圆形 `+` 或圆形 `...` 触发。
-- 菜单项标题、SF Symbol 图标、普通/危险角色、禁用态与动作回调。
-- 展开时触发按钮进入 active 态；`...` 触发按钮可进入 rotated 态。
-- 点菜单外区域关闭；选择菜单项后关闭菜单并执行对应动作。
-- 根据触发按钮位置锚定弹出：默认右边缘对齐、显示在触发按钮下方，卡片顶部与触发圆钮底部保持 8pt 垂直间距，并在靠近屏幕边缘时保持菜单完整可见。
-- 使用 `Theme.Color.surface`、`Theme.Color.border`、`Theme.Radius.lg`、`Theme.Font.*`、`paperShadow` 与 `PressableButtonStyle` 等现有纸感 token。
-- 在系统开启 Reduce Motion 时禁用缩放/位移动效，退化为淡入淡出。
-
-本 change 覆盖范围内的动作菜单入口 MUST 使用该组件，包括计划列表顶部 `+`、计划列表分组 `...`、计划详情 `...`、Team 列表顶部 `+`。二次确认弹窗和错误提示不属于本组件职责。
+设计系统 SHALL 提供统一纸感动作菜单，支持圆形 `+` / `...` 触发、菜单项状态与回调、锚定避让、关闭及减弱动态效果。组件 MUST 使用自绘浮层，不以 SwiftUI `Menu`、`.confirmationDialog` 或系统 action sheet 为主要呈现。计划列表顶部/分组、计划详情与Team列表的对应入口 MUST 接入；二次确认和错误提示不属于菜单职责。
 
 #### Scenario: 顶部添加菜单使用纸感组件
 
@@ -219,6 +199,8 @@ App SHALL 加载 JetBrains Mono 字体用于所有等宽数字展示（训练量
 - **THEN** 系统 SHALL 显示纸感动作菜单
 - **AND** 菜单使用项目自绘白底卡片、描边、圆角和阴影
 - **AND** 不显示 SwiftUI `Menu` 的系统弹层样式
+- **AND** 组件使用 `Theme.Color.surface`、`Theme.Color.border`、`Theme.Radius.lg`、`Theme.Font.*`、`paperShadow` 与 `PressableButtonStyle`
+- **AND** 触发按钮进入 active 态，`...` 触发按钮支持 rotated 态
 
 #### Scenario: 分组更多菜单使用纸感组件
 
@@ -226,6 +208,7 @@ App SHALL 加载 JetBrains Mono 字体用于所有等宽数字展示（训练量
 - **THEN** 系统 SHALL 显示纸感动作菜单
 - **AND** 菜单 SHALL 提供该分组可用操作，例如新建计划、调整计划顺序、重命名分组、删除分组
 - **AND** 危险操作 SHALL 使用危险角色视觉或明确的危险文案
+- **AND** 菜单项支持标题、SF Symbol、普通/危险角色、禁用态和动作回调
 
 #### Scenario: 选择菜单项后关闭菜单
 

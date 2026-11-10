@@ -16,6 +16,8 @@ extension Theme {
 
         // 强调色（纸感极简：朱砂红单点强调，PR 与 CTA 共用）
         static let accent        = SwiftUI.Color("accent")
+        /// 用于操作文字及白字按钮的深朱砂，原 accent 保留品牌装饰用途。
+        static let action        = SwiftUI.Color("action")
         /// 8% 朱砂红浅底（LIVE 横幅 / 选中浅底）。
         static let accentSoft    = SwiftUI.Color("accentSoft")
         /// 18% 朱砂红浅边。

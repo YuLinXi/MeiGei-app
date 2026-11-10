@@ -28,6 +28,8 @@ xcrun simctl list devices available
 
 优先选择已启动且兼容的设备，将其 UDID 设置到 `DONTLIFT_SIMULATOR_ID`；如果没有，选一个现有设备启动一次。后续所有测试复用这个 UDID，不按设备名称反复选择或新建设备。
 
+iPad 的全屏与窄窗口分别验收。窗口化模式下，设备已横放不代表 App 窗口也已横向；全屏横屏用例先确认实际窗口宽大于高，保留不满足前置条件的失败记录。横屏和多窗口的视觉证据使用 `XCUIScreen.main.screenshot()`，同时记录 App／窗口尺寸，避免 App 局部截图坐标裁切造成误判。系统窗口操作见 [Apple 窗口使用指南](https://support.apple.com/guide/ipad/work-with-multiple-windows-at-the-same-time-ipad08c9970c/ipados)。
+
 例如，休息策略改动只运行对应测试类（先将变量值替换为实际 UDID）：
 
 ```bash
@@ -51,12 +53,25 @@ xcodebuild test -project ios/DontLift/DontLift.xcodeproj -scheme DontLift \
 
 需要多个相关类或方法时，在同一条命令添加多个 `-only-testing`，减少重复构建和启动。使用 XcodeBuildMCP 时也保持相同 UDID、筛选范围和串行参数，不在 CLI 验证通过后再用 MCP 重跑同一检查。
 
+UI 测试复用固定的运行器 Bundle ID。每批测试结束、结果与日志已落盘且没有运行中任务后，及时卸载本批用完的临时 `DontLiftUITests-Runner`，避免测试图标堆积；保留主 App、日常训练库、模拟器设备及验证结果。排查旧测试包缓存时核对实际运行镜像，不通过持续新增运行器 Bundle ID 规避。
+
+本项目标准运行器的清理命令如下。测试失败时也要在测试进程结束后执行；自动化脚本应保留原测试退出码和清理结果，不能因清理成功将失败报告为通过。
+
+```bash
+xcrun simctl uninstall "$DONTLIFT_SIMULATOR_ID" com.yulinxi.app.DontLiftUITests.xctrunner
+```
+
+2026-11-09 在本地 iOS17.4 长 UI 用例中抓到 `XCTAutomationSupport.runtime_issue_os_log_fault_callback` 在日志高流量隔离时调用 `strcmp` 空地址。该堆栈位于测试注入框架，定位结论及验证边界见[专项收口记录](ui-ux-release-readiness-plan-2026-11-07.md#验证结论)；原始临时日志已按用户要求清理。当时只在临时 `xctestrun` 的 `UITargetAppEnvironmentVariables` 设置 `OS_ACTIVITY_MODE=disable`，已核对实际目标进程环境，再对原流程复验；不修改正式 App 配置或 Xcode 全局偏好，不以测试日志减少证明运行警告已清零。未来出现同类退出应先核对堆栈，不能凭“App 不在运行”直接套用此配置。
+
 变更影响广泛、发布候选或明确要求全量回归时，才使用主 scheme 执行完整测试。测试可能启动或重启宿主 App，这是 XCTest 的运行机制；无需为此开关模拟器。完整测试结束也要核对实际执行、失败与跳过数量，尤其注意筛选未命中和依赖缺失导致的跳过。
 
 ## 现有测试能证明什么
 
 - `DontLiftTests` 在 `project.pbxproj` 配置了 `TEST_HOST`，包含业务模型、持久化、同步等单元/集成测试。它们需要 App 宿主，但通常不操作 UI。
+- SwiftData 关系图的计算用例使用 `WorkoutTestStore` 管理隔离内存数据；不要依赖裸模型在不同系统上的关系行为。保存失败和编辑保留用例直接控制 context，通过 `WorkoutSession.start` 建立已保存训练，再模拟未保存编辑；`processPendingChanges()` 在自动保存开启时可能写盘，不能作为“保存前”的证据。
+- App 的明确保存使用 `LocalModelSave.save(context)`，界面缓存订阅 `LocalModelSave.didSave`；该同步函数沿用调用方context的执行器，仅在可靠保存后发布事件。框架自动保存保持原行为，数据库fixture的原始`context.save()`不能替代产品保存事件验证。
 - `DontLiftUITests` 有训练结束、排序弹窗等实际交互断言；许多用例通过启动参数注入本地测试数据，不能自动证明登录、真实后端和跨设备同步的全链路。
+- SwiftUI 合成控件的文本 AX 框可能与父 Button 相同，不能用框的长宽比证明文字已显示或保持单行；文字换行与裁切仍需核对实际渲染截图。
 - `testExample` 仅启动 App；`DontLiftUITestsLaunchTests` 主要截图；`testLaunchPerformance` 和 `testColdRestoreTenTimes` 会反复启动 App。这些不是每次功能开发的默认验收，应按启动、性能或恢复场景选择。
 - 真 Apple 登录、APNs 投递、Watch 展示、HealthKit 和签名相关能力需按受影响路径真机验收。`simctl push` 仅模拟客户端收到推送，不验证服务端到 APNs 的投递链路。
 

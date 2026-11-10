@@ -181,6 +181,12 @@ final class RestTimerController {
         return completionEvent
     }
 
+    /// 提交前只计算结算值；保存失败时计时、通知与待消费事件仍按原状态继续。
+    func previewCompletionForWorkoutFinish() -> CompletionEvent? {
+        guard let endDate else { return completionEvent }
+        return makeCompletionEvent(now: endDate) ?? completionEvent
+    }
+
     /// App 回到前台时兜底收束后台到点的休息。后台通知已负责提示音，这里不再补播。
     func handleAppBecameActive(now: Date = .now) {
         guard let endDate else {
@@ -263,15 +269,19 @@ final class RestTimerController {
     }
 
     private func recordCompletion(now: Date) {
-        guard let setId = activeSetId, let startedAt else { return }
+        if let event = makeCompletionEvent(now: now) { completionEvent = event }
+    }
+
+    private func makeCompletionEvent(now: Date) -> CompletionEvent? {
+        guard let setId = activeSetId, let startedAt else { return nil }
         let plannedEndDate = endDate ?? now
         let completedAt = min(now, plannedEndDate)
         let elapsed = max(0, min(totalDuration, completedAt.timeIntervalSince(startedAt)))
-        completionEvent = CompletionEvent(setId: setId,
-                                          elapsedSeconds: Int(elapsed.rounded()),
-                                          startedAt: startedAt,
-                                          completedAt: completedAt,
-                                          plannedEndDate: plannedEndDate)
+        return CompletionEvent(setId: setId,
+                               elapsedSeconds: Int(elapsed.rounded()),
+                               startedAt: startedAt,
+                               completedAt: completedAt,
+                               plannedEndDate: plannedEndDate)
     }
 
     /// 前台播放一声休息结束提醒音：`AVAudioSession.playback` + duck，无视静音键、瞬时压低背景音乐。

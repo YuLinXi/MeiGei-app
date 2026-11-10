@@ -32,8 +32,8 @@ enum SyncDomain: String, CaseIterable {
         }
     }
 
-    static func resetAllWatermarks() {
-        allCases.forEach { $0.since = nil }
+    static func resetAllWatermarks(in defaults: UserDefaults = .standard) {
+        allCases.forEach { $0.setWatermark(nil, in: defaults) }
     }
 
     /// 增量水位只对产生它的本地库有效；新库／重建库必须先全量拉取，不能沿用偏好中的旧水位。

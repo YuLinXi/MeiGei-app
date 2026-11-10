@@ -4,8 +4,10 @@ import Testing
 
 @MainActor
 struct SupersetTrainingUnitTests {
-    @Test func appendSingleExerciseDoesNotDuplicateLegacyDerivedUnit() {
-        let workout = Workout(title: "训练")
+    private let testStore = WorkoutTestStore()
+
+    @Test func appendSingleExerciseDoesNotDuplicateLegacyDerivedUnit() throws {
+        let workout = try testStore.insert(Workout(title: "训练"))
         let exercise = workoutExercise(name: "杠铃卧推", orderIndex: 0)
         workout.exercises = [exercise]
 
@@ -24,8 +26,8 @@ struct SupersetTrainingUnitTests {
         #expect(Workout.decodeUnits(json).isEmpty)
     }
 
-    @Test func invalidSupersetUnitsFallBackToSingleExerciseUnits() {
-        let workout = Workout(title: "旧训练")
+    @Test func invalidSupersetUnitsFallBackToSingleExerciseUnits() throws {
+        let workout = try testStore.insert(Workout(title: "旧训练"))
         let first = workoutExercise(name: "夹胸", orderIndex: 0)
         let second = workoutExercise(name: "下斜卧推", orderIndex: 1)
         let third = workoutExercise(name: "划船", orderIndex: 2)
@@ -95,7 +97,7 @@ struct SupersetTrainingUnitTests {
             ]
         )
 
-        let workout = PlanWorkoutBuilder.workout(title: "胸背", items: [item], mode: .adaptive, lookup: .empty)
+        let workout = try testStore.insert(PlanWorkoutBuilder.workout(title: "胸背", items: [item], mode: .adaptive, lookup: .empty))
         let unit = try #require(workout.trainingUnits.first)
         let superset = try #require(unit.superset)
         let first = try #require(workout.exercises.sorted { $0.orderIndex < $1.orderIndex }.first)
@@ -126,7 +128,7 @@ struct SupersetTrainingUnitTests {
             ]
         )
 
-        let workout = PlanWorkoutBuilder.workout(title: "胸", items: [item], mode: .strict, lookup: .empty)
+        let workout = try testStore.insert(PlanWorkoutBuilder.workout(title: "胸", items: [item], mode: .strict, lookup: .empty))
         let unit = try #require(workout.trainingUnits.first)
         let exercise = try #require(workout.exercises.first)
         let set = try #require(exercise.sets.first)
@@ -143,7 +145,7 @@ struct SupersetTrainingUnitTests {
     }
 
     @Test func statsTeamSummaryPosterAndPRExpandSupersetMembers() throws {
-        let workout = supersetWorkout(rounds: 4)
+        let workout = try supersetWorkout(rounds: 4)
         let first = try #require(workout.exercises.first { $0.exerciseName == "夹胸" })
         let second = try #require(workout.exercises.first { $0.exerciseName == "下斜卧推" })
 
@@ -191,7 +193,7 @@ struct SupersetTrainingUnitTests {
                 planMember(id: secondMemberId, name: "下斜卧推", orderIndex: 1, weight: 30, reps: 12)
             ]
         )
-        let workout = PlanWorkoutBuilder.workout(title: "胸背", items: [item], mode: .adaptive, lookup: .empty)
+        let workout = try testStore.insert(PlanWorkoutBuilder.workout(title: "胸背", items: [item], mode: .adaptive, lookup: .empty))
         workout.endedAt = workout.startedAt.addingTimeInterval(3600)
         for exercise in workout.exercises {
             for set in exercise.sets { set.completed = true }
@@ -224,7 +226,7 @@ struct SupersetTrainingUnitTests {
         #expect(members.map(\.suggestedReps) == [Int?](arrayLiteral: 8, 14))
     }
 
-    @Test func temporarySupersetIsNotWrittenBackAsPlanStructure() {
+    @Test func temporarySupersetIsNotWrittenBackAsPlanStructure() throws {
         let sourceItemId = UUID()
         let sourceItem = PlanItem(itemId: sourceItemId,
                                   exerciseName: "杠铃卧推",
@@ -232,7 +234,7 @@ struct SupersetTrainingUnitTests {
                                   suggestedSets: 1,
                                   suggestedReps: 5,
                                   suggestedWeightKg: 80)
-        let workout = Workout(planId: UUID(), title: "计划训练")
+        let workout = try testStore.insert(Workout(planId: UUID(), title: "计划训练"))
         let sourceExercise = workoutExercise(name: "杠铃卧推", orderIndex: 0, planItemId: sourceItemId)
         sourceExercise.sets = [WorkoutSet(setIndex: 0, weightKg: 80, reps: 5, completed: true)]
         workout.exercises = [sourceExercise]
@@ -256,7 +258,7 @@ struct SupersetTrainingUnitTests {
     }
 
     @Test func planTemplateItemsPreserveCompletedSupersetStructure() throws {
-        let workout = supersetWorkout(rounds: 3)
+        let workout = try supersetWorkout(rounds: 3)
 
         let items = workout.planTemplateItems()
         let item = try #require(items.first)
@@ -271,7 +273,7 @@ struct SupersetTrainingUnitTests {
     @Test func planTemplateItemsKeepUnifiedSupersetSummaryWhenRoundsDiffer() throws {
         // 历史另存沿用现有超级组规则：每个成员只取最大重量记录及其次数，不生成逐轮安排。
         let startedAt = Date(timeIntervalSince1970: 1_800_000_000)
-        let workout = Workout(planId: UUID(), title: "背臂", startedAt: startedAt, timerStartedAt: startedAt)
+        let workout = try testStore.insert(Workout(planId: UUID(), title: "背臂", startedAt: startedAt, timerStartedAt: startedAt))
         let first = workoutExercise(name: "下拉", orderIndex: 0)
         first.sets = [
             WorkoutSet(setIndex: 0, weightKg: 30, reps: 12, completed: true, setType: .working),
@@ -305,7 +307,7 @@ struct SupersetTrainingUnitTests {
         #expect(item.setPrescriptions == nil)
 
         // 从该计划启动仍按成员统一值落到每一轮。
-        let restarted = PlanWorkoutBuilder.workout(title: "背臂", items: items, mode: .adaptive, lookup: .empty)
+        let restarted = try testStore.insert(PlanWorkoutBuilder.workout(title: "背臂", items: items, mode: .adaptive, lookup: .empty))
         let restartedFirst = try #require(restarted.exercises.first { $0.exerciseName == "下拉" })
         let restartedSecond = try #require(restarted.exercises.first { $0.exerciseName == "弯举" })
         #expect(restartedFirst.sets.map(\.weightKg) == [Double?](repeating: 35, count: 3))
@@ -360,9 +362,9 @@ struct SupersetTrainingUnitTests {
         #expect(prescription.segments.map(\.reps) == [8, 6])
     }
 
-    private func supersetWorkout(rounds: Int) -> Workout {
+    private func supersetWorkout(rounds: Int) throws -> Workout {
         let startedAt = Date(timeIntervalSince1970: 1_800_000_000)
-        let workout = Workout(title: "胸背", startedAt: startedAt, timerStartedAt: startedAt)
+        let workout = try testStore.insert(Workout(title: "胸背", startedAt: startedAt, timerStartedAt: startedAt))
         let first = workoutExercise(name: "夹胸", orderIndex: 0)
         first.sets = completedSets(rounds: rounds, weight: 60, reps: 12)
         let second = workoutExercise(name: "下斜卧推", orderIndex: 1)

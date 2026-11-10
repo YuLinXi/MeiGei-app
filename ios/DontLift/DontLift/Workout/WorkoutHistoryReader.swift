@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// 后台 reader 连续提取持久化字段；只有这些 Sendable 值可以离开执行器。
+/// 持久化字段分批复制为值；只有这些 Sendable 快照可以进入后台聚合。
 nonisolated struct HistoryExerciseIdentity: Hashable, Sendable {
     var code: String?
     var name: String
@@ -184,14 +184,18 @@ nonisolated struct HistoryWorkout: Sendable {
     }
 }
 
-@ModelActor
 actor WorkoutHistoryReader {
-    func read() throws -> [HistoryWorkout] {
-        assert(!Thread.isMainThread)
-        return try WorkoutPerformanceMonitor.measure("history.read.values") {
-            let descriptor = FetchDescriptor<Workout>(predicate: #Predicate { $0.deletedAt == nil },
-                                                       sortBy: [SortDescriptor(\.startedAt, order: .reverse)])
-            return try modelContext.fetch(descriptor).map(HistoryWorkout.init)
+    let modelContainer: ModelContainer
+
+    init(modelContainer: ModelContainer) {
+        self.modelContainer = modelContainer
+    }
+
+    func read() async throws -> [HistoryWorkout] {
+        try await WorkoutPerformanceMonitor.measureAsync("history.read.values") {
+            try await WorkoutSnapshotCapture.read(from: modelContainer, completedOnly: false, order: .reverse) {
+                HistoryWorkout($0)
+            }
         }
     }
 }

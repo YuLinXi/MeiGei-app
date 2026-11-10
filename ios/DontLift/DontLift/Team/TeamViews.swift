@@ -9,13 +9,16 @@ private let uiLog = Logger(subsystem: "com.yulinxi.app.DontLift", category: "Tea
 
 struct TeamListView: View {
     @Environment(TeamService.self) private var teamService
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var creating = false
     @State private var joining = false
     /// Team 详情导航：用绑定式 navigationDestination(item:) 而非 NavigationLink(value:)。
     /// 本工程是「全局唯一 NavigationStack 包 TabView」，类型注册式 navigationDestination(for:)
     /// 从 TabView 子页注册不进外层 stack，value 链接点了不跳；绑定式可靠（与训练 tab 一致）。
     @State private var selectedTeam: TeamDTO?
-    @State private var error: String?
+    @State private var loadError: String?
+    @State private var hasLoadedTeams = false
     @State private var actionToast: String?   // 退出/解散返回后的黑底结果 toast
     @State private var isReloading = false
 
@@ -26,9 +29,20 @@ struct TeamListView: View {
                 ScrollView {
                     // 原型 scroll 直接铺团队卡（无「我的 Team」分组标签），下拉刷新走系统 refreshable。
                     LazyVStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                        if teamService.teams.isEmpty {
+                        // 缓存刷新沿用系统下拉指示，避免插入进度行重排内容并取消刷新任务。
+                        if loadError != nil {
+                            loadFailure
+                        } else if !hasLoadedTeams && teamService.teams.isEmpty {
+                            ProgressView("正在加载 Team…")
+                                .font(Theme.Font.l4)
+                                .tint(Theme.Color.action)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, Theme.Spacing.lg)
+                                .accessibilityIdentifier("team.list.loading")
+                        }
+                        if teamService.teams.isEmpty && hasLoadedTeams {
                             emptyState
-                        } else {
+                        } else if !teamService.teams.isEmpty {
                             ForEach(teamService.teams) { team in
                                 Button { selectedTeam = team } label: {
                                     teamCard(team)
@@ -41,10 +55,11 @@ struct TeamListView: View {
                     .padding(.horizontal, Theme.Spacing.lg)
                     .padding(.top, Theme.Spacing.md)
                 }
+                .accessibilityIdentifier("team.list.scroll")
             }
         }
         .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
-            if !teamService.teams.isEmpty {
+            if !teamService.teams.isEmpty || !hasLoadedTeams {
                 floatingAddMenu
             }
         }
@@ -64,9 +79,30 @@ struct TeamListView: View {
         .onReceive(NotificationCenter.default.publisher(for: .dontliftTeamNudgeOpened)) { notification in
             Task { await openTeamFromNudge(notification) }
         }
-        .alert("出错了", isPresented: .constant(error != nil)) {
-            Button("好") { error = nil }
-        } message: { Text(error ?? "") }
+    }
+
+    private var loadFailure: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text(hasLoadedTeams || !teamService.teams.isEmpty ? "刷新失败，已保留原列表" : "未能加载 Team")
+                .font(Theme.Font.body(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.Color.fg)
+            Text(loadError ?? "请稍后重试。")
+                .font(Theme.Font.l4)
+                .foregroundStyle(Theme.Color.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            Button { Task { await reload() } } label: {
+                Text("重试加载 Team")
+                    .font(Theme.Font.l3)
+                    .foregroundStyle(Theme.Color.action)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("team.list.retry")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, Theme.Spacing.sm)
     }
 
     // 退出/解散成功后返回列表顶部的黑底 toast（朱砂红勾选圆点 + 队名文案）。
@@ -90,7 +126,7 @@ struct TeamListView: View {
             .paperShadow(.lg, cornerRadius: Theme.Radius.md)
             .padding(.horizontal, 14)
             .padding(.top, 8)
-            .transition(.move(edge: .top).combined(with: .opacity))
+            .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
         }
     }
 
@@ -110,6 +146,7 @@ struct TeamListView: View {
     private var floatingAddMenu: some View {
         CircleAddMenu(items: teamHeaderMenuItems, accessibilityLabel: "创建或加入 Team")
             .frame(width: 48, height: 48)
+            .workoutOverlayObstacle()
             .padding(.trailing, Theme.Spacing.lg)
             .padding(.top, Theme.Spacing.sm)
             .padding(.bottom, Theme.Spacing.md)
@@ -126,11 +163,12 @@ struct TeamListView: View {
     private func teamCard(_ team: TeamDTO) -> some View {
         HStack(spacing: 12) {
             Text(String(team.name.prefix(1)))
-                .font(Theme.Font.display(size: 15, weight: .heavy))
-                .foregroundStyle(Theme.Color.accent)
+                .font(.system(size: 15, weight: .heavy))
+                .foregroundStyle(Theme.Color.action)
                 .frame(width: 44, height: 44)
                 .background(Theme.Color.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.Color.accentSofter, lineWidth: 1))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(team.name)
                     .font(Theme.Font.body(size: 15, weight: .bold))
@@ -152,6 +190,16 @@ struct TeamListView: View {
     // 原型空态（引导重设计）：虚化队友动态预览 → 价值三点 → 创建 / 加入双 CTA。
     // 用 containerRelativeFrame 撑满一屏，Spacer 把 CTA 压到底部（margin-top:auto 等效）。
     private var emptyState: some View {
+        Group {
+            if dynamicTypeSize >= .xxLarge {
+                emptyContent
+            } else {
+                emptyContent.containerRelativeFrame(.vertical) { length, _ in length - 48 }
+            }
+        }
+    }
+
+    private var emptyContent: some View {
         VStack(spacing: 0) {
             previewStack
                 .padding(.top, Theme.Spacing.sm)
@@ -178,7 +226,6 @@ struct TeamListView: View {
             emptyCTAs
         }
         .frame(maxWidth: .infinity)
-        .containerRelativeFrame(.vertical) { length, _ in length - 48 }
     }
 
     // 视觉引导区：2 张虚化背卡 + 1 张清晰前卡 + 朱砂红人群徽记（纯装饰，不请求数据）。
@@ -201,6 +248,8 @@ struct TeamListView: View {
                 .offset(y: -40)
         }
         .frame(height: 138)
+        .dynamicTypeSize(.large)
+        .accessibilityHidden(true)
     }
 
     private func ghostFeedCard(initial: String, reactions: [String]) -> some View {
@@ -237,7 +286,7 @@ struct TeamListView: View {
     private var groupEmblem: some View {
         Image(systemName: "person.2")
             .font(.system(size: 23, weight: .semibold))
-            .foregroundStyle(Theme.Color.accent)
+            .foregroundStyle(Theme.Color.action)
             .frame(width: 58, height: 58)
             .background(Theme.Color.surface, in: Circle())
             .overlay(Circle().stroke(Theme.Color.accentSofter, lineWidth: 1.6))
@@ -263,7 +312,7 @@ struct TeamListView: View {
         HStack(alignment: .top, spacing: 13) {
             Image(systemName: icon)
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Theme.Color.accent)
+                .foregroundStyle(Theme.Color.action)
                 .frame(width: 38, height: 38)
                 .background(Theme.Color.accentSoft, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(Theme.Color.accentSofter, lineWidth: 1))
@@ -291,8 +340,9 @@ struct TeamListView: View {
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 46)
-                .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .padding(.vertical, 12)
+                .frame(minHeight: 46)
+                .background(Theme.Color.action, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                 .shadow(color: Theme.Color.accent.opacity(0.4), radius: 12, x: 0, y: 6)
             }
             .buttonStyle(PressableButtonStyle())
@@ -307,7 +357,8 @@ struct TeamListView: View {
                         .foregroundStyle(Theme.Color.fg)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 46)
+                .padding(.vertical, 12)
+                .frame(minHeight: 46)
                 .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).stroke(Theme.Color.border2, lineWidth: 1))
                 .paperShadow(.sm, cornerRadius: Theme.Radius.md)
@@ -325,11 +376,15 @@ struct TeamListView: View {
     private func reload() async {
         guard !isReloading else { return }
         isReloading = true
+        loadError = nil
         defer { isReloading = false }
-        do { try await teamService.loadMyTeams() }
+        do {
+            try await teamService.loadMyTeams()
+            hasLoadedTeams = true
+        }
         catch {
             guard !error.isCancellationError else { return }
-            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            loadError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
 
@@ -358,6 +413,7 @@ struct TeamListView: View {
 struct CreateTeamSheet: View {
     @Environment(TeamService.self) private var teamService
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var name = ""
     @State private var busy = false
     @State private var error: String?
@@ -373,27 +429,38 @@ struct CreateTeamSheet: View {
                          confirmEnabled: canSubmit,
                          onCancel: { dismiss() },
                          onConfirm: { Task { await submit() } })
-            VStack(alignment: .leading, spacing: 0) {
-                TeamSheetLabel("队名").padding(.bottom, 8)
-                // 纸感输入框（内联以放大字号；paperField 固定 l2 无法覆盖）
-                TextField("周三力量小队", text: $name)
-                    .focused($focused)
-                    .font(Theme.Font.body(size: 17))
-                    .foregroundStyle(Theme.Color.fg)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 13)
-                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
-                TeamSheetHint(error ?? "建队后自动生成邀请码，分享给训练搭子", isError: error != nil)
-                    .padding(.top, 7)
-                TeamSheetCTA(title: "创建 Team", enabled: canSubmit) { Task { await submit() } }
+            if dynamicTypeSize >= .xxLarge {
+                ScrollView { fields }.scrollDismissesKeyboard(.interactively)
+            } else {
+                fields
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 16)
-            .padding(.bottom, 24)
         }
         .fittedTeamSheet()
         .onAppear { focused = true }
+    }
+
+    private var fields: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TeamSheetLabel("队名").padding(.bottom, 8)
+            TextField("周三力量小队", text: $name, prompt: Text("周三力量小队").foregroundColor(Theme.Color.muted))
+                .focused($focused)
+                .font(Theme.Font.body(size: 17))
+                .foregroundStyle(Theme.Color.fg)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 13)
+                .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
+                .accessibilityLabel("队名")
+                .submitLabel(.done)
+                .onSubmit { focused = false }
+            TeamSheetHint(error ?? "建队后自动生成邀请码，分享给训练搭子", isError: error != nil)
+                .padding(.top, 7)
+            TeamDefaultSharingNotice().padding(.top, 12)
+            TeamSheetCTA(title: "创建 Team", enabled: canSubmit) { Task { await submit() } }
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 16)
+        .padding(.bottom, 24)
     }
 
     private func submit() async {
@@ -410,6 +477,7 @@ struct CreateTeamSheet: View {
 struct JoinTeamSheet: View {
     @Environment(TeamService.self) private var teamService
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var code = ""
     @State private var busy = false
     @State private var error: String?
@@ -424,18 +492,27 @@ struct JoinTeamSheet: View {
                          confirmEnabled: canSubmit,
                          onCancel: { dismiss() },
                          onConfirm: { Task { await submit() } })
-            VStack(alignment: .leading, spacing: 0) {
-                TeamSheetLabel("邀请码").padding(.bottom, 8)
-                SegmentedCodeField(code: $code, length: Self.codeLength)
-                TeamSheetHint(error ?? "向队友要 6 位邀请码，输入自动转大写", isError: error != nil)
-                    .padding(.top, 7)
-                TeamSheetCTA(title: "加入 Team", enabled: canSubmit) { Task { await submit() } }
+            if dynamicTypeSize >= .xxLarge {
+                ScrollView { fields }.scrollDismissesKeyboard(.interactively)
+            } else {
+                fields
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 16)
-            .padding(.bottom, 24)
         }
         .fittedTeamSheet()
+    }
+
+    private var fields: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TeamSheetLabel("邀请码").padding(.bottom, 8)
+            SegmentedCodeField(code: $code, length: Self.codeLength)
+            TeamSheetHint(error ?? "向队友要 6 位邀请码，输入自动转大写", isError: error != nil)
+                .padding(.top, 7)
+            TeamDefaultSharingNotice().padding(.top, 12)
+            TeamSheetCTA(title: "加入 Team", enabled: canSubmit) { Task { await submit() } }
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 16)
+        .padding(.bottom, 24)
     }
 
     private func submit() async {
@@ -453,6 +530,7 @@ struct JoinTeamSheet: View {
 
 /// 内容自适应底部 sheet：按内容实际高度设 detent（贴合内容、CTA 紧贴 sheet 底），顶部圆角 26、白底。
 private struct FittedTeamSheet: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var height: CGFloat = 360
     func body(content: Content) -> some View {
         content
@@ -463,7 +541,7 @@ private struct FittedTeamSheet: ViewModifier {
                         .onChange(of: proxy.size.height) { _, h in height = h }
                 }
             }
-            .presentationDetents([.height(height)])
+            .presentationDetents(dynamicTypeSize >= .xxLarge ? [.large] : [.height(height)])
             .presentationCornerRadius(26)
             .presentationBackground(Theme.Color.surface)
     }
@@ -521,6 +599,16 @@ private struct TeamSheetHint: View {
     }
 }
 
+private struct TeamDefaultSharingNotice: View {
+    var body: some View {
+        Text("创建或加入后，分享动态和 Team 消息默认开启。完成的训练会分享到此 Team，可在 Team 内关闭；关闭不会撤回已有分享。")
+            .font(Theme.Font.body(size: 12))
+            .foregroundStyle(Theme.Color.muted)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("team.defaultSharing.notice")
+    }
+}
+
 /// 底部全宽 CTA：on=accent 白字 + 朱砂红投影；off=暖底 muted + border。l2 15px / 700。
 private struct TeamSheetCTA: View {
     let title: String
@@ -533,7 +621,7 @@ private struct TeamSheetCTA: View {
                 .foregroundStyle(enabled ? .white : Theme.Color.muted)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(enabled ? Theme.Color.accent : Theme.Color.surface2,
+                .background(enabled ? Theme.Color.action : Theme.Color.surface2,
                             in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                 .overlay {
                     if !enabled {
@@ -555,27 +643,48 @@ private struct TeamSheetCTA: View {
 private struct SegmentedCodeField: View {
     @Binding var code: String
     let length: Int
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @FocusState private var focused: Bool
 
     var body: some View {
-        ZStack {
-            TextField("", text: Binding(get: { code }, set: { code = normalize($0) }))
-                .focused($focused)
-                .keyboardType(.asciiCapable)
-                .textInputAutocapitalization(.characters)
-                .autocorrectionDisabled()
-                .foregroundStyle(.clear)
-                .tint(.clear)
-                .frame(height: 1)
-                .opacity(0.01)
-
-            HStack(spacing: 8) {
-                ForEach(0..<length, id: \.self) { cell(index: $0) }
+        Group {
+            if dynamicTypeSize >= .xxLarge {
+                input
+                    .font(Theme.Font.mono(size: 27, weight: .bold))
+                    .foregroundStyle(Theme.Color.fg)
+                    .tint(Theme.Color.action)
+                    .padding(12)
+                    .frame(minHeight: 52)
+                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm).stroke(Theme.Color.border2, lineWidth: 1))
+            } else {
+                ZStack {
+                    HStack(spacing: 8) {
+                        ForEach(0..<length, id: \.self) { cell(index: $0) }
+                    }
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                    input
+                        .foregroundStyle(.clear)
+                        .tint(.clear)
+                        .frame(minHeight: 52)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { focused = true }
             }
-            .contentShape(Rectangle())
-            .onTapGesture { focused = true }
         }
         .onAppear { focused = true }
+    }
+
+    private var input: some View {
+        TextField("", text: Binding(get: { code }, set: { code = normalize($0) }))
+            .focused($focused)
+            .keyboardType(.asciiCapable)
+            .textInputAutocapitalization(.characters)
+            .autocorrectionDisabled()
+            .accessibilityLabel("邀请码")
+            .submitLabel(.done)
+            .onSubmit { focused = false }
     }
 
     private func cell(index i: Int) -> some View {
@@ -614,17 +723,15 @@ private struct SegmentedCodeField: View {
 
 /// 朱砂红闪光游标（2×24）。
 private struct CodeCaret: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var on = true
     var body: some View {
         RoundedRectangle(cornerRadius: 1)
             .fill(Theme.Color.accent)
             .frame(width: 2, height: 24)
-            .opacity(on ? 1 : 0)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
-                    on = false
-                }
-            }
+            .opacity(reduceMotion ? 1 : (on ? 1 : 0))
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.55).repeatForever(autoreverses: true), value: on)
+            .onAppear { on = false }
     }
 }
 
@@ -635,6 +742,8 @@ struct TeamDetailView: View {
     @Environment(SessionStore.self) private var session
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let team: TeamDTO
     @State private var members: [TeamMemberDTO] = []
@@ -774,7 +883,7 @@ struct TeamDetailView: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "person.crop.circle.badge.checkmark")
                 .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Theme.Color.accent)
+                .foregroundStyle(Theme.Color.action)
                 .frame(width: 26, height: 26)
             VStack(alignment: .leading, spacing: 5) {
                 Text("已接管 Team")
@@ -792,7 +901,9 @@ struct TeamDetailView: View {
             } label: {
                 Text("知道了")
                     .font(Theme.Font.body(size: 12, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
+                    .foregroundStyle(Theme.Color.action)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
@@ -802,18 +913,21 @@ struct TeamDetailView: View {
     private var headerCard: some View {
         let totalMembers = members.count
         let trainedToday = Set(checkins.map(\.userId)).count
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: 8))
         return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            HStack(alignment: .top) {
+            layout {
                 Text(isOwner ? "Team · 你是队长" : "Team").eyebrowStyle()
-                Spacer(minLength: 8)
+                if dynamicTypeSize < .xxLarge { Spacer(minLength: 8) }
                 Button { showingTodayMembers = true } label: {
                     Text("\(trainedToday) / \(totalMembers) 今日已练")
                         .font(Theme.Font.mono(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.Color.accent)
+                        .foregroundStyle(Theme.Color.action)
                         .padding(.horizontal, 9).padding(.vertical, 4)
                         .background(Theme.Color.accentSoft, in: Capsule())
                         .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1))
-                        .fixedSize()
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
                 }
@@ -823,7 +937,7 @@ struct TeamDetailView: View {
             Text(team.name)
                 .font(Theme.Font.l2)
                 .foregroundStyle(Theme.Color.fg)
-            HStack {
+            layout {
                 Button {
                     UIPasteboard.general.string = team.inviteCode
                 } label: {
@@ -836,9 +950,13 @@ struct TeamDetailView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(Theme.Color.muted)
                     }
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                Spacer(minLength: 8)
+                .accessibilityLabel("复制邀请码")
+                .accessibilityValue(team.inviteCode)
+                if dynamicTypeSize < .xxLarge { Spacer(minLength: 8) }
                 Button { showingTodayMembers = true } label: {
                     avatarStack
                         .frame(minHeight: 44)
@@ -886,7 +1004,8 @@ struct TeamDetailView: View {
                         .font(Theme.Font.body(size: 15, weight: .bold))
                         .foregroundStyle(Theme.Color.fg)
                 }
-                .tint(Theme.Color.accent)
+                .tint(Theme.Color.action)
+                .accessibilityIdentifier("team.autoShare")
             }
         }
         .frame(maxWidth: .infinity)
@@ -915,9 +1034,10 @@ struct TeamDetailView: View {
                         .font(Theme.Font.body(size: 15, weight: .bold))
                         .foregroundStyle(Theme.Color.fg)
                 }
-                .tint(Theme.Color.accent)
+                .tint(Theme.Color.action)
                 .disabled(teamNotificationPreferenceBusy)
                 .accessibilityHint("控制当前 Team 的拍一拍、队友打卡和表情回应推送")
+                .accessibilityIdentifier("team.notifications")
             }
         }
         .frame(maxWidth: .infinity)
@@ -958,7 +1078,8 @@ struct TeamDetailView: View {
             } label: {
                 Image(systemName: "calendar")
                     .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 28, height: 26)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("历史训练")
@@ -977,7 +1098,7 @@ struct TeamDetailView: View {
             }
             if overflow > 0 {
                 Text("+\(overflow)")
-                    .font(Theme.Font.mono(size: 9, weight: .semibold))
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Theme.Color.fg2)
                     .frame(width: 26, height: 26)
                     .background(Theme.Color.surface2, in: Circle())
@@ -989,8 +1110,8 @@ struct TeamDetailView: View {
 
     private func headerMonogram(name: String, isMe: Bool) -> some View {
         Text(String(name.prefix(1)))
-            .font(Theme.Font.body(size: 9, weight: .bold))
-            .foregroundStyle(isMe ? Theme.Color.accent : Theme.Color.fg2)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(isMe ? Theme.Color.action : Theme.Color.fg2)
             .frame(width: 26, height: 26)
             .background(isMe ? Theme.Color.accentSoft : Theme.Color.surface2, in: Circle())
             .overlay(Circle().stroke(isMe ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
@@ -1062,7 +1183,7 @@ struct TeamDetailView: View {
                     } label: {
                         Text(isOwner ? "解散 Team" : "退出 Team")
                             .font(Theme.Font.body(size: 16, weight: .bold))
-                            .foregroundStyle(Theme.Color.accent)
+                            .foregroundStyle(Theme.Color.action)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
                             .contentShape(Rectangle())
@@ -1087,7 +1208,7 @@ struct TeamDetailView: View {
             .padding(.horizontal, 9)
             .padding(.bottom, 12)
             .paperShadow(.lg, cornerRadius: Theme.Radius.lg)
-            .transition(.move(edge: .bottom))
+            .transition(reduceMotion ? .opacity : .move(edge: .bottom))
         }
     }
 
@@ -1143,7 +1264,7 @@ struct TeamDetailView: View {
                     Circle().stroke(Theme.Color.accentSofter, lineWidth: 1).frame(width: 46, height: 46)
                     Image(systemName: kind == .leave ? "rectangle.portrait.and.arrow.right" : "exclamationmark.triangle")
                         .font(.system(size: 21, weight: .semibold))
-                        .foregroundStyle(Theme.Color.accent)
+                        .foregroundStyle(Theme.Color.action)
                 }
                 .padding(.bottom, 13)
 
@@ -1185,7 +1306,7 @@ struct TeamDetailView: View {
                         .foregroundStyle(dangerEnabled(kind) ? .white : Theme.Color.muted)
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
-                        .background(dangerEnabled(kind) ? Theme.Color.accent : Theme.Color.surface2,
+                        .background(dangerEnabled(kind) ? Theme.Color.action : Theme.Color.surface2,
                                     in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                     }
                     .buttonStyle(PressableButtonStyle())
@@ -1198,7 +1319,7 @@ struct TeamDetailView: View {
             .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
             .shadow(color: Theme.Color.fg.opacity(0.18), radius: 32, x: 0, y: 12)
             .padding(.horizontal, 40)
-            .scaleEffect(confirmOverlayShown ? 1 : 0.94)
+            .scaleEffect(reduceMotion ? 1 : (confirmOverlayShown ? 1 : 0.94))
             .opacity(confirmOverlayShown ? 1 : 0)
         }
     }
@@ -1211,7 +1332,7 @@ struct TeamDetailView: View {
                 + Text(" 随时重新加入。")
         case .dissolve:
             return Text("此操作")
-                + Text("不可恢复").foregroundColor(Theme.Color.accent).fontWeight(.bold)
+                + Text("不可恢复").foregroundColor(Theme.Color.action).fontWeight(.bold)
                 + Text("。\(members.count) 名成员将被移除，队内全部打卡动态与共享计划将被永久删除。")
         }
     }
@@ -1220,7 +1341,7 @@ struct TeamDetailView: View {
     private var dissolveConfirmField: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("输入队名以确认").eyebrowStyle()
-            TextField(team.name, text: $dissolveInput)
+            TextField(team.name, text: $dissolveInput, prompt: Text(team.name).foregroundColor(Theme.Color.muted))
                 .font(Theme.Font.body(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.Color.fg)
                 .autocorrectionDisabled()
@@ -1270,11 +1391,11 @@ struct TeamDetailView: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
-            .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .background(Theme.Color.action, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             .paperShadow(.lg, cornerRadius: Theme.Radius.md)
             .padding(.horizontal, 14)
             .padding(.top, 6)
-            .transition(.move(edge: .top).combined(with: .opacity))
+            .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
             .zIndex(5)
         }
     }
@@ -1450,6 +1571,8 @@ struct TeamDetailView: View {
 // MARK: - 拍一拍队友
 
 private struct TeamTodayMembersSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let members: [TeamMemberDTO]
     let checkinUserIds: Set<UUID>
     let currentUserId: UUID?
@@ -1490,6 +1613,8 @@ private struct TeamTodayMembersSheet: View {
             .padding(.top, Theme.Spacing.md)
             .padding(.bottom, 28)
         }
+        .accessibilityIdentifier("team.todayMembers")
+        .accessibilityAction(.escape) { dismiss() }
         .background(Theme.Color.bg.ignoresSafeArea())
         .alert("操作未完成", isPresented: .constant(errorMessage != nil)) {
             Button("好") { errorMessage = nil }
@@ -1497,6 +1622,7 @@ private struct TeamTodayMembersSheet: View {
             Text(errorMessage ?? "")
         }
     }
+
 
     private func memberSection(title: String, members: [TeamMemberDTO]) -> some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
@@ -1519,13 +1645,17 @@ private struct TeamTodayMembersSheet: View {
 
     private func memberRow(_ member: TeamMemberDTO) -> some View {
         let shared = checkinUserIds.contains(member.userId)
-        return HStack(spacing: 12) {
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(spacing: 12))
+        return layout {
             Text(String(memberName(member).prefix(1)))
-                .font(Theme.Font.body(size: 14, weight: .bold))
+                .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.Color.fg2)
                 .frame(width: 40, height: 40)
                 .background(Theme.Color.surface2, in: Circle())
                 .overlay(Circle().stroke(Theme.Color.border, lineWidth: 1))
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(memberName(member))
@@ -1535,10 +1665,11 @@ private struct TeamTodayMembersSheet: View {
                     .font(Theme.Font.body(size: 11))
                     .foregroundStyle(Theme.Color.fg2)
             }
-            Spacer(minLength: 8)
+            if dynamicTypeSize < .xxLarge { Spacer(minLength: 8) }
             memberAction(member, shared: shared)
         }
         .frame(minHeight: 64)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
@@ -1565,8 +1696,10 @@ private struct TeamTodayMembersSheet: View {
                 }
                 .font(Theme.Font.body(size: 13, weight: .bold))
                 .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
                 .frame(minWidth: 88, minHeight: 44)
-                .background(Theme.Color.accent, in: Capsule())
+                .background(Theme.Color.action, in: Capsule())
             }
             .buttonStyle(.plain)
             .disabled(busyRecipientIds.contains(member.userId))
@@ -1579,7 +1712,7 @@ private struct TeamTodayMembersSheet: View {
             Text(text)
         }
         .font(Theme.Font.body(size: 12, weight: .semibold))
-        .foregroundStyle(Theme.Color.accent)
+        .foregroundStyle(Theme.Color.action)
         .frame(minWidth: 76, minHeight: 44)
     }
 
@@ -1651,7 +1784,7 @@ struct FeedItemCard: View {
     }
 
     private var detailAccessoryPadding: CGFloat {
-        canOpenDetail ? 34 : 0
+        canOpenDetail ? 50 : 0
     }
 
     @ViewBuilder
@@ -1662,16 +1795,10 @@ struct FeedItemCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         if canOpenDetail {
-            summary
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    onOpen()
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isButton)
-                .accessibilityAction {
-                    onOpen()
-                }
+            Button(action: onOpen) { summary.contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("team.checkin.\(checkin.id.uuidString)")
+                .accessibilityHint("查看本次训练的分享快照")
         } else {
             summary
         }
@@ -1680,11 +1807,12 @@ struct FeedItemCard: View {
     private var memberHead: some View {
         HStack(spacing: Theme.Spacing.sm) {
             Text(String(memberName.prefix(1)))
-                .font(Theme.Font.body(size: 13, weight: .bold))
-                .foregroundStyle(Theme.Color.accent)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.Color.action)
                 .frame(width: 32, height: 32)
                 .background(Theme.Color.accentSoft, in: Circle())
                 .overlay(Circle().stroke(Theme.Color.accentSofter, lineWidth: 1))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(memberName)
                     .font(Theme.Font.body(size: 14, weight: .semibold))
@@ -1704,9 +1832,12 @@ struct FeedItemCard: View {
                 .font(Theme.Font.body(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.Color.danger)
                 .padding(.horizontal, 9)
-                .frame(height: 28)
+                .padding(.vertical, 6)
+                .frame(minHeight: 28)
                 .background(Theme.Color.bg, in: Capsule())
                 .overlay(Capsule().stroke(Theme.Color.border, lineWidth: 1))
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .layoutPriority(1)
@@ -1716,7 +1847,7 @@ struct FeedItemCard: View {
         Image(systemName: "chevron.right")
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(Theme.Color.muted)
-            .frame(width: 28, height: 44)
+            .frame(width: 44, height: 44)
             .contentShape(Rectangle())
             .onTapGesture {
                 onOpen()
@@ -1745,7 +1876,7 @@ struct FeedItemCard: View {
             sep.foregroundColor = Theme.Color.fg2
             s.append(sep)
             var prAttr = AttributedString("★ \(pr)")
-            prAttr.foregroundColor = Theme.Color.accent
+            prAttr.foregroundColor = Theme.Color.action
             s.append(prAttr)
         }
         return s
@@ -1776,13 +1907,17 @@ private extension CheckinSummary {
 // MARK: - 反应行
 
 struct ReactionRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let reactions: [CheckinReactionDTO]
     let myUserId: UUID?
     let emojis: [(code: String, glyph: String)]
     let onTap: (String) -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+            : AnyLayout(HStackLayout(spacing: 6))
+        layout {
             ForEach(emojis, id: \.code) { item in
                 let count = reactions.filter { $0.emoji == item.code }.count
                 let mine = myUserId.map { my in
@@ -1795,20 +1930,36 @@ struct ReactionRow: View {
                         if count > 0 {
                             Text("\(count)")
                                 .font(Theme.Font.mono(size: 10, weight: .semibold))
-                                .foregroundStyle(mine ? Theme.Color.accent : Theme.Color.fg2)
+                                .foregroundStyle(mine ? Theme.Color.action : Theme.Color.fg2)
                         }
                     }
                     .padding(.horizontal, 10)
-                    .frame(height: 28)
+                    .padding(.vertical, 6)
+                    .frame(minHeight: 28)
                     .background(
                         mine ? Theme.Color.accentSoft : Theme.Color.bg,
                         in: Capsule()
                     )
                     .overlay(Capsule().stroke(mine ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(reactionName(item.code))
+                .accessibilityValue("\(count) 人回应")
+                .accessibilityAddTraits(mine ? .isSelected : [])
             }
-            Spacer()
+            if dynamicTypeSize < .xxLarge { Spacer() }
+        }
+    }
+
+    private func reactionName(_ code: String) -> String {
+        switch code {
+        case "fire": "火热"
+        case "muscle": "加油"
+        case "heart": "喜欢"
+        case "clap": "鼓掌"
+        default: code
         }
     }
 }
@@ -1816,6 +1967,7 @@ struct ReactionRow: View {
 // MARK: - Team 计划浏览（保留功能，theme 微调）
 
 struct TeamPlansView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var modelContext
     @Environment(TeamService.self) private var teamService
     @Environment(SyncEngine.self) private var syncEngine
@@ -1855,7 +2007,7 @@ struct TeamPlansView: View {
                     privacyNote
                     if isReloading && shares.isEmpty {
                         ProgressView()
-                            .tint(Theme.Color.accent)
+                            .tint(Theme.Color.action)
                             .frame(maxWidth: .infinity)
                             .padding(.top, Theme.Spacing.lg)
                     } else if shares.isEmpty {
@@ -1894,7 +2046,7 @@ struct TeamPlansView: View {
                     .font(Theme.Font.body(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.Color.bg)
                     .padding(.horizontal, 16).padding(.vertical, 10)
-                    .background(Theme.Color.accent, in: Capsule())
+                    .background(Theme.Color.action, in: Capsule())
                     .padding(.bottom, 24)
                     .transition(.opacity)
             }
@@ -1902,27 +2054,20 @@ struct TeamPlansView: View {
         .alert("出错了", isPresented: .constant(error != nil)) {
             Button("好") { error = nil }
         } message: { Text(error ?? "") }
-        .paperConfirmDialog(
+        .activeWorkoutConflictDialog(
             isPresented: $showConflict,
-            title: "已有进行中的训练",
-            message: "同一时间只能有一个进行中的训练。继续既有训练，或丢弃后开始新的。",
-            confirmTitle: "丢弃并开始新训练",
-            secondaryTitle: "继续训练",
-            onSecondary: {
+            onContinue: {
                 if let existing = conflict { workoutPresentation.present(existing) }
                 clearConflict()
             },
-            showCancel: false,
-            onConfirm: {
-                if let existing = conflict {
-                    WorkoutSession.discard(existing, in: modelContext)
+            onDiscard: {
+                if let existing = conflict, let build = pendingBuild, let card = pendingStartCard,
+                   commit(build, source: card, replacing: existing) {
                     restTimer.stop()
-                    if let build = pendingBuild, let card = pendingStartCard {
-                        commit(build, source: card)
-                    }
                 }
                 clearConflict()
-            }
+            },
+            onCancel: { clearConflict() }
         )
         .paperConfirmDialog(
             isPresented: Binding(
@@ -1945,7 +2090,7 @@ struct TeamPlansView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "lock.shield")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Theme.Color.accent)
+                .foregroundStyle(Theme.Color.action)
                 .frame(width: 20)
             Text("只统计完成次数，不公开训练详情。是否出现在 Team 动态，仍取决于自动分享或本次分享。")
                 .font(Theme.Font.body(size: 12))
@@ -1974,6 +2119,9 @@ struct TeamPlansView: View {
         let own = isOwnShare(p)
         let rowBusy = forking != nil || deletingShareId != nil
         let canUse = !p.hasUnstartableItems && !rowBusy
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 8))
         return VStack(alignment: .leading, spacing: 10) {
             Button { selectedShare = p } label: {
                 HStack(alignment: .center, spacing: 10) {
@@ -1988,7 +2136,7 @@ struct TeamPlansView: View {
                             Text("\(p.itemCount) 个动作 · \(p.exercisePreviewText)")
                                 .font(Theme.Font.mono(size: 11))
                                 .foregroundStyle(Theme.Color.muted)
-                                .lineLimit(1)
+                                .fixedSize(horizontal: false, vertical: true)
                             if p.hasUnstartableItems {
                                 Text("包含无法识别的动作，请更新 App 或联系分享者修复")
                                     .font(Theme.Font.body(size: 12))
@@ -1997,14 +2145,12 @@ struct TeamPlansView: View {
                             }
                         }
 
-                        HStack(spacing: 8) {
+                        layout {
                             Label("\(p.displayCopyCount) 人复制", systemImage: "arrow.triangle.branch")
                             Label("总共 \(p.displayCompletionCount) 次完成", systemImage: "checkmark.circle")
                         }
                         .font(Theme.Font.mono(size: 10, weight: .bold))
                         .foregroundStyle(Theme.Color.muted)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.9)
                     }
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
@@ -2018,7 +2164,7 @@ struct TeamPlansView: View {
             .buttonStyle(.plain)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 10) {
+            layout {
                 Button { start(p) } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "play.fill").font(.system(size: 11, weight: .bold))
@@ -2027,8 +2173,9 @@ struct TeamPlansView: View {
                     .font(Theme.Font.body(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 36)
-                    .background(canUse ? Theme.Color.accent : Theme.Color.muted.opacity(0.35),
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 44)
+                    .background(canUse ? Theme.Color.action : Theme.Color.muted.opacity(0.35),
                                 in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
                     .opacity(canUse ? 1 : 0.72)
                 }
@@ -2038,7 +2185,7 @@ struct TeamPlansView: View {
                 if !own {
                     Button { Task { await fork(p) } } label: {
                         if forking == p.versionId {
-                            ProgressView().tint(Theme.Color.accent)
+                            ProgressView().tint(Theme.Color.action)
                                 .frame(width: 86, height: 36)
                         } else {
                             HStack(spacing: 5) {
@@ -2046,8 +2193,10 @@ struct TeamPlansView: View {
                                 Text("复制")
                             }
                             .font(Theme.Font.body(size: 13, weight: .bold))
-                            .foregroundStyle(canUse ? Theme.Color.accent : Theme.Color.muted)
-                            .frame(width: 86, height: 36)
+                            .foregroundStyle(canUse ? Theme.Color.action : Theme.Color.muted)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .frame(minWidth: 86, minHeight: 44)
                             .overlay(
                                 RoundedRectangle(cornerRadius: Theme.Radius.sm)
                                     .stroke(canUse ? Theme.Color.accent : Theme.Color.border, lineWidth: 1.3)
@@ -2131,10 +2280,17 @@ struct TeamPlansView: View {
         return w
     }
 
-    private func commit(_ build: () -> Workout, source share: TeamPlanShareCardDTO) {
-        let workout = build()
-        modelContext.insert(workout)
-        try? modelContext.save()
+    @discardableResult
+    private func commit(_ build: () -> Workout, source share: TeamPlanShareCardDTO,
+                        replacing existing: Workout? = nil) -> Bool {
+        let workout: Workout
+        do {
+            workout = try WorkoutSession.start(build, replacing: existing, in: modelContext)
+        } catch {
+            self.error = (error as? WorkoutSession.StartError)?.errorDescription
+                ?? (existing == nil ? "开始失败，请重试" : "开始失败，原训练仍保留，请重试")
+            return false
+        }
         historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
         NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
         workoutPresentation.present(workout)
@@ -2150,6 +2306,7 @@ struct TeamPlansView: View {
             }
             await reload()
         }
+        return true
     }
 
     private func clearConflict() {
@@ -2205,6 +2362,7 @@ struct TeamPlansView: View {
 
 private struct TeamPlanShareDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedExercise: BuiltinExercise?
 
     let share: TeamPlanShareCardDTO
@@ -2268,7 +2426,10 @@ private struct TeamPlanShareDetailView: View {
     }
 
     private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 8))
+        return VStack(alignment: .leading, spacing: 8) {
             Text(share.planNameSnapshot)
                 .font(Theme.Font.display(size: 24, weight: .heavy))
                 .foregroundStyle(Theme.Color.fg)
@@ -2276,7 +2437,7 @@ private struct TeamPlanShareDetailView: View {
             Text("\(updatedText) · \(ownerName)")
                 .font(Theme.Font.mono(size: 11, weight: .bold))
                 .foregroundStyle(Theme.Color.muted)
-            HStack(spacing: 8) {
+            layout {
                 Label("\(share.displayCopyCount) 人复制", systemImage: "arrow.triangle.branch")
                 Label("总共 \(share.displayCompletionCount) 次完成", systemImage: "checkmark.circle")
             }
@@ -2320,7 +2481,7 @@ private struct TeamPlanShareDetailView: View {
                     Text(itemTitle(item))
                         .font(Theme.Font.body(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.Color.fg)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Text(itemPrescription(item))
                     .font(Theme.Font.mono(size: 11, weight: .bold))
@@ -2329,7 +2490,7 @@ private struct TeamPlanShareDetailView: View {
                     Text("备选：\(item.usableAlternatives.map(\.displayExerciseName).joined(separator: "、"))")
                         .font(Theme.Font.body(size: 11.5))
                         .foregroundStyle(Theme.Color.muted)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer(minLength: 8)
@@ -2355,8 +2516,9 @@ private struct TeamPlanShareDetailView: View {
                 .font(Theme.Font.body(size: 15, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 48)
-                .background(canUse ? Theme.Color.accent : Theme.Color.muted.opacity(0.35),
+                .padding(.vertical, 12)
+                .frame(minHeight: 48)
+                .background(canUse ? Theme.Color.action : Theme.Color.muted.opacity(0.35),
                             in: RoundedRectangle(cornerRadius: Theme.Radius.md))
                 .opacity(canUse ? 1 : 0.72)
             }
@@ -2367,16 +2529,17 @@ private struct TeamPlanShareDetailView: View {
                 Button(action: onFork) {
                     HStack(spacing: 7) {
                         if isForking {
-                            ProgressView().tint(Theme.Color.accent)
+                            ProgressView().tint(Theme.Color.action)
                         } else {
                             Image(systemName: "doc.on.doc").font(.system(size: 13, weight: .bold))
                             Text("复制到我的计划")
                         }
                     }
                     .font(Theme.Font.body(size: 14, weight: .bold))
-                    .foregroundStyle(canUse ? Theme.Color.accent : Theme.Color.muted)
+                    .foregroundStyle(canUse ? Theme.Color.action : Theme.Color.muted)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 44)
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 44)
                     .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
                     .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(canUse ? Theme.Color.accentSofter : Theme.Color.border, lineWidth: 1))
                     .opacity(canUse ? 1 : 0.72)

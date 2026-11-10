@@ -27,7 +27,7 @@ struct WorkoutStructureIcon: View {
     var body: some View {
         Image(systemName: kind.systemImage)
             .font(.system(size: symbolSize, weight: .bold))
-            .foregroundStyle(Theme.Color.accent)
+            .foregroundStyle(Theme.Color.action)
             .frame(width: size, height: size)
             .background(Theme.Color.accentSoft, in: Capsule())
             .accessibilityLabel(kind.accessibilityLabel)
@@ -59,7 +59,7 @@ struct WorkoutStructureMenuButton: View {
                               placement: .above) { isPresented in
             Image(systemName: "square.stack.3d.up")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(isPresented ? Theme.Color.accent : Theme.Color.muted)
+                .foregroundStyle(isPresented ? Theme.Color.action : Theme.Color.muted)
                 .frame(width: 46, height: 40)
                 .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 .overlay(

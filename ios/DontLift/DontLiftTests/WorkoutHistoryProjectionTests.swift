@@ -94,12 +94,13 @@ struct WorkoutHistoryProjectionTests {
         #expect(store.workoutRecords[secondId]?.first?.weightKg == 70)
     }
 
-    @Test func personalRecordDetectionUsesPriorBestIndex() {
-        let workout = makeWorkout(
+    @Test func personalRecordDetectionUsesPriorBestIndex() throws {
+        let testStore = WorkoutTestStore()
+        let workout = try testStore.insert(makeWorkout(
             startedAt: Date(timeIntervalSince1970: 3_000),
             code: "BB_BENCH_PRESS",
             weights: [65, 70]
-        )
+        ))
 
         let newRecord = detectPersonalRecords(
             in: workout,
@@ -120,22 +121,23 @@ struct WorkoutHistoryProjectionTests {
         #expect(firstRecord.first?.previousBestKg == nil)
     }
 
-    @Test func planHistoryLookupUsesItemIdBeforeHistoryKey() {
+    @Test func planHistoryLookupUsesItemIdBeforeHistoryKey() throws {
+        let testStore = WorkoutTestStore()
         let key = "BB_BENCH_PRESS"
         let firstItemId = UUID()
         let secondItemId = UUID()
-        let firstWorkout = makeWorkout(
+        let firstWorkout = try testStore.insert(makeWorkout(
             startedAt: Date(timeIntervalSince1970: 1_000),
             code: key,
             weights: [90],
             planItemId: firstItemId
-        )
-        let secondWorkout = makeWorkout(
+        ))
+        let secondWorkout = try testStore.insert(makeWorkout(
             startedAt: Date(timeIntervalSince1970: 2_000),
             code: key,
             weights: [55],
             planItemId: secondItemId
-        )
+        ))
 
         let lookup = PlanHistoryLookup.build(from: [secondWorkout, firstWorkout])
         let secondItem = PlanItem(
@@ -161,7 +163,8 @@ struct WorkoutHistoryProjectionTests {
         #expect(lookup.latestSets(for: unknownItem).first?.weightKg == 55)
     }
 
-    @Test func planHistoryLookupDoesNotTreatWarmupOnlyAsCompletedSource() {
+    @Test func planHistoryLookupDoesNotTreatWarmupOnlyAsCompletedSource() throws {
+        let testStore = WorkoutTestStore()
         let key = "BB_BENCH_PRESS"
         let planId = UUID()
         let itemId = UUID()
@@ -184,6 +187,7 @@ struct WorkoutHistoryProjectionTests {
             WorkoutSet(setIndex: 0, weightKg: 20, reps: 12, completed: true, setType: .warmup)
         ]
         workout.exercises = [exercise]
+        _ = try testStore.insert(workout)
 
         let lookup = PlanHistoryLookup.build(from: [workout])
         let item = PlanItem(

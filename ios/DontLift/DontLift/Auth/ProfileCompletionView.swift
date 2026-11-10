@@ -14,6 +14,7 @@ struct ProfileCompletionView: View {
     @State private var submitting = false
     @State private var errorMessage: String?
     @State private var prefilled = false
+    @FocusState private var nameFocused: Bool
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
     private var nameValid: Bool { !trimmedName.isEmpty && trimmedName.count <= 20 }
@@ -22,38 +23,50 @@ struct ProfileCompletionView: View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 0) {
-                eyebrow
-                title
-                    .padding(.top, Theme.Spacing.md)
-                subtitle
-                    .padding(.top, Theme.Spacing.sm)
-
-                fields
-                    .padding(.top, 28)
-
-                Spacer(minLength: Theme.Spacing.lg)
-
-                if submitting {
-                    submittingButton
-                } else {
-                    ctaButton
+            GeometryReader { viewport in
+                ScrollView {
+                    content
+                        .frame(maxWidth: .infinity, minHeight: viewport.size.height, alignment: .leading)
                 }
-                if let errorMessage {
-                    failLine(errorMessage)
-                        .padding(.top, Theme.Spacing.sm)
-                }
-                signOutLink
-                    .padding(.top, Theme.Spacing.md)
-                    .frame(maxWidth: .infinity, alignment: .center)
+                .scrollDismissesKeyboard(.interactively)
+                .scrollBounceBehavior(.basedOnSize)
+                .clipped()
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.top, Theme.Spacing.xl)
-            .padding(.bottom, Theme.Spacing.xl)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .preferredColorScheme(.light)
         .onAppear(perform: prefillIfNeeded)
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            eyebrow
+            title
+                .padding(.top, Theme.Spacing.md)
+            subtitle
+                .padding(.top, Theme.Spacing.sm)
+
+            fields
+                .padding(.top, 28)
+                .disabled(submitting)
+
+            Spacer(minLength: Theme.Spacing.lg)
+
+            if submitting {
+                submittingButton
+            } else {
+                ctaButton
+            }
+            if let errorMessage {
+                failLine(errorMessage)
+                    .padding(.top, Theme.Spacing.sm)
+            }
+            signOutLink
+                .padding(.top, Theme.Spacing.md)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.top, Theme.Spacing.xl)
+        .padding(.bottom, Theme.Spacing.xl)
     }
 
     // MARK: - 文案区
@@ -62,7 +75,7 @@ struct ProfileCompletionView: View {
         Text("NO. 0042 · 资料补全")
             .font(Theme.Font.mono(size: 12))
             .tracking(2)
-            .foregroundStyle(Theme.Color.accent)
+            .foregroundStyle(Theme.Color.action)
     }
 
     private var title: some View {
@@ -70,6 +83,7 @@ struct ProfileCompletionView: View {
             .font(Theme.Font.display(size: 34, weight: .heavy))
             .tracking(-1)
             .foregroundStyle(Theme.Color.fg)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var subtitle: some View {
@@ -93,17 +107,21 @@ struct ProfileCompletionView: View {
             Text("称呼")
                 .font(Theme.Font.body(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.Color.fg)
-            TextField("请输入称呼", text: $name)
+            TextField("请输入称呼", text: $name, prompt: Text("请输入称呼").foregroundColor(Theme.Color.muted))
+                .focused($nameFocused)
                 .font(Theme.Font.body(size: 16))
                 .foregroundStyle(Theme.Color.fg)
                 .padding(.horizontal, 14)
-                .frame(height: 48)
+                .padding(.vertical, 12)
+                .frame(minHeight: 48)
                 .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.md)
                         .strokeBorder(nameFieldBorder, lineWidth: 1)
                 )
                 .submitLabel(.done)
+                .onSubmit { nameFocused = false }
+                .accessibilityLabel("称呼")
             if !trimmedName.isEmpty && trimmedName.count > 20 {
                 Text("称呼不超过 20 字")
                     .font(Theme.Font.mono(size: 11))
@@ -131,19 +149,24 @@ struct ProfileCompletionView: View {
 
     private func sexPill(_ s: BodySex) -> some View {
         let selected = sex == s
-        return Text(s.displayName)
-            .font(Theme.Font.body(size: 14, weight: selected ? .semibold : .regular))
-            .foregroundStyle(selected ? Color.white : Theme.Color.fg2)
-            .frame(width: 72, height: 38)
-            .background(selected ? Theme.Color.accent : Theme.Color.surface2,
-                        in: Capsule())
-            .overlay(Capsule().stroke(selected ? Color.clear : Theme.Color.border, lineWidth: 1))
-            .contentShape(Capsule())
-            .onTapGesture {
-                guard sex != s else { return }
-                sex = s
-                Theme.Haptics.selection()
-            }
+        return Button {
+            guard sex != s else { return }
+            sex = s
+            Theme.Haptics.selection()
+        } label: {
+            Text(s.displayName)
+                .font(Theme.Font.body(size: 14, weight: selected ? .semibold : .regular))
+                .foregroundStyle(selected ? Color.white : Theme.Color.fg2)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .frame(minWidth: 72, minHeight: 44)
+                .background(selected ? Theme.Color.action : Theme.Color.surface2, in: Capsule())
+                .overlay(Capsule().stroke(selected ? Color.clear : Theme.Color.border, lineWidth: 1))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("性别：\(s.displayName)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     // MARK: - 主按钮 / 状态机
@@ -154,8 +177,9 @@ struct ProfileCompletionView: View {
                 .font(Theme.Font.body(size: 16, weight: .bold))
                 .foregroundStyle(nameValid ? Color.white : Theme.Color.muted)
                 .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(nameValid ? Theme.Color.accent : Theme.Color.surface2,
+                .padding(.vertical, 12)
+                .frame(minHeight: 52)
+                .background(nameValid ? Theme.Color.action : Theme.Color.surface2,
                             in: RoundedRectangle(cornerRadius: Theme.Radius.md))
         }
         .buttonStyle(.plain)
@@ -170,8 +194,9 @@ struct ProfileCompletionView: View {
                 .foregroundStyle(.white)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 52)
-        .background(Theme.Color.accent.opacity(0.9), in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .padding(.vertical, 12)
+        .frame(minHeight: 52)
+        .background(Theme.Color.action.opacity(0.9), in: RoundedRectangle(cornerRadius: Theme.Radius.md))
     }
 
     /// 逃生出口：补全页是登录后的硬门，提供「退出登录 / 换账号」兜底——
@@ -185,9 +210,10 @@ struct ProfileCompletionView: View {
                 .font(Theme.Font.body(size: 13))
                 .foregroundStyle(Theme.Color.fg2)
                 .underline()
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(submitting)
     }
 
     private func failLine(_ message: String) -> some View {
@@ -212,13 +238,14 @@ struct ProfileCompletionView: View {
     private func submit() async {
         guard nameValid, !submitting else { return }
         submitting = true
+        defer { submitting = false }
         errorMessage = nil
         do {
             try await session.submitProfileCompletion(displayName: trimmedName, sex: sex)
             // 成功：RootView 监听 needsProfileCompletion == false 自动切到 MainTabView
         } catch {
+            guard !error.isCancellationError else { return }
             errorMessage = (error as? APIError)?.errorDescription ?? "网络异常，资料未保存，请重试"
         }
-        submitting = false
     }
 }

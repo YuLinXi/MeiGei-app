@@ -3,6 +3,7 @@ import SwiftData
 
 /// 历史训练日历：月历扫视训练节奏，底部抽屉查看选中日期的训练记录。
 struct WorkoutCalendarView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(WorkoutHistoryStore.self) private var historyStore
@@ -23,14 +24,35 @@ struct WorkoutCalendarView: View {
         historyStore.calendarMonth(containing: displayedMonth, calendar: calendar).calendarHistorySnapshot()
     }
 
+    private var historyLoadMessage: String? {
+        if historyStore.loadState == .failed {
+            return historyStore.hasSnapshot ? "刷新失败，已保留上次历史记录。" : "未能读取历史记录，请重试。"
+        }
+        if !historyStore.hasSnapshot || historyStore.isRefreshing {
+            return historyStore.hasSnapshot ? "正在更新历史记录…" : "正在读取历史记录…"
+        }
+        return nil
+    }
+
+    private var retryHistory: (() -> Void)? {
+        guard historyStore.loadState == .failed else { return nil }
+        return { Task { await historyStore.refresh(reason: .manual) } }
+    }
+
     var body: some View {
         CalendarHistoryScaffold(
             displayedMonth: $displayedMonth,
             selectedDate: $selectedDate,
             eyebrow: "训练日历",
             month: month,
-            archiveGroups: historyStore.calendarArchiveYearGroups(calendar: calendar).calendarHistoryGroups(),
+            archiveGroups: {
+                historyStore.hasSnapshot
+                    ? historyStore.calendarArchiveYearGroups(calendar: calendar).calendarHistoryGroups() : []
+            },
             calendar: calendar,
+            hasSnapshot: historyStore.hasSnapshot,
+            loadMessage: historyLoadMessage,
+            onRetry: retryHistory,
             monthSummaryText: { month in
                 "\(month.rowCount) 次训练 · \(formatTons(month.volumeKg)) t · \(month.setCount) 正式组"
             },
@@ -59,7 +81,7 @@ struct WorkoutCalendarView: View {
         }
         .onAppear {
             WorkoutPerformanceMonitor.event("history.calendar.open")
-            historyStore.ensureLoaded(reason: .manual)
+            if historyStore.loadState != .failed { historyStore.ensureLoaded(reason: .manual) }
             displayedMonth = monthStart(for: selectedDate)
         }
     }
@@ -88,7 +110,11 @@ struct WorkoutCalendarView: View {
     }
 
     private func workoutRow(_ row: WorkoutRowSummary, compact: Bool = false) -> some View {
-        HStack(spacing: Theme.Spacing.sm) {
+        let expanded = dynamicTypeSize >= .xxLarge
+        let layout = expanded
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Spacing.sm))
+            : AnyLayout(HStackLayout(spacing: Theme.Spacing.sm))
+        return layout {
             VStack(spacing: 2) {
                 Text(Self.timeFormatter.string(from: row.startedAt))
                     .font(Theme.Font.mono(size: compact ? 10 : 11, weight: .bold))
@@ -97,24 +123,28 @@ struct WorkoutCalendarView: View {
                     .font(Theme.Font.mono(size: compact ? 8 : 9, weight: .medium))
                     .foregroundStyle(Theme.Color.muted)
             }
-            .frame(width: compact ? 48 : 52, height: compact ? 40 : 46)
+            .padding(expanded ? 8 : 0)
+            .frame(minWidth: compact ? 48 : 52, minHeight: compact ? 40 : 46)
             .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(row.title)
                     .font(Theme.Font.body(size: compact ? 13 : 14, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
-                    .lineLimit(1)
+                    .lineLimit(expanded ? nil : 1)
                 Text("\(row.exerciseCount) 动作 · \(row.setCount) 组 · \(formatTons(row.volumeKg))t")
                     .font(Theme.Font.body(size: compact ? 10.5 : 11.5))
                     .foregroundStyle(Theme.Color.fg2)
-                    .lineLimit(1)
+                    .lineLimit(expanded ? nil : 1)
             }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.Color.muted)
+            if !expanded {
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.Color.muted)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(compact ? 8 : 10)
         .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .overlay(

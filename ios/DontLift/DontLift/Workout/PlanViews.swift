@@ -93,6 +93,7 @@ private extension View {
 /// 计划列表：按分组管理训练模板；所有计划使用同一标准卡片。
 struct PlanListView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(WorkoutHistoryStore.self) private var historyStore
     @Environment(GlobalMessageCenter.self) private var globalMessage
@@ -105,17 +106,18 @@ struct PlanListView: View {
     @State private var creatingPlanRoute: PlanEditorRoute?
     @State private var groupEditor: PlanGroupEditorTarget?
     @State private var deletingGroup: WorkoutPlanGroup?
-    /// 排序目标（nil = 未在排序）：分组排序或某分组内的计划排序；sheet 关闭提交后才清空。
+    /// 排序目标（nil = 未在排序）：分组排序或某分组内的计划排序。
     @State private var reorderTarget: PlanListReorderTarget?
     /// 排序 sheet 显隐。
     @State private var reorderPresented = false
-    /// 排序中的 id 草稿顺序；关闭 sheet（下滑或「完成」）时一次性写回模型。
+    /// 排序中的 id 草稿顺序；只有完成保存才写回模型。
     @State private var reorderDraft: [UUID] = []
     @State private var expandedSectionId: String?
     /// 计划详情导航：用绑定式 navigationDestination(item:) 而非 NavigationLink(value:)。
     /// 本工程是「全局唯一 NavigationStack 包 TabView」，类型注册式 navigationDestination(for:)
     /// 从 TabView 子页注册不进外层 stack，value 链接点了不跳；绑定式不依赖类型注册，可靠跳转。
     @State private var selectedPlan: WorkoutPlan?
+    @State private var inlineSaveFailed = false
 
     /// 「推荐模板」段开关：依赖尚未采集的内置动作库（见 CLAUDE.md 待办「数据工程未完」）。
     /// 数据就绪后置 `true` 即恢复整段（段标题 + `recommendedCard`），无需改动其它代码。
@@ -195,17 +197,17 @@ struct PlanListView: View {
         Theme.Haptics.impact(.light)
     }
 
-    /// 排序 sheet 关闭（下滑或「完成」）后统一提交：把草稿顺序一次性写回模型（无变化时 apply 内部直接返回）。
-    private func commitReorder() {
+    private func commitReorder() throws {
         switch reorderTarget {
         case .groups:
-            applyGroupOrder(reorderDraft)
+            try ReorderPersistence.groups(orderedGroups, orderedIDs: reorderDraft, in: modelContext)
         case .plans(let target):
-            applyPlanOrder(reorderDraft, groupId: target.groupId)
+            try ReorderPersistence.plans(plans(in: target.groupId), orderedIDs: reorderDraft, in: modelContext)
         case nil:
             break
         }
-        reorderTarget = nil
+        reorderPresented = false
+        Theme.Haptics.selection()
     }
 
     private func usage(for plan: WorkoutPlan) -> PlanUsageSummary {
@@ -248,6 +250,12 @@ struct PlanListView: View {
             if !reorderPresented { floatingAddMenu }
         }
         .rootTabTopScrim()
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if inlineSaveFailed { LocalSaveRetryBanner(onRetry: persistInlineChanges) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: LocalModelSave.didSave, object: modelContext)) { _ in
+            inlineSaveFailed = false
+        }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             WorkoutPerformanceMonitor.event("plan.list.appear")
@@ -262,24 +270,26 @@ struct PlanListView: View {
             switch target {
             case .create(let sortOrder):
                 PlanGroupEditorSheet(title: "新建分组", initialName: "") { name in
-                    createGroup(name: name, sortOrder: sortOrder)
+                    try createGroup(name: name, sortOrder: sortOrder)
                 }
             case .rename(let group):
                 PlanGroupEditorSheet(title: "重命名分组", initialName: group.name) { name in
-                    renameGroup(group, name: name)
+                    try renameGroup(group, name: name)
                 }
             }
         }
-        // 排序统一为系统 sheet 弹窗（与「编辑动作」等弹层一致）：原生下滑关闭。
-        // 下滑与点「完成」等价——onDismiss 统一提交草稿顺序并退出排序。
-        .sheet(isPresented: $reorderPresented, onDismiss: commitReorder) {
+        .sheet(isPresented: $reorderPresented, onDismiss: {
+            reorderTarget = nil
+            reorderDraft = []
+        }) {
             InPlaceReorderPanel(title: reorderPanelTitle,
                                 items: reorderItems,
                                 onMove: { source, destination in
                                     reorderDraft.move(fromOffsets: source, toOffset: destination)
                                     Theme.Haptics.selection()
                                 },
-                                onDone: { reorderPresented = false })
+                                onCancel: { reorderPresented = false },
+                                onDone: commitReorder)
         }
         .paperConfirmDialog(
             isPresented: Binding(
@@ -299,13 +309,17 @@ struct PlanListView: View {
     private var floatingAddMenu: some View {
         CircleAddMenu(items: headerMenuItems, accessibilityLabel: "添加计划或分组")
             .frame(width: 48, height: 48)
+            .workoutOverlayObstacle()
             .padding(.trailing, Theme.Spacing.lg)
             .padding(.top, Theme.Spacing.sm)
             .padding(.bottom, Theme.Spacing.md)
     }
 
     private var planOverview: some View {
-        HStack(spacing: Theme.Spacing.sm) {
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Spacing.sm))
+            : AnyLayout(HStackLayout(spacing: Theme.Spacing.sm))
+        return layout {
             Text("总览")
                 .font(Theme.Font.mono(size: 12, weight: .semibold))
                 .tracking(0.08 * 12)
@@ -313,9 +327,8 @@ struct PlanListView: View {
             Text(planListOverview)
                 .font(Theme.Font.mono(size: 12.5, weight: .semibold))
                 .foregroundStyle(Theme.Color.muted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.88)
-            Spacer(minLength: 0)
+                .fixedSize(horizontal: false, vertical: true)
+            if dynamicTypeSize < .xxLarge { Spacer(minLength: 0) }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("计划总览，\(planListOverview)")
@@ -345,7 +358,7 @@ struct PlanListView: View {
             sectionHeader(section, collapsed: collapsed)
                 .zIndex(1)
             if !collapsed {
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     if !section.plans.isEmpty {
                         ForEach(Array(section.plans.enumerated()), id: \.element.localId) { index, plan in
                             Button { selectedPlan = plan } label: {
@@ -372,21 +385,26 @@ struct PlanListView: View {
                 HStack(spacing: Theme.Spacing.sm) {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(collapsed ? Theme.Color.muted : Theme.Color.accent)
+                        .foregroundStyle(collapsed ? Theme.Color.muted : Theme.Color.action)
                         .rotationEffect(.degrees(collapsed ? -90 : 0))
                         .frame(width: 32, height: 32)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: Theme.Spacing.sm) {
+                        let titleLayout = dynamicTypeSize >= .xxLarge
+                            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Spacing.sm))
+                            : AnyLayout(HStackLayout(spacing: Theme.Spacing.sm))
+                        titleLayout {
                             Text(section.title)
                                 .font(Theme.Font.body(size: 16, weight: .bold))
                                 .foregroundStyle(Theme.Color.fg)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.86)
+                                .lineLimit(dynamicTypeSize >= .xxLarge ? nil : 1)
+                                .fixedSize(horizontal: false, vertical: true)
                                 .layoutPriority(1)
                             Text("\(section.plans.count)")
                                 .font(Theme.Font.mono(size: 10, weight: .bold))
-                                .foregroundStyle(Theme.Color.accent)
+                                .foregroundStyle(Theme.Color.action)
+                                .fixedSize()
+                                .accessibilityIdentifier("plan.group.count.\(section.id)")
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
                                 .background(Theme.Color.accentSoft, in: Capsule())
@@ -395,23 +413,24 @@ struct PlanListView: View {
                             Text(subtitle)
                                 .font(Theme.Font.mono(size: 11))
                                 .foregroundStyle(Theme.Color.muted)
-                                .lineLimit(1)
+                                .lineLimit(dynamicTypeSize >= .xxLarge ? nil : 1)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
 
                     Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(collapsed ? "展开\(section.title)" : "折叠\(section.title)")
-            .accessibilityValue("\(section.plans.count) 个计划")
+            .accessibilityValue("\(collapsed ? "已折叠" : "已展开")，\(section.plans.count) 个计划")
             PaperActionMenuButton(items: sectionMenuItems(for: section),
                                   accessibilityLabel: "\(section.title)更多操作") { isPresented in
                 Image(systemName: "ellipsis")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(isPresented ? Theme.Color.accent : Theme.Color.fg)
+                    .foregroundStyle(isPresented ? Theme.Color.action : Theme.Color.fg)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
@@ -500,19 +519,24 @@ struct PlanListView: View {
         let usage = usage(for: plan)
         return HStack(alignment: .center, spacing: Theme.Spacing.md) {
             VStack(alignment: .leading, spacing: 7) {
-                HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
+                let titleLayout = dynamicTypeSize >= .xxLarge
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Spacing.sm))
+                    : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm))
+                titleLayout {
                     Text(plan.name)
                         .font(Theme.Font.body(size: 17, weight: .bold))
                         .foregroundStyle(Theme.Color.fg)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize >= .xxLarge ? nil : 1)
                         .truncationMode(.tail)
-                        .minimumScaleFactor(0.86)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    Spacer(minLength: Theme.Spacing.xs)
-
+                    if dynamicTypeSize < .xxLarge { Spacer(minLength: Theme.Spacing.xs) }
                     planUsageInlineLabel(usage)
                 }
-                HStack(spacing: 6) {
+                let metricLayout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                    : AnyLayout(HStackLayout(spacing: 6))
+                metricLayout {
                     planMetricPill("\(plan.totalExerciseCount) 个动作")
                     planMetricPill("\(plan.totalSuggestedSets) 组")
                 }
@@ -543,10 +567,10 @@ struct PlanListView: View {
                 .frame(width: 14)
             Text("累计训练 \(usage.completedCount) 次")
                 .font(Theme.Font.mono(size: 10.5))
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(Theme.Color.muted)
-        .fixedSize(horizontal: true, vertical: false)
+        .fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, vertical: true)
         .layoutPriority(1)
     }
 
@@ -554,7 +578,7 @@ struct PlanListView: View {
         Text(title)
             .font(Theme.Font.mono(size: 10.5, weight: .semibold))
             .foregroundStyle(Theme.Color.fg2)
-            .lineLimit(1)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(Theme.Color.surface2, in: Capsule())
@@ -604,52 +628,40 @@ struct PlanListView: View {
         (groups.map(\.sortOrder).max() ?? -1) + 1
     }
 
-    private func createGroup(name: String, sortOrder: Int) {
+    private func createGroup(name: String, sortOrder: Int) throws {
         let group = WorkoutPlanGroup(name: name, sortOrder: sortOrder)
-        modelContext.insert(group)
-        try? modelContext.save()
+        try LocalModelCommit.insert(group, in: modelContext)
     }
 
-    private func renameGroup(_ group: WorkoutPlanGroup, name: String) {
-        group.name = name
-        group.markDirty()
-        try? modelContext.save()
+    private func renameGroup(_ group: WorkoutPlanGroup, name: String) throws {
+        try LocalModelCommit.perform(in: modelContext) {
+            group.name = name
+            group.markDirty()
+        }
     }
 
     private func deleteGroup(_ group: WorkoutPlanGroup) {
         let name = group.name
-        for plan in plans where plan.groupId == group.localId {
-            plan.groupId = nil
-            plan.markDirty()
+        do {
+            try LocalModelCommit.perform(in: modelContext) {
+                for plan in plans where plan.groupId == group.localId {
+                    plan.groupId = nil
+                    plan.markDirty()
+                }
+                group.markDeleted()
+            }
+            Theme.Haptics.notification(.warning)
+            globalMessage.show("已删除「\(name)」", style: .success)
+        } catch {
+            globalMessage.show("删除失败，分组与计划仍保留，请重试", style: .error)
         }
-        group.markDeleted()
-        try? modelContext.save()
-        Theme.Haptics.notification(.warning)
-        globalMessage.show("已删除「\(name)」", style: .success)
     }
 
-    private func applyGroupOrder(_ orderedIds: [UUID]) {
-        var byId = Dictionary(uniqueKeysWithValues: groups.map { ($0.localId, $0) })
-        let ordered = orderedIds.compactMap { byId.removeValue(forKey: $0) }
-        guard ordered.map(\.localId) != orderedGroups.map(\.localId) else { return }
-        for (index, group) in ordered.enumerated() {
-            group.sortOrder = index
-            group.markDirty()
-        }
-        try? modelContext.save()
-        Theme.Haptics.selection()
-    }
-
-    private func applyPlanOrder(_ orderedIds: [UUID], groupId: UUID?) {
-        var byId = Dictionary(uniqueKeysWithValues: plans(in: groupId).map { ($0.localId, $0) })
-        let ordered = orderedIds.compactMap { byId.removeValue(forKey: $0) }
-        guard ordered.map(\.localId) != plans(in: groupId).map(\.localId) else { return }
-        for (index, plan) in ordered.enumerated() {
-            plan.sortOrder = index
-            plan.markDirty()
-        }
-        try? modelContext.save()
-        Theme.Haptics.selection()
+    private func persistInlineChanges() {
+        do {
+            try LocalModelSave.save(modelContext)
+            inlineSaveFailed = false
+        } catch { inlineSaveFailed = true }
     }
 }
 
@@ -657,6 +669,7 @@ struct PlanListView: View {
 
 struct PlanDetailView: View {
     @Bindable var plan: WorkoutPlan
+    @State private var inlineSaveFailed = false
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(SyncEngine.self) private var syncEngine
@@ -700,9 +713,10 @@ struct PlanDetailView: View {
     /// 严格模式缺失必填预设时，阻止开始训练并展示原因。
     @State private var strictStartError: String?
 
-    @ScaledMetric(relativeTo: .subheadline) private var detailTitleFontSize = 13
-    @ScaledMetric(relativeTo: .caption) private var detailBodyFontSize = 12
-    @ScaledMetric(relativeTo: .caption2) private var detailMetadataFontSize = 11.5
+    // 只保留基准尺寸，实际阅读字号由 Theme 的公共入口缩放一次。
+    private let detailTitleFontSize: CGFloat = 13
+    private let detailBodyFontSize: CGFloat = 12
+    private let detailMetadataFontSize: CGFloat = 11.5
 
     private static let log = Logger(subsystem: "com.yulinxi.app.DontLift", category: "PlanDetail")
 
@@ -736,10 +750,10 @@ struct PlanDetailView: View {
         Theme.Haptics.impact(.light)
     }
 
-    /// 排序 sheet 关闭（下滑或「完成」）后统一提交：把草稿顺序一次性写回模型（无变化时 apply 内部直接返回）。
-    private func commitReorder() {
-        applyPlanItemOrder(reorderDraft)
+    private func commitReorder() throws {
+        try ReorderPersistence.planItems(plan, orderedIDs: reorderDraft, in: modelContext)
         reordering = false
+        Theme.Haptics.selection()
     }
 
     var body: some View {
@@ -794,10 +808,17 @@ struct PlanDetailView: View {
         }
         // 对齐原型 .footer：scroll 与 footer 为兄弟（内容不穿底栏），底栏实底 + 顶部分隔线。
         // 排序模式下隐藏底栏：排序区之外不允许任何操作。
-        .safeAreaInset(edge: .bottom, spacing: 0) { if !reordering { bottomBar } }
+        .safeAreaInset(edge: .bottom, spacing: 0) { if !reordering { bottomBar.workoutOverlayObstacle() } }
+        .workoutOverlayViewport()
         .onAppear { WorkoutPerformanceMonitor.event("plan.detail.appear") }
         // 子页统一导航栏：圆形返回 + ⋯ 菜单（标题留空，计划名在内容区大字呈现）。
-        // 排序模式下返回键无效、⋯ 菜单隐藏：不点「完成」不允许任何操作。
+        // 排序面板呈现期间由其取消／完成操作退出。
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if inlineSaveFailed { LocalSaveRetryBanner(onRetry: persistInlineChanges) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: LocalModelSave.didSave, object: modelContext)) { _ in
+            inlineSaveFailed = false
+        }
         .paperToolbar(onBack: { if !reordering { dismiss() } }) {
             if !reordering {
                 CircleIconMenu(systemName: "ellipsis",
@@ -835,7 +856,7 @@ struct PlanDetailView: View {
                 items.append(newItem)
                 plan.items = items
                 plan.markDirty()
-                try? modelContext.save()
+                persistInlineChanges()
                 pendingEditAfterPick = newItem
             }
         }
@@ -847,47 +868,49 @@ struct PlanDetailView: View {
         }
         .sheet(isPresented: $creatingSuperset) {
             SupersetCreationSheet { result in
-                addPlanSuperset(result)
+                try addPlanSuperset(result)
             }
         }
         .sheet(item: $editingItem) { item in
             PlanItemEditorView(item: item) { updated in
                 var items = plan.items
-                if let idx = items.firstIndex(where: { $0.itemId == updated.itemId }) {
+                guard let idx = items.firstIndex(where: { $0.itemId == updated.itemId }) else {
+                    throw PlanEditingError.sourceUnavailable
+                }
+                try LocalModelCommit.perform(in: modelContext) {
                     items[idx] = updated
                     plan.items = items
                     plan.markDirty()
-                    try? modelContext.save()
                 }
             }
         }
         .sheet(item: $editingSupersetItem) { item in
             SupersetCreationSheet(title: "编辑超级组",
                                   initial: supersetInitialResult(from: item)) { result in
-                updatePlanSuperset(itemId: item.itemId, result: result)
+                try updatePlanSuperset(itemId: item.itemId, result: result)
             }
         }
         .sheet(isPresented: $editing) {
             PlanRenameSheet(plan: plan)
         }
-        // 排序统一为系统 sheet 弹窗（与「编辑动作」等弹层一致）：原生下滑关闭。
-        // 下滑与点「完成」等价——onDismiss 统一提交草稿顺序并退出排序。
-        .sheet(isPresented: $reordering, onDismiss: commitReorder) {
+        .sheet(isPresented: $reordering, onDismiss: { reorderDraft = [] }) {
             InPlaceReorderPanel(title: "训练动作排序",
                                 items: reorderItems,
                                 onMove: { source, destination in
                                     reorderDraft.move(fromOffsets: source, toOffset: destination)
                                     Theme.Haptics.selection()
                                 },
-                                onDone: { reordering = false })
+                                onCancel: { reordering = false },
+                                onDone: commitReorder)
         }
         .sheet(isPresented: $editingPlanNote) {
             PlanNoteEditorSheet(title: "计划备注",
                                 placeholder: "记录这份计划的整体安排、周期或注意事项…",
                                 initial: plan.note) { saved in
-                plan.note = saved
-                plan.markDirty()
-                try? modelContext.save()
+                try LocalModelCommit.perform(in: modelContext) {
+                    plan.note = saved
+                    plan.markDirty()
+                }
             }
         }
         .sheet(isPresented: $movingGroup) {
@@ -901,27 +924,21 @@ struct PlanDetailView: View {
         .sheet(isPresented: $showingMode) {
             PlanModeSheet(plan: plan)
         }
-        // 训练冲突二次确认：统一为纸感弹窗。无独立取消按钮，点蒙层即取消；
-        // 「丢弃并开始新训练」为主（红填充）、「继续训练」为次（描边）。
-        .paperConfirmDialog(
+        // 继续为主、丢弃为危险次操作；取消仅清理本次待启动状态。
+        .activeWorkoutConflictDialog(
             isPresented: $showConflict,
-            title: "已有进行中的训练",
-            message: "同一时间只能有一个进行中的训练。继续既有训练，或丢弃后开始新的。",
-            confirmTitle: "丢弃并开始新训练",
-            secondaryTitle: "继续训练",
-            onSecondary: {
+            onContinue: {
                 if let existing = conflict { workoutPresentation.present(existing) }
                 clearConflict()
             },
-            showCancel: false,
-            onConfirm: {
-                if let existing = conflict {
-                    WorkoutSession.discard(existing, in: modelContext)
-                    restTimer.stop()   // 丢弃旧会话即停止其可能进行中的休息计时全套。
-                    if let build = pendingBuild { commit(build) }
+            onDiscard: {
+                if let existing = conflict, let build = pendingBuild,
+                   commit(build, replacing: existing) {
+                    restTimer.stop()
                 }
                 clearConflict()
-            }
+            },
+            onCancel: { clearConflict() }
         )
         .paperConfirmDialog(
             isPresented: Binding(
@@ -963,10 +980,10 @@ struct PlanDetailView: View {
                     .font(Theme.Font.body(size: 13, weight: .medium))
                     .foregroundStyle(Theme.Color.fg2)
                     .padding(.top, 8)
+                    .frame(minHeight: 44)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityElement(children: .combine)
                 .accessibilityLabel("计划备注，\(note)")
                 .accessibilityHint("点按编辑计划备注")
             }
@@ -1025,14 +1042,20 @@ struct PlanDetailView: View {
             if orderedItems.count > 1 {
                 // 胶囊大命中区（32pt 高），点击进入就地拖拽排序模式（与训练进行中一致）。
                 Button(action: beginReorder) {
-                    Label("排序", systemImage: "arrow.up.arrow.down")
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.up.arrow.down")
+                        Text("排序")
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
                         .font(Theme.Font.body(size: 12, weight: .bold))
-                        .foregroundStyle(Theme.Color.accent)
+                        .foregroundStyle(Theme.Color.action)
                         .padding(.horizontal, 12)
-                        .frame(height: 32)
+                        .padding(.vertical, 6)
+                        .frame(minHeight: 32)
                         .background(Theme.Color.accentSoft, in: Capsule())
                         .overlay(Capsule().stroke(Theme.Color.accentSofter, lineWidth: 1))
-                        .contentShape(Capsule())
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("调整动作顺序")
@@ -1053,31 +1076,40 @@ struct PlanDetailView: View {
                     expandedItemId = isExpanded ? nil : item.itemId
                 }
             } label: {
-                HStack(spacing: 11) {
-                    Text(String(format: "%02d", index))
-                        .font(Theme.Font.mono(size: 12, weight: .bold))
-                        .foregroundStyle(Theme.Color.muted)
-                        .frame(width: 18)
-                    planItemKindIcon(item)
+                let layout = dynamicTypeSize >= .xxLarge
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                    : AnyLayout(HStackLayout(spacing: 11))
+                layout {
+                    HStack(spacing: 8) {
+                        Text(String(format: "%02d", index))
+                            .font(Theme.Font.mono(size: 12, weight: .bold))
+                            .foregroundStyle(Theme.Color.muted)
+                            .fixedSize()
+                            .frame(minWidth: 18, alignment: .leading)
+                        planItemKindIcon(item)
+                    }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(planItemTitle(item))
                             .font(Theme.Font.body(size: 15, weight: .semibold))
                             .foregroundStyle(Theme.Color.fg)
-                            .lineLimit(1)
+                            .lineLimit(dynamicTypeSize >= .xxLarge ? nil : 1)
                             .truncationMode(.tail)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text(PlanItemDisplay.compactSummary(for: item))
                             .font(Theme.Font.body(size: 12))
                             .foregroundStyle(Theme.Color.fg2)
-                            .lineLimit(1)
+                            .lineLimit(dynamicTypeSize >= .xxLarge ? nil : 1)
                             .truncationMode(.tail)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("\(planItemTitle(item))，\(PlanItemDisplay.compactSummary(for: item))")
+            .accessibilityIdentifier("plan.item.\(item.itemId.uuidString)")
             .accessibilityValue(isExpanded ? "已展开" : "已收起")
             .accessibilityHint(isExpanded ? "双击收起训练安排" : "双击展开训练安排")
 
@@ -1085,8 +1117,8 @@ struct PlanDetailView: View {
                                   accessibilityLabel: "\(item.unitDisplayName)更多操作") { isPresented in
                 Image(systemName: "ellipsis")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(isPresented ? Theme.Color.accent : Theme.Color.fg2)
-                    .frame(width: 34, height: 34)
+                    .foregroundStyle(isPresented ? Theme.Color.action : Theme.Color.fg2)
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
         }
@@ -1158,7 +1190,7 @@ struct PlanDetailView: View {
 
             if groups.isEmpty {
                 Text("尚未设置组次")
-                    .font(Theme.Font.body(size: detailTitleFontSize))
+                    .font(Theme.Font.body(size: detailTitleFontSize, relativeTo: .subheadline))
                     .foregroundStyle(Theme.Color.muted)
             } else {
                 VStack(spacing: 0) {
@@ -1186,10 +1218,10 @@ struct PlanDetailView: View {
                 detailDivider
                 VStack(alignment: .leading, spacing: 5) {
                     Text("备选动作")
-                        .font(Theme.Font.body(size: detailBodyFontSize, weight: .bold))
+                        .font(Theme.Font.body(size: detailBodyFontSize, weight: .bold, relativeTo: .caption))
                         .foregroundStyle(Theme.Color.fg2)
                     Text(item.usableAlternatives.map(\.displayExerciseName).joined(separator: "、"))
-                        .font(Theme.Font.body(size: detailTitleFontSize))
+                        .font(Theme.Font.body(size: detailTitleFontSize, relativeTo: .subheadline))
                         .foregroundStyle(Theme.Color.fg)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -1232,7 +1264,7 @@ struct PlanDetailView: View {
             }
             if plan.mode == .strict {
                 Label("严格模式 · 完成后不更新", systemImage: "lock")
-                    .font(Theme.Font.body(size: detailBodyFontSize, weight: .semibold))
+                    .font(Theme.Font.body(size: detailBodyFontSize, weight: .semibold, relativeTo: .caption))
                     .foregroundStyle(Theme.Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1243,7 +1275,7 @@ struct PlanDetailView: View {
     private func trainingArrangementHeader(_ preview: PlanPrescriptionPreview) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             if plan.mode == .adaptive {
-                if dynamicTypeSize.isAccessibilitySize {
+                if dynamicTypeSize >= .xxLarge {
                     VStack(alignment: .leading, spacing: 5) {
                         detailSectionTitle("下次训练安排")
                         previewBadge(preview.badgeText)
@@ -1255,13 +1287,13 @@ struct PlanDetailView: View {
                     }
                 }
                 Text(preview.detailText)
-                    .font(Theme.Font.body(size: detailMetadataFontSize))
+                    .font(Theme.Font.body(size: detailMetadataFontSize, relativeTo: .caption2))
                     .foregroundStyle(Theme.Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 detailSectionTitle("训练安排")
                 Label("严格模式 · 完成后不更新", systemImage: "lock")
-                    .font(Theme.Font.body(size: detailBodyFontSize, weight: .semibold))
+                    .font(Theme.Font.body(size: detailBodyFontSize, weight: .semibold, relativeTo: .caption))
                     .foregroundStyle(Theme.Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1270,8 +1302,8 @@ struct PlanDetailView: View {
 
     private func previewBadge(_ text: String) -> some View {
         Text(text)
-            .font(Theme.Font.body(size: detailMetadataFontSize, weight: .bold))
-            .foregroundStyle(Theme.Color.accent)
+            .font(Theme.Font.body(size: detailMetadataFontSize, weight: .bold, relativeTo: .caption2))
+            .foregroundStyle(Theme.Color.action)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .background(Theme.Color.accentSoft, in: Capsule())
@@ -1279,7 +1311,7 @@ struct PlanDetailView: View {
 
     private func detailSectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(Theme.Font.body(size: detailTitleFontSize, weight: .bold))
+            .font(Theme.Font.body(size: detailTitleFontSize, weight: .bold, relativeTo: .subheadline))
             .foregroundStyle(Theme.Color.fg)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -1288,7 +1320,7 @@ struct PlanDetailView: View {
         VStack(alignment: .leading, spacing: 6) {
             if group.kind == .drop {
                 Text(group.title)
-                    .font(Theme.Font.body(size: detailBodyFontSize, weight: .semibold))
+                    .font(Theme.Font.body(size: detailBodyFontSize, weight: .semibold, relativeTo: .caption))
                     .foregroundStyle(Theme.Color.fg2)
                 ForEach(group.values) { value in
                     detailKeyValue(label: "第 \(value.position + 1) 段",
@@ -1304,7 +1336,7 @@ struct PlanDetailView: View {
 
     @ViewBuilder
     private func detailKeyValue(label: String, value: String) -> some View {
-        if dynamicTypeSize.isAccessibilitySize {
+        if dynamicTypeSize >= .xxLarge {
             VStack(alignment: .leading, spacing: 4) {
                 detailLabel(label)
                 detailValue(value, alignment: .leading)
@@ -1327,7 +1359,7 @@ struct PlanDetailView: View {
                 .foregroundStyle(Theme.Color.muted)
                 .padding(.top, 2)
             Text(note)
-                .font(Theme.Font.body(size: detailTitleFontSize))
+                .font(Theme.Font.body(size: detailTitleFontSize, relativeTo: .subheadline))
                 .foregroundStyle(Theme.Color.fg2)
                 .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.leading)
@@ -1339,14 +1371,14 @@ struct PlanDetailView: View {
 
     private func detailLabel(_ text: String) -> some View {
         Text(text)
-            .font(Theme.Font.body(size: detailBodyFontSize))
+            .font(Theme.Font.body(size: detailBodyFontSize, relativeTo: .caption))
             .foregroundStyle(Theme.Color.muted)
             .fixedSize(horizontal: false, vertical: true)
     }
 
     private func detailValue(_ text: String, alignment: TextAlignment) -> some View {
         Text(text)
-            .font(Theme.Font.mono(size: detailBodyFontSize, weight: .semibold))
+            .font(Theme.Font.mono(size: detailBodyFontSize, weight: .semibold, relativeTo: .caption))
             .foregroundStyle(Theme.Color.fg)
             .multilineTextAlignment(alignment)
             .fixedSize(horizontal: false, vertical: true)
@@ -1360,10 +1392,13 @@ struct PlanDetailView: View {
 
     private var modeInfoCard: some View {
         Button { showingMode = true } label: {
-            HStack(alignment: .top, spacing: Theme.Spacing.md) {
+            let layout = dynamicTypeSize >= .xxLarge
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Spacing.md))
+                : AnyLayout(HStackLayout(alignment: .top, spacing: Theme.Spacing.md))
+            layout {
                 Image(systemName: plan.mode == .adaptive ? "arrow.triangle.2.circlepath" : "lock")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Theme.Color.accent)
+                    .foregroundStyle(Theme.Color.action)
                     .frame(width: 22, height: 22)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(plan.mode.title)
@@ -1376,15 +1411,16 @@ struct PlanDetailView: View {
                         .foregroundStyle(Theme.Color.fg2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 0)
+                if dynamicTypeSize < .xxLarge { Spacer(minLength: 0) }
                 Text("规则")
                     .font(Theme.Font.mono(size: 11, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
+                    .foregroundStyle(Theme.Color.action)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .cardStyle()
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(plan.mode.title)，查看规则")
     }
 
     private var emptyExercisesCard: some View {
@@ -1433,17 +1469,19 @@ struct PlanDetailView: View {
                 Text(title)
                     .font(Theme.Font.body(size: 12.5, weight: .semibold))
             }
-            .foregroundStyle(compact ? Theme.Color.muted : Theme.Color.accent)
+            .foregroundStyle(compact ? Theme.Color.muted : Theme.Color.action)
             .padding(.horizontal, compact ? 12 : 22)
             .frame(maxWidth: compact ? nil : .infinity)
-            .frame(height: compact ? 36 : 40)
+            .padding(.vertical, 10)
+            .frame(minHeight: compact ? 36 : 40)
             .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                     .stroke(compact ? Theme.Color.border : Theme.Color.accentSofter,
                             style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
             )
-            .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -1472,7 +1510,10 @@ struct PlanDetailView: View {
     // 对齐原型 .footer：复制=ghost 次级键(自适应宽 + border2 + sh-sm)，开始=主键(flex1 + accent)；
     // 容器实底 bg + 顶部 1px 分隔线。主次对比靠填充 vs 描边，不靠尺寸。
     private var bottomBar: some View {
-        HStack(spacing: 10) {
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(spacing: 10))
+            : AnyLayout(HStackLayout(spacing: 10))
+        return layout {
             Button { duplicate() } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "doc.on.doc")
@@ -1482,7 +1523,8 @@ struct PlanDetailView: View {
                 }
                 .foregroundStyle(Theme.Color.fg)
                 .padding(.horizontal, 16)
-                .frame(height: 50)
+                .padding(.vertical, 12)
+                .frame(maxWidth: dynamicTypeSize >= .xxLarge ? .infinity : nil, minHeight: 50)
                 .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
@@ -1502,8 +1544,9 @@ struct PlanDetailView: View {
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                .padding(.vertical, 12)
+                .frame(minHeight: 50)
+                .background(Theme.Color.action, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                 .shadow(color: Theme.Color.accent.opacity(0.24), radius: 7, x: 0, y: 4)
             }
             .buttonStyle(PressableButtonStyle())
@@ -1579,8 +1622,12 @@ struct PlanDetailView: View {
                                forkedFrom: plan.localId,
                                groupId: nil,
                                sortOrder: nextSortOrder(in: nil))
-        modelContext.insert(copy)
-        try? modelContext.save()
+        do {
+            try LocalModelCommit.insert(copy, in: modelContext)
+            globalMessage.show("已复制计划", style: .success)
+        } catch {
+            globalMessage.show("复制失败，原计划仍保留，请重试", style: .error)
+        }
     }
 
     private func nextSortOrder(in groupId: UUID?) -> Int {
@@ -1717,33 +1764,43 @@ struct PlanDetailView: View {
         PlanWorkoutBuilder.workout(from: plan, lookup: historyStore.planLookup)
     }
 
-    private func commit(_ build: () -> Workout) {
-        let w = build()
-        modelContext.insert(w)
-        try? modelContext.save()
-        historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
-        NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
-        workoutPresentation.present(w)
+    @discardableResult
+    private func commit(_ build: () -> Workout, replacing existing: Workout? = nil) -> Bool {
+        do {
+            let workout = try WorkoutSession.start(build, replacing: existing, in: modelContext)
+            historyStore.scheduleRefresh(reason: .workoutChanged, delayNanoseconds: 0)
+            NotificationCenter.default.post(name: .dontliftActiveWorkoutChanged, object: nil)
+            workoutPresentation.present(workout)
+            return true
+        } catch {
+            globalMessage.show((error as? WorkoutSession.StartError)?.errorDescription
+                               ?? (existing == nil ? "开始失败，请重试" : "开始失败，原训练仍保留，请重试"), style: .error)
+            return false
+        }
     }
 
-    private func addPlanSuperset(_ result: SupersetCreationResult) {
+    private func addPlanSuperset(_ result: SupersetCreationResult) throws {
         var items = plan.items
         items.append(planSupersetItem(from: result, itemId: UUID(), orderIndex: items.count, existing: nil))
-        plan.items = items
-        plan.markDirty()
-        try? modelContext.save()
+        try LocalModelCommit.perform(in: modelContext) {
+            plan.items = items
+            plan.markDirty()
+        }
     }
 
-    private func updatePlanSuperset(itemId: UUID, result: SupersetCreationResult) {
+    private func updatePlanSuperset(itemId: UUID, result: SupersetCreationResult) throws {
         var items = plan.items
-        guard let idx = items.firstIndex(where: { $0.itemId == itemId }) else { return }
+        guard let idx = items.firstIndex(where: { $0.itemId == itemId }) else {
+            throw PlanEditingError.sourceUnavailable
+        }
         items[idx] = planSupersetItem(from: result,
                                       itemId: itemId,
                                       orderIndex: items[idx].orderIndex,
                                       existing: items[idx])
-        plan.items = items
-        plan.markDirty()
-        try? modelContext.save()
+        try LocalModelCommit.perform(in: modelContext) {
+            plan.items = items
+            plan.markDirty()
+        }
     }
 
     private func planSupersetItem(from result: SupersetCreationResult,
@@ -1799,32 +1856,35 @@ struct PlanDetailView: View {
     }
 
     private func delete() {
-        plan.markDeleted()
-        try? modelContext.save()
-        dismiss()
+        do {
+            try LocalModelCommit.perform(in: modelContext) { plan.markDeleted() }
+            dismiss()
+        } catch {
+            globalMessage.show("删除失败，计划仍保留，请重试", style: .error)
+        }
     }
 
     /// 删除单个动作项：从 items 移除后按顺序重排 orderIndex，markDirty 并落盘。
     private func deleteItem(_ item: PlanItem) {
-        if expandedItemId == item.itemId { expandedItemId = nil }
         var items = plan.items.sorted { $0.orderIndex < $1.orderIndex }
         items.removeAll { $0.itemId == item.itemId }
         for i in items.indices { items[i].orderIndex = i }
-        plan.items = items
-        plan.markDirty()
-        try? modelContext.save()
+        do {
+            try LocalModelCommit.perform(in: modelContext) {
+                plan.items = items
+                plan.markDirty()
+            }
+            if expandedItemId == item.itemId { expandedItemId = nil }
+        } catch {
+            globalMessage.show("删除失败，原动作仍保留，请重试", style: .error)
+        }
     }
 
-    private func applyPlanItemOrder(_ orderedIds: [UUID]) {
-        var byId = Dictionary(uniqueKeysWithValues: plan.items.map { ($0.itemId, $0) })
-        var items = orderedIds.compactMap { byId.removeValue(forKey: $0) }
-        items.append(contentsOf: byId.values.sorted { $0.orderIndex < $1.orderIndex })
-        guard items.map(\.itemId) != orderedItems.map(\.itemId) else { return }
-        for i in items.indices { items[i].orderIndex = i }
-        plan.items = items
-        plan.markDirty()
-        try? modelContext.save()
-        Theme.Haptics.selection()
+    private func persistInlineChanges() {
+        do {
+            try LocalModelSave.save(modelContext)
+            inlineSaveFailed = false
+        } catch { inlineSaveFailed = true }
     }
 }
 
@@ -1917,7 +1977,7 @@ private struct PlanShareToTeamSheet: View {
                     summary
                     if loading && teamService.teams.isEmpty {
                         ProgressView()
-                            .tint(Theme.Color.accent)
+                            .tint(Theme.Color.action)
                             .frame(maxWidth: .infinity)
                             .padding(.top, Theme.Spacing.lg)
                     } else if teamService.teams.isEmpty {
@@ -1986,7 +2046,7 @@ private struct PlanShareToTeamSheet: View {
         return HStack(spacing: 12) {
             Text(String(team.name.prefix(1)))
                 .font(Theme.Font.body(size: 13, weight: .bold))
-                .foregroundStyle(Theme.Color.accent)
+                .foregroundStyle(Theme.Color.action)
                 .frame(width: 36, height: 36)
                 .background(Theme.Color.accentSoft, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
             VStack(alignment: .leading, spacing: 2) {
@@ -1999,7 +2059,7 @@ private struct PlanShareToTeamSheet: View {
             }
             Spacer(minLength: 8)
             if busy {
-                ProgressView().tint(Theme.Color.accent)
+                ProgressView().tint(Theme.Color.action)
             } else if let existing {
                 HStack(spacing: 8) {
                     rowActionButton("更新") {
@@ -2025,7 +2085,7 @@ private struct PlanShareToTeamSheet: View {
         Button(action: action) {
             Text(title)
                 .font(Theme.Font.body(size: 13, weight: .bold))
-                .foregroundStyle(destructive ? Theme.Color.danger : Theme.Color.accent)
+                .foregroundStyle(destructive ? Theme.Color.danger : Theme.Color.action)
                 .frame(minWidth: 44)
                 .frame(height: 34)
                 .padding(.horizontal, 8)
@@ -2127,6 +2187,7 @@ struct PlanEditorView: View {
     @State private var choosingGroup = false
     @State private var submission = PlanCreationSubmission()
     @State private var saveError: String?
+    @FocusState private var nameFocused: Bool
     @FocusState private var noteFocused: Bool
 
     /// - Parameters:
@@ -2157,74 +2218,79 @@ struct PlanEditorView: View {
     var body: some View {
         ZStack {
             Theme.Color.bg.ignoresSafeArea()
-            VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                Text("新建计划").eyebrowStyle()
-                TextField("", text: $name, prompt: Text("计划名称").foregroundColor(Theme.Color.muted))
-                    .font(Theme.Font.display(size: 24, weight: .bold))
-                    .foregroundStyle(Theme.Color.fg)
-                    .padding(Theme.Spacing.md)
-                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("计划模式").eyebrowStyle()
-                    modeOption(.adaptive)
-                    modeOption(.strict)
-                }
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    HStack {
-                        Text("计划备注").eyebrowStyle()
-                        Spacer()
-                        Text("\(note.count)/\(PlanNoteEditorSheet.limit)")
-                            .font(Theme.Font.mono(size: 12, weight: .medium))
-                            .foregroundStyle(note.count >= PlanNoteEditorSheet.limit ? Theme.Color.fg2 : Theme.Color.muted)
-                    }
-                    ZStack(alignment: .topLeading) {
-                        TextEditor(text: limitedNote)
-                            .font(Theme.Font.body(size: 15, weight: .medium))
+            VStack(spacing: 0) {
+                LocalSaveErrorLabel(message: saveError)
+                    .accessibilityIdentifier("planEditor.saveError")
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                        Text("计划名称").eyebrowStyle()
+                        TextField("", text: $name, prompt: Text("计划名称").foregroundColor(Theme.Color.muted))
+                            .accessibilityLabel("计划名称")
+                            .focused($nameFocused)
+                            .submitLabel(.done)
+                            .onSubmit { nameFocused = false }
+                            .font(Theme.Font.display(size: 24, weight: .bold))
                             .foregroundStyle(Theme.Color.fg)
-                            .scrollContentBackground(.hidden)
-                            .focused($noteFocused)
-                            .padding(10)
-                            .frame(minHeight: 88)
+                            .padding(Theme.Spacing.md)
                             .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                                    .stroke(noteFocused ? Theme.Color.accent : Theme.Color.border,
-                                            lineWidth: noteFocused ? 1.7 : 1)
-                            )
-                            .accessibilityLabel("计划备注输入框")
-                        if note.isEmpty {
-                            Text("记录这份计划的整体安排、周期或注意事项…")
-                                .font(Theme.Font.body(size: 15, weight: .medium))
-                                .foregroundStyle(Theme.Color.muted)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 18)
-                                .allowsHitTesting(false)
+                            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1).allowsHitTesting(false))
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            Text("计划模式").eyebrowStyle()
+                            modeOption(.adaptive)
+                            modeOption(.strict)
+                        }
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            HStack {
+                                Text("计划备注").eyebrowStyle()
+                                Spacer()
+                                Text("\(note.count)/\(PlanNoteEditorSheet.limit)")
+                                    .font(Theme.Font.mono(size: 12, weight: .medium))
+                                    .foregroundStyle(note.count >= PlanNoteEditorSheet.limit ? Theme.Color.fg2 : Theme.Color.muted)
+                            }
+                            ZStack(alignment: .topLeading) {
+                                TextEditor(text: limitedNote)
+                                    .font(Theme.Font.body(size: 15, weight: .medium))
+                                    .foregroundStyle(Theme.Color.fg)
+                                    .scrollContentBackground(.hidden)
+                                    .focused($noteFocused)
+                                    .padding(10)
+                                    .frame(minHeight: 88)
+                                    .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                            .stroke(noteFocused ? Theme.Color.accent : Theme.Color.border,
+                                                    lineWidth: noteFocused ? 1.7 : 1)
+                                            .allowsHitTesting(false)
+                                    )
+                                    .accessibilityLabel("计划备注输入框")
+                                if note.isEmpty {
+                                    Text("记录这份计划的整体安排、周期或注意事项…")
+                                        .font(Theme.Font.body(size: 15, weight: .medium))
+                                        .foregroundStyle(Theme.Color.muted)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 18)
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            Text("分组").eyebrowStyle()
+                            groupPicker
                         }
                     }
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.vertical, Theme.Spacing.md)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("分组").eyebrowStyle()
-                    groupPicker
-                }
-                if let saveError {
-                    Text(saveError)
-                        .font(Theme.Font.body(size: 12))
-                        .foregroundStyle(Theme.Color.danger)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("planEditor.saveError")
-                }
-                Spacer()
+                .scrollDismissesKeyboard(.interactively)
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.top, Theme.Spacing.md)
         }
         // 子页统一导航栏：圆形返回 + 右侧保存键（双环处理收口在 paperToolbar）。
         .paperToolbar(title: existing == nil ? "新建计划" : "编辑计划", onBack: { dismiss() }) {
             Button("保存") { save() }
                 .font(Theme.Font.body(size: 15, weight: .semibold))
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || submission.hasCreated)
-                .tint(Theme.Color.accent)
+                .tint(Theme.Color.action)
         }
         .sheet(isPresented: $choosingGroup) {
             PlanGroupPickerSheet(selectedGroupId: groupId, groups: orderedGroups) { selected in
@@ -2236,9 +2302,14 @@ struct PlanEditorView: View {
     private func save() {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         if let existing {
-            Self.applyBasicInfo(to: existing, name: name, note: note, mode: mode, groupId: groupId)
-            try? modelContext.save()
-            dismiss()
+            do {
+                try Self.saveBasicInfo(to: existing, name: name, note: note, mode: mode,
+                                       groupId: groupId, in: modelContext)
+                saveError = nil
+                dismiss()
+            } catch {
+                saveError = "保存失败，当前输入仍保留，请重试"
+            }
             return
         }
         do {
@@ -2254,6 +2325,21 @@ struct PlanEditorView: View {
             onCreated?(plan)
         } catch {
             saveError = (error as? LocalizedError)?.errorDescription ?? "保存失败，请重试"
+        }
+    }
+
+    static func saveBasicInfo(to plan: WorkoutPlan,
+                              name: String,
+                              note: String,
+                              mode: WorkoutPlanMode,
+                              groupId: UUID?,
+                              in context: ModelContext,
+                              persist: (ModelContext) throws -> Void = { try LocalModelSave.save($0) }) throws {
+        try LocalModelCommit.perform(in: context, persist: persist) {
+            applyBasicInfo(to: plan, name: name, note: note, mode: mode, groupId: groupId)
+            #if DEBUG
+            try UITestHooks.failFirstSaveIfNeeded("plan")
+            #endif
         }
     }
 
@@ -2283,6 +2369,7 @@ struct PlanEditorView: View {
         } label: {
             HStack(spacing: Theme.Spacing.md) {
                 Image(systemName: "folder")
+                    .font(.system(size: 17))
                     .foregroundStyle(Theme.Color.fg2)
                     .frame(width: 22)
                 Text(selectedGroupName)
@@ -2306,7 +2393,7 @@ struct PlanEditorView: View {
             HStack(alignment: .top, spacing: Theme.Spacing.md) {
                 Image(systemName: selected ? "largecircle.fill.circle" : "circle")
                     .font(.system(size: 18))
-                    .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.muted)
+                    .foregroundStyle(selected ? Theme.Color.action : Theme.Color.muted)
                     .frame(width: 24, height: 24)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(candidate.title).font(Theme.Font.l2).foregroundStyle(Theme.Color.fg)
@@ -2326,9 +2413,11 @@ struct PlanEditorView: View {
 /// 计划名称与整体备注编辑 sheet（PlanDetailView 三点菜单触发）。
 struct PlanRenameSheet: View {
     @Bindable var plan: WorkoutPlan
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var note: String
+    @State private var saveError: String?
     @FocusState private var noteFocused: Bool
 
     init(plan: WorkoutPlan) {
@@ -2356,16 +2445,27 @@ struct PlanRenameSheet: View {
                 onConfirm: save
             )
 
+            if let saveError {
+                Text(saveError)
+                    .font(Theme.Font.l4)
+                    .foregroundStyle(Theme.Color.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.vertical, Theme.Spacing.sm)
+                    .accessibilityIdentifier("planEditor.saveError")
+            }
+
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                         Text("计划名称").eyebrowStyle()
                         TextField("", text: $name)
+                            .accessibilityLabel("计划名称")
                             .font(Theme.Font.display(size: 22, weight: .bold))
                             .foregroundStyle(Theme.Color.fg)
                             .padding(Theme.Spacing.md)
                             .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.Color.border, lineWidth: 1).allowsHitTesting(false))
                     }
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                         HStack {
@@ -2388,6 +2488,7 @@ struct PlanRenameSheet: View {
                                     RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                                         .stroke(noteFocused ? Theme.Color.accent : Theme.Color.border,
                                                 lineWidth: noteFocused ? 1.7 : 1)
+                                        .allowsHitTesting(false)
                                 )
                                 .accessibilityLabel("计划备注输入框")
                             if note.isEmpty {
@@ -2414,10 +2515,14 @@ struct PlanRenameSheet: View {
     private func save() {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
-        plan.name = trimmed
-        plan.note = PlanNoteEditorSheet.normalize(note)
-        plan.markDirty()
-        dismiss()
+        do {
+            try PlanEditorView.saveBasicInfo(to: plan, name: trimmed, note: note,
+                                              mode: plan.mode, groupId: plan.groupId, in: modelContext)
+            saveError = nil
+            dismiss()
+        } catch {
+            saveError = "保存失败，当前输入仍保留，请重试"
+        }
     }
 }
 
@@ -2428,16 +2533,18 @@ struct PlanNoteEditorSheet: View {
     let title: String
     let placeholder: String
     let initial: String?
-    let onSave: (String?) -> Void
+    let onSave: (String?) throws -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var draft: String
+    @State private var saveError: String?
     @FocusState private var editorFocused: Bool
 
     init(title: String,
          placeholder: String = "记录要点、提醒或注意事项…",
          initial: String?,
-         onSave: @escaping (String?) -> Void) {
+         onSave: @escaping (String?) throws -> Void) {
         self.title = title
         self.placeholder = placeholder
         self.initial = initial
@@ -2465,73 +2572,88 @@ struct PlanNoteEditorSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            PaperSheetHeader(
-                title: title,
-                cancelTitle: "取消",
-                confirmTitle: "完成",
-                background: Theme.Color.surface,
-                onCancel: { dismiss() },
-                onConfirm: {
-                    onSave(Self.normalize(draft))
-                    dismiss()
-                }
-            )
-            VStack(alignment: .leading, spacing: 14) {
-                ZStack(alignment: .topLeading) {
-                    TextEditor(text: limitedDraft)
-                        .font(Theme.Font.body(size: 16, weight: .medium))
-                        .foregroundStyle(Theme.Color.fg)
-                        .scrollContentBackground(.hidden)
-                        .focused($editorFocused)
-                        .padding(10)
-                        .frame(minHeight: 180)
-                        .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                                .stroke(editorFocused ? Theme.Color.accent : Theme.Color.border2,
-                                        lineWidth: editorFocused ? 1.7 : 1)
-                        )
-                        .accessibilityLabel("\(title)输入框")
-                    if draft.isEmpty {
-                        Text(placeholder)
-                            .font(Theme.Font.body(size: 16, weight: .medium))
-                            .foregroundStyle(Theme.Color.muted)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 18)
-                            .allowsHitTesting(false)
-                    }
-                }
+        NavigationStack {
+            VStack(spacing: 0) {
+                PaperSheetHeader(
+                    title: title,
+                    cancelTitle: "取消",
+                    confirmTitle: "完成",
+                    background: Theme.Color.surface,
+                    onCancel: { dismiss() },
+                    onConfirm: save
+                )
+                LocalSaveErrorLabel(message: saveError)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        ZStack(alignment: .topLeading) {
+                            TextEditor(text: limitedDraft)
+                                .font(Theme.Font.body(size: 16, weight: .medium))
+                                .foregroundStyle(Theme.Color.fg)
+                                .scrollContentBackground(.hidden)
+                                .focused($editorFocused)
+                                .padding(10)
+                                .frame(minHeight: 180)
+                                .background(Theme.Color.bg, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                        .stroke(editorFocused ? Theme.Color.accent : Theme.Color.border2,
+                                                lineWidth: editorFocused ? 1.7 : 1)
+                                        .allowsHitTesting(false)
+                                )
+                                .accessibilityLabel("\(title)输入框")
+                            if draft.isEmpty {
+                                Text(placeholder)
+                                    .font(Theme.Font.body(size: 16, weight: .medium))
+                                    .foregroundStyle(Theme.Color.muted)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 18)
+                                    .allowsHitTesting(false)
+                            }
+                        }
 
-                HStack {
-                    Text("\(draft.count)/\(Self.limit)")
-                        .font(Theme.Font.mono(size: 12, weight: .medium))
-                        .foregroundStyle(draft.count >= Self.limit ? Theme.Color.fg2 : Theme.Color.muted)
-                    Spacer()
-                    Button("清空备注") {
-                        draft = ""
+                        HStack {
+                            Text("\(draft.count)/\(Self.limit)")
+                                .font(Theme.Font.mono(size: 12, weight: .medium))
+                                .foregroundStyle(draft.count >= Self.limit ? Theme.Color.fg2 : Theme.Color.muted)
+                            Spacer()
+                            Button("清空备注") {
+                                draft = ""
+                            }
+                            .font(Theme.Font.body(size: 14, weight: .bold))
+                            .foregroundStyle(hasDraftText ? Theme.Color.fg2 : Theme.Color.muted)
+                            .disabled(!hasDraftText)
+                            .accessibilityHint("清空当前输入，点击完成后保存")
+                        }
                     }
-                    .font(Theme.Font.body(size: 14, weight: .bold))
-                    .foregroundStyle(hasDraftText ? Theme.Color.fg2 : Theme.Color.muted)
-                    .disabled(!hasDraftText)
-                    .accessibilityHint("清空并保存为空备注")
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.top, Theme.Spacing.lg)
+                    .padding(.bottom, Theme.Spacing.lg)
+                }
+                .scrollDismissesKeyboard(.interactively)
+            }
+            .background(Theme.Color.surface.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") { editorFocused = false }
+                        .font(Theme.Font.body(size: 15, weight: .semibold))
                 }
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.top, Theme.Spacing.lg)
-            Spacer(minLength: 0)
         }
-        .background(Theme.Color.surface.ignoresSafeArea())
-        .presentationDetents([.medium, .large])
+        .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
         .presentationDragIndicator(.visible)
-        // 打开即聚焦弹键盘，减少一次点击；键盘工具条提供「完成」收起键。
+        // 打开即聚焦，键盘工具条只收起输入，不提交草稿。
         .onAppear { editorFocused = true }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("完成") { editorFocused = false }
-                    .font(Theme.Font.body(size: 15, weight: .semibold))
-            }
+    }
+
+    private func save() {
+        do {
+            try onSave(Self.normalize(draft))
+            saveError = nil
+            dismiss()
+        } catch {
+            saveError = (error as? PlanEditingError)?.errorDescription ?? "保存失败，当前输入仍保留，请重试"
         }
     }
 }
@@ -2540,10 +2662,11 @@ struct PlanNoteEditorSheet: View {
 struct PlanGroupEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     let title: String
-    let onSave: (String) -> Void
+    let onSave: (String) throws -> Void
     @State private var name: String
+    @State private var saveError: String?
 
-    init(title: String, initialName: String, onSave: @escaping (String) -> Void) {
+    init(title: String, initialName: String, onSave: @escaping (String) throws -> Void) {
         self.title = title
         self.onSave = onSave
         _name = State(initialValue: initialName)
@@ -2560,10 +2683,12 @@ struct PlanGroupEditorSheet: View {
                 onCancel: { dismiss() },
                 onConfirm: save
             )
+            LocalSaveErrorLabel(message: saveError)
 
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                 Text("分组").eyebrowStyle()
                 TextField("", text: $name, prompt: Text("分组名称").foregroundColor(Theme.Color.muted))
+                    .accessibilityLabel("分组名称")
                     .font(Theme.Font.display(size: 22, weight: .bold))
                     .foregroundStyle(Theme.Color.fg)
                     .padding(Theme.Spacing.md)
@@ -2583,14 +2708,18 @@ struct PlanGroupEditorSheet: View {
     private func save() {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
-        onSave(trimmed)
-        dismiss()
+        do {
+            try onSave(trimmed)
+            saveError = nil
+            dismiss()
+        } catch { saveError = "保存失败，当前输入仍保留，请重试" }
     }
 }
 
 /// 新建计划时选择分组：不用系统 Menu/Picker，保持纸感 sheet 与卡片行规范。
 struct PlanGroupPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let selectedGroupId: UUID?
     let groups: [WorkoutPlanGroup]
     let onSelect: (UUID?) -> Void
@@ -2604,20 +2733,21 @@ struct PlanGroupPickerSheet: View {
                 onCancel: { dismiss() }
             )
 
-            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                groupOption(title: "未分组", groupId: nil)
-                ForEach(groups) { group in
-                    groupOption(title: group.name, groupId: group.localId)
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    groupOption(title: "未分组", groupId: nil)
+                    ForEach(groups) { group in
+                        groupOption(title: group.name, groupId: group.localId)
+                    }
                 }
-                Spacer()
+                .padding(Theme.Spacing.lg)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(Theme.Spacing.lg)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Theme.Color.bg)
         }
         .background(Theme.Color.bg.ignoresSafeArea())
         .presentationBackground(Theme.Color.bg)
-        .presentationDetents([.medium, .large])
+        .presentationDetents(dynamicTypeSize >= .xxLarge ? [.large] : [.medium, .large])
     }
 
     private func groupOption(title: String, groupId: UUID?) -> some View {
@@ -2630,7 +2760,7 @@ struct PlanGroupPickerSheet: View {
             HStack(spacing: Theme.Spacing.md) {
                 Image(systemName: selected ? "largecircle.fill.circle" : "circle")
                     .font(.system(size: 18))
-                    .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.muted)
+                    .foregroundStyle(selected ? Theme.Color.action : Theme.Color.muted)
                     .frame(width: 24)
                 Image(systemName: groupId == nil ? "tray" : "folder")
                     .font(.system(size: 16, weight: .semibold))
@@ -2639,12 +2769,15 @@ struct PlanGroupPickerSheet: View {
                 Text(title)
                     .font(Theme.Font.body(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.Color.fg)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
             .cardStyle()
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(selected ? "已选择" : "未选择")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
@@ -2654,6 +2787,8 @@ struct PlanMoveGroupSheet: View {
     let groups: [WorkoutPlanGroup]
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var saveError: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -2663,35 +2798,41 @@ struct PlanMoveGroupSheet: View {
                 background: Theme.Color.bg,
                 onCancel: { dismiss() }
             )
+            LocalSaveErrorLabel(message: saveError)
 
-            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                groupOption(title: "未分组", groupId: nil)
-                ForEach(groups) { group in
-                    groupOption(title: group.name, groupId: group.localId)
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    groupOption(title: "未分组", groupId: nil)
+                    ForEach(groups) { group in
+                        groupOption(title: group.name, groupId: group.localId)
+                    }
                 }
-                Spacer()
+                .padding(Theme.Spacing.lg)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(Theme.Spacing.lg)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Theme.Color.bg)
         }
         .background(Theme.Color.bg.ignoresSafeArea())
         .presentationBackground(Theme.Color.bg)
-        .presentationDetents([.medium, .large])
+        .presentationDetents(dynamicTypeSize >= .xxLarge ? [.large] : [.medium, .large])
     }
 
     private func groupOption(title: String, groupId: UUID?) -> some View {
         let selected = plan.groupId == groupId
         return Button {
-            plan.groupId = groupId
-            plan.markDirty()
-            try? modelContext.save()
-            dismiss()
+            do {
+                try LocalModelCommit.perform(in: modelContext) {
+                    plan.groupId = groupId
+                    plan.markDirty()
+                }
+                saveError = nil
+                dismiss()
+            } catch { saveError = "保存失败，计划仍在原分组，请再次选择重试" }
         } label: {
             HStack(spacing: Theme.Spacing.md) {
                 Image(systemName: selected ? "largecircle.fill.circle" : "circle")
                     .font(.system(size: 18))
-                    .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.muted)
+                    .foregroundStyle(selected ? Theme.Color.action : Theme.Color.muted)
                     .frame(width: 24)
                 Text(title)
                     .font(Theme.Font.body(size: 15, weight: .semibold))
@@ -2701,6 +2842,9 @@ struct PlanMoveGroupSheet: View {
             .cardStyle()
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("移动到\(title)")
+        .accessibilityValue(selected ? "已选择" : "未选择")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
@@ -2732,6 +2876,8 @@ struct PlanItemEditorView: View {
     private static let restPresets = [60, 90, 120]
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var prescriptions: [EditablePlanPrescription]
     @State private var warmupPrescriptions: [EditablePlanPrescription]
     @State private var isWarmupExpanded = false
@@ -2746,10 +2892,11 @@ struct PlanItemEditorView: View {
     @State private var pickingAlternative = false
     @State private var alternativeError: String?
     private let original: PlanItem
-    let onSave: (PlanItem) -> Void
+    let onSave: (PlanItem) throws -> Void
+    @State private var saveError: String?
 
     @MainActor
-    init(item: PlanItem, onSave: @escaping (PlanItem) -> Void) {
+    init(item: PlanItem, onSave: @escaping (PlanItem) throws -> Void) {
         self.original = item
         self.onSave = onSave
         let editable = item.manualSetPrescriptionsForEditing().map(EditablePlanPrescription.init)
@@ -2779,6 +2926,7 @@ struct PlanItemEditorView: View {
                 onCancel: { dismiss() },
                 onConfirm: save
             )
+            LocalSaveErrorLabel(message: saveError)
 
             ScrollViewReader { proxy in
                 ScrollView {
@@ -2796,6 +2944,13 @@ struct PlanItemEditorView: View {
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
                 .background(Theme.Color.bg)
+                .background {
+                    if reduceMotion {
+                        NumericFormViewportObserver {
+                            scrollFocusedField(focusedField, with: proxy)
+                        }
+                    }
+                }
                 .onChange(of: focusedField) { _, field in
                     scrollFocusedField(field, with: proxy)
                 }
@@ -2816,7 +2971,7 @@ struct PlanItemEditorView: View {
         .background(Theme.Color.bg.ignoresSafeArea())
         .presentationBackground(Theme.Color.bg)
         .presentationDetents([.large])
-        .animation(.spring(response: 0.32, dampingFraction: 0.88), value: focusedField)
+        .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.88), value: focusedField)
         .sheet(isPresented: $pickingAlternative) {
             ExercisePickerView(onPick: addAlternative)
         }
@@ -2855,8 +3010,13 @@ struct PlanItemEditorView: View {
         }
         updated.restAfterSetSeconds = restAfterSetSeconds
         updated.note = PlanNoteEditorSheet.normalize(note)
-        onSave(updated)
-        dismiss()
+        do {
+            try onSave(updated)
+            saveError = nil
+            dismiss()
+        } catch {
+            saveError = (error as? PlanEditingError)?.errorDescription ?? "保存失败，当前输入仍保留，请重试"
+        }
     }
 
     private var prescriptionEditor: some View {
@@ -2876,7 +3036,8 @@ struct PlanItemEditorView: View {
                 .font(Theme.Font.l2)
                 .foregroundStyle(Theme.Color.fg)
 
-            HStack(spacing: 6) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6),
+                                     count: dynamicTypeSize >= .xxLarge ? 2 : 5), spacing: 6) {
                 restOptionButton(title: "全局", value: nil, accessibilityLabel: "跟随全局休息")
                 restOptionButton(title: "关", value: 0, accessibilityLabel: "关闭自动休息")
                 ForEach(Self.restPresets, id: \.self) { seconds in
@@ -2891,17 +3052,21 @@ struct PlanItemEditorView: View {
                 }
                 focus(.restSeconds)
             } label: {
-                HStack {
+                let layout = dynamicTypeSize >= .xxLarge
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                    : AnyLayout(HStackLayout())
+                layout {
                     Text("自定义")
-                    Spacer()
+                    if dynamicTypeSize < .xxLarge { Spacer() }
                     Text(restCustomText.isEmpty ? "输入秒数" : "\(restCustomText) 秒")
                         .font(Theme.Font.mono(size: 13, weight: .bold))
-                        .foregroundStyle(isCustomRest ? Theme.Color.accent : Theme.Color.muted)
+                        .foregroundStyle(isCustomRest ? Theme.Color.action : Theme.Color.muted)
                 }
                 .font(Theme.Font.body(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.Color.fg)
                 .padding(.horizontal, 12)
-                .frame(height: 42)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
@@ -2926,8 +3091,9 @@ struct PlanItemEditorView: View {
                 .font(Theme.Font.mono(size: 13, weight: .bold))
                 .foregroundStyle(selected ? .white : Theme.Color.fg2)
                 .frame(maxWidth: .infinity)
-                .frame(height: 42)
-                .background(selected ? Theme.Color.accent : Theme.Color.surface,
+                .padding(.vertical, 10)
+                .frame(minHeight: 44)
+                .background(selected ? Theme.Color.action : Theme.Color.surface,
                             in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
@@ -2958,20 +3124,21 @@ struct PlanItemEditorView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "note.text")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(note.isEmpty ? Theme.Color.muted : Theme.Color.accent)
+                        .foregroundStyle(note.isEmpty ? Theme.Color.muted : Theme.Color.action)
                     Text(note.isEmpty ? "添加备注" : note)
                         .font(Theme.Font.body(size: 13, weight: .semibold))
                         .foregroundStyle(note.isEmpty ? Theme.Color.muted : Theme.Color.fg)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize >= .xxLarge ? nil : 2)
                         .truncationMode(.tail)
                         .multilineTextAlignment(.leading)
                     Spacer(minLength: 0)
                     Image(systemName: note.isEmpty ? "plus.circle" : "square.and.pencil")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(note.isEmpty ? Theme.Color.accent : Theme.Color.muted)
+                        .foregroundStyle(note.isEmpty ? Theme.Color.action : Theme.Color.muted)
                 }
                 .padding(.horizontal, 12)
-                .frame(minHeight: 42)
+                .padding(.vertical, 8)
+                .frame(minHeight: 44)
                 .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
@@ -3044,9 +3211,10 @@ struct PlanItemEditorView: View {
             } label: {
                 Label("添加备选动作", systemImage: "arrow.triangle.branch")
                     .font(Theme.Font.body(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.Color.accent)
+                    .foregroundStyle(Theme.Color.action)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 42)
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 44)
                     .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
@@ -3129,15 +3297,18 @@ struct PlanItemEditorView: View {
         VStack(alignment: .leading, spacing: 10) {
             workingGroupCountRow
             Rectangle().fill(Theme.Color.border).frame(height: 1)
-            HStack(spacing: 8) {
-                valueField(title: "重量（可选）", placeholder: "kg", text: workingWeightBinding.wrappedValue, focused: focusedField == .workingWeight) {
+            let layout = dynamicTypeSize >= .xxLarge
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(spacing: 8))
+            layout {
+                valueField(title: "重量（可选）", placeholder: "kg", text: workingWeightBinding.wrappedValue,
+                           focused: focusedField == .workingWeight, accessibilityLabel: "正式组重量", scrollID: .workingWeight) {
                     focus(.workingWeight)
                 }
-                .id(PlanItemEditorField.workingWeight)
-                valueField(title: "次数", placeholder: "次", text: workingRepsBinding.wrappedValue, focused: focusedField == .workingReps) {
+                valueField(title: "次数", placeholder: "次", text: workingRepsBinding.wrappedValue,
+                           focused: focusedField == .workingReps, accessibilityLabel: "正式组次数", scrollID: .workingReps) {
                     focus(.workingReps)
                 }
-                .id(PlanItemEditorField.workingReps)
             }
         }
         .cardStyle(padding: 12, cornerRadius: Theme.Radius.md)
@@ -3149,7 +3320,10 @@ struct PlanItemEditorView: View {
                 Button {
                     isWarmupExpanded.toggle()
                 } label: {
-                    HStack(spacing: 8) {
+                    let layout = dynamicTypeSize >= .xxLarge
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                        : AnyLayout(HStackLayout(spacing: 8))
+                    layout {
                         Image(systemName: isWarmupExpanded ? "chevron.down" : "chevron.right")
                             .font(.system(size: 11, weight: .bold))
                             .frame(width: 16)
@@ -3160,19 +3334,23 @@ struct PlanItemEditorView: View {
                             .foregroundStyle(Theme.Color.muted)
                     }
                     .foregroundStyle(Theme.Color.fg)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("热身组，\(warmupPrescriptions.count) 组")
+                .accessibilityValue(isWarmupExpanded ? "已展开" : "已收起")
 
                 Button {
                     addWarmupPrescription()
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Theme.Color.accent)
+                        .foregroundStyle(Theme.Color.action)
                         .frame(width: 30, height: 30)
                         .background(Theme.Color.accentSoft, in: Circle())
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("添加热身组")
@@ -3201,11 +3379,11 @@ struct PlanItemEditorView: View {
             Text("组数")
                 .font(Theme.Font.body(size: 13, weight: .bold))
                 .foregroundStyle(Theme.Color.fg)
-                .frame(width: 44, alignment: .leading)
+                .fixedSize()
             valuePill(text: "\(workingGroupCount)",
                       placeholder: "组",
                       focused: focusedField == .workingGroupCount,
-                      width: nil) {
+                      width: nil, accessibilityLabel: "正式组组数") {
                 focus(.workingGroupCount)
             }
             .id(PlanItemEditorField.workingGroupCount)
@@ -3214,39 +3392,44 @@ struct PlanItemEditorView: View {
 
     private func warmupPrescriptionRow(_ prescription: EditablePlanPrescription, index: Int) -> some View {
         let controlTopOffset: CGFloat = 16
-        return HStack(spacing: 8) {
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 8))
+        return layout {
             Text("热\(index + 1)")
                 .font(Theme.Font.mono(size: 11, weight: .bold))
-                .foregroundStyle(Theme.Color.accent)
-                .frame(width: 28, height: 30, alignment: .leading)
-                .padding(.top, controlTopOffset)
+                .foregroundStyle(Theme.Color.action)
+                .fixedSize()
+                .frame(minWidth: 28, minHeight: 44, alignment: .leading)
+                .padding(.top, dynamicTypeSize >= .xxLarge ? 0 : controlTopOffset)
             valueField(title: "重量（可选）",
                        placeholder: "kg",
                        text: prescription.weight,
-                       focused: focusedField == .warmupWeight(prescription.id)) {
+                       focused: focusedField == .warmupWeight(prescription.id),
+                       accessibilityLabel: "热身组 \(index + 1) 重量", scrollID: .warmupWeight(prescription.id)) {
                 focus(.warmupWeight(prescription.id))
             }
-            .id(PlanItemEditorField.warmupWeight(prescription.id))
-            Text("×")
+            if dynamicTypeSize < .xxLarge { Text("×")
                 .font(Theme.Font.mono(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.Color.muted)
-                .padding(.top, controlTopOffset)
+                .padding(.top, controlTopOffset) }
             valueField(title: "次数",
                        placeholder: "次",
                        text: prescription.reps,
-                       focused: focusedField == .warmupReps(prescription.id)) {
+                       focused: focusedField == .warmupReps(prescription.id),
+                       accessibilityLabel: "热身组 \(index + 1) 次数", scrollID: .warmupReps(prescription.id)) {
                 focus(.warmupReps(prescription.id))
             }
-            .id(PlanItemEditorField.warmupReps(prescription.id))
             Button {
                 removeWarmupPrescription(prescription.id)
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.Color.danger)
-                    .frame(width: 28, height: 30)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .padding(.top, controlTopOffset)
+            .padding(.top, dynamicTypeSize >= .xxLarge ? 0 : controlTopOffset)
             .buttonStyle(.plain)
             .accessibilityLabel("删除热身组")
         }
@@ -3269,11 +3452,11 @@ struct PlanItemEditorView: View {
             Text("组数")
                 .font(Theme.Font.body(size: 13, weight: .bold))
                 .foregroundStyle(Theme.Color.fg)
-                .frame(width: 44, alignment: .leading)
+                .fixedSize()
             valuePill(text: dropOuterGroupCountText,
                       placeholder: "组",
                       focused: focusedField == .dropOuterGroupCount,
-                      width: nil) {
+                      width: nil, accessibilityLabel: "递减组组数") {
                 focus(.dropOuterGroupCount)
             }
             .id(PlanItemEditorField.dropOuterGroupCount)
@@ -3289,7 +3472,8 @@ struct PlanItemEditorView: View {
             Text(title)
                 .font(Theme.Font.mono(size: 9, weight: .semibold))
                 .foregroundStyle(Theme.Color.muted)
-            valuePill(text: text, placeholder: "组", focused: focused, width: nil, onTap: onTap)
+            valuePill(text: text, placeholder: "组", focused: focused, width: nil,
+                      accessibilityLabel: title, onTap: onTap)
         }
     }
 
@@ -3303,9 +3487,10 @@ struct PlanItemEditorView: View {
                 Text("添加子组")
                     .font(Theme.Font.body(size: 11.5, weight: .semibold))
             }
-            .foregroundStyle(Theme.Color.accent)
+            .foregroundStyle(Theme.Color.action)
             .frame(maxWidth: .infinity)
-            .frame(height: 32)
+            .padding(.vertical, 8)
+            .frame(minHeight: 44)
             .background(Theme.Color.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
@@ -3317,50 +3502,59 @@ struct PlanItemEditorView: View {
     }
 
     private func dropSegmentRow(_ segment: EditablePlanSegment, index: Int) -> some View {
-        HStack(spacing: 8) {
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 8))
+        return layout {
             Text("\(index + 1)")
                 .font(Theme.Font.mono(size: 11, weight: .bold))
                 .foregroundStyle(Theme.Color.muted)
-                .frame(width: 18, alignment: .leading)
+                .fixedSize()
+                .frame(minWidth: 18, alignment: .leading)
             valueField(title: "重量", placeholder: "kg",
                        text: segment.weight,
-                       focused: focusedField == .dropSegmentWeight(segment.id)) {
+                       focused: focusedField == .dropSegmentWeight(segment.id),
+                       accessibilityLabel: "第 \(index + 1) 子组重量", scrollID: .dropSegmentWeight(segment.id)) {
                 focus(.dropSegmentWeight(segment.id))
             }
-            .id(PlanItemEditorField.dropSegmentWeight(segment.id))
-            Text("×")
+            if dynamicTypeSize < .xxLarge { Text("×")
                 .font(Theme.Font.mono(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.Color.muted)
-                .padding(.top, 16)
+                .padding(.top, 16) }
             valueField(title: "次数", placeholder: "次",
                        text: segment.reps,
-                       focused: focusedField == .dropSegmentReps(segment.id)) {
+                       focused: focusedField == .dropSegmentReps(segment.id),
+                       accessibilityLabel: "第 \(index + 1) 子组次数", scrollID: .dropSegmentReps(segment.id)) {
                 focus(.dropSegmentReps(segment.id))
             }
-            .id(PlanItemEditorField.dropSegmentReps(segment.id))
         }
     }
 
-    private func valueField(title: String, placeholder: String, text: String, focused: Bool, onTap: @escaping () -> Void) -> some View {
+    private func valueField(title: String, placeholder: String, text: String, focused: Bool,
+                            accessibilityLabel: String, scrollID: PlanItemEditorField,
+                            onTap: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(Theme.Font.mono(size: 9, weight: .semibold))
                 .foregroundStyle(Theme.Color.muted)
-            valuePill(text: text, placeholder: placeholder, focused: focused, width: nil, onTap: onTap)
+            valuePill(text: text, placeholder: placeholder, focused: focused, width: nil,
+                      accessibilityLabel: accessibilityLabel, onTap: onTap)
+                .id(scrollID)
         }
     }
 
-    private func valuePill(text: String, placeholder: String, focused: Bool, width: CGFloat?, onTap: @escaping () -> Void) -> some View {
+    private func valuePill(text: String, placeholder: String, focused: Bool, width: CGFloat?,
+                           accessibilityLabel: String, onTap: @escaping () -> Void) -> some View {
         let display = text.isEmpty ? placeholder : text
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
         return Button(action: onTap) {
             Text(display)
                 .font(Theme.Font.number(size: 14, weight: .bold))
-                .foregroundStyle(text.isEmpty ? Theme.Color.muted.opacity(0.45) : Theme.Color.fg)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .foregroundStyle(text.isEmpty ? Theme.Color.muted : Theme.Color.fg)
+                .fixedSize()
                 .frame(maxWidth: .infinity)
-                .frame(height: 30)
+                .padding(.vertical, 8)
+                .frame(minHeight: 44)
                 .padding(.horizontal, 7)
                 .background(Theme.Color.surface, in: shape)
                 .overlay(
@@ -3370,7 +3564,8 @@ struct PlanItemEditorView: View {
                 .frame(width: width)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(display)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(text.isEmpty ? "未填写" : text)
     }
 
     private func addWarmupPrescription() {
@@ -3494,12 +3689,16 @@ struct PlanItemEditorView: View {
 
     private func scrollFocusedField(_ field: PlanItemEditorField?, with proxy: ScrollViewProxy) {
         guard let field else { return }
-        withAnimation(.easeOut(duration: 0.18)) {
+        if reduceMotion {
+            proxy.scrollTo(field, anchor: .center)
+            return
+        }
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
             proxy.scrollTo(field, anchor: .center)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             guard focusedField == field else { return }
-            withAnimation(.easeOut(duration: 0.18)) {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
                 proxy.scrollTo(field, anchor: .center)
             }
         }
@@ -3732,6 +3931,7 @@ struct PlanModeSheet: View {
     @Bindable var plan: WorkoutPlan
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var draftMode: WorkoutPlanMode
     @State private var error: String?
     @State private var confirmingChange = false
@@ -3752,22 +3952,24 @@ struct PlanModeSheet: View {
                 onConfirm: requestConfirm
             )
 
-            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                option(.adaptive)
-                option(.strict)
-                if let error {
-                    Text(error).font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.danger)
-                        .fixedSize(horizontal: false, vertical: true)
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    option(.adaptive)
+                    option(.strict)
+                    if let error {
+                        Text(error).font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.danger)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("localSave.error")
+                    }
                 }
-                Spacer()
+                .padding(Theme.Spacing.lg)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(Theme.Spacing.lg)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Theme.Color.bg)
         }
         .background(Theme.Color.bg.ignoresSafeArea())
         .presentationBackground(Theme.Color.bg)
-        .presentationDetents([.medium, .large])
+        .presentationDetents(dynamicTypeSize >= .xxLarge ? [.large] : [.medium, .large])
         .paperConfirmDialog(
             isPresented: $confirmingChange,
             title: "确认切换计划模式？",
@@ -3784,7 +3986,7 @@ struct PlanModeSheet: View {
             HStack(alignment: .top, spacing: Theme.Spacing.md) {
                 Image(systemName: selected ? "largecircle.fill.circle" : "circle")
                     .font(.system(size: 18))
-                    .foregroundStyle(selected ? Theme.Color.accent : Theme.Color.muted)
+                    .foregroundStyle(selected ? Theme.Color.action : Theme.Color.muted)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(m.title).font(Theme.Font.l2).foregroundStyle(Theme.Color.fg)
                     Text(m.detailText).font(Theme.Font.body(size: 12)).foregroundStyle(Theme.Color.muted)
@@ -3795,6 +3997,9 @@ struct PlanModeSheet: View {
             .cardStyle()
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(m.title)
+        .accessibilityValue(selected ? "已选择" : "未选择")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var confirmMessage: String {
@@ -3825,10 +4030,14 @@ struct PlanModeSheet: View {
     }
 
     private func applyDraftMode() {
-        plan.mode = draftMode
-        plan.markDirty()
-        try? modelContext.save()
-        dismiss()
+        do {
+            try LocalModelCommit.perform(in: modelContext) {
+                plan.mode = draftMode
+                plan.markDirty()
+            }
+            error = nil
+            dismiss()
+        } catch { self.error = "保存失败，当前选择仍保留，请重试" }
     }
 }
 

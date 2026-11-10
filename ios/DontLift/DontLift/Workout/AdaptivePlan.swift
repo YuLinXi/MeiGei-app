@@ -353,60 +353,70 @@ enum PlanWorkoutBuilder {
                         items: [PlanItem],
                         mode: WorkoutPlanMode,
                         lookup: PlanHistoryLookup) -> Workout {
-        let workout = Workout(title: title)
-        var exerciseOrder = 0
+        // 先装配局部集合，插入容器前不读取模型关系，兼容 iOS 17 的 SwiftData。
+        var exercises: [WorkoutExercise] = []
+        var units: [WorkoutUnit] = []
         for item in items.sorted(by: { $0.orderIndex < $1.orderIndex }) {
             if item.isSuperset {
-                appendSuperset(from: item, to: workout, exerciseOrder: &exerciseOrder)
+                appendSuperset(from: item, exercises: &exercises, units: &units)
                 continue
             }
+            let sets = PlanPrefill.sets(for: item, mode: mode, lookup: lookup)
+            let options = item.isDropSet ? [] : item.exerciseOptions
+            // 建立动作反向关系前复制处方，避免 iOS 17 读取未保存的动作归属。
+            let defaultSetSnapshots = options.isEmpty ? nil : sets
+                .sorted { $0.setIndex < $1.setIndex }
+                .map(PlanPrefill.snapshot(from:))
             let exercise = WorkoutExercise(builtinExerciseCode: item.builtinExerciseCode,
                                            customExerciseId: item.customExerciseId,
                                            exerciseName: item.displayExerciseName,
                                            primaryMuscle: item.resolvedPrimaryMuscle,
-                                           orderIndex: exerciseOrder,
-                                           planItemId: item.itemId)
+                                           orderIndex: exercises.count,
+                                           note: item.note,
+                                           planItemId: item.itemId,
+                                           sets: sets)
             // 计划动作备注一次性预填；训练中的后续编辑不回写计划。
-            exercise.note = item.note
-            exercise.sets = PlanPrefill.sets(for: item, mode: mode, lookup: lookup)
-            workout.exercises.append(exercise)
+            exercises.append(exercise)
             if item.isDropSet {
-                workout.appendDropSetUnit(for: exercise, restAfterSetSeconds: item.restAfterSetSeconds)
+                units.append(WorkoutUnit(kind: .dropSet, orderIndex: units.count,
+                                         singleExerciseId: exercise.localId,
+                                         restAfterSetSeconds: item.restAfterSetSeconds))
             } else {
-                let options = item.exerciseOptions
-                workout.appendSingleExerciseUnit(
-                    for: exercise,
+                units.append(WorkoutUnit(
+                    unitId: exercise.localId,
+                    kind: .singleExercise,
+                    orderIndex: units.count,
+                    singleExerciseId: exercise.localId,
                     restAfterSetSeconds: item.restAfterSetSeconds,
                     exerciseOptions: options.isEmpty ? nil : options,
-                    planMode: options.isEmpty ? nil : mode,
-                    defaultSetSnapshots: options.isEmpty ? nil : exercise.sets
-                        .sorted { $0.setIndex < $1.setIndex }
-                        .map(PlanPrefill.snapshot(from:))
-                )
+                    planModeRaw: options.isEmpty ? nil : mode.rawValue,
+                    defaultSetSnapshots: defaultSetSnapshots
+                ))
             }
-            exerciseOrder += 1
         }
+        let workout = Workout(title: title, exercises: exercises)
+        workout.updateTrainingUnits(units)
         return workout
     }
 
-    private static func appendSuperset(from item: PlanItem, to workout: Workout, exerciseOrder: inout Int) {
+    private static func appendSuperset(from item: PlanItem,
+                                       exercises: inout [WorkoutExercise], units: inout [WorkoutUnit]) {
         let members = item.orderedSupersetMembers
         guard members.count == 2 else { return }
-        let first = workoutExercise(from: members[0], orderIndex: exerciseOrder)
+        let first = workoutExercise(from: members[0], orderIndex: exercises.count)
         first.sets = supersetSets(rounds: item.supersetRounds, member: members[0])
-        exerciseOrder += 1
 
-        let second = workoutExercise(from: members[1], orderIndex: exerciseOrder)
+        let second = workoutExercise(from: members[1], orderIndex: exercises.count + 1)
         second.sets = supersetSets(rounds: item.supersetRounds, member: members[1])
-        exerciseOrder += 1
 
-        workout.exercises.append(first)
-        workout.exercises.append(second)
-        workout.appendSupersetUnit(first: first,
-                                   second: second,
-                                   roundCount: item.supersetRounds,
-                                   restAfterRoundSeconds: item.supersetRestAfterRoundSeconds,
-                                   note: item.note)
+        exercises.append(contentsOf: [first, second])
+        units.append(WorkoutUnit(kind: .superset, orderIndex: units.count,
+                                 superset: WorkoutSupersetUnit(
+                                    roundCount: item.supersetRounds,
+                                    restAfterRoundSeconds: item.supersetRestAfterRoundSeconds,
+                                    note: item.note,
+                                    members: [WorkoutSupersetMember(exerciseId: first.localId, orderIndex: 0),
+                                              WorkoutSupersetMember(exerciseId: second.localId, orderIndex: 1)])))
     }
 
     private static func workoutExercise(from member: PlanSupersetMember, orderIndex: Int) -> WorkoutExercise {
@@ -600,6 +610,36 @@ enum PlanWriteback {
         let diffs: [ItemDiff]
         /// 是否产生了实际改动（有 updated/added）；无改动则不回写、不弹回执。
         var changed: Bool { diffs.contains { $0.kind != .kept } }
+    }
+
+    enum UndoError: LocalizedError {
+        case planUnavailable
+        case planChanged
+        var errorDescription: String? {
+            switch self {
+            case .planUnavailable: "原计划已不存在，无法撤销此次更新"
+            case .planChanged: "计划动作已在之后修改，未撤销此次更新，请核对当前计划"
+            }
+        }
+    }
+
+    @MainActor
+    static func undo(_ receipt: PlanWritebackCenter.Receipt, in context: ModelContext,
+                     persist: (ModelContext) throws -> Void = { try LocalModelSave.save($0) }) throws {
+        let id = receipt.planLocalId
+        var descriptor = FetchDescriptor<WorkoutPlan>(predicate: #Predicate { $0.localId == id })
+        descriptor.fetchLimit = 1
+        guard let plan = try context.fetch(descriptor).first, plan.deletedAt == nil else { throw UndoError.planUnavailable }
+        if let appliedItems = receipt.appliedItems, plan.items != appliedItems { throw UndoError.planChanged }
+        try LocalModelCommit.perform(in: context, persist: { context in
+            #if DEBUG
+            try UITestHooks.failFirstSaveIfNeeded("writeback")
+            #endif
+            try persist(context)
+        }) {
+            plan.items = receipt.snapshot
+            plan.markDirty()
+        }
     }
 
     /// 计划项强度摘要：`组×次×重kg`，缺省段省略。
@@ -963,12 +1003,40 @@ final class PlanWritebackCenter {
         let diffs: [PlanWriteback.ItemDiff]
         /// 回写前计划项快照，供撤销还原。
         let snapshot: [PlanItem]
+        let workoutLocalId: UUID?
+        /// 可靠保存后的动作值，重开回执时用于保护之后的计划编辑。
+        let appliedItems: [PlanItem]?
+
+        init(planLocalId: UUID, planName: String, diffs: [PlanWriteback.ItemDiff], snapshot: [PlanItem],
+             workoutLocalId: UUID? = nil, appliedItems: [PlanItem]? = nil) {
+            self.planLocalId = planLocalId
+            self.planName = planName
+            self.diffs = diffs
+            self.snapshot = snapshot
+            self.workoutLocalId = workoutLocalId
+            self.appliedItems = appliedItems
+        }
     }
 
     /// 待展示的回执；非 nil 即弹出回执 sheet。
     var receipt: Receipt?
+    /// 仅保留当前会话最近一次回写，不随即时弹层关闭而丢失，也不持久化到数据库。
+    private var retainedReceipt: Receipt?
 
-    func present(_ r: Receipt) { receipt = r }
+    func present(_ r: Receipt) {
+        receipt = r
+        if r.workoutLocalId != nil { retainedReceipt = r }
+    }
+
+    func retainedReceipt(for workoutId: UUID) -> Receipt? {
+        retainedReceipt?.workoutLocalId == workoutId ? retainedReceipt : nil
+    }
+
+    func didUndo(_ receipt: Receipt) {
+        if retainedReceipt?.workoutLocalId == receipt.workoutLocalId { retainedReceipt = nil }
+    }
+
+    func clearRetainedReceipt() { retainedReceipt = nil }
 }
 
 // MARK: - 回写回执 sheet（task 6.4）
@@ -978,91 +1046,77 @@ struct PlanWritebackSheet: View {
     let receipt: PlanWritebackCenter.Receipt
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @State private var contentHeight: CGFloat = 360
+    @Environment(PlanWritebackCenter.self) private var planWriteback
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var headerHeight: CGFloat = 80
+    @State private var detailsHeight: CGFloat = 240
+    @State private var saveError: String?
 
     private var changed: [PlanWriteback.ItemDiff] { receipt.diffs.filter { $0.kind != .kept } }
     private var kept: [PlanWriteback.ItemDiff] { receipt.diffs.filter { $0.kind == .kept } }
-    private var changedListMaxHeight: CGFloat { min(CGFloat(max(changed.count, 1)) * 72, 320) }
 
     var body: some View {
-        content
-            .background(
-                GeometryReader { proxy in
-                    Color.clear.preference(key: PlanWritebackSheetHeightKey.self, value: proxy.size.height)
-                }
-            )
-            .onPreferenceChange(PlanWritebackSheetHeightKey.self) { height in
-                guard abs(contentHeight - height) > 0.5 else { return }
-                contentHeight = height
+        VStack(spacing: 0) {
+            PaperSheetHeader(title: "已更新计划", cancelTitle: "撤销此次更新", confirmTitle: "好",
+                             showsHandle: true, onCancel: undo, onConfirm: { dismiss() })
+                .background(GeometryReader { proxy in
+                    Color.clear.preference(key: PlanWritebackSheetHeightKey.self, value: ["header": proxy.size.height])
+                })
+            ScrollView {
+                details
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.vertical, Theme.Spacing.md)
+                    .background(GeometryReader { proxy in
+                        Color.clear.preference(key: PlanWritebackSheetHeightKey.self, value: ["details": proxy.size.height])
+                    })
+            }
+            .scrollIndicators(.visible)
+            .accessibilityIdentifier("planWriteback.details")
+        }
+            .onPreferenceChange(PlanWritebackSheetHeightKey.self) { heights in
+                if let height = heights["header"], abs(headerHeight - height) > 0.5 { headerHeight = height }
+                if let height = heights["details"], abs(detailsHeight - height) > 0.5 { detailsHeight = height }
             }
             .frame(maxWidth: .infinity)
             .presentationBackground(Theme.Color.surface)
             .presentationCornerRadius(26)
             .presentationDragIndicator(.hidden)
-            .presentationDetents([.height(contentHeight)])
+            .presentationDetents(dynamicTypeSize >= .xxLarge ? [.large]
+                                 : [.height(headerHeight + min(detailsHeight, 380)), .large])
     }
 
-    private var content: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Capsule().fill(Theme.Color.border2)
-                .frame(width: 38, height: 5)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 10).padding(.bottom, 16)
-
-            Text("已更新计划")
-                .font(Theme.Font.mono(size: 12, weight: .bold))
-                .tracking(0.2 * 12).textCase(.uppercase)
-                .foregroundStyle(Theme.Color.accent)
+    private var details: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             Text("「\(receipt.planName)」")
-                .font(Theme.Font.display(size: 26, weight: .heavy))
+                .font(Theme.Font.body(size: 20, weight: .bold))
                 .foregroundStyle(Theme.Color.fg)
-                .padding(.top, 6)
+                .fixedSize(horizontal: false, vertical: true)
 
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(Array(changed.enumerated()), id: \.element.id) { idx, d in
-                        if idx > 0 { Rectangle().fill(Theme.Color.border).frame(height: 1) }
-                        row(d)
-                    }
+            VStack(spacing: 0) {
+                ForEach(Array(changed.enumerated()), id: \.element.id) { idx, d in
+                    if idx > 0 { Rectangle().fill(Theme.Color.border).frame(height: 1) }
+                    row(d)
                 }
             }
-            .scrollIndicators(.visible)
-            .frame(maxHeight: changedListMaxHeight)
-            .padding(.top, 18)
 
             if !kept.isEmpty {
                 Text("已保留未训练的 \(kept.count) 个动作（需手动删除）")
                     .font(Theme.Font.body(size: 15))
                     .foregroundStyle(Theme.Color.muted)
-                    .padding(.top, 16)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            HStack(spacing: 12) {
-                Button { undo() } label: {
-                    Text("撤销此次更新")
-                        .font(Theme.Font.display(size: 18, weight: .bold))
-                        .foregroundStyle(Theme.Color.fg)
-                        .frame(maxWidth: .infinity).padding(.vertical, 17)
-                        .background(Theme.Color.surface2, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).stroke(Theme.Color.border, lineWidth: 1))
-                }
-                .buttonStyle(PressableButtonStyle())
-                Button { dismiss() } label: {
-                    Text("好")
-                        .font(Theme.Font.display(size: 18, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity).padding(.vertical, 17)
-                        .background(Theme.Color.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-                }
-                .buttonStyle(PressableButtonStyle())
-            }
-            .padding(.top, 20)
+            LocalSaveErrorLabel(message: saveError)
+
         }
-        .padding(.horizontal, 24).padding(.bottom, 30)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder private func row(_ d: PlanWriteback.ItemDiff) -> some View {
-        HStack(spacing: Theme.Spacing.md) {
+        let layout = dynamicTypeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Spacing.sm))
+            : AnyLayout(HStackLayout(spacing: Theme.Spacing.md))
+        layout {
             VStack(alignment: .leading, spacing: 3) {
                 Text(d.exerciseName)
                     .font(Theme.Font.display(size: 19, weight: .bold))
@@ -1075,35 +1129,32 @@ struct PlanWritebackSheet: View {
                     Text(n).font(Theme.Font.body(size: 15)).foregroundStyle(Theme.Color.muted)
                 }
             }
-            Spacer(minLength: 0)
+            .fixedSize(horizontal: false, vertical: true)
+            if dynamicTypeSize < .xxLarge { Spacer(minLength: 0) }
             Text(d.kind == .added ? "新增" : "更新")
                 .font(Theme.Font.mono(size: 12, weight: .bold))
                 .tracking(0.06 * 12).textCase(.uppercase)
-                .foregroundStyle(Theme.Color.accent)
+                .foregroundStyle(Theme.Color.action)
         }
         .padding(.vertical, 14)
     }
 
     /// 撤销：把计划项还原至回写前快照并标脏（重新同步该还原）。
     private func undo() {
-        let planId = receipt.planLocalId
-        var descriptor = FetchDescriptor<WorkoutPlan>(
-            predicate: #Predicate {
-                $0.localId == planId
-            }
-        )
-        descriptor.fetchLimit = 1
-        if let p = (try? modelContext.fetch(descriptor))?.first {
-            p.items = receipt.snapshot
-            p.markDirty()
-            try? modelContext.save()
-        }
-        dismiss()
+        do {
+            try PlanWriteback.undo(receipt, in: modelContext)
+            planWriteback.didUndo(receipt)
+            dismiss()
+        } catch let error as PlanWriteback.UndoError {
+            saveError = error.localizedDescription
+        } catch { saveError = "撤销保存失败，当前计划仍保留，请重试" }
     }
 }
 
 /// 测量回写回执 sheet 内容自然高度，避免短内容落在固定 medium detent 中产生大块上下留白。
 private struct PlanWritebackSheetHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+    static var defaultValue: [String: CGFloat] = [:]
+    static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
 }

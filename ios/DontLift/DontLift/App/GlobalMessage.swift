@@ -19,7 +19,7 @@ enum GlobalMessageStyle: Equatable {
         switch self {
         case .info: return Theme.Color.fg
         case .success: return Theme.Color.ok
-        case .warning: return Theme.Color.accent
+        case .warning: return Theme.Color.action
         case .error: return Theme.Color.danger
         }
     }
@@ -103,7 +103,8 @@ private struct GlobalMessageBanner: View {
             Text(message.text)
                 .font(Theme.Font.body(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
-                .lineLimit(2)
+                // 错误提示完整保留原因与恢复方法，避免放大字号截断。
+                .lineLimit(message.style == .error ? nil : 2)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
         }

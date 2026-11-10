@@ -4,6 +4,7 @@ import SwiftUI
 struct WorkoutRestFloatingControl: View {
     @Environment(RestTimerController.self) private var restTimer
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .largeTitle) private var fabDiameter: CGFloat = 58
     let keyboardLayout: WorkoutKeyboardLayout
     let reordering: Bool
     let canShowWorkoutAddBar: Bool
@@ -17,13 +18,13 @@ struct WorkoutRestFloatingControl: View {
             if restTimer.isRunning && !restTimer.isExpanded && !reordering {
                 GeometryReader { geo in
                     ZStack { restFAB }
-                        .frame(width: Self.fabRadius * 2, height: Self.fabRadius * 2)
+                        .frame(width: fabDiameter, height: fabDiameter)
                         .transaction { transaction in
                             transaction.animation = nil
                         }
                         .position(fabPosition(in: geo))
                         // 键盘顶边变化时平滑被顶上去/落回（与键盘升降同一条弹簧）；拖动由手势驱动，不经此动画。
-                        .animation(.spring(response: 0.45, dampingFraction: 0.92), value: keyboardLayout.keypadTopY)
+                        .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.92), value: keyboardLayout.keypadTopY)
                         .gesture(
                             // 单一手势同时承担拖动与点按：实时位移跟手，松手按位移阈值区分「点按展开 / 落定」。
                             DragGesture(minimumDistance: 0, coordinateSpace: .named("fabSpace"))
@@ -52,11 +53,11 @@ struct WorkoutRestFloatingControl: View {
     // MARK: FAB
 
     /// FAB 半径（直径 58）。
-    private static let fabRadius: CGFloat = 29
+    private var fabRadius: CGFloat { fabDiameter / 2 }
 
     /// 把落点钳制在屏幕内；只在键盘升起时上抬，底部工具栏交给用户自行避让。
     private func clampedFabPoint(_ p: CGPoint, in geo: GeometryProxy) -> CGPoint {
-        let r = Self.fabRadius
+        let r = fabRadius
         let margin: CGFloat = 12
         let minX = margin + r
         let maxX = max(minX, geo.size.width - margin - r)
@@ -72,7 +73,7 @@ struct WorkoutRestFloatingControl: View {
 
     /// FAB 默认位置：右下角；底部添加栏可见时上移避让。
     private func fabDefault(in geo: GeometryProxy) -> CGPoint {
-        let r = Self.fabRadius
+        let r = fabRadius
         let bottomOffset: CGFloat = canShowWorkoutAddBar ? 112 : 28
         return CGPoint(x: geo.size.width - Theme.Spacing.lg - r,
                        y: geo.size.height - bottomOffset - r)
@@ -93,14 +94,16 @@ struct WorkoutRestFloatingControl: View {
                 VStack(spacing: 0) {
                     // 主体：剩余倒计时。
                     Text("\(Int(remaining.rounded()))s")
-                        .font(Theme.Font.number(size: 17, weight: .heavy))
-                        .foregroundStyle(Theme.Color.accent)
+                        .font(Theme.Font.number(size: 17, weight: .heavy, relativeTo: .largeTitle))
+                        .foregroundStyle(Theme.Color.action)
                     // 底部小一号：本次休息总时长 MM:SS。
                     Text(formatMMSS(restTimer.totalDuration))
-                        .font(Theme.Font.number(size: 10, weight: .semibold))
+                        .font(Theme.Font.number(size: 10, weight: .semibold, relativeTo: .largeTitle))
                         .foregroundStyle(Theme.Color.fg2)
                 }
-                .frame(width: 58, height: 58)
+                .frame(width: fabDiameter, height: fabDiameter)
+                .accessibilityElement(children: .ignore)
+                .accessibilityValue("剩余 \(Int(remaining.rounded())) 秒，总时长 \(Int(restTimer.totalDuration.rounded())) 秒")
                 .background(Circle().fill(Theme.Color.surface))
                 .overlay(Circle().stroke(Theme.Color.accent, lineWidth: 2))
                 // box-shadow: 朱砂红辉光 22% + 中性 sh-md。

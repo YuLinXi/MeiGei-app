@@ -26,9 +26,7 @@ final class BadgeWallStore {
     @ObservationIgnored private let readHistory: @Sendable (ModelContainer) async throws -> [BadgeWorkoutSnapshot]
 
     init(readHistory: @escaping @Sendable (ModelContainer) async throws -> [BadgeWorkoutSnapshot] = { container in
-        try await Task.detached(priority: .utility) {
-            try await BadgeHistoryReader(modelContainer: container).readWorkouts()
-        }.value
+        try await BadgeHistoryReader(modelContainer: container).readWorkouts()
     }) {
         self.readHistory = readHistory
     }

@@ -13,6 +13,14 @@ import SwiftData
 
 @MainActor
 struct AdaptivePlanTests {
+    private let container: ModelContainer
+    private let context: ModelContext
+
+    init() {
+        let container = AppModelContainer.make(inMemory: true)
+        self.container = container
+        self.context = ModelContext(container)
+    }
 
     // MARK: 测试数据工具
 
@@ -28,6 +36,8 @@ struct AdaptivePlanTests {
             WorkoutSet(setIndex: idx, weightKg: s.w, reps: s.r, completed: s.done, setType: s.type)
         }
         w.exercises = [ex]
+        context.insert(w)
+        context.processPendingChanges()
         return w
     }
 
@@ -60,6 +70,8 @@ struct AdaptivePlanTests {
                                                      items: [single, drop, followsGlobal],
                                                      mode: mode,
                                                      lookup: .empty)
+            context.insert(workout)
+            context.processPendingChanges()
             let units = workout.trainingUnits.sorted { $0.orderIndex < $1.orderIndex }
             #expect(units.map(\.restAfterSetSeconds) == [120, 0, nil])
         }
@@ -86,6 +98,8 @@ struct AdaptivePlanTests {
                                                      items: [single, drop, superset, plain],
                                                      mode: mode,
                                                      lookup: .empty)
+            context.insert(workout)
+            context.processPendingChanges()
             let exercises = workout.exercises.sorted { $0.orderIndex < $1.orderIndex }
             #expect(exercises.map(\.note) == ["顶峰收缩 1 秒", "控制离心", nil, nil, nil])
             let supersetUnit = workout.trainingUnits.first { $0.kind == .superset }
@@ -106,6 +120,8 @@ struct AdaptivePlanTests {
         // 从计划开始训练（带入备注），训练中修改备注后完成一组正式组
         let workout = PlanWorkoutBuilder.workout(title: "训练", items: [single, supersetWithNote],
                                                  mode: .adaptive, lookup: .empty)
+        context.insert(workout)
+        context.processPendingChanges()
         let bench = workout.exercises.first { $0.exerciseName == "卧推" }!
         bench.note = "训练中改的备注"
         bench.sets[0].completed = true
@@ -440,6 +456,8 @@ struct AdaptivePlanTests {
                                        planItemId: planItemId)
         exercise.sets = [dropSet(segments: [(82.5, 7), (62.5, 6)])]
         workout.exercises = [exercise]
+        context.insert(workout)
+        context.processPendingChanges()
         let item = PlanItem.dropSet(
             itemId: planItemId,
             orderIndex: 0,
@@ -490,6 +508,8 @@ struct AdaptivePlanTests {
         let history = [Workout(startedAt: Date(timeIntervalSince1970: 1000),
                                endedAt: Date(timeIntervalSince1970: 4600),
                                exercises: [first, second])]
+        history.forEach { context.insert($0) }
+        context.processPendingChanges()
         let secondItem = PlanItem(itemId: secondId, builtinExerciseCode: key, exerciseName: "卧推",
                                   orderIndex: 1, suggestedSets: 1, suggestedReps: 8, suggestedWeightKg: 60)
 
@@ -595,6 +615,8 @@ struct AdaptivePlanTests {
         let exercise = WorkoutExercise(exerciseName: "卧推", orderIndex: 0, planItemId: itemId)
         exercise.sets = [dropSet(segments: [(80, 8)])]
         workout.exercises = [exercise]
+        context.insert(workout)
+        context.processPendingChanges()
         workout.appendDropSetUnit(for: exercise, restAfterSetSeconds: 120)
 
         let result = PlanWriteback.merge(planItems: [item], workout: workout)
@@ -710,6 +732,8 @@ struct AdaptivePlanTests {
             dropSet(setIndex: 1, segments: [(75, 8), (55, 6)])
         ]
         workout.exercises = [exercise]
+        context.insert(workout)
+        context.processPendingChanges()
 
         let updated = PlanWriteback.merge(planItems: plan, workout: workout).newItems.first!
 
@@ -744,6 +768,8 @@ struct AdaptivePlanTests {
             dropSet(setIndex: 1, segments: [(80, 8), (60, 6)])
         ]
         workout.exercises = [exercise]
+        context.insert(workout)
+        context.processPendingChanges()
 
         let updated = PlanWriteback.merge(planItems: plan, workout: workout).newItems.first!
 

@@ -770,7 +770,7 @@ enum BadgeEngine {
         }
 
         if rebuilding || !createdGrants.isEmpty {
-            do { try context.save() } catch {
+            do { try LocalModelSave.save(context) } catch {
                 context.rollback()
                 return []
             }
