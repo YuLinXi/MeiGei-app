@@ -2,10 +2,10 @@
 
 ## 版本、基线与候选范围
 
-- 日期：2026-11-10（上海时区）。状态：**Apple 协议页面告警已解除，build 9 准备中，尚未归档、上传或可安装。**
+- 日期：2026-11-10（上海时区）。状态：**build 9 已于 13:58:46 成功上传，Apple 处理完成；现有内部测试组为“正在测试”、可安装。外部 Beta 审核已批准，“朋友内侧”已关联，但尚未执行“通知测试员”启动外测。真机验收、main 与 tag 待完成。**
 - `MARKETING_VERSION=1.1`、`CURRENT_PROJECT_VERSION=9`，App、widget、单元测试和 UI 测试的 Debug／Release 共 8 处一致。
 - 已发布基线为 `v1.1-b5`（`ea6d1c0fc05e70c3227a76202d7223e1062919c1`）。build 6 用户确认已占用，build 7／8 实际上传均被合同门禁拒绝，不复用；失败候选不是发布基线。
-- 分支沿用 `feature/v1.1-b6`，业务实现冻结于 `b9333e5`；build 9 只递增版本并维护发版记录。已推送的 build 8 准备与记录为 `3683cff`、`3af8f54`。
+- 分支沿用 `feature/v1.1-b6`，业务实现冻结于 `b9333e5`；build 9 只递增版本并维护发版记录。build 9 候选 `5793709` 已提交并推送；build 8 准备与记录为 `3683cff`、`3af8f54`。
 - 保留且排除既有未跟踪 `.codex/hooks.json`。main 与发布 tag 均未变更。
 - [功能介绍及 TestFlight 测试内容](release-1.1-b9-feature-intro.md) · [用户公告](release-1.1-b9-user-announcement.md) · [build 8 上传失败记录](release-1.1-b8-checklist.md)
 
@@ -25,10 +25,12 @@
 - [x] App 内关于页实际打开两张法律页面，App Store Connect 隐私政策 URL 正确；登录页复用已有可达 UI 证据与相同 URL 引用核对，本轮未登出日常账号重复操作。
 - [x] 已恢复模拟器原 1.1／3 安装包，日常数据库和 wal／shm 哈希与检查前一致；复用单个现有设备，无新增、重置或清空。
 - [x] build 9 的 8 处版本、三份文档、本地链接与 `git diff --check` 复核通过。
-- [ ] 提交、推送候选，冻结归档输入。
-- [ ] 独立完成 build 9 Release 设备 Archive，核对主 App／widget 的 1.1／9、arm64、团队 `D566UZ8QG4`、App Group `group.com.yulinxi.app.DontLift`、签名及 profile。
+- [x] 候选 `5793709` 已提交并推送，归档输入冻结。
+- [x] 13:54:56 独立完成 build 9 Release 设备 Archive；主 App／widget 均为 1.1／9、arm64、团队 `D566UZ8QG4`、App Group `group.com.yulinxi.app.DontLift`，`codesign --verify --deep --strict` 均通过，两个开发 profile 均有效至 2027-09-06。
 
 仅版本元数据变化不重复运行已有效验证的业务测试；设备 Archive 本身包含编译。归档的 Apple Development 签名与 Store 分发重签、可安装、真机回归分别记录。
+
+归档 `/Users/yu/Library/Developer/Xcode/Archives/2026-11-10/DontLift-1.1-b9.xcarchive`；编译日志 `/tmp/dontlift-release-b9-archive-20261110.log`；13:55:18 独立核验记录 `/tmp/dontlift-release-b9-archive-verified-20261110.json`。
 
 ## 后端与生产状态
 
@@ -44,14 +46,18 @@
 
 顺序：候选冻结推送 → build 9 设备 Archive／分发签名 → 实际上传 → `VALID`／可安装 → 真机回归 → main／tag。
 
-- [ ] 使用标准 Xcode 分发或 `xcodebuild -exportArchive`，App Store Connect Upload、自动管理签名、固定 1.1／9，不自动改 build。
-- [ ] 上传成功，记录时间、回执和构建身份。若失败，保留真实错误并使用新的未占用 build，不把尝试记为上传成功。
-- [ ] App Store Connect build 9 处理完成且为 `VALID`、TestFlight 可安装；外部测试审核单独记录。
-- [ ] 填写[测试内容](release-1.1-b9-feature-intro.md#testflight测试内容文案)，核对既有“内部测试”和“朋友内侧”群组，不默认外部审核已通过。
+- [x] 使用 `xcodebuild -exportArchive` 完成 App Store Connect Upload、自动分发签名、固定 1.1／9，不自动改 build。
+- [x] 13:58:46 收到 `Upload succeeded`／`EXPORT SUCCEEDED`，命令退出 0。归档分发记录确认 App ID `6779657886`、团队 `D566UZ8QG4`、build 9；分发签名证书为 Apple Distribution: Linxi Yu (D566UZ8QG4)，分发记录 ID `3af6ecc3-8de4-4224-b490-74cdd0c44fc3`。
+- [x] App Store Connect 处理门禁通过、TestFlight 内部测试可安装：上传列表为“完成”，内部群组的 1.1 (9) 行为“正在测试”、90 天后过期。这里记录实际 UI 可测试状态，未把上传命令成功直接当作处理完成或真机安装结果。
+- [x] 简体中文[测试内容](release-1.1-b9-feature-intro.md#testflight测试内容文案)共 230 字符已保存，刷新后逐字与文档一致。
+- [x] 已关联现有“内部测试”（1 人）和“朋友内侧”（外部 3 人）；没有创建群组或更改成员。外部“提交以供审核”已执行，列表随后为“已批准”。
+- [ ] 明确指示后执行“通知测试员”，向现有外部 3 人发送 TestFlight 通知并启动外测。此次提交关闭了“自动通知测试员”，尚未点击手动通知；不把“已批准”记为外部正在测试。Apple 对该步骤的说明见[外部测试通知](https://developer.apple.com/help/app-store-connect/test-a-beta-version/invite-external-testers#notify-external-testers-after-your-build-is-approved)。
+
+上传日志 `/tmp/dontlift-release-b9-upload-20261110.log`、分发日志 `/var/folders/yx/jf84mf0d6gd0hsk5wpftv2rm0000gn/T/DontLift_2026-11-10_13-55-19.225.xcdistributionlogs`、真实回执 `/tmp/dontlift-release-b9-upload-result-20261110.json`、UI 状态记录 `/tmp/dontlift-release-b9-testflight-status-20261110.json`。既有内部群组采用手动分发，本次已显式加入 build 9；[构建详情](https://appstoreconnect.apple.com/teams/0df9b076-827a-40cb-8361-50de912bb16d/apps/6779657886/testflight/ios/3af6ecc3-8de4-4224-b490-74cdd0c44fc3)。
 
 ## 真机回归
 
-此前三台已配对真机均不可连接，本轮尚未执行真机验收。可安装后记录具体设备、系统、时间、入口与结论：
+本轮重新查询三台已配对真机（iOS 18.2.1、26.4.2、26.5），tunnelState 均为 unavailable，未执行真机安装或验收；记录 `/tmp/dontlift-release-b9-devices-20261110.json`。内部测试现已可安装，仍需用户在真机验收并记录具体设备、系统、时间、入口与结论：
 
 | 路径 | 核对内容 | 状态 |
 | --- | --- | --- |
@@ -64,11 +70,11 @@
 
 ## 合并、Tag、回滚与收口
 
-- [ ] 必要线上变更与生产健康核对完成，候选及三份发布文档已推送。
+- [x] 必要线上变更与生产健康核对完成，候选及三份发布文档已推送，最新上传状态随本次记录回填。
 - [ ] 对应 build 为 `VALID`、可安装，真机主流程通过、阻塞问题清零并由用户确认。
 - [ ] 满足条件后合并 main；冲突解决或新差异需补验受影响范围，代码相同则复用结果。
 - [ ] 创建并推送 annotated tag `v1.1-b9`，回填完成时间。**当前不要打 tag。**
 
 回滚：停止问题候选分发，保留已确认可用历史版本，修复使用新 build；不清理用户训练库，无迁移则不降库。法律页可从已保存备份恢复，恢复旧正文后对应文案门禁重新待验。
 
-当前 build 9 尚未有 Archive、分发重签、上传、`VALID`、真机、main 合并或 tag 结果；不套用其他 build 的产物结论。
+当前 build 9 的 Archive、归档签名核验、Apple Distribution 分发和实际上传成功，Apple 处理完成、内部测试可安装、外部审核已批准；外部通知／启动、真机、main 合并与 tag 未完成。上传参数 `/tmp/dontlift-release-b9-ExportOptions-20261110.plist` 固定 App Store Connect upload、自动签名且不自动更改 build。
