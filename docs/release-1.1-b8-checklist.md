@@ -2,11 +2,11 @@
 
 ## 版本、基线与候选范围
 
-- 准备日期：2026-11-10（上海时区）。状态：**build 7 因 Apple 必需合同未完成而上传失败，现准备 build 8；尚未 Archive／上传，不可安装。**
+- 准备日期：2026-11-10（上海时区）。状态：**build 8 的设备 Archive 与归档签名校验已通过，候选已推送；尚未上传、不可安装。用户已反馈接受新版协议，但刷新 Apple 账户页仍显示待接受，合同门禁尚未独立确认解除。**
 - `MARKETING_VERSION=1.1`，`CURRENT_PROJECT_VERSION=8`；App、widget、单元测试和 UI 测试的 Debug／Release 共 8 处配置一致。
 - build 6 按用户确认已占用；build 7 虽完成归档与分发重签，实际上传返回 ContentDelivery 403，按发版流程不复用。失败事实及日志见 [build 7 记录](release-1.1-b7-checklist.md)。
 - 已发布基线仍为 `v1.1-b5`（`ea6d1c0fc05e70c3227a76202d7223e1062919c1`）；不把失败的 build 7 作为已发布基线。
-- 分支沿用 `feature/v1.1-b6`。业务源码为 `b9333e5`，build 7 版本准备提交 `df70ed8`、状态记录 `039ac7b` 已推送；build 8 只递增版本并维护发布文档，业务代码及资源不变。
+- 分支沿用 `feature/v1.1-b6`。业务源码为 `b9333e5`，build 7 准备提交 `df70ed8`、记录 `039ac7b` 以及 build 8 准备提交 `3683cff` 均已推送；build 8 只递增版本并维护发布文档，业务代码及资源不变。
 - App Store Connect 的构建和全部状态上传列表已独立查看，当前未见 build 8。上传前若出现并发占用，使用新的更高 build。
 - `.codex/hooks.json` 继续保留且排除，不自动暂存；main 与 tag 尚未变更。
 - [功能介绍与 TestFlight 测试内容](release-1.1-b8-feature-intro.md) · [用户公告](release-1.1-b8-user-announcement.md)
@@ -26,8 +26,10 @@
 - [x] App 内关于页实际打开隐私政策和独立服务条款，App Store Connect 隐私政策 URL 正确。登录页复用已有按钮可达 UI 证据及相同 URL／SafariView 静态引用核对，本轮未登出日常账号重复操作。
 - [x] 已停止隔离候选，恢复原模拟器 1.1／3 安装包；日常 `default.store` 及 wal／shm 三个文件哈希与检查前一致。复用同一现存设备，没有新增运行时、设备或清空数据。
 - [x] build 8 版本／文档差异、内部链接和 `git diff --check` 最终复核通过。
-- [ ] build 8 候选提交并推送，冻结归档输入。
-- [ ] build 8 Release 设备 Archive，复核主 App／widget 的 1.1／8、arm64、团队、App Group、签名及 profile。
+- [x] build 8 候选 `3683cff` 已提交并推送，冻结归档输入。
+- [x] 11:32:07 build 8 Release 设备 Archive 成功；主 App／widget 均为 1.1／8、arm64、D566UZ8QG4，App Group 一致，`codesign --verify --deep --strict` 均通过，两个开发 profile 到期于 2027-09-06。
+
+归档：`/Users/yu/Library/Developer/Xcode/Archives/2026-11-10/DontLift-1.1-b8.xcarchive`；日志：`/tmp/dontlift-release-b8-archive-20261110.log`；验证记录：`/tmp/dontlift-release-b8-archive-verified-20261110.json`。这是 Apple Development 归档签名，后续仍须以 Apple Distribution 重签并实际上传，不能把它当作 Store 分发签名或 TestFlight 可用。
 
 版本元数据变化不重复运行业务／UI 测试；设备 Archive 本身包含编译。签名 Archive 不等于真机运行验收。
 
@@ -46,8 +48,8 @@
 
 发布顺序：build 8 冻结推送 → 完成设备 Archive／分发准备 → 账户持有人接受新版 Apple Developer Program 许可协议 → 验证合同门禁解除 → 上传 → `VALID`／可安装 → 真机回归 → main／tag。
 
-- [ ] 账户持有人自行阅读并接受 Apple Developer 账号页的新许可协议。页面已打开到协议接受步骤；没有代用户勾选或点击“同意”。
-- [ ] 确认账户的合同告警解除，Xcode／App Store Connect 对应权限恢复。
+- [ ] 账户持有人在 Apple Developer 账号页接受新许可协议。用户已回复“已接受新版协议，继续上传”，但 11:39 复核同一团队 `D566UZ8QG4`：App Store Connect 的本人资料确认具有“账户持有人、管理”职能，Apple Developer 刷新后仍有协议告警，2026-10-29 版协议的“同意”按钮仍可用。当前证据不支持权限不足，也尚不能确认接受已在服务端生效；没有代用户点击“同意”或提交协议，已准备把这一具体页面交由用户核对。
+- [ ] 独立确认合同告警解除，Xcode／App Store Connect 对应权限恢复；确认前不重复上传 build 8。
 - [ ] 使用标准 Xcode 分发流程或 `xcodebuild -exportArchive`，目标为 App Store Connect Upload，保留 1.1／8，不自动改成其他 build；使用现有团队自动管理分发签名。
 - [ ] 上传成功并记录准确时间、回执及构建身份。若失败，不将尝试记为提交成功，并按流程改用新的未占用 build。
 - [ ] App Store Connect 中 build 8 为 `VALID` 且 TestFlight 可安装；处理完成、可安装及外部测试审核是不同状态，按实际结果回填。
@@ -75,4 +77,4 @@
 
 回滚：停止分发有阻塞问题的候选，保留已确认可用历史版本，修复后用新 build；不清理用户训练库。本次没有数据库迁移，不执行降库。法律页面可用已保存备份恢复，但旧文案恢复后对应正文门禁重新变为未完成。
 
-当前没有 build 8 的 Archive、成功上传、`VALID`、真机、main 合并或 tag 结果，不把 build 7 的签名成功套到 build 8。
+当前只有 build 8 的设备 Archive／归档签名验证完成，尚无成功上传、`VALID`、真机、main 合并或 tag 结果。上传参数已按当前 `xcodebuild -help` 准备在 `/tmp/dontlift-release-b8-ExportOptions-20261110.plist`，目标为 App Store Connect upload、自动分发签名且不自动更改 build；协议门禁确认解除后再执行。

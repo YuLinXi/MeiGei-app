@@ -5,7 +5,7 @@
 - 版本：1.1，build 8。build 6 已占用；build 7 实际上传被 Apple 必需合同门禁以 403 拒绝，按流程递增至 8，不复用失败上传号。
 - 基线：已完成发布并打 tag 的 `v1.1-b5`（`ea6d1c0`）。业务实现与已验证的 build 7 候选相同，build 8 只改版本元数据与发布记录。
 - 后端：客户端不依赖应用服务更新，无数据库迁移；隐私／条款静态页面已发布，公网正文及 App 内关于页打开结果已核对。
-- iOS：build 8 设备 Archive／上传待执行，Apple 新版许可协议仍待账户持有人接受；尚未可安装。签名或归档成功不会直接记作 TestFlight 可用。
+- iOS：build 8 的设备 Archive 与归档签名验证已通过，上传待执行，尚未可安装。用户已反馈接受新版协议；11:39 确认当前账号具有账户持有人职能，但同一团队的 2026-10-29 版协议仍显示可点击“同意”，合同门禁尚未独立确认解除，需在该具体页面核对完成结果。
 
 [检查清单](release-1.1-b8-checklist.md) · [用户公告](release-1.1-b8-user-announcement.md) · [build 7 失败与验证记录](release-1.1-b7-checklist.md)
 
@@ -47,7 +47,7 @@
 - 当前 iOS 26.5 正常进程两条 HID 返回通过，用户确认手动核对通过；App 内关于页两张法律页面实际打开，App Store Connect 隐私政策 URL 正确。登录页本轮未登出日常账号重复操作。
 - 已恢复模拟器原安装包，日常数据库及 wal／shm 三个文件哈希保持一致；没有新建设备或运行时。
 - 法律静态页于 2026-11-10 10:41:47 发布后正文校验一致，health 连续 3 次 UP，Flyway V22 成功，GET 开发入口 404、未登录 Team 401，三个生产容器未重启。
-- build 7 的 Archive 和分发重签成功，但上传被合同门禁拒绝。build 8 的 Archive／签名验证仍待执行，不能直接套用 build 7 产物结论。
+- build 7 的 Archive 和分发重签成功，但上传被合同门禁拒绝。build 8 已于 11:32:07 独立完成 Release arm64 Archive，主 App／widget 均为 1.1／8，归档签名校验、团队、App Group 和 profile 均通过；分发重签与上传仍待执行，不把归档成功记为 TestFlight 可用。
 - 真实 Apple 登录、真实后端／多设备端到端、VoiceOver、锁屏、通知、HealthKit、Live Activity、widget 与真机验收仍按 checklist 待验，已有编译 warning 也未声称清零。
 
 ## TestFlight 回归重点
