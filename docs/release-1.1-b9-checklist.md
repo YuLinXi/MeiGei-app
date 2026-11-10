@@ -2,11 +2,11 @@
 
 ## 版本、基线与候选范围
 
-- 日期：2026-11-10（上海时区）。状态：**build 9 已于 13:58:46 成功上传并完成 Apple 处理，内部测试可安装；用户已明确确认验收通过并授权分支、tag 处理，正在执行 main／tag 收口。外部 Beta 已批准、群组已关联，通知／启动外测仍待明确指示。**
+- 日期：2026-11-10（上海时区）。状态：**build 9 上传、Apple 处理、用户验收与 Git 发布收口已完成；main 已合并推送，annotated tag `v1.1-b9` 已推送。内部测试可安装；外部 Beta 已批准、群组已关联，通知／启动外测仍未执行。**
 - `MARKETING_VERSION=1.1`、`CURRENT_PROJECT_VERSION=9`，App、widget、单元测试和 UI 测试的 Debug／Release 共 8 处一致。
 - 本次功能差异基线为上一已发布版本 `v1.1-b5`（`ea6d1c0fc05e70c3227a76202d7223e1062919c1`）。build 6 用户确认已占用，build 7／8 实际上传均被合同门禁拒绝，不复用；失败候选不是发布基线。
-- 分支沿用 `feature/v1.1-b6`，业务实现冻结于 `b9333e5`；build 9 只递增版本并维护发版记录。build 9 候选 `5793709` 已提交并推送；build 8 准备与记录为 `3683cff`、`3af8f54`。
-- 保留且排除既有未跟踪 `.codex/hooks.json`。main 与发布 tag 均未变更。
+- 分支沿用 `feature/v1.1-b6`，业务实现冻结于 `b9333e5`；build 9 归档输入为 `5793709`，之后只有发布文档变化。验收记录 `a1e1735` 已推送，发布合并提交为 `019ca8a`，归档业务代码没有漂移。
+- 保留且排除既有未跟踪 `.codex/hooks.json`；源分支及工作区保留。main 与 tag 的实际执行和远端核验见收口记录。
 - [功能介绍及 TestFlight 测试内容](release-1.1-b9-feature-intro.md) · [用户公告](release-1.1-b9-user-announcement.md) · [build 8 上传失败记录](release-1.1-b8-checklist.md)
 
 ## 功能范围
@@ -72,9 +72,12 @@
 
 - [x] 必要线上变更与生产健康核对完成，候选及三份发布文档已推送，最新上传状态随本次记录回填。
 - [x] build 9 处理完成、内部可安装；用户确认整体验收通过，未报告阻塞问题，并明确授权继续处理分支与 tag。
-- [ ] 满足条件后合并 main；冲突解决或新差异需补验受影响范围，代码相同则复用结果。
-- [ ] 创建并推送 annotated tag `v1.1-b9`，回填完成时间。**当前不要打 tag。**
+- [x] 14:21:32 使用 `--no-ff` 将已验收候选 `a1e1735` 合并到 main，发布提交 `019ca8a404e3dcc81b7dc5e1fdf15bfd8810b4a0`。合并树与候选完整一致，没有冲突解决或新增业务代码，复用已有验证结果。
+- [x] 14:21:51 创建 annotated tag `v1.1-b9`，指向发布合并提交 `019ca8a`，tag 对象为 `2ad7312490f63f8588d966c71ab1f92538c6baca`；main 与 tag 已在同一次 atomic push 中成功推送。
+- [x] 14:23:01 对远端引用独立核验：main 为发布合并提交，tag 对象与本地一致，tag 解引用仍为 `019ca8a`。本次后续收口提交只更新发布文档，发布 tag 固定在该合并提交。
+
+Git 收口证据：`/tmp/dontlift-release-b9-git-close-20261110.json`。最后记录本次 main／tag 状态后，保持源分支与 main 同步，工作区中的未跟踪文件不纳入提交。
 
 回滚：停止问题候选分发，保留已确认可用历史版本，修复使用新 build；不清理用户训练库，无迁移则不降库。法律页可从已保存备份恢复，恢复旧正文后对应文案门禁重新待验。
 
-当前 build 9 的 Archive、归档签名核验、Apple Distribution 分发、实际上传与 Apple 处理成功，内部测试可安装、外部审核已批准，用户已确认整体验收通过；main 合并与 tag 正在执行，外部通知／启动单独保留为未执行。上传参数 `/tmp/dontlift-release-b9-ExportOptions-20261110.plist` 固定 App Store Connect upload、自动签名且不自动更改 build。
+当前 build 9 的 Archive、归档签名核验、Apple Distribution 分发、实际上传与 Apple 处理成功，内部测试可安装、外部审核已批准，用户已确认整体验收通过；main 合并与 tag 创建、推送和远端核验完成。外部通知／启动仍为独立未执行事项，不把 TestFlight Git 收口表述为 App Store 正式上架。上传参数 `/tmp/dontlift-release-b9-ExportOptions-20261110.plist` 固定 App Store Connect upload、自动签名且不自动更改 build。
